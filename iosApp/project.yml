@@ -1,0 +1,86 @@
+name: Mode
+options:
+  bundleIdPrefix: com.piyush.mode
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  SWIFT_VERSION: "5.0"
+  CODE_SIGN_STYLE: Automatic
+  DEVELOPMENT_TEAM: BH9TWW5HPR
+  MARKETING_VERSION: "0.1"
+  CURRENT_PROJECT_VERSION: "1"
+targets:
+  Mode:
+    type: application
+    platform: iOS
+    sources:
+      - path: Mode
+    info:
+      # Keys Xcode's generated plist has no build setting for; merged with it.
+      path: Mode/Info.plist
+      properties:
+        # Compose refuses to start without it on 120 Hz iPhones.
+        CADisableMinimumFrameDurationOnPhone: true
+    preBuildScripts:
+      # Builds the Kotlin side (ModeKit.framework) for the SDK and configuration Xcode is building.
+      - name: Build ModeKit
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "YES" = "$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED" ]; then
+            echo "Skipping Gradle: OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES"
+            exit 0
+          fi
+          cd "$SRCROOT/.."
+          ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode
+      PRODUCT_NAME: Mode
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_CFBundleDisplayName: Mode
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+      TARGETED_DEVICE_FAMILY: "1"
+      SUPPORTS_MACCATALYST: NO
+      ENABLE_USER_SCRIPT_SANDBOXING: NO
+      FRAMEWORK_SEARCH_PATHS:
+        - "$(inherited)"
+        - "$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+  # The engine: an XCUITest bundle, the only way iOS lets code read and tap
+  # other apps. Phase 1 grows it into the long-running local server.
+  ModeEngine:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ModeEngine
+    dependencies:
+      - target: Mode
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.engine
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_TARGET_NAME: Mode
+      TARGETED_DEVICE_FAMILY: "1"
+  # Experiment: the same engine, hosted inside Mode.app instead of a separate
+  # runner app. If XCUITest works from here, Mode ships as one app.
+  ModeEngineHosted:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ModeEngine
+    dependencies:
+      - target: Mode
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.enginehosted
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Mode.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Mode"
+      BUNDLE_LOADER: "$(TEST_HOST)"
+      TARGETED_DEVICE_FAMILY: "1"
+schemes:
+  Mode:
+    build:
+      targets:
+        Mode: all
+    test:
+      targets:
+        - ModeEngine
+        - ModeEngineHosted

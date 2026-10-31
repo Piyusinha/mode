@@ -1,0 +1,21 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Xcode
+iosApp/Mode.xcodeproj/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# Python
+__pycache__/
+
+# Native (Rust) builds
+.build/
+native/target/
+native/out/
