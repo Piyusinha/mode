@@ -112,6 +112,13 @@ class PhoneHolder(private val link: PhoneLink, private val log: (String) -> Unit
         }
     }
 
+    /** Closes the session right now, without suspending (Mode is being ended). */
+    fun closeNow() {
+        (phone as? AutoCloseable)?.let { runCatching { it.close() } }
+        phone = null
+        AppLog.log("phone", "closed (Mode is ending)")
+    }
+
     /** Drops the current connection and connects again now. */
     suspend fun reconnect(): PhoneBackend {
         lock.withLock {

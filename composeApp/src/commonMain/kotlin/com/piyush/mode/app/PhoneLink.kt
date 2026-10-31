@@ -25,6 +25,9 @@ interface PhoneLink {
 
     /** Calls [action] whenever Mode goes to the background (the user left it). */
     fun onAppBackground(action: () -> Unit)
+
+    /** Calls [action] when iOS is about to end Mode; it must finish quickly and not suspend. */
+    fun onAppTerminate(action: () -> Unit)
 }
 
 class PhoneConnection(

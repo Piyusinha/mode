@@ -15,6 +15,7 @@ import platform.Foundation.NSUserDefaults
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
+import platform.UIKit.UIApplicationWillTerminateNotification
 import com.piyush.mode.coredevice.LoopbackVpn
 import com.piyush.mode.agent.darwinHttpClient
 import platform.UIKit.UIApplication
@@ -85,6 +86,12 @@ private object IosPhoneLink : PhoneLink {
     override suspend fun release() {
         LoopbackVpn.stop()
         AppLog.log("vpn", "Mode's VPN stopped")
+    }
+
+    override fun onAppTerminate(action: () -> Unit) {
+        NSNotificationCenter.defaultCenter.addObserverForName(
+            UIApplicationWillTerminateNotification, null, NSOperationQueue.mainQueue,
+        ) { _ -> action() }
     }
 
     override fun onAppBackground(action: () -> Unit) {

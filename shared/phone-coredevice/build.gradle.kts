@@ -27,7 +27,11 @@ kotlin {
             definitionFile.set(project.file("src/nativeInterop/cinterop/modecore.def"))
             includeDirs(rootProject.file("native/modecore/include"))
             extraOpts("-libraryPath", rootProject.file("native/out/$outDir").absolutePath)
-            tasks.named(interopProcessingTaskName) { dependsOn(buildModecore) }
+            tasks.named(interopProcessingTaskName) {
+                dependsOn(buildModecore)
+                // The .a is embedded in the klib: repack whenever it changes.
+                inputs.file(rootProject.file("native/out/$outDir/libmodecore.a"))
+            }
         }
     }
 

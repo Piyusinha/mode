@@ -53,6 +53,7 @@ fun App(link: PhoneLink, services: AppServices) {
     remember {
         // Leaving Mode while it is idle ends the session, so iOS drops its
         // "viewing and controlling" indicator and the VPN goes off.
+        link.onAppTerminate { holder.closeNow() }
         link.onAppBackground {
             if (!runner.running && !compare.running && !check.busy) {
                 AppLog.log("app", "left Mode while idle")
@@ -243,7 +244,7 @@ private fun HandsCheckScreen(check: HandsCheck) {
         Text(check.status, style = MaterialTheme.typography.bodyMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { scope.launch { check.connect() } }, enabled = !check.busy) {
-                Text(if (check.connected) "Reconnect" else "Connect")
+                Text("Test connection")
             }
             OutlinedButton(onClick = { scope.launch { check.lookHere() } }, enabled = check.connected && !check.busy) { Text("Look") }
             OutlinedButton(onClick = { scope.launch { check.home() } }, enabled = check.connected && !check.busy) { Text("Home") }

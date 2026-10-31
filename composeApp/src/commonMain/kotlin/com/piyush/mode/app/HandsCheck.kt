@@ -6,7 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import com.piyush.mode.ops.Op
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
@@ -33,13 +35,19 @@ class HandsCheck(private val link: PhoneLink, private val holder: PhoneHolder) {
 
     private val clock = TimeSource.Monotonic
 
-    val status: String get() = holder.status
-    val connected: Boolean get() = holder.connected
+    /** The last check's result; the session itself closes after every check. */
+    var status by mutableStateOf("Phone: not checked yet")
+        private set
+
+    /** Checks can run any time: each one connects for itself and lets go after. */
+    val connected: Boolean get() = true
 
     suspend fun connect() = run("connect") {
         val started = clock.markNow()
         holder.reconnect()
-        step("connected in ${started.elapsedNow().inWholeMilliseconds} ms")
+        val ms = started.elapsedNow().inWholeMilliseconds
+        status = "${holder.status} in $ms ms (closed again after the check)"
+        step("connected in $ms ms")
     }
 
     /** Looks at the screen as it is now (Mode itself). */
@@ -121,6 +129,8 @@ class HandsCheck(private val link: PhoneLink, private val holder: PhoneHolder) {
             log += "  ✗ ${e.message ?: e.toString()}"
             AppLog.error("hands", what, e)
         } finally {
+            // Let go, so iOS drops its "viewing and controlling" icon.
+            withContext(NonCancellable) { holder.disconnect() }
             busy = false
         }
     }

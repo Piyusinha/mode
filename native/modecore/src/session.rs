@@ -469,6 +469,11 @@ async fn open_screen_stream(
     let mut display = DisplayServiceClient::connect_rsd(adapter, handshake)
         .await
         .map_err(|e| err("display service", e))?;
+    // Clear streams nobody owns any more: a session whose app crashed, was
+    // reinstalled or was killed never stopped its stream, and the phone keeps
+    // streaming (and showing its "viewing and controlling" icon) until told.
+    // stopmediastream stops them all; with none running it is a no-op.
+    let _ = display.stop_media_stream().await;
     let audio_udp = adapter.bind_udp(0).await.map_err(|e| err("bind audio", e))?;
     let video_udp = adapter.bind_udp(0).await.map_err(|e| err("bind video", e))?;
     let receiver_ip = adapter.host_ip().to_string();
