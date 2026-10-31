@@ -1,0 +1,59 @@
+# CoreDevice remote control
+
+Mode sees and taps other apps through iOS 27's CoreDevice remote-control
+services: the ones Xcode's Device Hub uses. No XCTest is involved, so iOS shows
+no "Automation Running" overlay.
+
+| Need | Service |
+|---|---|
+| Touch (tap, drag, multi-finger) | `com.apple.coredevice.hid.universalhidservice` (digitizer, 0..65535 normalised) |
+| Keyboard (ASCII key codes) | same, host-registered virtual keyboard |
+| Hardware buttons | `com.apple.coredevice.hid.indigo` |
+| Screenshot | `com.apple.coredevice.screencaptureservice` |
+| Media stream (gates touch) | `com.apple.coredevice.displayservice` |
+| Clipboard | CoreDevice pasteboard copy/paste |
+| Launch, app list, processes | CoreDevice app service |
+
+## Phase 1 check (2026-10-31)
+
+Driven **from the Mac** over USB with pymobiledevice3 11.49.1 (`--userspace`
+tunnel, no sudo). iPhone 17 Pro, iOS 27.2 (24B119), disk image already mounted.
+
+| Check | Result |
+|---|---|
+| Home button | works, ~1 s per CLI call |
+| Screenshot | works, ~1 s, 1206×2622 PNG (402×874 pt at 3×) |
+| Tap | works: Spotlight from the Home Screen Search pill, Uber from its icon |
+| Type ASCII | works ("Uber" into Spotlight) |
+| Taps over Uber's live map | work first try |
+| Type Unicode ("इंडिया गेट") | **not via the keyboard**: it sends key codes, ASCII only |
+| Unicode via clipboard | works: CoreDevice `copy`, then tap iOS's Paste menu; no "Allow Paste" prompt |
+| "Automation Running" overlay | **none** (confirmed by watching the phone) |
+| Notification | "Device was viewed remotely from Mac" after the session |
+
+The ~1 s per call is the CLI opening a fresh tunnel and stream each time; Mode
+keeps one session open.
+
+## Gotchas
+
+- **Touch needs an open media stream from the same client.** Without one, iOS
+  accepts touch reports and silently drops them. Open one stream per session;
+  negotiating per gesture costs ~1 s and has wedged the media daemon until reboot.
+- Stamp HID reports with `mach_absolute_time()`; wall-clock stamps drop taps.
+- Buttons: hold ≥ 50 ms, wait ~100 ms before closing the connection.
+- A foreground app using the camera or microphone blocks the media stream.
+- Non-ASCII text goes through the clipboard, then Paste.
+- No accessibility tree: screen text comes from on-device OCR.
+- The phone reports every session as "viewed remotely from Mac", even when the
+  client is Mode itself (the phone cannot tell). Sessions are listed in
+  Settings › Privacy & Security › Safety Check.
+- Requires Developer Mode and a remote-pairing file made once over USB.
+
+## Connecting from the phone itself
+
+Mode connects to the phone's own `remotepairingd`: first `127.0.0.1` (untested;
+LocalDevVPN#31 shows it accepts loopback TCP even on cellular), else a loopback
+VPN peer `10.7.0.1`. Over the VPN, iOS refuses the connection on cellular-only
+(it treats it as coming from the cellular interface), so turn mobile data off
+while connecting. Paid accounts build the VPN into Mode; free accounts use the
+LocalDevVPN app.
