@@ -18,14 +18,22 @@ HOSTNAME_FOR_PAIRING=Mode
 BUNDLE_ID=com.piyush.mode
 OUT="$ROOT/build/pairing/mode.rppairing"
 
-DEVICE=${DEVICE:-$(xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /iPhone/ && /connected/ {for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) {print $i; exit}}')}
-[ -n "$DEVICE" ] || { echo "no connected iPhone; plug one in or set DEVICE" >&2; exit 1; }
-
 mkdir -p "$(dirname "$OUT")"
+# Pairs over plain USB (usbmuxd), so it works even when Xcode's own pairing
+# with the phone is gone (Stop Session on the phone removes both).
 (cd "$ROOT/native/modecore" && "$CARGO" run -q --features usb --example mc -- pair "$HOSTNAME_FOR_PAIRING" "$OUT")
 chmod 600 "$OUT"
 
-xcrun devicectl device copy to --device "$DEVICE" \
-    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
-    --source "$OUT" --destination Documents/mode.rppairing >/dev/null
+# Into Mode's Documents: through the file-sharing service if pymobiledevice3
+# is installed (USB only), else devicectl (needs Xcode's pairing).
+PMD=${PMD:-$(command -v pymobiledevice3 || echo "$HOME/.local/bin/pymobiledevice3")}
+if [ -x "$PMD" ]; then
+    "$PMD" apps push --documents "$BUNDLE_ID" "$OUT" /Documents/mode.rppairing >/dev/null
+else
+    DEVICE=${DEVICE:-$(xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /iPhone/ && /connected/ {for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) {print $i; exit}}')}
+    [ -n "$DEVICE" ] || { echo "no connected iPhone for devicectl; install pymobiledevice3 or set DEVICE" >&2; exit 1; }
+    xcrun devicectl device copy to --device "$DEVICE" \
+        --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+        --source "$OUT" --destination Documents/mode.rppairing >/dev/null
+fi
 echo "pairing file installed in Mode (Documents/mode.rppairing)"

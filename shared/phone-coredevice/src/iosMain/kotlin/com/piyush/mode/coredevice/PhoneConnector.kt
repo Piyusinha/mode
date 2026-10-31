@@ -76,6 +76,14 @@ class PhoneConnector(
             val backend = CoreDeviceBackend(session, screen, reader, UIKitImageTools(), Dispatchers.IO)
             return ConnectedPhone(backend, route, attempts, session.mountedDiskImage)
         }
+        // The VPN reached the phone but it refused the pairing: Mode was unpaired.
+        if (attempts.any { (_, error) -> error?.contains("pair-verify") == true }) {
+            throw PhoneUnavailable(
+                "This iPhone no longer trusts Mode: it was unpaired (for example by Stop Session in the " +
+                    "Dynamic Island, or by removing it from paired devices). Pair again once from a computer: " +
+                    "tools/make-pairing.sh with the phone on USB.",
+            )
+        }
         throw PhoneUnavailable(
             buildString {
                 append("Could not reach this iPhone's developer services.\n")
