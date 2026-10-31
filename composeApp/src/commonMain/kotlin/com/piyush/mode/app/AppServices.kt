@@ -116,6 +116,23 @@ class PhoneHolder(private val link: PhoneLink, private val log: (String) -> Unit
         }
     }
 
+    /**
+     * The user's "Stop session": closes the connection if there is one and
+     * always turns Mode's VPN off, even if the app thinks it is not connected.
+     * Unlike iOS's own Stop Session, it does not unpair Mode.
+     */
+    suspend fun stopSession() {
+        AppLog.log("phone", "Stop session pressed")
+        lock.withLock {
+            (phone as? AutoCloseable)?.let { runCatching { it.close() } }
+            phone = null
+            connected = false
+            status = "Session stopped"
+        }
+        kotlinx.coroutines.delay(2000)
+        runCatching { link.release() }
+    }
+
     /** Closes the session right now, without suspending (Mode is being ended). */
     fun closeNow() {
         (phone as? AutoCloseable)?.let { runCatching { it.close() } }

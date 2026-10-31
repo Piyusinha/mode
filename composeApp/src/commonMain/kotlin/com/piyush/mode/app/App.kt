@@ -65,6 +65,25 @@ fun App(link: PhoneLink, services: AppServices) {
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                var stopping by remember { mutableStateOf(false) }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Text(holder.status, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                    OutlinedButton(
+                        onClick = {
+                            stopping = true
+                            runner.stop()
+                            appScope.launch {
+                                holder.stopSession()
+                                stopping = false
+                            }
+                        },
+                        enabled = !stopping,
+                    ) { Text(if (stopping) "Stopping…" else "Stop session") }
+                }
                 PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
                     listOf("Agent", "Compare", "Logs", "Settings", "Hands").forEachIndexed { i, title ->
                         Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, maxLines = 1) })
