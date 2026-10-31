@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -43,6 +44,7 @@ fun App(link: PhoneLink) {
 @Composable
 private fun HandsCheckScreen(check: HandsCheck) {
     val scope = rememberCoroutineScope()
+    val focus = LocalFocusManager.current
     var app by remember { mutableStateOf("") }
     var tap by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("") }
@@ -70,7 +72,10 @@ private fun HandsCheckScreen(check: HandsCheck) {
         OutlinedTextField(tap, { tap = it }, Modifier.fillMaxWidth(), label = { Text("Then tap text containing (optional)") }, singleLine = true)
         OutlinedTextField(type, { type = it }, Modifier.fillMaxWidth(), label = { Text("Then type (optional)") }, singleLine = true)
         Button(
-            onClick = { scope.launch { check.probe(app.trim(), tap.trim(), type) } },
+            onClick = {
+                focus.clearFocus()
+                scope.launch { check.probe(app.trim(), tap.trim(), type) }
+            },
             enabled = check.connected && !check.busy && app.isNotBlank(),
         ) { Text("Run in that app, then come back") }
 

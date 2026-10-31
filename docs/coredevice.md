@@ -74,7 +74,9 @@ Found along the way:
   Settings › Privacy & Security › Safety Check.
 - Requires Developer Mode and a remote-pairing file made once over USB.
 - The phone refuses pairing from clients on the phone itself; connect through the loopback VPN.
-- A reboot unmounts the developer disk image; until it is mounted again the services are gone.
+- The developer disk image survived a restart on iOS 27.2. If it is missing, Mode mounts its bundled copy (needs internet for Apple's signature), then reconnects, because mounting resets the service directory.
+- During a session the Dynamic Island shows a screen-sharing icon; its **Stop Session** button also unpairs Mode.
+- Mode must stay awake while another app is in front, or the phone drops the idle connection: Mode plays silent mixable audio during tasks.
 
 ## Phase 4: on the phone itself (2026-10-31)
 

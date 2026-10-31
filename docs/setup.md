@@ -76,6 +76,8 @@ cargo build --features usb --example mc
 # through remote pairing instead of the USB tunnel (the app's path):
 MC_CONNECT=<phone-ip>:49152 MC_PAIRING=../../build/pairing/mode.rppairing ./target/debug/examples/mc apps
 ./target/debug/examples/mc pair Mode /tmp/new.rppairing     # what make-pairing.sh runs
+./target/debug/examples/mc ddi-remove                        # unmount the disk image (to test remounting)
+MC_DDI=/Library/Developer/DeveloperDiskImages/iOS_DDI/Restore ./target/debug/examples/mc home   # mount if missing
 ```
 
 Commands: `home`, `shot <file>`, `tap x y`, `drag x1 y1 x2 y2 ms`,
@@ -92,7 +94,9 @@ stream.
 | `pair-verify: device socket io failed` | Connecting without the VPN; the phone refuses local clients. Use the VPN route. |
 | `connect 10.7.0.1:49152: timed out` | VPN not on. Paid: allow the VPN configuration. Free: turn on LocalDevVPN. |
 | Refused only on mobile data | Turn Mobile Data off while connecting, then back on |
-| Services missing after a reboot | Disk image not mounted. From the Mac: `pymobiledevice3 mounter auto-mount`. On-device mounting is pending. |
+| Services missing after a reboot | Mode mounts the bundled image itself at Connect (needs internet). From the Mac: `pymobiledevice3 mounter auto-mount`. |
+| `device socket io failed` mid-task | The connection dropped (Mode was paused). Mode reconnects by itself; check that it plays silent audio during tasks. |
+| Mode no longer paired after tapping the Dynamic Island | **Stop Session** unpairs. Run `tools/make-pairing.sh` again. |
 | Taps do nothing, no error | The session's screen stream is not running, or an app is using the camera or mic |
 | "Allow Paste?" prompt | Expected for non-ASCII text; tap Allow, or allow pasting for that app in Settings |
 | `xcodebuild` cannot find the device | Phone locked or unplugged (`devicectl` shows "unavailable") |

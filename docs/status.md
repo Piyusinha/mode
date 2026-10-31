@@ -10,7 +10,7 @@ As of 2026-10-31.
 | 1 | Prove CoreDevice remote control from a Mac: no overlay, taps land, Unicode | ✅ Done |
 | 2 | `native/modecore`: our own Rust session on idevice, with a C API | ✅ Done |
 | 3 | `shared/phone-coredevice`: the Kotlin `PhoneBackend` for iOS | ✅ Done |
-| 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed | 🟡 Mostly done |
+| 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake | 🟡 All but mobile data |
 | 5 | Docs | 🟡 This set |
 | 6 | The agent: task in, AI picks each action, Mode executes | ⏳ Not started |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
@@ -25,19 +25,18 @@ As of 2026-10-31.
 | Open another app, tap text in it, come back to Mode | ✅ Settings → Wi-Fi → back |
 | Touch after the session sat idle for 45 s | ✅ |
 | Hindi text | ✅ Through the clipboard |
+| Restart with the cable unplugged | ✅ The disk image stays mounted; connect 2340 ms |
+| Disk image removed, Mode mounts it itself | ✅ 2.49 s, then driving (tested over USB with the bundled files) |
+| Mode stays awake in the background, music keeps playing | ✅ Settings → Wi-Fi → back; look at 3.85 s, not 27 s |
 
 ## Pending
 
 ### Phase 4, remaining
-1. **Mount the developer disk image from the phone.** A reboot unmounts it,
-   and until it is mounted again the services are gone. Today only the Mac can
-   mount it. Then test: reboot with the cable unplugged, Mode still works.
-2. **Stay alive in the background for long runs.** Tested only for about
-   10 seconds while another app was in front. Needs background audio or
-   location, then a 5-minute soak test.
-3. **Mobile data.** Connecting through the VPN fails when only mobile data is
+1. **Mobile data.** Connecting through the VPN fails when only mobile data is
    on. Needs a test and a clear prompt (turn mobile data off for a moment while
    connecting).
+2. **A longer soak.** Keep-awake is proven for a short run; a 5-minute run
+   (as long as a real task) is still to do.
 
 ### Phase 6, the agent
 - The look → decide → act loop, with the AI's tools generated from `Op`.
@@ -61,3 +60,7 @@ As of 2026-10-31.
 | `e55f7f6` | Phase 4a: pairing setup and the on-phone hands check |
 | `b863d51` | Phase 4b: loopback VPN route (paid built-in, free via LocalDevVPN) |
 | `821a812` | Faster looks: one screenshot per look, decode once, half-size OCR |
+| `b2742e2` | Docs |
+| `fe503f8` | Mount the developer disk image from the phone after a restart |
+| `9566e2c` | Keep Mode awake while it drives other apps; reconnect on drops |
+| `63d7399` | Reconnect afresh after mounting the developer disk image |

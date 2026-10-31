@@ -48,6 +48,10 @@ sequenceDiagram
     MC->>RPD: TCP via tunnel (source rewritten to 10.7.0.1)
     MC->>RPD: pair-verify with the pairing file
     MC->>RPD: create TCP listener → TLS-PSK tunnel → RSD handshake
+    alt display service missing (disk image not mounted)
+        MC->>RPD: cryptexd: identity + nonce, Apple TSS signs a ticket, install bundled image
+        MC->>RPD: drop the tunnel, connect afresh until the services appear (2.5 s total)
+    end
     MC->>MC: open DisplayService audio+video stream, start RTP drains
     MC->>MC: wait 300 ms, connect touch + button/keyboard clients
     Conn->>Conn: VisionTextReader.warmUp()

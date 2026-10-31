@@ -193,3 +193,53 @@ covers ops that ran but did not work.
 - **Auto-lock.** Our touches go through the real input path, so they should
   reset auto-lock while the agent is active. Not yet verified. If the phone
   locks, the agent stops and asks; it never types the passcode.
+- **iOS's own indicator.** During a session the Dynamic Island shows a
+  screen-sharing icon. Tapping it opens "'Mode' is viewing and controlling
+  this iPhone" with **Stop Session**, which also **unpairs** Mode, so
+  `make-pairing.sh` has to be run again. This is the acceptable kind of
+  indicator, not the "Automation Running" overlay.
+
+## D18. Mode remounts the developer disk image itself (bundled from Xcode)
+
+**Context.** Before iOS 26.4 a restart unmounted the disk image, and only a
+computer could mount it again. That breaks the "everything on the phone" rule.
+
+| Option | Verdict |
+|---|---|
+| Download at runtime from a third-party mirror (`doronz88/DeveloperDiskImage`, as iphone-use-app does) | Depends on a third party |
+| **Bundle Apple's own copy from this Mac's Xcode** (`/Library/Developer/DeveloperDiskImages/iOS_DDI`) | **Chosen.** `tools/bundle-ddi.sh` copies the five files the manifest's Cryptex1 identity names (~17 MB) into `Mode.app/DDI`. |
+
+At connect, if the display service is missing, modecore has Apple's TSS sign a
+ticket for this phone's nonce and installs the image through `cryptexd`.
+**That step needs internet.** Mounting restarts the phone's service directory
+and kills the tunnel it ran over, so modecore then reconnects afresh.
+
+**Found on the phone:**
+- On iOS 27 the image **survives a restart**.
+- When removed, something (the Mac while connected, or the phone itself)
+  **restores it within about 5 s**.
+- Mode's own mount is the fallback: proven at 2.49 s.
+
+## D19. Keep Mode awake with silent, mixable audio
+
+**Context.** iOS paused Mode about 25 s into a hands check. The phone then
+closed the idle connection, and the tap went out on a dead socket.
+
+| Option | Verdict |
+|---|---|
+| Background-task time (what Mode had) | iOS decides how long, and here it was nearly nothing |
+| **Silent audio, `UIBackgroundModes: audio`, mix-with-others** | **Chosen.** No permission prompt, almost no battery. Music keeps playing and nothing shows in Now Playing. Runs only while a task drives another app, and restarts after interruptions. Not allowed on the App Store, which does not matter for a sideloaded app. |
+| Background location | Backup: needs a permission prompt and shows an arrow |
+| Picture-in-Picture | Maybe later as a status bubble; it would appear in the agent's screenshots |
+| Run inside the VPN extension | Paid only, tight memory limits |
+
+Verified: music kept playing, Wi-Fi was tapped, and Mode came back by itself.
+The look finished at 3.85 s instead of 27 s.
+
+## D20. Reconnect on drops, but never repeat an action blindly
+
+`ResilientBackend` (core-ops) reconnects when the connection drops. It retries
+looks, Home and opening an app. It does **not** re-send a tap, swipe or typing,
+because if the drop came after the phone acted, a retry would act twice.
+Instead it reports that the action may not have happened, and the caller looks
+again (4 tests).
