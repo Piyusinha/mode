@@ -38,9 +38,12 @@ sealed interface Op {
     @Serializable @SerialName("screen.text")
     data class ScreenText(@SerialName("min_confidence") val minConfidence: Double = 0.3) : Op
 
-    /** The screen as `{png_b64, bounds}`. */
+    /**
+     * The screen as `{png_b64, bounds}`, or, with [maxSize], a JPEG whose longer
+     * side is at most that many pixels: `{jpeg_b64, bounds, img_px}`.
+     */
     @Serializable @SerialName("screen.capture")
-    data object ScreenCapture : Op
+    data class ScreenCapture(@SerialName("max_size") val maxSize: Int? = null) : Op
 
     /** Screen bounds `{x, y, w, h, id}` in points. */
     @Serializable @SerialName("screen.bounds")

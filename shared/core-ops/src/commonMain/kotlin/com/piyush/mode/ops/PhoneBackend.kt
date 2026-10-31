@@ -28,3 +28,6 @@ class Unsupported(message: String) : RuntimeException(message)
 
 /** The phone could not be reached or refused the op; the message says what the user has to do. */
 class PhoneUnavailable(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/** The op ran and did not work; the message says what was on screen or what to try. */
+class OpFailed(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

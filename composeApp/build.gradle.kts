@@ -14,12 +14,14 @@ kotlin {
             baseName = "ModeKit"
             isStatic = true
             export(projects.shared.coreOps)
+            export(projects.shared.phoneCoredevice)
         }
     }
 
     sourceSets {
         commonMain.dependencies {
             api(projects.shared.coreOps)
+            api(projects.shared.phoneCoredevice)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)

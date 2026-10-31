@@ -34,6 +34,12 @@ class OpTest {
     }
 
     @Test
+    fun absentMaxSizeIsLeftOff() {
+        assertEquals(JsonObject(emptyMap()), Op.ScreenCapture().toCall().second)
+        assertEquals(JsonPrimitive(1024), Op.ScreenCapture(maxSize = 1024).toCall().second["max_size"])
+    }
+
+    @Test
     fun defaultsAreSent() {
         val kw = Op.Scroll(x = 200.0, y = 400.0, dy = -300.0).toCall().second
         assertEquals(0.0, kw.getValue("dx").jsonPrimitive.double)
@@ -43,7 +49,7 @@ class OpTest {
     @Test
     fun everyOpHasADistinctWireName() {
         val all = listOf(
-            Op.Tree, Op.ScreenText(), Op.ScreenCapture, Op.ScreenBounds,
+            Op.Tree, Op.ScreenText(), Op.ScreenCapture(), Op.ScreenBounds,
             Op.Tap(0.0, 0.0), Op.LongPress(0.0, 0.0), Op.Drag(0.0, 0.0, 1.0, 1.0),
             Op.Scroll(0.0, 0.0, dy = -1.0), Op.TypeText("hi"), Op.PressKey("return"),
             Op.Home, Op.LaunchApp("Uber"), Op.CurrentApp, Op.OpenUrl("https://example.com"),

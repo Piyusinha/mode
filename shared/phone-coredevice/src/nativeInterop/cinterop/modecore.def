@@ -1,0 +1,6 @@
+# modecore, Mode's native CoreDevice layer (native/modecore). The static library
+# is embedded in the klib, so it ends up inside ModeKit.framework.
+headers = modecore.h
+headerFilter = modecore.h
+staticLibraries = libmodecore.a
+package = com.piyush.mode.coredevice.native
