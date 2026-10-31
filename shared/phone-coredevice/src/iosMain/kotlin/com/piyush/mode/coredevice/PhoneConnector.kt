@@ -8,6 +8,8 @@ import kotlinx.cinterop.useContents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
+import platform.Foundation.NSBundle
+import platform.Foundation.NSFileManager
 import platform.UIKit.UIScreen
 
 /**
@@ -31,6 +33,8 @@ class ConnectedPhone(
     val route: Route,
     /** Every route tried, in order, with why the failed ones failed. */
     val attempts: List<Pair<Route, String?>>,
+    /** True when connecting had to mount the developer disk image (the phone had restarted). */
+    val mountedDiskImage: Boolean,
 )
 
 /**
@@ -59,7 +63,9 @@ class PhoneConnector(
                 }
             }
             val session = try {
-                withContext(Dispatchers.IO) { ModecoreSession.open(route.host, port, hostname, pairingFile) }
+                withContext(Dispatchers.IO) {
+                    ModecoreSession.open(route.host, port, hostname, pairingFile, bundledDiskImage())
+                }
             } catch (e: Exception) {
                 attempts += route to (e.message ?: e.toString())
                 continue
@@ -68,7 +74,7 @@ class PhoneConnector(
             val reader = VisionTextReader()
             withContext(Dispatchers.IO) { reader.warmUp() }
             val backend = CoreDeviceBackend(session, screen, reader, UIKitImageTools(), Dispatchers.IO)
-            return ConnectedPhone(backend, route, attempts)
+            return ConnectedPhone(backend, route, attempts, session.mountedDiskImage)
         }
         throw PhoneUnavailable(
             buildString {
@@ -89,6 +95,15 @@ class PhoneConnector(
     companion object {
         const val DEFAULT_PORT = 49152
     }
+}
+
+/**
+ * Apple's developer disk image bundled into Mode by `tools/bundle-ddi.sh`, used
+ * to remount it after the phone restarts; null if the build had none.
+ */
+fun bundledDiskImage(): String? {
+    val dir = (NSBundle.mainBundle.resourcePath ?: return null) + "/DDI"
+    return dir.takeIf { NSFileManager.defaultManager.fileExistsAtPath("$it/BuildManifest.plist") }
 }
 
 /** This screen in points. UIKit wants this read on the main thread. */

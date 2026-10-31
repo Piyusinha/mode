@@ -52,6 +52,10 @@ unsafe fn session<'a>(s: *mut McSession) -> Result<&'a Session> {
 
 /// Connects to the phone's remotepairingd at `host`:`port` (an IP literal)
 /// using a remote-pairing file's bytes, and opens the screen stream.
+///
+/// `disk_image_dir` (may be NULL) is an unpacked iOS DDI `Restore` folder,
+/// mounted first when the phone has none mounted (after a restart).
+/// `out_mounted` (may be NULL) is set to 1 when that happened.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mc_session_open_rppairing(
     host: *const c_char,
@@ -59,7 +63,9 @@ pub unsafe extern "C" fn mc_session_open_rppairing(
     hostname: *const c_char,
     pairing: *const u8,
     pairing_len: usize,
+    disk_image_dir: *const c_char,
     out: *mut *mut McSession,
+    out_mounted: *mut u8,
 ) -> *mut c_char {
     guard(|| {
         if out.is_null() || pairing.is_null() {
@@ -71,7 +77,15 @@ pub unsafe extern "C" fn mc_session_open_rppairing(
         let hostname = unsafe { text(hostname, "hostname") }?;
         // SAFETY: the caller passes `pairing_len` readable bytes.
         let bytes = unsafe { std::slice::from_raw_parts(pairing, pairing_len) };
-        let s = Session::open_rppairing(SocketAddr::new(ip, port), hostname, bytes)?;
+        let disk_image = if disk_image_dir.is_null() {
+            None
+        } else {
+            Some(std::path::PathBuf::from(unsafe { text(disk_image_dir, "disk image folder") }?))
+        };
+        let s = Session::open_rppairing(SocketAddr::new(ip, port), hostname, bytes, disk_image.as_deref())?;
+        if !out_mounted.is_null() {
+            unsafe { *out_mounted = s.mounted_disk_image() as u8 };
+        }
         unsafe { *out = Box::into_raw(Box::new(McSession(s))) };
         Ok(())
     })

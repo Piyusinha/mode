@@ -38,7 +38,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** [DeviceSession] over `native/modecore`'s C API. */
-class ModecoreSession private constructor(private var handle: CPointer<McSession>?) : DeviceSession {
+class ModecoreSession private constructor(
+    private var handle: CPointer<McSession>?,
+    /** True when opening had to mount the developer disk image (the phone had restarted). */
+    val mountedDiskImage: Boolean,
+) : DeviceSession {
 
     override fun touch(x1: Int, y1: Int, x2: Int, y2: Int, holdMs: Long, travelMs: Long) = check(
         mc_touch(
@@ -91,20 +95,36 @@ class ModecoreSession private constructor(private var handle: CPointer<McSession
         /**
          * Connects to the phone's remote-pairing service at [host]:[port] (an IP
          * literal) with a remote-pairing file, and opens the screen stream.
+         *
+         * If the phone has no developer disk image mounted (it restarted) and
+         * [diskImageDir] names one, it is mounted first; that needs internet for
+         * Apple's signature and takes several seconds.
+         *
          * Blocks for about a second; call it off the main thread.
          */
-        fun open(host: String, port: Int, hostname: String, pairingFile: ByteArray): ModecoreSession {
+        fun open(
+            host: String,
+            port: Int,
+            hostname: String,
+            pairingFile: ByteArray,
+            diskImageDir: String? = null,
+        ): ModecoreSession {
             require(pairingFile.isNotEmpty()) { "the pairing file is empty" }
             return memScoped {
                 val out = alloc<CPointerVar<McSession>>()
+                val mounted = alloc<UByteVar>()
                 val error = pairingFile.usePinned { pinned ->
                     mc_session_open_rppairing(
                         host, port.convert(), hostname,
-                        pinned.addressOf(0).reinterpret(), pairingFile.size.convert(), out.ptr,
+                        pinned.addressOf(0).reinterpret(), pairingFile.size.convert(),
+                        diskImageDir, out.ptr, mounted.ptr,
                     )
                 }
                 check(error)
-                ModecoreSession(out.value ?: throw OpFailed("the phone session did not open"))
+                ModecoreSession(
+                    out.value ?: throw OpFailed("the phone session did not open"),
+                    mountedDiskImage = mounted.value.toInt() != 0,
+                )
             }
         }
     }

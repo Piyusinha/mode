@@ -35,7 +35,7 @@ private object IosPhoneLink : PhoneLink {
             route = "${phone.route.label} (${phone.route.host})",
             attempts = phone.attempts.joinToString("\n") { (route, error) ->
                 "  ${route.label} (${route.host}): ${error ?: "connected"}"
-            },
+            } + if (phone.mountedDiskImage) "\n  mounted the developer disk image (the phone had restarted)" else "",
         )
     }
 

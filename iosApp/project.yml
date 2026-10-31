@@ -39,6 +39,13 @@ targets:
           fi
           cd "$SRCROOT/.."
           ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
+    postCompileScripts:
+      # Apple's developer disk image from this Mac's Xcode, so Mode can remount
+      # it after the phone restarts (shared/phone-coredevice: PhoneConnector).
+      - name: Bundle developer disk image
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/../tools/bundle-ddi.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/DDI"
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode
       PRODUCT_NAME: Mode

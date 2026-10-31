@@ -27,6 +27,8 @@ fn main() {
         return;
     }
     let t0 = Instant::now();
+    // MC_DDI=<iOS DDI Restore folder> mounts the disk image if the phone has none.
+    let disk_image = std::env::var("MC_DDI").ok().map(std::path::PathBuf::from);
     // MC_CONNECT=host:port MC_PAIRING=file uses the remote-pairing path the app
     // uses on the phone; otherwise the USB tunnel.
     let session = match (std::env::var("MC_CONNECT"), std::env::var("MC_PAIRING")) {
@@ -34,11 +36,14 @@ fn main() {
             let addr = addr.parse().unwrap_or_else(|_| fail("MC_CONNECT must be ip:port"));
             let pairing = std::fs::read(&file).unwrap_or_else(|e| fail(&format!("read {file}: {e}")));
             let hostname = std::env::var("MC_HOSTNAME").unwrap_or_else(|_| "Mode".into());
-            Session::open_rppairing(addr, &hostname, &pairing)
+            Session::open_rppairing(addr, &hostname, &pairing, disk_image.as_deref())
         }
-        _ => Session::open_usb(),
+        _ => Session::open_usb(disk_image.as_deref()),
     }
     .unwrap_or_else(|e| fail(&format!("open: {e}")));
+    if session.mounted_disk_image() {
+        println!("[{:>6.2}s] mounted the developer disk image", t0.elapsed().as_secs_f64());
+    }
     println!("[{:>6.2}s] session open", t0.elapsed().as_secs_f64());
 
     while let Some(cmd) = args.next() {

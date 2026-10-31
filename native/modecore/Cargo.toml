@@ -24,6 +24,7 @@ idevice = { git = "https://github.com/jkcoxson/idevice", rev = "89702099f4d7552f
   "remote_pairing",
   "tunnel_tcp_stack",
   "tcp",
+  "cryptexd",
 ] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
 uuid = { version = "1", features = ["v4"] }

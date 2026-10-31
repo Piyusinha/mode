@@ -12,8 +12,13 @@
 
 typedef struct McSession McSession;
 
+/* disk_image_dir (nullable): unpacked iOS DDI Restore folder, mounted first if the
+ * phone has none (after a restart; needs internet for Apple's signature).
+ * out_mounted (nullable): set to 1 when it was mounted. */
 char *mc_session_open_rppairing(const char *host, uint16_t port, const char *hostname,
-                                const uint8_t *pairing, size_t pairing_len, McSession **out);
+                                const uint8_t *pairing, size_t pairing_len,
+                                const char *disk_image_dir, McSession **out,
+                                uint8_t *out_mounted);
 void mc_session_close(McSession *s);
 
 /* clock: 0 = mach_absolute_time, 1 = wall clock */

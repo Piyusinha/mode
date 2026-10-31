@@ -8,9 +8,11 @@
 //! (Jackson Coxson, MIT).
 
 use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use futures::TryStreamExt;
+use idevice::cryptexd::{Cryptex1Assets, install_ddi};
 use idevice::core_device::{
     AppListEntry, AppServiceClient, CallInfoBlob, DisplayServiceClient, GENERAL_PASTEBOARD, ImageFormat,
     PasteboardServiceClient, ScreenCaptureServiceClient, build_screen_audio_offer,
@@ -112,7 +114,11 @@ struct Live {
 pub struct Session {
     rt: tokio::runtime::Runtime,
     live: Mutex<Option<Live>>,
+    mounted_disk_image: bool,
 }
+
+/// The service whose absence means the developer disk image is not mounted.
+const DDI_SERVICE: &str = "com.apple.coredevice.displayservice";
 
 impl Session {
     /// Connects to the phone's `remotepairingd` at `addr` with a remote-pairing
@@ -121,11 +127,20 @@ impl Session {
     /// On the phone itself `addr` is `127.0.0.1:<port>`, or the loopback VPN's
     /// peer `10.7.0.1:<port>`. From a Mac on the same network it is the phone's
     /// Wi-Fi address.
-    pub fn open_rppairing(addr: SocketAddr, hostname: &str, pairing_file: &[u8]) -> Result<Session> {
+    ///
+    /// When the developer disk image is not mounted (the phone rebooted) and
+    /// `disk_image` names an unpacked iOS DDI `Restore` folder, it is mounted
+    /// first; that asks Apple's signing server for a ticket, so it needs internet.
+    pub fn open_rppairing(
+        addr: SocketAddr,
+        hostname: &str,
+        pairing_file: &[u8],
+        disk_image: Option<&Path>,
+    ) -> Result<Session> {
         let rt = runtime()?;
         let mut pairing = RpPairingFile::from_bytes(pairing_file).map_err(|e| err("pairing file", e))?;
         let hostname = hostname.to_string();
-        let (adapter, handshake) = rt.block_on(async move {
+        let (adapter, handshake, rsd_port) = rt.block_on(async move {
             let stream = tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(addr))
                 .await
                 .map_err(|_| Error(format!("connect {addr}: timed out")))?
@@ -156,20 +171,20 @@ impl Session {
             let mut adapter = adapter.to_async_handle();
             let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
             let handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
-            Ok::<_, Error>((adapter, handshake))
+            Ok::<_, Error>((adapter, handshake, rsd_port))
         })?;
-        Self::start(rt, adapter, handshake)
+        Self::start(rt, adapter, handshake, rsd_port, disk_image)
     }
 
     /// Connects over USB through usbmuxd (Mac-side testing only).
     #[cfg(feature = "usb")]
-    pub fn open_usb() -> Result<Session> {
+    pub fn open_usb(disk_image: Option<&Path>) -> Result<Session> {
         use idevice::IdeviceService;
         use idevice::core_device_proxy::CoreDeviceProxy;
         use idevice::usbmuxd::{UsbmuxdAddr, UsbmuxdConnection};
 
         let rt = runtime()?;
-        let (adapter, handshake) = rt.block_on(async {
+        let (adapter, handshake, rsd_port) = rt.block_on(async {
             let mut mux = UsbmuxdConnection::default().await?;
             let device = mux
                 .get_devices()
@@ -183,13 +198,21 @@ impl Session {
             let mut adapter = proxy.create_software_tunnel()?.to_async_handle();
             let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
             let handshake = RsdHandshake::new(rsd).await?;
-            Ok::<_, Error>((adapter, handshake))
+            Ok::<_, Error>((adapter, handshake, rsd_port))
         })?;
-        Self::start(rt, adapter, handshake)
+        Self::start(rt, adapter, handshake, rsd_port, disk_image)
     }
 
-    fn start(rt: tokio::runtime::Runtime, mut adapter: AdapterHandle, mut handshake: RsdHandshake) -> Result<Session> {
-        let live = rt.block_on(async {
+    fn start(
+        rt: tokio::runtime::Runtime,
+        mut adapter: AdapterHandle,
+        mut handshake: RsdHandshake,
+        rsd_port: u16,
+        disk_image: Option<&Path>,
+    ) -> Result<Session> {
+        let disk_image = disk_image.map(Path::to_path_buf);
+        let (live, mounted_disk_image) = rt.block_on(async {
+            let mounted = ensure_disk_image(&mut adapter, &mut handshake, rsd_port, disk_image).await?;
             let (display, drains) = open_screen_stream(&mut adapter, &mut handshake).await?;
             tokio::time::sleep(STREAM_SETTLE).await;
             let touch = UniversalHidServiceClient::connect_rsd(&mut adapter, &mut handshake)
@@ -198,9 +221,15 @@ impl Session {
             let indigo = IndigoHidClient::connect_rsd(&mut adapter, &mut handshake)
                 .await
                 .map_err(|e| err("button/keyboard service", e))?;
-            Ok::<_, Error>(Live { adapter, handshake, display, drains, touch, indigo, clock: Clock::Mach })
+            let live = Live { adapter, handshake, display, drains, touch, indigo, clock: Clock::Mach };
+            Ok::<_, Error>((live, mounted))
         })?;
-        Ok(Session { rt, live: Mutex::new(Some(live)) })
+        Ok(Session { rt, live: Mutex::new(Some(live)), mounted_disk_image })
+    }
+
+    /// True when this session had to mount the developer disk image itself.
+    pub fn mounted_disk_image(&self) -> bool {
+        self.mounted_disk_image
     }
 
     fn run<T>(&self, op: impl AsyncFnOnce(&mut Live) -> Result<T>) -> Result<T> {
@@ -362,6 +391,39 @@ impl Drop for Session {
     fn drop(&mut self) {
         self.close();
     }
+}
+
+/// Mounts the developer disk image when its services are missing, then
+/// re-reads the service list. Answers whether it mounted anything.
+async fn ensure_disk_image(
+    adapter: &mut AdapterHandle,
+    handshake: &mut RsdHandshake,
+    rsd_port: u16,
+    disk_image: Option<PathBuf>,
+) -> Result<bool> {
+    if handshake.services.contains_key(DDI_SERVICE) {
+        return Ok(false);
+    }
+    let dir = disk_image.ok_or_else(|| {
+        Error("the developer disk image is not mounted (did the phone restart?) and no image was given to mount".into())
+    })?;
+    let assets = Cryptex1Assets::load(&dir)
+        .await
+        .map_err(|e| err(&format!("disk image files in {}", dir.display()), e))?;
+    install_ddi(adapter, handshake, &assets)
+        .await
+        .map_err(|e| err("mounting the developer disk image (needs internet for Apple's signature)", e))?;
+
+    // The services appear once the image is mounted; read the list again.
+    for _ in 0..20 {
+        let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD reconnect", e))?;
+        *handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
+        if handshake.services.contains_key(DDI_SERVICE) {
+            return Ok(true);
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    Err(Error("mounted the developer disk image, but its services did not appear".into()))
 }
 
 fn runtime() -> Result<tokio::runtime::Runtime> {
