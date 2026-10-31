@@ -20,6 +20,9 @@ import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
 import kotlin.math.hypot
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * The iPhone, driven through CoreDevice remote control (`native/modecore`).
@@ -36,6 +39,7 @@ class CoreDeviceBackend(
     private val reader: TextReader,
     private val images: ImageTools,
     private val io: CoroutineDispatcher = Dispatchers.Default,
+    private val clock: TimeSource = TimeSource.Monotonic,
 ) : PhoneBackend, AutoCloseable {
 
     override val name = "ios-coredevice"
@@ -43,11 +47,22 @@ class CoreDeviceBackend(
     private val lock = Mutex()
     private var apps: List<InstalledApp>? = null
 
+    /**
+     * The last screenshot, reused by the next read if nothing was done in
+     * between, so `screen.capture` and `screen.text` for one look cost one shot.
+     */
+    private var lastShot: Pair<TimeMark, ByteArray>? = null
+
     override suspend fun ops(): Set<String> = SUPPORTED
 
     override suspend fun send(op: Op): JsonElement {
         if (op.wireName !in SUPPORTED) throw Unsupported("this iPhone cannot '${op.wireName}' over CoreDevice")
-        return lock.withLock { withContext(io) { run(op) } }
+        return lock.withLock {
+            withContext(io) {
+                if (op.wireName !in READS) lastShot = null
+                run(op)
+            }
+        }
     }
 
     override fun close() = session.close()
@@ -120,7 +135,7 @@ class CoreDeviceBackend(
 
     @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
     private fun capture(maxSize: Int?): JsonElement {
-        val png = session.screenshotPng()
+        val png = screenshot()
         if (maxSize == null || maxSize <= 0) {
             return buildJsonObject {
                 put("png_b64", Base64.encode(png))
@@ -141,7 +156,7 @@ class CoreDeviceBackend(
 
     /** OCR boxes in screen points, centres ready to tap: `{text, confidence, source, x, y, w, h}`. */
     private fun readText(minConfidence: Double): List<JsonElement> =
-        reader.read(session.screenshotPng())
+        reader.read(screenshot())
             .filter { it.confidence >= minConfidence && it.text.isNotBlank() }
             .map {
                 buildJsonObject {
@@ -155,6 +170,11 @@ class CoreDeviceBackend(
                 }
             }
 
+    private fun screenshot(): ByteArray {
+        lastShot?.let { (taken, png) -> if (taken.elapsedNow() < SHOT_REUSE) return png }
+        return session.screenshotPng().also { lastShot = clock.markNow() to it }
+    }
+
     private fun round(v: Double): Double = kotlin.math.round(v)
 
     private fun seconds(s: Double): Long = (s * 1000).roundToLong().coerceAtLeast(0)
@@ -166,6 +186,12 @@ class CoreDeviceBackend(
             "input.tap", "input.press", "input.drag", "input.scroll", "input.text", "input.keys",
             "nav.home", "apps.launch", "session.state",
         )
+
+        /** Ops that only look; they keep the last screenshot valid. */
+        private val READS = setOf("screen.capture", "screen.text", "screen.bounds", "session.state")
+
+        /** How long a screenshot stays good for when nothing has been done. */
+        private val SHOT_REUSE = 1500.milliseconds
 
         private const val TAP_HOLD_MS = 50L
         private const val SCROLL_SPEED_PT_PER_S = 800.0

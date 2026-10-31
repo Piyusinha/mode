@@ -15,6 +15,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
+import kotlin.time.TimeSource
 
 /** Records what the backend asked of the phone. */
 private class FakeSession(
@@ -22,6 +25,7 @@ private class FakeSession(
 ) : DeviceSession {
     val calls = mutableListOf<String>()
     var listCalls = 0
+    var shots = 0
 
     override fun touch(x1: Int, y1: Int, x2: Int, y2: Int, holdMs: Long, travelMs: Long) {
         calls += "touch $x1,$y1 -> $x2,$y2 hold=$holdMs travel=$travelMs"
@@ -31,7 +35,7 @@ private class FakeSession(
     override fun key(name: String) { calls += "key $name" }
     override fun typeAscii(text: String) { calls += "type $text" }
     override fun pasteText(text: String) { calls += "paste $text" }
-    override fun screenshotPng(): ByteArray = byteArrayOf(1, 2, 3)
+    override fun screenshotPng(): ByteArray = byteArrayOf(1, 2, 3).also { shots++ }
     override fun launch(bundleId: String) { calls += "launch $bundleId" }
     override fun listApps(): List<InstalledApp> = apps.also { listCalls++ }
     override fun close() { calls += "close" }
@@ -42,10 +46,12 @@ private val SCREEN = ScreenInfo(widthPt = 402.0, heightPt = 874.0)
 private fun backend(
     session: DeviceSession = FakeSession(),
     text: List<RecognizedText> = emptyList(),
+    clock: TimeSource = TimeSource.Monotonic,
 ) = CoreDeviceBackend(
     session, SCREEN,
     reader = { text },
     images = { _, maxSide -> ShrunkImage(byteArrayOf(9), maxSide / 2, maxSide) },
+    clock = clock,
 )
 
 class CoreDeviceBackendTest {
@@ -169,5 +175,28 @@ class CoreDeviceBackendTest {
         val b = backend()
         val answered = everyOp.filter { runCatching { b.send(it) }.exceptionOrNull() !is Unsupported }
         assertEquals(b.ops(), answered.map { it.wireName }.toSet())
+    }
+
+    @Test
+    fun oneLookTakesOneScreenshot() = runTest {
+        val phone = FakeSession()
+        val b = backend(phone)
+        b.send(Op.ScreenCapture(maxSize = 1000))
+        b.send(Op.ScreenText())
+        assertEquals(1, phone.shots)
+    }
+
+    @Test
+    fun anActionOrTimeMeansANewScreenshot() = runTest {
+        val phone = FakeSession()
+        val clock = TestTimeSource()
+        val b = backend(phone, clock = clock)
+        b.send(Op.ScreenText())
+        b.send(Op.Tap(1.0, 1.0))
+        b.send(Op.ScreenText())
+        assertEquals(2, phone.shots, "a tap changes the screen")
+        clock += 2.seconds
+        b.send(Op.ScreenText())
+        assertEquals(3, phone.shots, "an old screenshot is not reused")
     }
 }

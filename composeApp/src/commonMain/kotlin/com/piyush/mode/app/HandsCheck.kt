@@ -88,7 +88,9 @@ class HandsCheck(private val link: PhoneLink) {
 
     @OptIn(ExperimentalEncodingApi::class)
     private suspend fun look(label: String): Shot {
+        val started = clock.markNow()
         val capture = send(Op.ScreenCapture(maxSize = 1000)).jsonObject
+        val captured = started.elapsedNow().inWholeMilliseconds
         val jpeg = Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content)
         val texts = (send(Op.ScreenText()) as JsonArray).map {
             val box = it.jsonObject
@@ -98,7 +100,8 @@ class HandsCheck(private val link: PhoneLink) {
                 box.getValue("y").jsonPrimitive.double,
             )
         }
-        step("looked at $label: ${texts.size} pieces of text")
+        val total = started.elapsedNow().inWholeMilliseconds
+        step("looked at $label: ${texts.size} pieces of text (picture $captured ms, text ${total - captured} ms, total $total ms)")
         return Shot(label, link.decodeImage(jpeg), texts)
     }
 

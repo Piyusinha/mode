@@ -65,7 +65,9 @@ class PhoneConnector(
                 continue
             }
             attempts += route to null
-            val backend = CoreDeviceBackend(session, screen, VisionTextReader(), UIKitImageTools(), Dispatchers.IO)
+            val reader = VisionTextReader()
+            withContext(Dispatchers.IO) { reader.warmUp() }
+            val backend = CoreDeviceBackend(session, screen, reader, UIKitImageTools(), Dispatchers.IO)
             return ConnectedPhone(backend, route, attempts)
         }
         throw PhoneUnavailable(
