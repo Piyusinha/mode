@@ -286,6 +286,34 @@ class AgentTest {
     }
 
     @Test
+    fun aRepeatQuestionIsNotPutToTheUserAgain() = runTest {
+        val phone = FakePhone(List(10) { listOf("Sonali" to (1.0 to 1.0)) })
+        val gate = Gate(answer = "Sending via agent test")
+        val model = ScriptedModel(
+            call("ask_user", "question" to "What should the message say?"),
+            call("ask_user", "question" to "Please confirm the exact text?"),
+            call("done", "summary" to "x"),
+        )
+        Agent(phone, model, gate, noSettle).run("message Sonali")
+        assertEquals(listOf("What should the message say?"), gate.asked, "asked once")
+        assertTrue("THE USER'S ANSWERS" in model.lastUserText && "Sending via agent test" in model.lastUserText, model.lastUserText)
+        assertTrue("not asked" in model.lastUserText)
+    }
+
+    @Test
+    fun theSendConfirmationShowsWhatWasTyped() = runTest {
+        val phone = FakePhone(List(10) { listOf("Send" to (300.0 to 800.0)) })
+        val gate = Gate()
+        val model = ScriptedModel(
+            call("type_text", "text" to "Will sleep after this test", "reason" to "x"),
+            call("tap", "x" to 373.0, "y" to 915.0, "reason" to "send"),
+            call("done", "summary" to "x"),
+        )
+        Agent(phone, model, gate, noSettle).run("t")
+        assertTrue(gate.asked.single().contains("Will sleep after this test"), gate.asked.toString())
+    }
+
+    @Test
     fun controlCenterSwipesDownFromTheTopRight() {
         val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
         val op = AgentTools.toOp(call("control_center", "reason" to "x"), g) as Op.Drag
@@ -321,6 +349,6 @@ class AgentTest {
         Agent(phone, model, Gate(answer = "Home Wi-Fi"), noSettle).run("t")
         val launches = phone.actions.filterIsInstance<Op.LaunchApp>().map { it.name }
         assertEquals(listOf("Settings", "bundle.Settings"), launches)
-        assertTrue("Mode has reopened bundle.Settings" in model.lastUserText, model.lastUserText)
+        assertTrue("Mode reopened bundle.Settings" in model.lastUserText, model.lastUserText)
     }
 }

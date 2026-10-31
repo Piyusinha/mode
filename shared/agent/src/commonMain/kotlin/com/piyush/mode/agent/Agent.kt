@@ -120,6 +120,12 @@ class Agent(
         /** The model's own plan for multi-part tasks, shown back to it every step. */
         var plan: String? = null
         var inMode = startsInMode
+        /** The user's answers, shown on their own every step so they are not lost in the history. */
+        val answers = mutableListOf<Pair<String, String>>()
+        /** The user answered and the agent has not acted since: another question would repeat it. */
+        var answeredSinceAction = false
+        /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
+        var lastTyped: String? = null
 
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
@@ -150,7 +156,7 @@ class Agent(
                 badReplies = 0
             }
 
-            val messages = prompt(task, history, screen, step, lastApp, plan, hideScreen = inMode)
+            val messages = prompt(task, history, screen, step, lastApp, plan, answers, hideScreen = inMode)
             inMode = false
             val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, messages, schema)
             val reply = answer.reply
@@ -181,6 +187,18 @@ class Agent(
                 }
                 "ask_user" -> {
                     val question = call.arguments.string("question").orEmpty()
+                    // Seen on the phone: four questions in a row about the same message,
+                    // each answered. Nothing changed since the last answer, so act on it.
+                    if (answeredSinceAction) {
+                        badReplies++
+                        record(
+                            "ask_user (not asked)", question,
+                            "not asked: the user already answered \"${answers.last().second}\" and nothing has " +
+                                "happened since. Act on that answer now; where it leaves something open, pick the " +
+                                "most sensible reading yourself",
+                        )
+                        continue
+                    }
                     onStatus("Waiting for you")
                     val reply2 = gate.ask(question)
                     if (reply2 == null) {
@@ -191,9 +209,11 @@ class Agent(
                     val back = lastApp?.let { app ->
                         runCatching { phone.send(Op.LaunchApp(app)) }.isSuccess.also { settle() }
                     } == true
+                    answers += question to reply2
+                    answeredSinceAction = true
                     record(
                         "ask_user", question,
-                        "the user answered: $reply2" + if (back) " (Mode has reopened $lastApp for you)" else
+                        "the user answered \"$reply2\"" + if (back) " (Mode reopened $lastApp)" else
                             " (Mode is on screen now: open the app you need)",
                     )
                 }
@@ -224,7 +244,8 @@ class Agent(
                     }
                     val described = describe(call, op, screen)
                     val risky = riskyTarget(op, screen)
-                    if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason). Allow it?")) {
+                    val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
+                    if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
                         record(described, reason, "the user did not allow it; do not try again without asking")
                         continue
                     }
@@ -232,6 +253,8 @@ class Agent(
                     val outcome = try {
                         val result = phone.send(op)
                         lastWasPhoneAction = true
+                        answeredSinceAction = false
+                        if (op is Op.TypeText) lastTyped = op.text
                         badReplies = 0
                         if (op is Op.LaunchApp) lastApp = result.jsonPrimitiveOrNull() ?: op.name
                         "ok"
@@ -342,12 +365,18 @@ class Agent(
         step: Int,
         lastApp: String?,
         plan: String?,
+        answers: List<Pair<String, String>>,
         hideScreen: Boolean,
     ): List<ChatMessage> {
         val g = screen.geometry
         val user = buildString {
             append("TASK: ").append(task).append("\n\n")
             append("STEP ").append(step).append(" of at most ").append(config.maxSteps).append("\n\n")
+            if (answers.isNotEmpty()) {
+                append("THE USER'S ANSWERS (final: act on them, never ask about the same thing again):\n")
+                answers.forEach { (q, a) -> append("- You asked: ").append(q).append("\n  They said: ").append(a).append('\n') }
+                append('\n')
+            }
             plan?.let { append("YOUR PLAN (keep it up to date with the plan tool):\n").append(it).append("\n\n") }
             if (history.isEmpty()) {
                 append("No actions yet.\n\n")
@@ -433,11 +462,19 @@ class Agent(
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).
             - Work on your own. Do not ask the user how to navigate or whether to go back.
 
+            Use what the task gives you: names, times, places and message text. In "send a message to
+            Sonali saying I'm late" or "message Sonali: sending this automatically", the words after the
+            name are the message: type them. If the task wants a message sent but gives no text, write a
+            short, natural one that fits the task instead of asking.
+
+            Do not ask for permission to send, pay, book, post or delete: Mode itself shows the user what
+            you typed and asks them right before such a tap. So type the message and tap Send.
+
             Ask the user (ask_user) only when you are truly blocked:
             - a login, passcode, Face ID, verification code or payment details are needed;
-            - a choice only the user can make (which address, which contact, which plan);
-            - before anything that spends money, books, orders, sends or posts a message, deletes, or
-              cannot be undone.
+            - a choice only the user can make, with no sensible default (which of two contacts with the
+              same name, which address, which plan).
+            Ask once. Their answer is final: act on it, and never ask again to confirm it.
             Never type passwords, passcodes or card numbers.
 
             Plan multi-part tasks:

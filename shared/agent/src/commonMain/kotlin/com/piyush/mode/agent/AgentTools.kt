@@ -101,8 +101,9 @@ object AgentTools {
             listOf(Param("seconds", "number", "1 to 10."), reason),
         ),
         Tool(
-            "ask_user", "Ask the user: before paying, booking, sending, posting or deleting anything; when a login, " +
-                "passcode or choice is needed; or when stuck.", null,
+            "ask_user", "Ask the user, only when blocked: a login, passcode or code is needed, or a choice only " +
+                "they can make. Not to confirm sending, paying or deleting (Mode confirms those itself), and never " +
+                "twice about the same thing.", null,
             listOf(Param("question", "string", "One clear question.")),
         ),
         Tool(
