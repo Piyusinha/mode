@@ -6,8 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import com.piyush.mode.ops.Op
-import com.piyush.mode.ops.PhoneBackend
-import com.piyush.mode.ops.ResilientBackend
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.double
@@ -27,30 +25,21 @@ class ScreenText(val text: String, val x: Double, val y: Double)
  * tap some text, type. Everything it does comes from what the user enters;
  * there is no task logic here. The agent replaces this.
  */
-class HandsCheck(private val link: PhoneLink) {
-    var status by mutableStateOf("Phone: not connected")
-        private set
+class HandsCheck(private val link: PhoneLink, private val holder: PhoneHolder) {
     var busy by mutableStateOf(false)
         private set
     val log = mutableStateListOf<String>()
     val shots = mutableStateListOf<Shot>()
 
-    private var phone: PhoneBackend? = null
     private val clock = TimeSource.Monotonic
 
-    val connected: Boolean get() = phone != null
+    val status: String get() = holder.status
+    val connected: Boolean get() = holder.connected
 
     suspend fun connect() = run("connect") {
         val started = clock.markNow()
-        val connection = link.connect()
-        var first: PhoneBackend? = connection.backend
-        // Reconnects by itself if iOS pauses Mode or the connection drops.
-        phone = ResilientBackend(
-            connect = { first?.also { first = null } ?: link.connect().backend },
-            onReconnect = { why -> log += "  ↻ connection dropped ($why), reconnected" },
-        )
-        status = "Connected via ${connection.route} in ${started.elapsedNow().inWholeMilliseconds} ms"
-        log += connection.attempts
+        holder.reconnect()
+        step("connected in ${started.elapsedNow().inWholeMilliseconds} ms")
     }
 
     /** Looks at the screen as it is now (Mode itself). */
@@ -111,7 +100,7 @@ class HandsCheck(private val link: PhoneLink) {
         return Shot(label, link.decodeImage(jpeg), texts)
     }
 
-    private suspend fun send(op: Op) = (phone ?: error("connect first")).send(op)
+    private suspend fun send(op: Op) = holder.phone().send(op)
 
     private var opStarted = clock.markNow()
 
@@ -129,7 +118,6 @@ class HandsCheck(private val link: PhoneLink) {
             step("done")
         } catch (e: Exception) {
             log += "  ✗ ${e.message ?: e.toString()}"
-            if (what == "connect") status = "Phone: not connected"
         } finally {
             busy = false
         }

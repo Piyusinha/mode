@@ -11,12 +11,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import platform.Foundation.NSBundle
+import platform.Foundation.NSUserDefaults
+import com.piyush.mode.agent.darwinHttpClient
 import platform.UIKit.UIApplication
 import platform.UIKit.UIBackgroundTaskInvalid
 import platform.UIKit.UIViewController
 
 /** The root view controller Swift hosts in its window. */
-fun MainViewController(): UIViewController = ComposeUIViewController { App(IosPhoneLink) }
+fun MainViewController(): UIViewController = ComposeUIViewController { App(IosPhoneLink, IosServices) }
+
+private object IosServices : AppServices {
+    private val defaults = NSUserDefaults.standardUserDefaults
+
+    override fun secret(name: String): String? = Keychain.get(name)
+    override fun setSecret(name: String, value: String?) = Keychain.set(name, value)
+    override fun pref(name: String): String? = defaults.stringForKey(name)
+    override fun setPref(name: String, value: String) = defaults.setObject(value, forKey = name)
+    override fun notify(title: String, body: String) = Notifier.post(title, body)
+    override fun requestNotifications() = Notifier.requestPermission()
+    override val http by lazy { darwinHttpClient() }
+}
 
 private object IosPhoneLink : PhoneLink {
     private val connector = PhoneConnector()

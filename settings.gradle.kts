@@ -31,4 +31,5 @@ dependencyResolutionManagement {
 // Shared modules are added as their phase starts (screen, agent, tools, llm, mcp, devsvc).
 include(":shared:core-ops")
 include(":shared:phone-coredevice")
+include(":shared:agent")
 include(":composeApp")

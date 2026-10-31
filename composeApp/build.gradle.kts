@@ -15,6 +15,7 @@ kotlin {
             isStatic = true
             export(projects.shared.coreOps)
             export(projects.shared.phoneCoredevice)
+            export(projects.shared.agent)
         }
     }
 
@@ -22,6 +23,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.shared.coreOps)
             api(projects.shared.phoneCoredevice)
+            api(projects.shared.agent)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
