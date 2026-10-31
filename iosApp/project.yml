@@ -27,6 +27,9 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         # The loopback-VPN route reaches the phone's pairing service as a local-network peer.
+        # Silent, mixable audio keeps Mode running while it drives other apps.
+        UIBackgroundModes:
+          - audio
         NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
     preBuildScripts:
       # Builds the Kotlin side (ModeKit.framework) for the SDK and configuration Xcode is building.

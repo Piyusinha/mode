@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
+import com.piyush.mode.ops.ResilientBackend
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.double
@@ -42,7 +43,12 @@ class HandsCheck(private val link: PhoneLink) {
     suspend fun connect() = run("connect") {
         val started = clock.markNow()
         val connection = link.connect()
-        phone = connection.backend
+        var first: PhoneBackend? = connection.backend
+        // Reconnects by itself if iOS pauses Mode or the connection drops.
+        phone = ResilientBackend(
+            connect = { first?.also { first = null } ?: link.connect().backend },
+            onReconnect = { why -> log += "  ↻ connection dropped ($why), reconnected" },
+        )
         status = "Connected via ${connection.route} in ${started.elapsedNow().inWholeMilliseconds} ms"
         log += connection.attempts
     }

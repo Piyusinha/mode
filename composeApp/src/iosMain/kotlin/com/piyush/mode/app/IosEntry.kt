@@ -40,6 +40,9 @@ private object IosPhoneLink : PhoneLink {
     }
 
     override suspend fun <T> inBackground(work: suspend () -> T): T {
+        // Silent mixable audio keeps Mode running for as long as the work
+        // takes; the background task is a second, shorter safety net.
+        withContext(Dispatchers.Main) { KeepAwake.start() }
         val app = UIApplication.sharedApplication
         var task = UIBackgroundTaskInvalid
         task = app.beginBackgroundTaskWithName("mode.drive") {
@@ -50,6 +53,7 @@ private object IosPhoneLink : PhoneLink {
             return work()
         } finally {
             if (task != UIBackgroundTaskInvalid) app.endBackgroundTask(task)
+            withContext(Dispatchers.Main) { KeepAwake.stop() }
         }
     }
 

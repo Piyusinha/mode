@@ -52,3 +52,37 @@ pub fn pair_over_usb(hostname: &str) -> Result<Vec<u8>> {
         Ok(file.to_bytes())
     })
 }
+
+/// Removes the developer disk image from the first iPhone on USB, for testing
+/// that Mode can mount it again. Answers what was removed, if anything.
+pub fn remove_disk_image_over_usb() -> Result<Option<String>> {
+    use idevice::RsdService;
+    use idevice::cryptexd::{CryptexdClient, installed_ddi};
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| Error(format!("runtime: {e}")))?;
+    rt.block_on(async {
+        let mut mux = UsbmuxdConnection::default().await?;
+        let device = mux
+            .get_devices()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error("no iPhone on USB".into()))?;
+        let provider = device.to_provider(UsbmuxdAddr::default(), "modecore-ddi");
+        let proxy = CoreDeviceProxy::connect(&provider).await?;
+        let rsd_port = proxy.tunnel_info().server_rsd_port;
+        let mut adapter = proxy.create_software_tunnel()?.to_async_handle();
+        let rsd = adapter.connect(rsd_port).await.map_err(|e| Error(format!("RSD connect: {e}")))?;
+        let mut handshake = RsdHandshake::new(rsd).await?;
+        let Some(installed) = installed_ddi(&mut adapter, &mut handshake).await? else {
+            return Ok(None);
+        };
+        let client: CryptexdClient<Box<dyn idevice::ReadWrite>> =
+            CryptexdClient::connect_rsd(&mut adapter, &mut handshake).await?;
+        client.uninstall(&installed.identifier, Some(&installed.version)).await?;
+        Ok(Some(format!("{} {}", installed.identifier, installed.version)))
+    })
+}

@@ -9,6 +9,6 @@ mod session;
 mod pairing;
 
 #[cfg(feature = "usb")]
-pub use pairing::pair_over_usb;
+pub use pairing::{pair_over_usb, remove_disk_image_over_usb};
 
 pub use session::{Button, Clock, Error, Result, Session};

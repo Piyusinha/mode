@@ -7,7 +7,8 @@
 //!     home | shot <file> | tap <x> <y> | drag <x1> <y1> <x2> <y2> <ms>
 //!     type <ascii> | paste <text> | key <name> | launch <bundle id> | apps
 //!     clock mach|wall | sleep <ms>
-//! Or, alone: `pair <hostname> <file>` makes a remote-pairing file over USB.
+//! Or, alone: `pair <hostname> <file>` makes a remote-pairing file over USB;
+//! `ddi-remove` unmounts the developer disk image (to test remounting).
 //! Coordinates are 0..65535.
 
 use std::time::{Duration, Instant};
@@ -16,6 +17,15 @@ use modecore::{Button, Clock, Session};
 
 fn main() {
     let mut args = std::env::args().skip(1).peekable();
+    // `ddi-remove` unmounts the developer disk image, to test remounting.
+    if args.peek().map(String::as_str) == Some("ddi-remove") {
+        match modecore::remove_disk_image_over_usb() {
+            Ok(Some(what)) => println!("removed {what}"),
+            Ok(None) => println!("no developer disk image was installed"),
+            Err(e) => fail(&format!("ddi-remove: {e}")),
+        }
+        return;
+    }
     // `pair <hostname> <file>` makes a remote-pairing file; it needs no session.
     if args.peek().map(String::as_str) == Some("pair") {
         args.next();
