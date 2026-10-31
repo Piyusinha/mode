@@ -34,6 +34,31 @@ tunnel, no sudo). iPhone 17 Pro, iOS 27.2 (24B119), disk image already mounted.
 The ~1 s per call is the CLI opening a fresh tunnel and stream each time; Mode
 keeps one session open.
 
+## Phase 2: modecore, our own session (2026-10-31)
+
+`native/modecore` (Rust, on idevice) holds one tunnel and one screen stream for
+the whole session. Driven from the Mac over USB with `examples/mc`:
+
+| Op | Time |
+|---|---|
+| Open session (tunnel + stream) | 0.5–0.7 s, once |
+| Tap / drag | ~52 ms / hold + travel |
+| Home | ~81 ms |
+| Type "Uber" | ~55 ms |
+| Paste (clipboard + Cmd+V) | ~55 ms |
+| Launch by bundle id | ~113 ms |
+| App list (238 apps) | 42 ms |
+| Screenshot, PNG 1206×2622 | 0.24–1.8 s |
+
+Found along the way:
+- iOS 27.2 rejects idevice's `jpeg` screenshot format; only PNG works.
+  Shrink on the phone, or later take frames from the open stream.
+- Cmd+V paste makes iOS ask "<App> would like to paste from dtpasteboardd".
+  Tapping Allow Paste works; so does Settings › <App> › Paste from Other Apps ›
+  Allow. Tapping iOS's own Paste menu never asks.
+- The plain app-list call never returns on iOS 27; the streamed one does.
+- Uber's bundle id is `com.ubercab.UberClient`.
+
 ## Gotchas
 
 - **Touch needs an open media stream from the same client.** Without one, iOS
