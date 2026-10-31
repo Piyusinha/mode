@@ -1,6 +1,6 @@
 # Status
 
-As of 2026-10-31.
+As of 2026-11-01.
 
 ## Phases
 
@@ -10,9 +10,9 @@ As of 2026-10-31.
 | 1 | Prove CoreDevice remote control from a Mac: no overlay, taps land, Unicode | ✅ Done |
 | 2 | `native/modecore`: our own Rust session on idevice, with a C API | ✅ Done |
 | 3 | `shared/phone-coredevice`: the Kotlin `PhoneBackend` for iOS | ✅ Done |
-| 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake | 🟡 All but mobile data |
-| 5 | Docs | 🟡 This set |
-| 6 | The agent: task in, AI picks each action, Mode executes | 🟡 Built and unit-tested (12 tests); first real runs pending (needs the OpenRouter key) |
+| 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake, clean session end | 🟡 All but mobile data and the long soak |
+| 5 | Docs | 🟡 Needs a pass for everything since the agent |
+| 6 | The agent: task in, AI picks each action, Mode executes | ✅ Working on the phone (52 tests); tuning continues |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
 ## Proven on the phone (iPhone 17 Pro, iOS 27.2)
@@ -28,19 +28,41 @@ As of 2026-10-31.
 | Restart with the cable unplugged | ✅ The disk image stays mounted; connect 2340 ms |
 | Disk image removed, Mode mounts it itself | ✅ 2.49 s, then driving (tested over USB with the bundled files) |
 | Mode stays awake in the background, music keeps playing | ✅ Settings → Wi-Fi → back; look at 3.85 s, not 27 s |
+| The "viewing and controlling" icon goes away when a session ends | ✅ Confirmed by the user |
+| Agent: "Turn off dark mode" | ✅ 7 steps, 37 s, $0.0036 (Claude Haiku 5.5) |
+| Agent: send a WhatsApp message, then read today's calendar | ✅ 11 steps, 62 s, $0.0065, no questions |
 
-## Pending
+## Roadmap
 
-### Phase 4, remaining
-1. **Mobile data.** Connecting through the VPN fails when only mobile data is
-   on. Needs a test and a clear prompt (turn mobile data off for a moment while
-   connecting).
-2. **A longer soak.** Keep-awake is proven for a short run; a 5-minute run
-   (as long as a real task) is still to do.
+In order. Items 1–7 are engineering; 8–10 are for launch; the free build stays last.
 
-### Phase 6, the agent
-- First real runs with the OpenRouter key, then the model comparison (Compare tab) to pick the default.
-- Read the debug logs of those runs and tune the prompt.
+### Make the agent better
+1. **Speed.** About a third of a run is waiting. Typing waits ~6 s, probably because a
+   blinking cursor never gives two identical screenshots; each plan step takes a
+   screenshot of an unchanged screen. Target: 30–40% faster runs.
+2. **Pick the default model.** Compare tab on 3–4 real tasks across Claude Haiku 5.5,
+   Qwen 3.8-27B, Qwen 3.7 Flash and GPT-5 nano; choose by cost per *finished* task.
+3. **Start a task from anywhere.** Siri / Shortcuts / Action Button ("Hey Siri, Mode:
+   turn off dark mode"), so a task starts from whatever is on screen. The agent already
+   handles starting outside Mode.
+
+### Finish the app
+4. **Background soak.** 5 minutes with Mode in the background during a long task.
+5. **Mobile data.** Connecting with only mobile data on still needs data switched off
+   for a moment; test it and make the prompt clear, or find a way around it.
+6. **UI/UX.** Agent screen with live steps, the plan, cost and stop; cleaner Settings
+   and Logs; onboarding (API key, pairing check).
+7. **Docs.** Bring architecture, decisions, flows and setup up to date.
+
+### Launch
+8. **Mac setup app: one click.** A small Mac app that does the whole first-time setup
+   in one click: installs Mode on the phone, makes and pushes the pairing file over
+   USB, checks Developer Mode and the disk image, and says when the phone is ready.
+   After that the Mac is not needed. Must work for both paid and free Apple accounts.
+9. **Landing page.** What Mode does, the demo video, and the download for the Mac
+   setup app.
+10. **Demo video.** A short, polished screen recording of real runs from the phone
+    (for example the WhatsApp + Calendar task), for the landing page and sharing.
 
 ### Last
 - Free build (`tools/gen-project.sh free`) with LocalDevVPN, on the phone.
@@ -62,3 +84,14 @@ As of 2026-10-31.
 | `fe503f8` | Mount the developer disk image from the phone after a restart |
 | `9566e2c` | Keep Mode awake while it drives other apps; reconnect on drops |
 | `63d7399` | Reconnect afresh after mounting the developer disk image |
+| `f814d58` | Docs: restart recovery, keep-awake, reconnect; close the keyboard on Run |
+| `554ee33` | Phase 6: the agent (OpenRouter), model comparison, settings, notifications |
+| `9b5947f` | Debug logs for every run; end the session when idle |
+| `2a42710` | Fix a launch crash in the event log; one-line tab labels |
+| `7a031b3` | Pairing works without Xcode's pairing; a clear "unpaired" message |
+| `c3e11ab` | Clear orphaned screen streams; let go after every hands check |
+| `e74741a` | Let the session's goodbye reach the phone before stopping the VPN |
+| `bd8ecb2` | Stop session button |
+| `0ceca00` | End the session the way Device Hub does; the agent leaves Mode before looking |
+| `6d60120` | Smarter agent: settle before acting, back, plan, iOS know-how; fix the Sonnet 400 |
+| `c3cb155` | Agent: ask once and act on the answer; take the message text from the task |
