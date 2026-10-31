@@ -73,12 +73,34 @@ Found along the way:
   client is Mode itself (the phone cannot tell). Sessions are listed in
   Settings › Privacy & Security › Safety Check.
 - Requires Developer Mode and a remote-pairing file made once over USB.
+- The phone refuses pairing from clients on the phone itself; connect through the loopback VPN.
+- A reboot unmounts the developer disk image; until it is mounted again the services are gone.
 
-## Connecting from the phone itself
+## Phase 4: on the phone itself (2026-10-31)
 
-Mode connects to the phone's own `remotepairingd`: first `127.0.0.1` (untested;
-LocalDevVPN#31 shows it accepts loopback TCP even on cellular), else a loopback
-VPN peer `10.7.0.1`. Over the VPN, iOS refuses the connection on cellular-only
-(it treats it as coming from the cellular interface), so turn mobile data off
-while connecting. Paid accounts build the VPN into Mode; free accounts use the
-LocalDevVPN app.
+Mode connects to its own phone with the pairing file, through a loopback VPN.
+
+| Route | Result |
+|---|---|
+| `127.0.0.1:49152` | TCP accepted, **pair-verify dropped** |
+| Own Wi-Fi address `:49152` | TCP accepted, **pair-verify dropped** |
+| Own USB-link address `:49152` | TCP accepted, **pair-verify dropped** |
+| `10.7.0.1:49152` through Mode's loopback VPN | ✅ connected |
+| Mac → phone's USB-link address, same file and code | ✅ connected (control test) |
+
+So the phone refuses pairing on connections that start on the phone itself, and
+the VPN is required. On mobile data with Wi-Fi off, the phone refuses the VPN
+route as well (it treats it as cellular), so turn mobile data off for a moment
+while connecting.
+
+| Measured on the phone | Time |
+|---|---|
+| Connect (first time, including the VPN permission prompt) | 5976 ms |
+| Connect (afterwards) | 962 ms |
+| Open Settings by name | 149 ms |
+| Look: picture + text (first) | 1413 ms (694 + 719) |
+| Look (next) | 825 ms (417 + 408) |
+| Look before the speed fix | about 7–8 s |
+| Touch after the session sat idle for 45 s | works |
+
+See [decisions.md](decisions.md) D12–D15 and [flows.md](flows.md).
