@@ -22,7 +22,7 @@ fun App() {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("Mode", style = MaterialTheme.typography.displayMedium)
-                Text("Engine: not connected", style = MaterialTheme.typography.bodyLarge)
+                Text("Phone: not connected", style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

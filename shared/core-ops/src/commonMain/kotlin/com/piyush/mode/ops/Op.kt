@@ -12,25 +12,28 @@ import kotlinx.serialization.json.jsonObject
  *
  * Ops are named for what they mean, never for how a platform does them, the
  * same rule as phone-harness's transport.py: `nav.home` means one thing on an
- * iPhone and on an Android, though one is an XCUIDevice button press and the
- * other a key event.
+ * iPhone and on an Android, though one is a CoreDevice HID button press and
+ * the other a key event.
  *
- * Wire names and parameter names are phone-harness's, so the engine speaks the
- * same `POST /op {"op", "kw"}` protocol as its cloud iPhone host.
+ * Wire names and parameter names are phone-harness's, so an op can also go out
+ * as phone-harness's `POST /op {"op", "kw"}` to its cloud iPhone host.
  *
- * Coordinates are screen points, top-left origin, the space the engine taps in.
- * Durations are seconds.
+ * Not every phone can answer every op: a backend raises [Unsupported] for the
+ * ones it cannot honour (on iOS, [Tree] and [CurrentApp] today).
+ *
+ * Coordinates are screen points, top-left origin. Durations are seconds.
  */
 @Serializable
 sealed interface Op {
 
-    /** The foreground app's accessibility tree, nested, as the engine reports it. */
+    /** The foreground app's accessibility tree, nested. Not every phone can answer. */
     @Serializable @SerialName("tree")
     data object Tree : Op
 
     /**
      * Visible text with tap-ready centres: `[{text, confidence, source, x, y, w, h}]`.
-     * From the accessibility tree on iOS, so `source` is `"tree"`.
+     * `source` says where it came from: `"ocr"` when read off a screenshot (iOS),
+     * `"tree"` when the OS reported it.
      */
     @Serializable @SerialName("screen.text")
     data class ScreenText(@SerialName("min_confidence") val minConfidence: Double = 0.3) : Op
@@ -89,7 +92,7 @@ sealed interface Op {
     @Serializable @SerialName("apps.launch")
     data class LaunchApp(val name: String, val fresh: Boolean = false) : Op
 
-    /** The foreground app's bundle id, or null when the engine cannot tell. */
+    /** The foreground app's bundle id, or null when the phone cannot tell. Not every phone can answer. */
     @Serializable @SerialName("apps.current")
     data object CurrentApp : Op
 

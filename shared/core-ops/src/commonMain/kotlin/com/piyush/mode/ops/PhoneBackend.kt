@@ -3,7 +3,7 @@ package com.piyush.mode.ops
 import kotlinx.serialization.json.JsonElement
 
 /**
- * The one seam every phone sits behind: the iOS engine today, an Android
+ * The one seam every phone sits behind: CoreDevice remote control on iOS, an Android
  * accessibility service later, a fake in tests.
  *
  * A backend answers only the ops it can honour. What it cannot do raises
@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonElement
  * result the caller cannot tell from a real one.
  */
 interface PhoneBackend {
-    /** Short name for logs and errors, such as `ios-engine`. */
+    /** Short name for logs and errors, such as `ios-coredevice`. */
     val name: String
 
     /** Wire names of every op this phone can do right now. */
