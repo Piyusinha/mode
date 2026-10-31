@@ -7,6 +7,7 @@
 //!     home | shot <file> | tap <x> <y> | drag <x1> <y1> <x2> <y2> <ms>
 //!     type <ascii> | paste <text> | key <name> | launch <bundle id> | apps
 //!     clock mach|wall | sleep <ms>
+//! Or, alone: `pair <hostname> <file>` makes a remote-pairing file over USB.
 //! Coordinates are 0..65535.
 
 use std::time::{Duration, Instant};
@@ -15,6 +16,16 @@ use modecore::{Button, Clock, Session};
 
 fn main() {
     let mut args = std::env::args().skip(1).peekable();
+    // `pair <hostname> <file>` makes a remote-pairing file; it needs no session.
+    if args.peek().map(String::as_str) == Some("pair") {
+        args.next();
+        let hostname = args.next().unwrap_or_else(|| fail("pair: missing hostname"));
+        let path = args.next().unwrap_or_else(|| fail("pair: missing output file"));
+        let bytes = modecore::pair_over_usb(&hostname).unwrap_or_else(|e| fail(&format!("pair: {e}")));
+        std::fs::write(&path, bytes).unwrap_or_else(|e| fail(&format!("write {path}: {e}")));
+        println!("paired as '{hostname}', saved {path}");
+        return;
+    }
     let t0 = Instant::now();
     let session = Session::open_usb().unwrap_or_else(|e| fail(&format!("open: {e}")));
     println!("[{:>6.2}s] session open", t0.elapsed().as_secs_f64());

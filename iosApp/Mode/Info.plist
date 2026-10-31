@@ -20,5 +20,11 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 </dict>
 </plist>

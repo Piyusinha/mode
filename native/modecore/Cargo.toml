@@ -12,7 +12,7 @@ crate-type = ["staticlib", "rlib"]
 [features]
 default = []
 # Mac-side testing over USB through usbmuxd. Not built for iOS.
-usb = ["idevice/usbmuxd", "idevice/core_device_proxy"]
+usb = ["idevice/usbmuxd", "idevice/core_device_proxy", "idevice/xpc"]
 
 [dependencies]
 # jkcoxson/idevice, MIT. Pinned: these are private, version-sensitive protocols.

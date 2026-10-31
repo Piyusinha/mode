@@ -22,6 +22,12 @@ targets:
       properties:
         # Compose refuses to start without it on 120 Hz iPhones.
         CADisableMinimumFrameDurationOnPhone: true
+        # Mode's Documents show in the Files app and in Finder, so the pairing
+        # file can also be dropped in by hand (free accounts, no Mac tools).
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        # The loopback-VPN route reaches the phone's pairing service as a local-network peer.
+        NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
     preBuildScripts:
       # Builds the Kotlin side (ModeKit.framework) for the SDK and configuration Xcode is building.
       - name: Build ModeKit

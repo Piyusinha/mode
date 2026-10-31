@@ -5,5 +5,10 @@
 pub mod keys;
 mod ffi;
 mod session;
+#[cfg(feature = "usb")]
+mod pairing;
+
+#[cfg(feature = "usb")]
+pub use pairing::pair_over_usb;
 
 pub use session::{Button, Clock, Error, Result, Session};
