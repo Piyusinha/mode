@@ -107,6 +107,10 @@ class PhoneHolder(private val link: PhoneLink, private val log: (String) -> Unit
             current != null
         }
         if (had) {
+            // The session's goodbye (TCP FIN) travels through the VPN; stopping
+            // the VPN at once can drop it, leaving the phone believing the
+            // session is still open (and its icon showing). Give it time.
+            kotlinx.coroutines.delay(2000)
             runCatching { link.release() }
             AppLog.log("phone", "disconnected (idle)")
         }

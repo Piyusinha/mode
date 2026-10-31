@@ -57,18 +57,33 @@ object LoopbackVpn {
     suspend fun ensureUp(timeout: Duration = 10.seconds) {
         if (!builtIn) return
         val manager = loadOrCreate()
+        // A manager object can go stale (the user toggled the VPN in Settings,
+        // or it was just stopped): reload before starting.
+        completion { cb -> manager.loadFromPreferencesWithCompletionHandler(cb) }
         if (manager.connection.status == NEVPNStatusConnected) return
-        val session = manager.connection as? NETunnelProviderSession
-            ?: throw PhoneUnavailable("Mode's VPN configuration is not a packet tunnel")
-        memScoped {
-            val error = alloc<ObjCObjectVar<NSError?>>()
-            if (!session.startVPNTunnelAndReturnError(error.ptr)) {
-                throw PhoneUnavailable("could not start Mode's VPN: ${error.value?.localizedDescription}")
+        repeat(2) { attempt ->
+            val session = manager.connection as? NETunnelProviderSession
+                ?: throw PhoneUnavailable("Mode's VPN configuration is not a packet tunnel")
+            memScoped {
+                val error = alloc<ObjCObjectVar<NSError?>>()
+                if (!session.startVPNTunnelAndReturnError(error.ptr)) {
+                    throw PhoneUnavailable("could not start Mode's VPN: ${error.value?.localizedDescription}")
+                }
+            }
+            val up = withTimeoutOrNull(timeout / 2) {
+                while (manager.connection.status != NEVPNStatusConnected) delay(100.milliseconds)
+                true
+            } ?: false
+            if (up) return
+            if (attempt == 0) {
+                manager.connection.stopVPNTunnel()
+                delay(500.milliseconds)
             }
         }
-        withTimeoutOrNull(timeout) {
-            while (manager.connection.status != NEVPNStatusConnected) delay(100.milliseconds)
-        } ?: throw PhoneUnavailable("Mode's VPN did not connect within $timeout (status ${manager.connection.status})")
+        throw PhoneUnavailable(
+            "Mode's VPN did not connect (status ${manager.connection.status}). Open Settings › VPN, check that " +
+                "\"Mode\" is listed and allowed, then try again.",
+        )
     }
 
     /**
