@@ -25,16 +25,21 @@ private class FakePhone(
     var screens: List<List<Pair<String, Pair<Double, Double>>>>,
     private val supported: Set<String> = setOf(
         "screen.capture", "screen.text", "input.tap", "input.scroll", "input.text", "input.keys", "nav.home", "apps.launch",
+        "input.drag",
     ),
 ) : PhoneBackend {
     val actions = mutableListOf<Op>()
+    /** Base64 frames handed out by successive captures; the last one repeats. */
+    var frames: MutableList<String> = mutableListOf("AAAA")
+    var captures = 0
     private var screen = 0
     override val name = "fake"
     override suspend fun ops() = supported
 
     override suspend fun send(op: Op): JsonElement = when (op) {
         is Op.ScreenCapture -> buildJsonObject {
-            put("jpeg_b64", "AAAA")
+            captures++
+            put("jpeg_b64", if (frames.size > 1) frames.removeAt(0) else frames.first())
             put("bounds", buildJsonObject { put("x", 0); put("y", 0); put("w", 402.0); put("h", 874.0); put("id", 0) })
             put("img_px", buildJsonObject { put("w", 500); put("h", 1000) })
         }
@@ -47,7 +52,7 @@ private class FakePhone(
             require(op.wireName in supported)
             actions += op
             screen++
-            JsonNull
+            if (op is Op.LaunchApp) JsonPrimitive("bundle.${op.name}") else JsonNull
         }
     }
 }
@@ -91,8 +96,7 @@ class AgentTest {
         val result = Agent(phone, model, Gate(), noSettle).run("open wifi")
 
         assertIs<AgentOutcome.Done>(result.outcome)
-        assertEquals(Op.Home, phone.actions.first(), "a run starts from the Home Screen")
-        val tap = phone.actions[1] as Op.Tap
+        val tap = phone.actions.single() as Op.Tap
         assertEquals(125 * 402.0 / 500, tap.x)
         assertEquals(500 * 874.0 / 1000, tap.y)
         assertEquals(2, result.steps)
@@ -115,7 +119,7 @@ class AgentTest {
         val gate = Gate(allow = false)
         val model = ScriptedModel(call("tap", "x" to 250, "y" to 915, "reason" to "book"), call("done", "summary" to "stopped"))
         Agent(phone, model, gate, noSettle).run("get a cab")
-        assertEquals(listOf<Op>(Op.Home), phone.actions, "declined, so nothing was tapped")
+        assertTrue(phone.actions.isEmpty(), "declined, so nothing was tapped")
         assertTrue(gate.asked.single().contains("Request Uber Go"))
     }
 
@@ -139,7 +143,7 @@ class AgentTest {
         val result = Agent(phone, model, Gate(), AgentConfig(maxSteps = 3, settleMs = 0)).run("t")
         val outcome = assertIs<AgentOutcome.Stopped>(result.outcome)
         assertTrue("3 steps" in outcome.why)
-        assertEquals(1 + 3, phone.actions.size, "Home first, then three steps")
+        assertEquals(3, phone.actions.size)
     }
 
     @Test
@@ -156,7 +160,7 @@ class AgentTest {
         val model = ScriptedModel(null, call("fly", "reason" to "?"), call("done", "summary" to "ok"))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         assertEquals(listOf("cheap", "cheap", "strong"), model.models)
-        assertEquals(listOf<Op>(Op.Home), phone.actions)
+        assertTrue(phone.actions.isEmpty())
     }
 
     @Test
@@ -165,7 +169,7 @@ class AgentTest {
         val model = ScriptedModel(call("done", "summary" to "x"))
         Agent(phone, model, Gate(), noSettle).run("t")
         val names = model.lastTools!!.map { it.jsonObject.getValue("function").jsonObject.getValue("name").jsonPrimitive.content }
-        assertEquals(listOf("tap", "wait", "ask_user", "done"), names)
+        assertEquals(listOf("tap", "plan", "wait", "ask_user", "done"), names)
     }
 
     @Test
@@ -225,5 +229,98 @@ class AgentTest {
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
         assertTrue("waiting is not getting anywhere" in model.lastUserText)
+    }
+
+    @Test
+    fun aFailingStrongModelHandsTheStepBackToTheMainModel() = runTest {
+        val phone = FakePhone(List(10) { listOf("Same" to (10.0 to 10.0)) })
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "try")
+        val scripted = ScriptedModel(tap, tap, call("done", "summary" to "ok"))
+        val flaky = LlmClient { model, messages, tools ->
+            if (model == "strong") throw LlmFailed("strong: HTTP 400: Provider returned error")
+            scripted.chat(model, messages, tools)
+        }
+        val result = Agent(phone, flaky, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
+        assertIs<AgentOutcome.Done>(result.outcome, "the run survives the strong model's error")
+        assertEquals(listOf("cheap", "cheap", "cheap"), scripted.models)
+    }
+
+    @Test
+    fun waitsForTheScreenToBeStillBeforeLookingAgain() = runTest {
+        val phone = FakePhone(listOf(listOf("A" to (1.0 to 1.0)), listOf("B" to (1.0 to 1.0))))
+        // Capture 1 is step 1's look; after Home the screen moves (BBBB, CCCC) until two match.
+        phone.frames = mutableListOf("AAAA", "BBBB", "CCCC", "CCCC", "CCCC")
+        val model = ScriptedModel(call("home", "reason" to "x"), call("done", "summary" to "ok"))
+        Agent(phone, model, Gate(), AgentConfig(settleMs = 0)).run("t")
+        // look, then settle: BBBB, CCCC, CCCC (still), then step 2's look.
+        assertEquals(5, phone.captures)
+    }
+
+    @Test
+    fun startingInModeHidesModesScreenAndDoesNotGoHome() = runTest {
+        val phone = FakePhone(listOf(listOf("Step 1: thinking" to (1.0 to 1.0))))
+        var firstImage: ByteArray? = ByteArray(1)
+        var firstText = ""
+        val scripted = ScriptedModel(call("done", "summary" to "x"))
+        val spy = LlmClient { model, messages, tools ->
+            if (firstText.isEmpty()) { firstImage = messages.last().image; firstText = messages.last().text }
+            scripted.chat(model, messages, tools)
+        }
+        Agent(phone, spy, Gate(), noSettle).run("turn off dark mode", startsInMode = true)
+        assertEquals(null, firstImage, "Mode's own screen is not shown to the model")
+        assertTrue("Mode, the app that runs you" in firstText)
+        assertTrue("Step 1: thinking" !in firstText)
+        assertTrue(phone.actions.isEmpty(), "no Home press")
+    }
+
+    @Test
+    fun thePlanIsShownBackEveryStep() = runTest {
+        val phone = FakePhone(List(10) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val model = ScriptedModel(
+            call("plan", "steps" to "1. turn off dark mode\n2. open YouTube"),
+            call("home", "reason" to "x"),
+            call("done", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertTrue("YOUR PLAN" in model.lastUserText && "2. open YouTube" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun controlCenterSwipesDownFromTheTopRight() {
+        val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
+        val op = AgentTools.toOp(call("control_center", "reason" to "x"), g) as Op.Drag
+        assertTrue(op.x1 > 350 && op.y1 < 5 && op.y2 > 400)
+    }
+
+    @Test
+    fun backIsTheLeftEdgeSwipe() {
+        val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
+        val op = AgentTools.toOp(call("back", "reason" to "x"), g) as Op.Drag
+        assertEquals(1.0, op.x1)
+        assertTrue(op.x2 > 250, "swipes well across the screen")
+        assertEquals(op.y1, op.y2)
+    }
+
+    @Test
+    fun theModelIsToldWhenItsActionChangedNothing() = runTest {
+        val phone = FakePhone(List(10) { listOf("Same" to (10.0 to 10.0)) })
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "try")
+        val model = ScriptedModel(tap, call("done", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertTrue("screen did NOT change" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun afterTheUserAnswersModeReopensTheAppItWasIn() = runTest {
+        val phone = FakePhone(List(10) { i -> listOf("s$i" to (10.0 to 10.0)) })
+        val model = ScriptedModel(
+            call("open_app", "name" to "Settings", "reason" to "x"),
+            call("ask_user", "question" to "Which Wi-Fi?"),
+            call("done", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(answer = "Home Wi-Fi"), noSettle).run("t")
+        val launches = phone.actions.filterIsInstance<Op.LaunchApp>().map { it.name }
+        assertEquals(listOf("Settings", "bundle.Settings"), launches)
+        assertTrue("Mode has reopened bundle.Settings" in model.lastUserText, model.lastUserText)
     }
 }

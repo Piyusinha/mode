@@ -100,7 +100,8 @@ class AgentRunner(
                 onStatus = { status = it },
                 trace = recorder,
             )
-            val result = link.inBackground { agent.run(task) }
+            // Started from Mode's own screen; the agent goes straight to the app it needs.
+            val result = link.inBackground { agent.run(task, startsInMode = true) }
             lastResult = result
             status = describe(result)
             services.notify("Mode", describe(result))

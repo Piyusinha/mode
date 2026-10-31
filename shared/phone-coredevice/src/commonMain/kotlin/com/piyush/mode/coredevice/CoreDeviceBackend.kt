@@ -48,8 +48,10 @@ class CoreDeviceBackend(
     private var apps: List<InstalledApp>? = null
 
     /**
-     * The last screenshot, reused by the next read if nothing was done in
-     * between, so `screen.capture` and `screen.text` for one look cost one shot.
+     * The screenshot a `screen.capture` just took, reused once by the
+     * `screen.text` that follows it, so one look (picture + text) costs one
+     * shot. Anything else takes a fresh shot, so callers can watch the screen
+     * change (an agent waiting for a scroll to stop needs that).
      */
     private var lastShot: Pair<TimeMark, ByteArray>? = null
 
@@ -135,7 +137,7 @@ class CoreDeviceBackend(
 
     @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
     private fun capture(maxSize: Int?): JsonElement {
-        val png = screenshot()
+        val png = session.screenshotPng().also { lastShot = clock.markNow() to it }
         if (maxSize == null || maxSize <= 0) {
             return buildJsonObject {
                 put("png_b64", Base64.encode(png))
@@ -156,7 +158,7 @@ class CoreDeviceBackend(
 
     /** OCR boxes in screen points, centres ready to tap: `{text, confidence, source, x, y, w, h}`. */
     private fun readText(minConfidence: Double): List<JsonElement> =
-        reader.read(screenshot())
+        reader.read(shotForText())
             .filter { it.confidence >= minConfidence && it.text.isNotBlank() }
             .map {
                 buildJsonObject {
@@ -170,9 +172,12 @@ class CoreDeviceBackend(
                 }
             }
 
-    private fun screenshot(): ByteArray {
-        lastShot?.let { (taken, png) -> if (taken.elapsedNow() < SHOT_REUSE) return png }
-        return session.screenshotPng().also { lastShot = clock.markNow() to it }
+    /** The capture's shot if it was just taken, else a fresh one; either way used once. */
+    private fun shotForText(): ByteArray {
+        val shot = lastShot
+        lastShot = null
+        if (shot != null && shot.first.elapsedNow() < SHOT_REUSE) return shot.second
+        return session.screenshotPng()
     }
 
     private fun round(v: Double): Double = kotlin.math.round(v)

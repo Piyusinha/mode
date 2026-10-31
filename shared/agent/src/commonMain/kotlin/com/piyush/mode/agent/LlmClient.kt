@@ -44,7 +44,7 @@ fun interface LlmClient {
 }
 
 /** The model call failed: network, key, credit, or a model that cannot do this. */
-class LlmFailed(message: String) : RuntimeException(message)
+class LlmFailed(message: String, val status400: Boolean = false) : RuntimeException(message)
 
 /**
  * OpenRouter's OpenAI-compatible chat completions, which also fits any
@@ -57,13 +57,29 @@ class OpenRouterClient(
     private val baseUrl: String = "https://openrouter.ai/api/v1",
 ) : LlmClient {
 
+    /** Models that answered a forced tool choice with a 400 this session. */
+    private val noForcedToolChoice = mutableSetOf<String>()
+
     override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
         val key = apiKey()?.takeIf { it.isNotBlank() } ?: throw LlmFailed("No OpenRouter API key: add it in Settings.")
+        val forced = forcedToolChoiceAllowed(model) && model !in noForcedToolChoice
+        return try {
+            post(key, model, messages, tools, if (forced) "required" else "auto")
+        } catch (e: LlmFailed) {
+            // Newer models reject forced tool use with a 400; ask again with "auto"
+            // (the prompt already says to always call exactly one tool).
+            if (!forced || !e.status400) throw e
+            noForcedToolChoice += model
+            post(key, model, messages, tools, "auto")
+        }
+    }
+
+    private suspend fun post(key: String, model: String, messages: List<ChatMessage>, tools: JsonArray, toolChoice: String): ChatResult {
         val body = buildJsonObject {
             put("model", model)
             put("messages", buildJsonArray { messages.forEach { add(it.toJson()) } })
             put("tools", tools)
-            put("tool_choice", "required")
+            put("tool_choice", toolChoice)
             put("parallel_tool_calls", false)
             put("max_tokens", 1024)
             putJsonObject("usage") { put("include", true) }
@@ -74,12 +90,21 @@ class OpenRouterClient(
             setBody(TextContent(body.toString(), ContentType.Application.Json))
         }
         val text = response.bodyAsText()
-        if (!response.status.isSuccess()) throw LlmFailed("$model: HTTP ${response.status.value}: ${errorMessage(text)}")
+        if (!response.status.isSuccess()) {
+            throw LlmFailed("$model: HTTP ${response.status.value}: ${errorMessage(text)}", status400 = response.status.value == 400)
+        }
         return parse(text, model)
     }
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Claude Sonnet 5.5, Opus 5.5 and Fable/Mythos 5.1 reject forced tool use
+         * (tool_choice any/required → HTTP 400); everything else accepts it.
+         */
+        fun forcedToolChoiceAllowed(model: String): Boolean =
+            listOf("claude-sonnet-5.5", "claude-opus-5.5", "claude-fable-5.1", "claude-mythos-5.1").none { it in model }
 
         @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
         private fun ChatMessage.toJson(): JsonElement = buildJsonObject {
@@ -104,9 +129,15 @@ class OpenRouterClient(
             }
         }
 
+        /** OpenRouter's message plus the provider's own reason (metadata.raw), which says what was wrong. */
         private fun errorMessage(body: String): String = runCatching {
-            json.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
-        }.getOrNull() ?: body.take(300)
+            val error = json.parseToJsonElement(body).jsonObject["error"]?.jsonObject ?: return@runCatching null
+            val message = error["message"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            val metadata = error["metadata"]?.jsonObject
+            val raw = metadata?.get("raw")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull ?: it.toString() }
+            val provider = metadata?.get("provider_name")?.jsonPrimitive?.contentOrNull
+            listOfNotNull(message, provider?.let { "provider $it" }, raw?.take(500)).joinToString(" | ")
+        }.getOrNull() ?: body.take(500)
 
         /** Parses a chat-completions response (exposed for tests). */
         fun parse(body: String, model: String): ChatResult {

@@ -50,7 +50,8 @@ object AgentTools {
         Tool("tap", "Tap a point on the screen.", "input.tap", listOf(point("x"), point("y"), reason)),
         Tool("long_press", "Press and hold a point (context menus, rearranging).", "input.press", listOf(point("x"), point("y"), reason)),
         Tool(
-            "swipe", "Drag a finger from one point to another (sliders, swiping cards, pull to refresh).", "input.drag",
+            "swipe", "Drag a finger from one point to another: sliders, swiping cards, pull to refresh. " +
+                "Not for scrolling lists (use scroll).", "input.drag",
             listOf(
                 Param("x1", "number", "Start x, screenshot pixels."), Param("y1", "number", "Start y, screenshot pixels."),
                 Param("x2", "number", "End x, screenshot pixels."), Param("y2", "number", "End y, screenshot pixels."),
@@ -77,10 +78,23 @@ object AgentTools {
                 reason,
             ),
         ),
+        Tool(
+            "back", "Go back one screen with the iOS edge swipe. Prefer the screen's own Back / \"<\" button when " +
+                "there is one.", "input.drag", listOf(reason),
+        ),
+        Tool(
+            "control_center", "Open Control Center (quick toggles: Wi-Fi, Bluetooth, brightness, Focus, " +
+                "flashlight, and Dark Mode by long-pressing brightness).", "input.drag", listOf(reason),
+        ),
         Tool("home", "Go to the Home Screen.", "nav.home", listOf(reason)),
         Tool(
             "open_app", "Open an installed app by its name (or bundle id). Faster than finding its icon.", "apps.launch",
             listOf(Param("name", "string", "The app's name, as on its icon."), reason),
+        ),
+        Tool(
+            "plan", "Write or update your plan for a task with several parts: a short numbered list, marking " +
+                "items done as you go. It is shown back to you every step.", null,
+            listOf(Param("steps", "string", "The plan, one item per line, e.g. \"1. [done] turn off dark mode\\n2. set brightness\"")),
         ),
         Tool(
             "wait", "Wait for something to load or arrive before looking again.", null,
@@ -154,6 +168,10 @@ object AgentTools {
             "type_text" -> Op.TypeText(str("text"))
             "press_key" -> Op.PressKey(str("key"))
             "home" -> Op.Home
+            // Control Center: down from the top-right corner.
+            "control_center" -> Op.Drag(g.screenWidth - 30, 2.0, g.screenWidth - 30, g.screenHeight * 0.55, duration = 0.35)
+            // The iOS back gesture: from the very left edge, across, at mid height.
+            "back" -> Op.Drag(1.0, g.screenHeight * 0.45, g.screenWidth * 0.75, g.screenHeight * 0.45, duration = 0.25)
             "open_app" -> Op.LaunchApp(str("name"))
             else -> throw IllegalArgumentException("unknown action '${call.name}'")
         }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.double
@@ -20,6 +21,8 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
 
+private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+
 class AgentConfig(
     /** OpenRouter model id for every step. */
     val model: String = DEFAULT_MODEL,
@@ -28,8 +31,10 @@ class AgentConfig(
     val maxSteps: Int = 30,
     /** Longer side of the screenshot sent to the model, in pixels. */
     val imageMaxSide: Int = 1000,
-    /** Pause after each action for the screen to settle. */
-    val settleMs: Long = 900,
+    /** Pause after each action before checking that the screen is still. */
+    val settleMs: Long = 400,
+    /** After each action, wait until the screen stops changing before looking again. */
+    val waitForStill: Boolean = true,
     /** How many past steps the model is reminded of. */
     val historySteps: Int = 12,
 ) {
@@ -84,15 +89,23 @@ class Agent(
 ) {
     private val clock = TimeSource.Monotonic
 
-    suspend fun run(task: String): AgentResult {
-        val result = runSteps(task)
+    /**
+     * Runs [task]. [startsInMode]: the task was started from Mode's own screen,
+     * which the model must not mistake for the task (it once waited 12 steps
+     * on Mode's live log); the first step then shows no screen and the model
+     * goes straight to the app it needs. Started from anywhere else (Siri,
+     * Shortcuts), the agent works from whatever is on screen.
+     */
+    suspend fun run(task: String, startsInMode: Boolean = false): AgentResult {
+        val result = runSteps(task, startsInMode)
         trace.runEnded(result)
         return result
     }
 
-    private suspend fun runSteps(task: String): AgentResult {
+    private suspend fun runSteps(task: String, startsInMode: Boolean): AgentResult {
         val started = clock.markNow()
-        val tools = AgentTools.available(phone.ops())
+        val ops = phone.ops()
+        val tools = AgentTools.available(ops)
         val schema = AgentTools.schema(tools)
         trace.runStarted(task, config, tools.map { it.name })
         val history = mutableListOf<String>()
@@ -102,15 +115,11 @@ class Agent(
         var noProgress = 0
         var badReplies = 0
         var waits = 0
-
-        // Start from the Home Screen: when the user taps Run, Mode itself is on
-        // screen, and a model looking at Mode's live log only sees "the agent is
-        // thinking" and waits for ever (seen on the first real run).
-        if (Op.Home.wireName in phone.ops()) {
-            onStatus("Leaving Mode")
-            runCatching { phone.send(Op.Home) }
-            delay(config.settleMs)
-        }
+        /** The app the agent last opened, to return to after the user answers a question. */
+        var lastApp: String? = null
+        /** The model's own plan for multi-part tasks, shown back to it every step. */
+        var plan: String? = null
+        var inMode = startsInMode
 
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
@@ -126,30 +135,26 @@ class Agent(
                 lookStarted.elapsedNow().inWholeMilliseconds,
             )
 
-            // The same text before and after an action means it changed nothing.
-            if (lastWasPhoneAction) noProgress = if (screen.signature == lastScreen) noProgress + 1 else 0
+            // Tell the model what its last action did, and notice when nothing changes.
+            if (lastWasPhoneAction) {
+                val changed = screen.signature != lastScreen
+                noProgress = if (changed) 0 else noProgress + 1
+                if (history.isNotEmpty()) {
+                    history[history.lastIndex] += if (changed) " → screen changed" else " → screen did NOT change"
+                }
+            }
             lastScreen = screen.signature
             val stepUp = config.strongModel != null && (noProgress >= 2 || badReplies >= 2)
-            val model = if (stepUp) config.strongModel!! else config.model
             if (stepUp) {
                 noProgress = 0
                 badReplies = 0
             }
 
-            onStatus("Step $step: thinking ($model)")
-            val messages = prompt(task, history, screen, step)
-            trace.asking(step, model, stepUp, messages.last().text)
-            val llmStarted = clock.markNow()
-            val reply = try {
-                llm.chat(model, messages, schema)
-            } catch (e: Exception) {
-                trace.answered(step, model, null, null, "", null, llmStarted.elapsedNow().inWholeMilliseconds, e.message ?: e.toString())
-                throw e
-            }
-            trace.answered(
-                step, model, reply.toolCall?.name, reply.toolCall?.arguments, reply.text, reply.usage,
-                llmStarted.elapsedNow().inWholeMilliseconds,
-            )
+            val messages = prompt(task, history, screen, step, lastApp, plan, hideScreen = inMode)
+            inMode = false
+            val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, messages, schema)
+            val reply = answer.reply
+            val model = answer.model
             cost += reply.usage.costUsd
             val call = reply.toolCall
             var actionStarted = clock.markNow()
@@ -177,12 +182,24 @@ class Agent(
                 "ask_user" -> {
                     val question = call.arguments.string("question").orEmpty()
                     onStatus("Waiting for you")
-                    val answer = gate.ask(question)
-                    if (answer == null) {
+                    val reply2 = gate.ask(question)
+                    if (reply2 == null) {
                         record("ask_user", question, "you stopped the task")
                         return result(AgentOutcome.Stopped("Stopped at: $question"), step)
                     }
-                    record("ask_user", question, "you answered: $answer")
+                    // Answering happened in Mode; go straight back to where the agent was.
+                    val back = lastApp?.let { app ->
+                        runCatching { phone.send(Op.LaunchApp(app)) }.isSuccess.also { settle() }
+                    } == true
+                    record(
+                        "ask_user", question,
+                        "the user answered: $reply2" + if (back) " (Mode has reopened $lastApp for you)" else
+                            " (Mode is on screen now: open the app you need)",
+                    )
+                }
+                "plan" -> {
+                    plan = call.arguments.string("steps")?.trim()?.take(1500)
+                    record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
                 }
                 "wait" -> {
                     waits++
@@ -208,25 +225,84 @@ class Agent(
                     val described = describe(call, op, screen)
                     val risky = riskyTarget(op, screen)
                     if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason). Allow it?")) {
-                        record(described, reason, "you did not allow it; do not try again without asking")
+                        record(described, reason, "the user did not allow it; do not try again without asking")
                         continue
                     }
                     actionStarted = clock.markNow()
                     val outcome = try {
-                        phone.send(op)
+                        val result = phone.send(op)
                         lastWasPhoneAction = true
                         badReplies = 0
+                        if (op is Op.LaunchApp) lastApp = result.jsonPrimitiveOrNull() ?: op.name
                         "ok"
                     } catch (e: Exception) {
                         "failed: ${e.message}"
                     }
+                    // Never look (or tap) while the screen is still moving.
+                    if (lastWasPhoneAction) settle()
                     record(described, reason, outcome, op.toString())
-                    delay(config.settleMs)
                 }
             }
         }
         return result(AgentOutcome.Stopped("Reached the limit of ${config.maxSteps} steps"), config.maxSteps)
     }
+
+    private class Answer(val reply: ChatResult, val model: String)
+
+    /**
+     * Asks the model. A failure is not the end of the task: a transient error is
+     * retried once, and a stronger model that fails hands the step back to the
+     * main model. Only the main model failing twice stops the run.
+     */
+    private suspend fun think(step: Int, model: String, steppedUp: Boolean, messages: List<ChatMessage>, schema: JsonArray): Answer {
+        val tries = buildList {
+            add(model)
+            if (steppedUp && model != config.model) add(config.model) else add(model)
+        }
+        var last: Exception? = null
+        for ((attempt, candidate) in tries.withIndex()) {
+            onStatus("Step $step: thinking ($candidate)")
+            trace.asking(step, candidate, steppedUp && candidate != config.model, messages.last().text)
+            val started = clock.markNow()
+            try {
+                val reply = llm.chat(candidate, messages, schema)
+                trace.answered(
+                    step, candidate, reply.toolCall?.name, reply.toolCall?.arguments, reply.text, reply.usage,
+                    started.elapsedNow().inWholeMilliseconds,
+                )
+                return Answer(reply, candidate)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                trace.answered(step, candidate, null, null, "", null, started.elapsedNow().inWholeMilliseconds, e.message ?: e.toString())
+                last = e
+                if (attempt == 0) delay(1500)
+            }
+        }
+        throw last ?: LlmFailed("the model did not answer")
+    }
+
+    /**
+     * Waits until the screen stops changing (a scroll coasting, a page
+     * loading, an animation), so the next look and tap see where things
+     * really are. Compares tiny screenshots; gives up after about 3 s.
+     */
+    private suspend fun settle() {
+        delay(config.settleMs)
+        if (!config.waitForStill) return
+        var previous = tinyShot() ?: return
+        repeat(6) {
+            delay(150)
+            val current = tinyShot() ?: return
+            if (current.contentEquals(previous)) return
+            previous = current
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private suspend fun tinyShot(): ByteArray? = runCatching {
+        val capture = phone.send(Op.ScreenCapture(maxSize = 160)).jsonObject
+        Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content)
+    }.getOrNull()
 
     /** What the model sees of the screen. */
     private class Screen(
@@ -235,7 +311,8 @@ class Agent(
         /** Text with its centre in screenshot pixels. */
         val texts: List<Triple<String, Int, Int>>,
     ) {
-        val signature: String = texts.joinToString("|") { it.first }
+        /** Text and rough position: a scroll changes it even when the words do not. */
+        val signature: String = texts.joinToString("|") { "${it.first}@${it.third / 12}" }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -258,17 +335,32 @@ class Agent(
         return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
     }
 
-    private fun prompt(task: String, history: List<String>, screen: Screen, step: Int): List<ChatMessage> {
+    private fun prompt(
+        task: String,
+        history: List<String>,
+        screen: Screen,
+        step: Int,
+        lastApp: String?,
+        plan: String?,
+        hideScreen: Boolean,
+    ): List<ChatMessage> {
         val g = screen.geometry
         val user = buildString {
             append("TASK: ").append(task).append("\n\n")
             append("STEP ").append(step).append(" of at most ").append(config.maxSteps).append("\n\n")
+            plan?.let { append("YOUR PLAN (keep it up to date with the plan tool):\n").append(it).append("\n\n") }
             if (history.isEmpty()) {
                 append("No actions yet.\n\n")
             } else {
                 append("WHAT HAPPENED SO FAR (latest last):\n")
                 history.takeLast(config.historySteps).forEach { append(it).append('\n') }
                 append('\n')
+            }
+            lastApp?.let { append("App you last opened: ").append(it).append("\n\n") }
+            if (hideScreen) {
+                append("THE SCREEN NOW: Mode, the app that runs you, is in front (not shown: it is not part of the task). ")
+                append("Start by opening the app or place the task needs (usually open_app), or plan first if the task has several parts.")
+                return listOf(ChatMessage("system", SYSTEM_PROMPT), ChatMessage("user", toString()))
             }
             append("THE SCREEN NOW: the screenshot is ${g.imageWidth}×${g.imageHeight} pixels. ")
             append("Text on it, with each piece's centre in screenshot pixels:\n")
@@ -320,27 +412,48 @@ class Agent(
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.
+            Each turn you get the task, what you did so far (with whether each action changed the
+            screen), a screenshot, and the text on the screen with positions. Reply with exactly one
+            tool call. After each action you will see the new screen.
+
             You are run by an app called Mode. If Mode's own screen (its task log, "Step N: thinking",
-            the Agent/Compare/Logs tabs) is showing, that is you: never wait on it, leave it (home or
-            open_app) and work in the app the task needs.
-            Each turn you get the task, what you did so far, a screenshot, and the text on the screen with
-            positions. Reply with exactly one tool call. After each action you will see the new screen.
+            the Agent/Compare/Logs tabs) is showing, that is you: never wait on it, leave it and work in
+            the app the task needs.
 
             How to act:
             - Coordinates are screenshot pixels. To tap a piece of text, use its listed centre. For icons
               without text, read the position off the screenshot.
-            - Prefer open_app to open apps. To find something not on screen, scroll. Tap a text field
-              before typing into it; press return to submit a search if there is no button.
-            - Check the new screen to see whether your last action worked. If nothing changed, try a
-              different way instead of repeating the same action.
-            - If a popup, permission request or ad is in the way, deal with it sensibly (dismiss or allow
-              as the task needs).
+            - Open apps with open_app. Apps reopen where they were left, so to go back use the screen's
+              own Back / "<" / Cancel / Done / X button, or the back tool. Home then open_app does not reset
+              an app.
+            - To see more of a list or page, use scroll (never swipe for scrolling). Search fields and
+              search pages: tap the field, type, then press return or pick a result; Cancel closes them.
+            - Tap a text field before typing into it.
+            - If an action did not change the screen, do not repeat it: try another way.
+            - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).
+            - Work on your own. Do not ask the user how to navigate or whether to go back.
 
-            Safety:
-            - Before anything that spends money, books, orders, sends or posts a message, deletes, or can
-              not be undone, use ask_user to confirm, even if the task seems to ask for it.
-            - Never type passwords, passcodes or card numbers. If a login, passcode, Face ID, payment
-              details or a CAPTCHA is needed, use ask_user.
+            Ask the user (ask_user) only when you are truly blocked:
+            - a login, passcode, Face ID, verification code or payment details are needed;
+            - a choice only the user can make (which address, which contact, which plan);
+            - before anything that spends money, books, orders, sends or posts a message, deletes, or
+              cannot be undone.
+            Never type passwords, passcodes or card numbers.
+
+            Plan multi-part tasks:
+            - If the task has several parts ("turn off dark mode, set brightness to half and open YouTube"),
+              first call plan with a short numbered list, then do the items in order. Call plan again to
+              mark items done or change course. Finish (done) only when every item is done.
+
+            Know iOS and pick the fastest route (from wherever you are):
+            - Settings has a search field at the top of its main page: searching a setting's name ("Dark
+              Mode", "Wi-Fi", "Brightness", "Bluetooth") jumps straight to it.
+            - Control Center (control_center tool) has quick toggles: Wi-Fi, Bluetooth, Airplane Mode,
+              brightness, volume, Focus, Flashlight; long-press a control for more (e.g. Dark Mode under
+              brightness). Swipe it closed or press home when done.
+            - Spotlight (swipe down in the middle of the Home Screen) finds apps, settings and contacts.
+            - Most apps put Search, Back and tabs in the same places: tabs at the bottom, Back at top left.
+            - You can start from any screen: you do not need to go home first.
 
             Finishing:
             - When the task is done, call done with a short summary of what you did and what the screen

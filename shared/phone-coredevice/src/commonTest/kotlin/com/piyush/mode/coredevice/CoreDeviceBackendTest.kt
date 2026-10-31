@@ -191,12 +191,24 @@ class CoreDeviceBackendTest {
         val phone = FakeSession()
         val clock = TestTimeSource()
         val b = backend(phone, clock = clock)
-        b.send(Op.ScreenText())
+        b.send(Op.ScreenCapture(maxSize = 100))
         b.send(Op.Tap(1.0, 1.0))
         b.send(Op.ScreenText())
         assertEquals(2, phone.shots, "a tap changes the screen")
+        b.send(Op.ScreenCapture(maxSize = 100))
         clock += 2.seconds
         b.send(Op.ScreenText())
-        assertEquals(3, phone.shots, "an old screenshot is not reused")
+        assertEquals(4, phone.shots, "an old screenshot is not reused")
+    }
+
+    @Test
+    fun repeatedLooksAreFreshSoAChangingScreenCanBeWatched() = runTest {
+        val phone = FakeSession()
+        val b = backend(phone)
+        b.send(Op.ScreenCapture(maxSize = 100))
+        b.send(Op.ScreenCapture(maxSize = 100))
+        b.send(Op.ScreenText())
+        b.send(Op.ScreenText())
+        assertEquals(3, phone.shots, "capture, capture (+ text reusing it), then a fresh text")
     }
 }

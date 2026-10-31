@@ -54,13 +54,18 @@ class AgentSettings(private val services: AppServices) {
     companion object {
         private const val KEY = "openrouter_api_key"
 
-        /** OpenRouter models worth comparing on this phone (prices on 2026-10-31, $/M in·out). */
+        /**
+         * OpenRouter models worth comparing on this phone: all take images and
+         * tool calls. Prices are $ per million tokens (in · out) on 2026-11-01;
+         * a step is ~3.5K tokens in, ~70 out.
+         */
         val CANDIDATES = listOf(
-            "anthropic/claude-haiku-5.5" to "0.10 · 0.50",
-            "qwen/qwen3.5-flash-02-23" to "0.065 · 0.26",
-            "openai/gpt-5-mini" to "0.25 · 2.00",
-            "google/gemini-3.5-flash-lite" to "0.30 · 2.50",
-            "anthropic/claude-sonnet-5.5" to "2.00 · 10.00",
+            "anthropic/claude-haiku-5.5" to "0.10 · 0.50 — default; reported 72% on OSWorld 2.1",
+            "qwen/qwen3.8-27b" to "0.04 · 2.30 — top cheap model on OSWorld-Verified (0.84)",
+            "qwen/qwen3.7-flash" to "0.03 · 0.13 — cheapest",
+            "openai/gpt-5-nano" to "0.05 · 0.40",
+            "qwen/qwen3.8-flash" to "0.15 · 0.47",
+            "anthropic/claude-sonnet-5.5" to "2.00 · 10.00 — stronger model when stuck",
         )
     }
 }
