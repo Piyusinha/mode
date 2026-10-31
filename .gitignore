@@ -17,5 +17,5 @@ __pycache__/
 
 # Native (Rust) builds
 .build/
-native/target/
+native/*/target/
 native/out/

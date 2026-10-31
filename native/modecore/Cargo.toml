@@ -1,0 +1,39 @@
+[package]
+name = "modecore"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Mode's native layer: drives this iPhone through CoreDevice remote control (idevice)"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[features]
+default = []
+# Mac-side testing over USB through usbmuxd. Not built for iOS.
+usb = ["idevice/usbmuxd", "idevice/core_device_proxy"]
+
+[dependencies]
+# jkcoxson/idevice, MIT. Pinned: these are private, version-sensitive protocols.
+idevice = { git = "https://github.com/jkcoxson/idevice", rev = "89702099f4d7552f704f93b4526756abda319ceb", default-features = false, features = [
+  "ring",
+  "core_device",
+  "display_stream",
+  "rsd",
+  "remote_pairing",
+  "tunnel_tcp_stack",
+  "tcp",
+] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+uuid = { version = "1", features = ["v4"] }
+serde_json = "1"
+futures = "0.3"
+
+[profile.release]
+# idevice's LTO embeds ~140 MB of bitcode in the static library; off keeps it small.
+lto = false
+
+[[example]]
+name = "mc"
+required-features = ["usb"]
