@@ -22,6 +22,8 @@
 	<string>1</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>ModeBuiltInVPN</key>
+	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.</string>
 	<key>UIFileSharingEnabled</key>

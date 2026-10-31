@@ -27,7 +27,18 @@ fn main() {
         return;
     }
     let t0 = Instant::now();
-    let session = Session::open_usb().unwrap_or_else(|e| fail(&format!("open: {e}")));
+    // MC_CONNECT=host:port MC_PAIRING=file uses the remote-pairing path the app
+    // uses on the phone; otherwise the USB tunnel.
+    let session = match (std::env::var("MC_CONNECT"), std::env::var("MC_PAIRING")) {
+        (Ok(addr), Ok(file)) => {
+            let addr = addr.parse().unwrap_or_else(|_| fail("MC_CONNECT must be ip:port"));
+            let pairing = std::fs::read(&file).unwrap_or_else(|e| fail(&format!("read {file}: {e}")));
+            let hostname = std::env::var("MC_HOSTNAME").unwrap_or_else(|_| "Mode".into());
+            Session::open_rppairing(addr, &hostname, &pairing)
+        }
+        _ => Session::open_usb(),
+    }
+    .unwrap_or_else(|e| fail(&format!("open: {e}")));
     println!("[{:>6.2}s] session open", t0.elapsed().as_secs_f64());
 
     while let Some(cmd) = args.next() {

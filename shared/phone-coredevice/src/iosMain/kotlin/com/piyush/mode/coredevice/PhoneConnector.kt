@@ -11,21 +11,18 @@ import kotlinx.coroutines.withContext
 import platform.UIKit.UIScreen
 
 /**
- * How Mode reaches this phone's own `remotepairingd`.
+ * One way Mode can reach this phone's own `remotepairingd`.
  *
- * The pairing service refuses connections it thinks come from the cellular
- * interface, and the loopback VPN looks like one when Wi-Fi is off. A plain
- * loopback connection is tried first because it does not have that problem.
+ * The phone drops pair-verify on any connection that starts on the phone
+ * itself (127.0.0.1 and its own Wi-Fi and USB addresses all failed, 2026-10-31),
+ * so the only route is a loopback VPN that rewrites packets to come from a
+ * peer, [Vpn], which the phone treats as a paired computer.
  */
-enum class Route(val host: String, val label: String) {
-    /** Straight to 127.0.0.1: no VPN needed, should work on cellular. */
-    Loopback("127.0.0.1", "loopback"),
-
-    /**
-     * Through a loopback VPN whose peer is 10.7.0.1: Mode's own packet tunnel
-     * on paid builds, the LocalDevVPN app on free ones.
-     */
-    Vpn("10.7.0.1", "loopback VPN"),
+data class Route(val host: String, val label: String) {
+    companion object {
+        /** Mode's packet tunnel on paid builds, the LocalDevVPN app on free ones. */
+        val Vpn = Route(LoopbackVpn.PEER, "loopback VPN")
+    }
 }
 
 /** A connected phone and how it was reached. */
@@ -49,28 +46,39 @@ class PhoneConnector(
     suspend fun connect(
         pairingFile: ByteArray,
         screen: ScreenInfo,
-        routes: List<Route> = Route.entries,
-    ): ConnectedPhone = withContext(Dispatchers.IO) {
+        routes: List<Route> = listOf(Route.Vpn),
+    ): ConnectedPhone {
         val attempts = mutableListOf<Pair<Route, String?>>()
         for (route in routes) {
+            if (route == Route.Vpn) {
+                try {
+                    LoopbackVpn.ensureUp()
+                } catch (e: Exception) {
+                    attempts += route to (e.message ?: e.toString())
+                    continue
+                }
+            }
             val session = try {
-                ModecoreSession.open(route.host, port, hostname, pairingFile)
+                withContext(Dispatchers.IO) { ModecoreSession.open(route.host, port, hostname, pairingFile) }
             } catch (e: Exception) {
                 attempts += route to (e.message ?: e.toString())
                 continue
             }
             attempts += route to null
             val backend = CoreDeviceBackend(session, screen, VisionTextReader(), UIKitImageTools(), Dispatchers.IO)
-            return@withContext ConnectedPhone(backend, route, attempts)
+            return ConnectedPhone(backend, route, attempts)
         }
         throw PhoneUnavailable(
             buildString {
                 append("Could not reach this iPhone's developer services.\n")
                 attempts.forEach { (route, error) -> append("- ${route.label} (${route.host}:$port): $error\n") }
+                if (!LoopbackVpn.builtIn) {
+                    append("This build has no VPN of its own: turn on the LocalDevVPN app first.\n")
+                }
                 append(
                     "Check that Developer Mode is on, the pairing file is current, and the developer disk " +
-                        "image is mounted. For the VPN route, turn on the VPN; on cellular with Wi-Fi off, " +
-                        "turn mobile data off while connecting.",
+                        "image is mounted. On mobile data with Wi-Fi off, the phone refuses the VPN route: " +
+                        "turn Mobile Data off for a moment, connect, then turn it back on.",
                 )
             },
         )

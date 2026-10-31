@@ -1,0 +1,39 @@
+# Paid Apple Developer accounts: Mode with its own loopback VPN extension
+# (needs the Network Extension entitlement, which free accounts cannot sign).
+# Generate with `tools/gen-project.sh paid`; `free` uses project.yml alone and
+# relies on the LocalDevVPN app instead.
+include:
+  - project.yml
+targets:
+  Mode:
+    dependencies:
+      - target: ModeTunnel
+    info:
+      properties:
+        ModeBuiltInVPN: true
+    entitlements:
+      path: Mode/Mode.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+  ModeTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ModeTunnel
+    info:
+      path: ModeTunnel/Info.plist
+      properties:
+        CFBundleDisplayName: Mode Tunnel
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: ModeTunnel/ModeTunnel.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.tunnel
+      TARGETED_DEVICE_FAMILY: "1"
+      GENERATE_INFOPLIST_FILE: YES
