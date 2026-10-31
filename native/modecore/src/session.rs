@@ -138,81 +138,30 @@ impl Session {
         disk_image: Option<&Path>,
     ) -> Result<Session> {
         let rt = runtime()?;
-        let mut pairing = RpPairingFile::from_bytes(pairing_file).map_err(|e| err("pairing file", e))?;
-        let hostname = hostname.to_string();
-        let (adapter, handshake, rsd_port) = rt.block_on(async move {
-            let stream = tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(addr))
-                .await
-                .map_err(|_| Error(format!("connect {addr}: timed out")))?
-                .map_err(|e| err(&format!("connect {addr}"), e))?;
-            let mut rpc = RemotePairingClient::new(RpPairingSocket::new(stream), &hostname);
-            // A stored pairing never needs a PIN; an empty one fails cleanly.
-            rpc.connect(&mut pairing, async || String::new())
-                .await
-                .map_err(|e| err("pair-verify", e))?;
-
-            let tunnel_port = rpc.create_tcp_listener().await.map_err(|e| err("tunnel listener", e))?;
-            let mut tunnel_addr = addr;
-            tunnel_addr.set_port(tunnel_port);
-            let tunnel_stream = tokio::net::TcpStream::connect(tunnel_addr)
-                .await
-                .map_err(|e| err("tunnel connect", e))?;
-            let tunnel = connect_tls_psk_tunnel_native(tunnel_stream, rpc.encryption_key())
-                .await
-                .map_err(|e| err("tunnel TLS", e))?;
-
-            let client_ip: IpAddr = tunnel.info.client_address.parse().map_err(|e| err("client address", e))?;
-            let server_ip: IpAddr = tunnel.info.server_address.parse().map_err(|e| err("server address", e))?;
-            let mtu = tunnel.info.mtu as usize;
-            let rsd_port = tunnel.info.server_rsd_port;
-            let mut adapter =
-                idevice::tcp::adapter::Adapter::new(Box::new(tunnel.into_inner()), client_ip, server_ip);
-            adapter.set_mss(mtu.min(8192) - 60);
-            let mut adapter = adapter.to_async_handle();
-            let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
-            let handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
-            Ok::<_, Error>((adapter, handshake, rsd_port))
-        })?;
-        Self::start(rt, adapter, handshake, rsd_port, disk_image)
+        let disk_image = disk_image.map(Path::to_path_buf);
+        let (adapter, handshake, mounted) = rt.block_on(connect_ready(
+            async || tunnel_rppairing(addr, hostname, pairing_file).await,
+            disk_image,
+        ))?;
+        Self::start(rt, adapter, handshake, mounted)
     }
 
     /// Connects over USB through usbmuxd (Mac-side testing only).
     #[cfg(feature = "usb")]
     pub fn open_usb(disk_image: Option<&Path>) -> Result<Session> {
-        use idevice::IdeviceService;
-        use idevice::core_device_proxy::CoreDeviceProxy;
-        use idevice::usbmuxd::{UsbmuxdAddr, UsbmuxdConnection};
-
         let rt = runtime()?;
-        let (adapter, handshake, rsd_port) = rt.block_on(async {
-            let mut mux = UsbmuxdConnection::default().await?;
-            let device = mux
-                .get_devices()
-                .await?
-                .into_iter()
-                .next()
-                .ok_or_else(|| Error("no iPhone on USB".into()))?;
-            let provider = device.to_provider(UsbmuxdAddr::default(), "modecore");
-            let proxy = CoreDeviceProxy::connect(&provider).await?;
-            let rsd_port = proxy.tunnel_info().server_rsd_port;
-            let mut adapter = proxy.create_software_tunnel()?.to_async_handle();
-            let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
-            let handshake = RsdHandshake::new(rsd).await?;
-            Ok::<_, Error>((adapter, handshake, rsd_port))
-        })?;
-        Self::start(rt, adapter, handshake, rsd_port, disk_image)
+        let disk_image = disk_image.map(Path::to_path_buf);
+        let (adapter, handshake, mounted) = rt.block_on(connect_ready(async || tunnel_usb().await, disk_image))?;
+        Self::start(rt, adapter, handshake, mounted)
     }
 
     fn start(
         rt: tokio::runtime::Runtime,
         mut adapter: AdapterHandle,
         mut handshake: RsdHandshake,
-        rsd_port: u16,
-        disk_image: Option<&Path>,
+        mounted_disk_image: bool,
     ) -> Result<Session> {
-        let disk_image = disk_image.map(Path::to_path_buf);
-        let (live, mounted_disk_image) = rt.block_on(async {
-            let mounted = ensure_disk_image(&mut adapter, &mut handshake, rsd_port, disk_image).await?;
+        let live = rt.block_on(async {
             let (display, drains) = open_screen_stream(&mut adapter, &mut handshake).await?;
             tokio::time::sleep(STREAM_SETTLE).await;
             let touch = UniversalHidServiceClient::connect_rsd(&mut adapter, &mut handshake)
@@ -221,8 +170,7 @@ impl Session {
             let indigo = IndigoHidClient::connect_rsd(&mut adapter, &mut handshake)
                 .await
                 .map_err(|e| err("button/keyboard service", e))?;
-            let live = Live { adapter, handshake, display, drains, touch, indigo, clock: Clock::Mach };
-            Ok::<_, Error>((live, mounted))
+            Ok::<_, Error>(Live { adapter, handshake, display, drains, touch, indigo, clock: Clock::Mach })
         })?;
         Ok(Session { rt, live: Mutex::new(Some(live)), mounted_disk_image })
     }
@@ -393,16 +341,75 @@ impl Drop for Session {
     }
 }
 
-/// Mounts the developer disk image when its services are missing, then
-/// re-reads the service list. Answers whether it mounted anything.
-async fn ensure_disk_image(
-    adapter: &mut AdapterHandle,
-    handshake: &mut RsdHandshake,
-    rsd_port: u16,
+/// A fresh tunnel to the phone's `remotepairingd` with a remote-pairing file.
+async fn tunnel_rppairing(addr: SocketAddr, hostname: &str, pairing_file: &[u8]) -> Result<(AdapterHandle, RsdHandshake)> {
+    let mut pairing = RpPairingFile::from_bytes(pairing_file).map_err(|e| err("pairing file", e))?;
+    let stream = tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(addr))
+        .await
+        .map_err(|_| Error(format!("connect {addr}: timed out")))?
+        .map_err(|e| err(&format!("connect {addr}"), e))?;
+    let mut rpc = RemotePairingClient::new(RpPairingSocket::new(stream), hostname);
+    // A stored pairing never needs a PIN; an empty one fails cleanly.
+    rpc.connect(&mut pairing, async || String::new())
+        .await
+        .map_err(|e| err("pair-verify", e))?;
+
+    let tunnel_port = rpc.create_tcp_listener().await.map_err(|e| err("tunnel listener", e))?;
+    let mut tunnel_addr = addr;
+    tunnel_addr.set_port(tunnel_port);
+    let tunnel_stream = tokio::net::TcpStream::connect(tunnel_addr)
+        .await
+        .map_err(|e| err("tunnel connect", e))?;
+    let tunnel = connect_tls_psk_tunnel_native(tunnel_stream, rpc.encryption_key())
+        .await
+        .map_err(|e| err("tunnel TLS", e))?;
+
+    let client_ip: IpAddr = tunnel.info.client_address.parse().map_err(|e| err("client address", e))?;
+    let server_ip: IpAddr = tunnel.info.server_address.parse().map_err(|e| err("server address", e))?;
+    let mtu = tunnel.info.mtu as usize;
+    let rsd_port = tunnel.info.server_rsd_port;
+    let mut adapter = idevice::tcp::adapter::Adapter::new(Box::new(tunnel.into_inner()), client_ip, server_ip);
+    adapter.set_mss(mtu.min(8192) - 60);
+    let mut adapter = adapter.to_async_handle();
+    let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
+    let handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
+    Ok((adapter, handshake))
+}
+
+/// A fresh tunnel over USB through usbmuxd (Mac-side testing only).
+#[cfg(feature = "usb")]
+async fn tunnel_usb() -> Result<(AdapterHandle, RsdHandshake)> {
+    use idevice::IdeviceService;
+    use idevice::core_device_proxy::CoreDeviceProxy;
+    use idevice::usbmuxd::{UsbmuxdAddr, UsbmuxdConnection};
+
+    let mut mux = UsbmuxdConnection::default().await?;
+    let device = mux
+        .get_devices()
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error("no iPhone on USB".into()))?;
+    let provider = device.to_provider(UsbmuxdAddr::default(), "modecore");
+    let proxy = CoreDeviceProxy::connect(&provider).await?;
+    let rsd_port = proxy.tunnel_info().server_rsd_port;
+    let mut adapter = proxy.create_software_tunnel()?.to_async_handle();
+    let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD connect", e))?;
+    let handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
+    Ok((adapter, handshake))
+}
+
+/// Connects with `connect`, and if the developer disk image is not mounted,
+/// mounts it from `disk_image`. Mounting restarts the phone's service
+/// directory and kills the tunnel it was done over (seen 2026-10-31), so it
+/// then connects afresh until the services appear. Answers whether it mounted.
+async fn connect_ready(
+    connect: impl AsyncFn() -> Result<(AdapterHandle, RsdHandshake)>,
     disk_image: Option<PathBuf>,
-) -> Result<bool> {
+) -> Result<(AdapterHandle, RsdHandshake, bool)> {
+    let (mut adapter, mut handshake) = connect().await?;
     if handshake.services.contains_key(DDI_SERVICE) {
-        return Ok(false);
+        return Ok((adapter, handshake, false));
     }
     let dir = disk_image.ok_or_else(|| {
         Error("the developer disk image is not mounted (did the phone restart?) and no image was given to mount".into())
@@ -410,20 +417,25 @@ async fn ensure_disk_image(
     let assets = Cryptex1Assets::load(&dir)
         .await
         .map_err(|e| err(&format!("disk image files in {}", dir.display()), e))?;
-    install_ddi(adapter, handshake, &assets)
+    install_ddi(&mut adapter, &mut handshake, &assets)
         .await
         .map_err(|e| err("mounting the developer disk image (needs internet for Apple's signature)", e))?;
+    let _ = adapter.close().await;
 
-    // The services appear once the image is mounted; read the list again.
-    for _ in 0..20 {
-        let rsd = adapter.connect(rsd_port).await.map_err(|e| err("RSD reconnect", e))?;
-        *handshake = RsdHandshake::new(rsd).await.map_err(|e| err("RSD handshake", e))?;
-        if handshake.services.contains_key(DDI_SERVICE) {
-            return Ok(true);
+    let mut last = String::from("services did not appear");
+    for _ in 0..30 {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        match connect().await {
+            Ok((adapter, handshake)) if handshake.services.contains_key(DDI_SERVICE) => {
+                return Ok((adapter, handshake, true));
+            }
+            Ok((mut adapter, _)) => {
+                let _ = adapter.close().await;
+            }
+            Err(e) => last = e.0,
         }
-        tokio::time::sleep(Duration::from_millis(250)).await;
     }
-    Err(Error("mounted the developer disk image, but its services did not appear".into()))
+    Err(Error(format!("mounted the developer disk image, but could not reconnect afterwards: {last}")))
 }
 
 fn runtime() -> Result<tokio::runtime::Runtime> {
