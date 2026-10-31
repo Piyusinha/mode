@@ -243,3 +243,52 @@ looks, Home and opening an app. It does **not** re-send a tap, swipe or typing,
 because if the drop came after the phone acted, a retry would act twice.
 Instead it reports that the action may not have happened, and the caller looks
 again (4 tests).
+
+## D21. The agent (Phase 6): OpenRouter, a cheap default, a strong fallback
+
+- **Provider.** OpenRouter's OpenAI-compatible API, as the user chose. The key
+  is pasted into Settings and kept in the iOS Keychain (this device only,
+  readable after first unlock so background runs work). It is never in code.
+- **Default model.** `anthropic/claude-haiku-5.5` ($0.10 / $0.50 per M tokens
+  on 2026-10-31, about $0.0004 a step). After two no-progress steps or two bad
+  replies, one decision goes to `anthropic/claude-sonnet-5.5`. Both are
+  settings. The final default comes from the on-phone comparison (Compare tab).
+- **What the model sees each step.** The task; the last 12 steps as text; a
+  ~1000 px JPEG; the text on screen with centres in screenshot pixels. One
+  tool call is required. Tools are generated from the phone's supported ops.
+- **Safety.** The prompt says to ask before paying, booking, sending,
+  deleting, or anything irreversible, and to never type passwords. As a
+  backstop, `RiskGuard` asks the user before tapping a label containing pay,
+  book, order, confirm, request, send, delete and similar words (whole words,
+  not tied to any app).
+- **Questions.** Mode comes to the front and notifies; the model is told Mode
+  is now on screen, so it reopens its app.
+
+## D22. Debug logs for every run
+
+Comparing models and fixing errors needs a full record, so every run writes
+`Documents/logs/runs/<time>/`:
+
+- `run.json`: task, model, outcome, steps, time, cost.
+- `steps.jsonl`: per step, the look (ms, text count), the exact prompt, the
+  model's raw tool call with tokens, cost and ms (or its error), and the action
+  with its outcome and ms.
+- `step-N.jpg`: what the model saw.
+
+App events (connecting, routes tried, disk-image mounts, reconnects,
+keep-awake, VPN, questions, errors) go to `logs/events.log` and to the system
+log. Comparisons write `logs/compare/<id>.txt`.
+
+- See them in the Logs tab, in Files › On My iPhone › Mode › logs, or on a Mac
+  with `tools/pull-logs.sh`.
+- The newest 60 runs are kept.
+
+## D23. Hold the session only while working
+
+The Dynamic Island's "viewing and controlling" icon and the VPN icon stayed
+after Mode was closed, because the session was held open forever. Now Mode
+ends the session (the screen stream stops, Mode's VPN goes off) when a task,
+comparison or hands check ends, and whenever the user leaves Mode while it is
+idle. Each task then reconnects, which costs about 1 s. Cleanup runs even
+after Stop.
+

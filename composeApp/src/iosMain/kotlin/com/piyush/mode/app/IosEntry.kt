@@ -12,13 +12,21 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import platform.Foundation.NSBundle
 import platform.Foundation.NSUserDefaults
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSOperationQueue
+import platform.UIKit.UIApplicationDidEnterBackgroundNotification
+import com.piyush.mode.coredevice.LoopbackVpn
 import com.piyush.mode.agent.darwinHttpClient
 import platform.UIKit.UIApplication
 import platform.UIKit.UIBackgroundTaskInvalid
 import platform.UIKit.UIViewController
 
 /** The root view controller Swift hosts in its window. */
-fun MainViewController(): UIViewController = ComposeUIViewController { App(IosPhoneLink, IosServices) }
+fun MainViewController(): UIViewController {
+    AppLog.install(IosLogStore::event)
+    AppLog.log("app", "Mode started (${if (LoopbackVpn.builtIn) "paid build, own VPN" else "free build, LocalDevVPN"})")
+    return ComposeUIViewController { App(IosPhoneLink, IosServices) }
+}
 
 private object IosServices : AppServices {
     private val defaults = NSUserDefaults.standardUserDefaults
@@ -30,6 +38,7 @@ private object IosServices : AppServices {
     override fun notify(title: String, body: String) = Notifier.post(title, body)
     override fun requestNotifications() = Notifier.requestPermission()
     override val http by lazy { darwinHttpClient() }
+    override val logs: LogStore = IosLogStore
 }
 
 private object IosPhoneLink : PhoneLink {
@@ -72,4 +81,15 @@ private object IosPhoneLink : PhoneLink {
     }
 
     override fun decodeImage(bytes: ByteArray): ImageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
+
+    override suspend fun release() {
+        LoopbackVpn.stop()
+        AppLog.log("vpn", "Mode's VPN stopped")
+    }
+
+    override fun onAppBackground(action: () -> Unit) {
+        NSNotificationCenter.defaultCenter.addObserverForName(
+            UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue,
+        ) { _ -> action() }
+    }
 }

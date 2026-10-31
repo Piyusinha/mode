@@ -46,22 +46,34 @@ fun App(link: PhoneLink, services: AppServices) {
     val holder = remember { PhoneHolder(link) { log += it } }
     val settings = remember { AgentSettings(services) }
     val runner = remember { AgentRunner(link, services, holder, settings) }
-    val compare = remember { CompareRunner(runner, holder) }
+    val compare = remember { CompareRunner(runner, holder, services.logs) }
     val check = remember { HandsCheck(link, holder) }
     var tab by remember { mutableIntStateOf(0) }
+    val appScope = rememberCoroutineScope()
+    remember {
+        // Leaving Mode while it is idle ends the session, so iOS drops its
+        // "viewing and controlling" indicator and the VPN goes off.
+        link.onAppBackground {
+            if (!runner.running && !compare.running && !check.busy) {
+                AppLog.log("app", "left Mode while idle")
+                appScope.launch { holder.disconnect() }
+            }
+        }
+    }
 
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 PrimaryTabRow(selectedTabIndex = tab) {
-                    listOf("Agent", "Compare", "Settings", "Hands").forEachIndexed { i, title ->
+                    listOf("Agent", "Compare", "Logs", "Settings", "Hands").forEachIndexed { i, title ->
                         Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
                     }
                 }
                 when (tab) {
                     0 -> AgentScreen(runner, holder)
                     1 -> CompareScreen(compare, runner)
-                    2 -> SettingsScreen(settings)
+                    2 -> LogsScreen(services.logs, link)
+                    3 -> SettingsScreen(settings)
                     else -> HandsCheckScreen(check)
                 }
             }

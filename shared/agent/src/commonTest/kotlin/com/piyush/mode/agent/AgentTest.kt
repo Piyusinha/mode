@@ -195,4 +195,24 @@ class AgentTest {
             .getValue("function").jsonObject.getValue("parameters").jsonObject
         assertEquals(listOf("x", "y", "reason"), tap.getValue("required").jsonArray.map { it.jsonPrimitive.content })
     }
+
+    @Test
+    fun traceRecordsEveryPartOfEveryStepInOrder() = runTest {
+        val events = mutableListOf<String>()
+        val trace = object : AgentTrace {
+            override fun runStarted(task: String, config: AgentConfig, tools: List<String>) { events += "start:$task" }
+            override fun looked(step: Int, jpeg: ByteArray, imageWidth: Int, imageHeight: Int, texts: List<Triple<String, Int, Int>>, millis: Long) { events += "look$step:${texts.size}" }
+            override fun asking(step: Int, model: String, steppedUp: Boolean, prompt: String) { events += "ask$step" }
+            override fun answered(step: Int, model: String, toolName: String?, arguments: kotlinx.serialization.json.JsonObject?, text: String, usage: Usage?, millis: Long, error: String?) { events += "answer$step:$toolName" }
+            override fun acted(step: Int, action: String, op: String?, outcome: String, millis: Long) { events += "act$step:$outcome" }
+            override fun runEnded(result: AgentResult) { events += "end:${result.steps}" }
+        }
+        val phone = FakePhone(listOf(listOf("A" to (1.0 to 1.0)), listOf("B" to (2.0 to 2.0))))
+        val model = ScriptedModel(call("home", "reason" to "go"), call("done", "summary" to "ok"))
+        Agent(phone, model, Gate(), noSettle, trace = trace).run("t")
+        assertEquals(
+            listOf("start:t", "look1:1", "ask1", "answer1:home", "act1:ok", "look2:1", "ask2", "answer2:done", "act2:finished", "end:2"),
+            events,
+        )
+    }
 }

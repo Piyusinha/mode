@@ -19,6 +19,12 @@ interface PhoneLink {
 
     /** Decodes a JPEG or PNG for display. */
     fun decodeImage(bytes: ByteArray): ImageBitmap
+
+    /** Releases what connecting set up (Mode's VPN) once the session is closed. */
+    suspend fun release()
+
+    /** Calls [action] whenever Mode goes to the background (the user left it). */
+    fun onAppBackground(action: () -> Unit)
 }
 
 class PhoneConnection(

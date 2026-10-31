@@ -17,7 +17,7 @@ import kotlinx.serialization.json.JsonElement
 class ResilientBackend(
     private val connect: suspend () -> PhoneBackend,
     private val onReconnect: (String) -> Unit = {},
-) : PhoneBackend {
+) : PhoneBackend, AutoCloseable {
     private val lock = Mutex()
     private var current: PhoneBackend? = null
 
@@ -39,6 +39,12 @@ class ResilientBackend(
                 e,
             )
         }
+    }
+
+    /** Closes the current connection; the next op connects again. */
+    override fun close() {
+        (current as? AutoCloseable)?.let { runCatching { it.close() } }
+        current = null
     }
 
     private suspend fun backend(): PhoneBackend = lock.withLock { current ?: connect().also { current = it } }

@@ -79,13 +79,21 @@ class Agent(
     private val config: AgentConfig = AgentConfig(),
     private val onStep: (StepRecord) -> Unit = {},
     private val onStatus: (String) -> Unit = {},
+    private val trace: AgentTrace = AgentTrace.None,
 ) {
     private val clock = TimeSource.Monotonic
 
     suspend fun run(task: String): AgentResult {
+        val result = runSteps(task)
+        trace.runEnded(result)
+        return result
+    }
+
+    private suspend fun runSteps(task: String): AgentResult {
         val started = clock.markNow()
         val tools = AgentTools.available(phone.ops())
         val schema = AgentTools.schema(tools)
+        trace.runStarted(task, config, tools.map { it.name })
         val history = mutableListOf<String>()
         var cost = 0.0
         var lastScreen: String? = null
@@ -100,7 +108,12 @@ class Agent(
             currentCoroutineContext().ensureActive()
             val stepStarted = clock.markNow()
             onStatus("Step $step: looking")
+            val lookStarted = clock.markNow()
             val screen = look()
+            trace.looked(
+                step, screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts,
+                lookStarted.elapsedNow().inWholeMilliseconds,
+            )
 
             // The same text before and after an action means it changed nothing.
             if (lastWasPhoneAction) noProgress = if (screen.signature == lastScreen) noProgress + 1 else 0
@@ -113,13 +126,27 @@ class Agent(
             }
 
             onStatus("Step $step: thinking ($model)")
-            val reply = llm.chat(model, prompt(task, history, screen, step), schema)
+            val messages = prompt(task, history, screen, step)
+            trace.asking(step, model, stepUp, messages.last().text)
+            val llmStarted = clock.markNow()
+            val reply = try {
+                llm.chat(model, messages, schema)
+            } catch (e: Exception) {
+                trace.answered(step, model, null, null, "", null, llmStarted.elapsedNow().inWholeMilliseconds, e.message ?: e.toString())
+                throw e
+            }
+            trace.answered(
+                step, model, reply.toolCall?.name, reply.toolCall?.arguments, reply.text, reply.usage,
+                llmStarted.elapsedNow().inWholeMilliseconds,
+            )
             cost += reply.usage.costUsd
             val call = reply.toolCall
+            var actionStarted = clock.markNow()
             lastWasPhoneAction = false
 
-            fun record(action: String, reason: String, outcome: String) {
+            fun record(action: String, reason: String, outcome: String, op: String? = null) {
                 onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds))
+                trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
                 history += "$step. $action — $outcome"
             }
 
@@ -165,6 +192,7 @@ class Agent(
                         record(described, reason, "you did not allow it; do not try again without asking")
                         continue
                     }
+                    actionStarted = clock.markNow()
                     val outcome = try {
                         phone.send(op)
                         lastWasPhoneAction = true
@@ -173,7 +201,7 @@ class Agent(
                     } catch (e: Exception) {
                         "failed: ${e.message}"
                     }
-                    record(described, reason, outcome)
+                    record(described, reason, outcome, op.toString())
                     delay(config.settleMs)
                 }
             }

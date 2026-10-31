@@ -71,6 +71,17 @@ object LoopbackVpn {
         } ?: throw PhoneUnavailable("Mode's VPN did not connect within $timeout (status ${manager.connection.status})")
     }
 
+    /**
+     * Turns Mode's VPN off when Mode is not working, so iOS stops showing it.
+     * Free builds leave LocalDevVPN alone: the user runs that app.
+     */
+    suspend fun stop() {
+        if (!builtIn) return
+        loadAll().filter {
+            (it.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == providerBundleId
+        }.forEach { it.connection.stopVPNTunnel() }
+    }
+
     private suspend fun loadOrCreate(): NETunnelProviderManager {
         val existing = loadAll().firstOrNull {
             (it.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == providerBundleId

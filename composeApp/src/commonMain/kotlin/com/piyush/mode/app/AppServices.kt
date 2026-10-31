@@ -25,6 +25,9 @@ interface AppServices {
     fun requestNotifications()
 
     val http: HttpClient
+
+    /** Debug logs: runs, steps, screenshots, app events. */
+    val logs: LogStore
 }
 
 /** The user's agent settings. */
@@ -81,8 +84,31 @@ class PhoneHolder(private val link: PhoneLink, private val log: (String) -> Unit
             var pending: PhoneBackend? = first
             ResilientBackend(
                 connect = { pending?.also { pending = null } ?: connectOnce() },
-                onReconnect = { why -> log("↻ connection dropped ($why), reconnected") },
+                onReconnect = { why ->
+                    AppLog.log("phone", "connection dropped ($why); reconnected")
+                    log("↻ connection dropped ($why), reconnected")
+                },
             ).also { phone = it }
+        }
+    }
+
+    /**
+     * Ends the session: the screen stream stops (so iOS removes its "viewing
+     * and controlling" indicator) and Mode's VPN goes off. The next op
+     * connects again, which takes about a second.
+     */
+    suspend fun disconnect() {
+        val had = lock.withLock {
+            val current = phone
+            (current as? AutoCloseable)?.let { runCatching { it.close() } }
+            phone = null
+            connected = false
+            status = "Phone: not connected"
+            current != null
+        }
+        if (had) {
+            runCatching { link.release() }
+            AppLog.log("phone", "disconnected (idle)")
         }
     }
 
@@ -98,15 +124,20 @@ class PhoneHolder(private val link: PhoneLink, private val log: (String) -> Unit
 
     private suspend fun connectOnce(): PhoneBackend {
         status = "Connecting…"
+        AppLog.log("phone", "connecting")
+        val started = kotlin.time.TimeSource.Monotonic.markNow()
         try {
             val connection = link.connect()
+            val ms = started.elapsedNow().inWholeMilliseconds
             status = "Connected via ${connection.route}"
             connected = true
+            AppLog.log("phone", "connected via ${connection.route} in $ms ms\n${connection.attempts}")
             log(connection.attempts)
             return connection.backend
         } catch (e: Exception) {
             status = "Phone: not connected"
             connected = false
+            AppLog.error("phone", "connect failed after ${started.elapsedNow().inWholeMilliseconds} ms", e)
             throw e
         }
     }

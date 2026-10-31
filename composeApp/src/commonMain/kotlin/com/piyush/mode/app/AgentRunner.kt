@@ -15,7 +15,9 @@ import com.piyush.mode.ops.Op
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /** A question from the agent that the screen shows until the user answers. */
@@ -42,6 +44,10 @@ class AgentRunner(
     private var job: Job? = null
     private val llm by lazy { OpenRouterClient(services.http, apiKey = { settings.apiKey }) }
 
+    /** The folder of the most recent run under logs/, for the Logs tab. */
+    var lastRunId by mutableStateOf<String?>(null)
+        private set
+
     fun start(scope: CoroutineScope, task: String, config: AgentConfig = settings.config(), onFinished: (AgentResult?) -> Unit = {}) {
         if (running || task.isBlank()) return
         job = scope.launch {
@@ -60,19 +66,31 @@ class AgentRunner(
         question = null
     }
 
-    /** Runs one task to the end; null if it could not start. */
-    suspend fun runTask(task: String, config: AgentConfig): AgentResult? {
+    /**
+     * Runs one task to the end; null if it could not start. Disconnects after,
+     * unless [stayConnected] (more tasks follow straight away).
+     */
+    suspend fun runTask(task: String, config: AgentConfig, tag: String? = null, stayConnected: Boolean = false): AgentResult? {
         running = true
         steps.clear()
         lastResult = null
         services.requestNotifications()
+        RunRecorder.prune(services.logs)
+        val recorder = RunRecorder(services.logs, tag = tag)
+        lastRunId = recorder.id
         try {
             if (settings.apiKey.isNullOrBlank()) {
                 status = "Add your OpenRouter API key in Settings first."
+                recorder.failedToStart(task, "no API key")
                 return null
             }
             status = "Connecting to the phone…"
-            val phone = holder.phone()
+            val phone = try {
+                holder.phone()
+            } catch (e: Exception) {
+                recorder.failedToStart(task, "could not connect: ${e.message}")
+                throw e
+            }
             val agent = Agent(
                 phone = phone,
                 llm = llm,
@@ -80,6 +98,7 @@ class AgentRunner(
                 config = config,
                 onStep = { steps.add(it) },
                 onStatus = { status = it },
+                trace = recorder,
             )
             val result = link.inBackground { agent.run(task) }
             lastResult = result
@@ -90,8 +109,10 @@ class AgentRunner(
             return result
         } catch (e: kotlinx.coroutines.CancellationException) {
             status = "Stopped."
+            AppLog.log("agent", "run ${recorder.id} stopped by the user")
             throw e
         } catch (e: Exception) {
+            AppLog.error("agent", "run ${recorder.id} failed", e)
             status = "Failed: ${e.message}"
             services.notify("Mode", "Task failed: ${e.message}")
             log += "✗ ${e.message}"
@@ -99,6 +120,8 @@ class AgentRunner(
         } finally {
             running = false
             question = null
+            // Also after Stop: cleanup must not be cancelled with the task.
+            if (!stayConnected) withContext(NonCancellable) { holder.disconnect() }
         }
     }
 
@@ -115,11 +138,15 @@ class AgentRunner(
 
     private suspend fun askUser(phone: com.piyush.mode.ops.PhoneBackend, text: String, yesNo: Boolean): String? {
         val pending = PendingQuestion(text, yesNo, CompletableDeferred())
+        AppLog.log("agent", (if (yesNo) "confirm: " else "ask: ") + text)
         question = pending
         status = "Waiting for you"
         services.notify("Mode needs you", text)
         runCatching { phone.send(Op.LaunchApp(link.ownBundleId)) }
-        return pending.answer.await().also { question = null }
+        return pending.answer.await().also {
+            AppLog.log("agent", "user answered: ${it ?: "(stopped)"}")
+            question = null
+        }
     }
 
     companion object {
@@ -142,7 +169,7 @@ class CompareRow(val model: String, val task: String, val outcome: String, val s
  * Runs each task the user wrote with each model, from the Home Screen, and
  * tabulates success, steps, time and cost. The tasks come from the user.
  */
-class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHolder) {
+class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHolder, private val logs: LogStore) {
     val rows = mutableStateListOf<CompareRow>()
     var running by mutableStateOf(false)
         private set
@@ -151,11 +178,15 @@ class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHo
         if (running) return
         running = true
         rows.clear()
+        val id = "compare-" + nowId()
+        AppLog.log("compare", "$id: ${tasks.size} tasks × ${models.size} models")
         try {
             for (model in models) for (task in tasks) {
                 runCatching { holder.phone().send(Op.Home) }
                 val base = runner.settings.config()
-                val result = runner.runTask(task, AgentConfig(model = model, strongModel = null, maxSteps = base.maxSteps))
+                val result = runner.runTask(
+                    task, AgentConfig(model = model, strongModel = null, maxSteps = base.maxSteps), tag = id, stayConnected = true,
+                )
                 rows += if (result == null) {
                     CompareRow(model, task, "did not run: ${runner.status}", 0, 0, 0.0)
                 } else {
@@ -166,9 +197,22 @@ class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHo
                     }
                     CompareRow(model, task, outcome, result.steps, result.millis / 1000, result.costUsd)
                 }
+                logs.write("compare/$id.txt", summary().encodeToByteArray())
             }
         } finally {
             running = false
+            withContext(NonCancellable) { holder.disconnect() }
+            AppLog.log("compare", "$id finished:\n" + summary())
+        }
+    }
+
+    /** Per model: successes, steps, time, cost, then each task. */
+    fun summary(): String = buildString {
+        for ((model, rows) in rows.groupBy { it.model }) {
+            val wins = rows.count { it.outcome.startsWith("✅") }
+            append("$model: $wins/${rows.size} done, ${rows.sumOf { it.steps }} steps, ")
+            append("${rows.sumOf { it.seconds }}s, $${(rows.sumOf { it.costUsd } * 10000).roundToInt() / 10000.0}\n")
+            rows.forEach { append("  • ${it.task}: ${it.outcome} (${it.steps} steps, ${it.seconds}s, $${(it.costUsd * 10000).roundToInt() / 10000.0})\n") }
         }
     }
 }

@@ -43,6 +43,7 @@ object KeepAwake {
     fun start() {
         holders++
         if (holders > 1) return
+        AppLog.log("awake", "silent audio on")
         val session = AVAudioSession.sharedInstance()
         session.setCategory(AVAudioSessionCategoryPlayback, AVAudioSessionCategoryOptionMixWithOthers, null)
         session.setActive(true, null)
@@ -56,6 +57,7 @@ object KeepAwake {
             AVAudioSessionInterruptionNotification, null, NSOperationQueue.mainQueue,
         ) { note ->
             val type = (note?.userInfo?.get(AVAudioSessionInterruptionTypeKey) as? NSNumber)?.unsignedLongValue
+            AppLog.log("awake", "audio interruption " + (if (type == AVAudioSessionInterruptionTypeEnded) "ended" else "began"))
             if (type == AVAudioSessionInterruptionTypeEnded && holders > 0) {
                 AVAudioSession.sharedInstance().setActive(true, null)
                 player?.play()
@@ -69,6 +71,7 @@ object KeepAwake {
         if (holders > 0) return
         player?.stop()
         player = null
+        AppLog.log("awake", "silent audio off")
         interruptions?.let { NSNotificationCenter.defaultCenter.removeObserver(it) }
         interruptions = null
         AVAudioSession.sharedInstance().setActive(false, AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation, null)

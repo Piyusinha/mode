@@ -58,6 +58,20 @@ In Mode: **Open app** `Settings`, **Then tap text containing** `Wi-Fi`, then
 **Run in that app, then come back**. The log shows each step with timings, plus
 both screenshots and the text read from them.
 
+## Debug logs
+
+Every run is recorded in Mode's `Documents/logs`:
+- `runs/<time>/run.json`, `steps.jsonl` and `step-N.jpg`.
+- App events in `events.log`.
+
+See them in the **Logs** tab, in Files › On My iPhone › Mode › logs, or pull
+them to the Mac:
+
+```sh
+tools/pull-logs.sh                                   # → build/logs/<time>/
+pymobiledevice3 syslog live | grep "Mode "           # watch app events live
+```
+
 ## Tests
 
 ```sh

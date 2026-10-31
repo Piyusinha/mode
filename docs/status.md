@@ -12,7 +12,7 @@ As of 2026-10-31.
 | 3 | `shared/phone-coredevice`: the Kotlin `PhoneBackend` for iOS | ✅ Done |
 | 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake | 🟡 All but mobile data |
 | 5 | Docs | 🟡 This set |
-| 6 | The agent: task in, AI picks each action, Mode executes | ⏳ Not started |
+| 6 | The agent: task in, AI picks each action, Mode executes | 🟡 Built and unit-tested (12 tests); first real runs pending (needs the OpenRouter key) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
 ## Proven on the phone (iPhone 17 Pro, iOS 27.2)
@@ -39,10 +39,8 @@ As of 2026-10-31.
    (as long as a real task) is still to do.
 
 ### Phase 6, the agent
-- The look → decide → act loop, with the AI's tools generated from `Op`.
-- Ask the user before anything irreversible (pay, book, send, delete).
-- Notifications when the task is done or the agent needs the user.
-- Decide which model and whose API key.
+- First real runs with the OpenRouter key, then the model comparison (Compare tab) to pick the default.
+- Read the debug logs of those runs and tune the prompt.
 
 ### Last
 - Free build (`tools/gen-project.sh free`) with LocalDevVPN, on the phone.

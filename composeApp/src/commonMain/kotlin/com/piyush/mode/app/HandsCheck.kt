@@ -106,6 +106,7 @@ class HandsCheck(private val link: PhoneLink, private val holder: PhoneHolder) {
 
     private fun step(what: String) {
         log += "  ${opStarted.elapsedNow().inWholeMilliseconds} ms  $what"
+        AppLog.log("hands", what)
     }
 
     private suspend fun run(what: String, block: suspend () -> Unit) {
@@ -118,6 +119,7 @@ class HandsCheck(private val link: PhoneLink, private val holder: PhoneHolder) {
             step("done")
         } catch (e: Exception) {
             log += "  ✗ ${e.message ?: e.toString()}"
+            AppLog.error("hands", what, e)
         } finally {
             busy = false
         }
