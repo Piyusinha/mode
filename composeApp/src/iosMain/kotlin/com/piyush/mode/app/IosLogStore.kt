@@ -66,7 +66,9 @@ object IosLogStore : LogStore {
     /** The app-event sink: logs/events.log plus the system log, so a Mac can watch it live. */
     fun event(line: String) {
         append("events.log", line + "\n")
-        NSLog("Mode %@", line)
+        // One preformatted string: Kotlin strings cannot go through NSLog's
+        // varargs (%@ crashed at launch), and a literal % must not be read as a format.
+        NSLog(("Mode " + line).replace("%", "%%"))
     }
 
     private fun full(path: String) = if (path.isEmpty()) root else "$root/$path"

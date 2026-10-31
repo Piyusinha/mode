@@ -19,7 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -64,9 +64,9 @@ fun App(link: PhoneLink, services: AppServices) {
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                PrimaryTabRow(selectedTabIndex = tab) {
+                PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
                     listOf("Agent", "Compare", "Logs", "Settings", "Hands").forEachIndexed { i, title ->
-                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title) })
+                        Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, maxLines = 1) })
                     }
                 }
                 when (tab) {
