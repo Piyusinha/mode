@@ -91,7 +91,8 @@ class AgentTest {
         val result = Agent(phone, model, Gate(), noSettle).run("open wifi")
 
         assertIs<AgentOutcome.Done>(result.outcome)
-        val tap = phone.actions.single() as Op.Tap
+        assertEquals(Op.Home, phone.actions.first(), "a run starts from the Home Screen")
+        val tap = phone.actions[1] as Op.Tap
         assertEquals(125 * 402.0 / 500, tap.x)
         assertEquals(500 * 874.0 / 1000, tap.y)
         assertEquals(2, result.steps)
@@ -114,7 +115,7 @@ class AgentTest {
         val gate = Gate(allow = false)
         val model = ScriptedModel(call("tap", "x" to 250, "y" to 915, "reason" to "book"), call("done", "summary" to "stopped"))
         Agent(phone, model, gate, noSettle).run("get a cab")
-        assertTrue(phone.actions.isEmpty(), "declined, so nothing was tapped")
+        assertEquals(listOf<Op>(Op.Home), phone.actions, "declined, so nothing was tapped")
         assertTrue(gate.asked.single().contains("Request Uber Go"))
     }
 
@@ -138,7 +139,7 @@ class AgentTest {
         val result = Agent(phone, model, Gate(), AgentConfig(maxSteps = 3, settleMs = 0)).run("t")
         val outcome = assertIs<AgentOutcome.Stopped>(result.outcome)
         assertTrue("3 steps" in outcome.why)
-        assertEquals(3, phone.actions.size)
+        assertEquals(1 + 3, phone.actions.size, "Home first, then three steps")
     }
 
     @Test
@@ -155,7 +156,7 @@ class AgentTest {
         val model = ScriptedModel(null, call("fly", "reason" to "?"), call("done", "summary" to "ok"))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         assertEquals(listOf("cheap", "cheap", "strong"), model.models)
-        assertTrue(phone.actions.isEmpty())
+        assertEquals(listOf<Op>(Op.Home), phone.actions)
     }
 
     @Test
@@ -214,5 +215,15 @@ class AgentTest {
             listOf("start:t", "look1:1", "ask1", "answer1:home", "act1:ok", "look2:1", "ask2", "answer2:done", "act2:finished", "end:2"),
             events,
         )
+    }
+
+    @Test
+    fun repeatedWaitingStepsUpAndIsCalledOut() = runTest {
+        val phone = FakePhone(List(10) { i -> listOf("log $i" to (1.0 to 1.0)) })
+        val wait = call("wait", "seconds" to 0.5, "reason" to "agent thinking")
+        val model = ScriptedModel(wait, wait, wait, call("done", "summary" to "x"))
+        Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
+        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
+        assertTrue("waiting is not getting anywhere" in model.lastUserText)
     }
 }

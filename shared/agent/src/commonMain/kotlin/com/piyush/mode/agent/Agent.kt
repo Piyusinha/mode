@@ -2,6 +2,7 @@ package com.piyush.mode.agent
 
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
+import com.piyush.mode.ops.wireName
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -100,6 +101,16 @@ class Agent(
         var lastWasPhoneAction = false
         var noProgress = 0
         var badReplies = 0
+        var waits = 0
+
+        // Start from the Home Screen: when the user taps Run, Mode itself is on
+        // screen, and a model looking at Mode's live log only sees "the agent is
+        // thinking" and waits for ever (seen on the first real run).
+        if (Op.Home.wireName in phone.ops()) {
+            onStatus("Leaving Mode")
+            runCatching { phone.send(Op.Home) }
+            delay(config.settleMs)
+        }
 
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
@@ -174,11 +185,19 @@ class Agent(
                     record("ask_user", question, "you answered: $answer")
                 }
                 "wait" -> {
+                    waits++
                     val seconds = (call.arguments["seconds"]?.jsonPrimitive?.doubleOrNull ?: 2.0).coerceIn(0.5, 10.0)
                     delay((seconds * 1000).toLong())
-                    record("wait ${seconds}s", reason, "waited")
+                    // Waiting again and again is not progress: say so, and step up.
+                    if (waits >= 3) {
+                        noProgress = 2
+                        record("wait ${seconds}s", reason, "waited $waits times in a row; waiting is not getting anywhere, act instead")
+                    } else {
+                        record("wait ${seconds}s", reason, "waited")
+                    }
                 }
                 else -> {
+                    waits = 0
                     val op = try {
                         AgentTools.toOp(call, screen.geometry)
                     } catch (e: IllegalArgumentException) {
@@ -301,6 +320,9 @@ class Agent(
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.
+            You are run by an app called Mode. If Mode's own screen (its task log, "Step N: thinking",
+            the Agent/Compare/Logs tabs) is showing, that is you: never wait on it, leave it (home or
+            open_app) and work in the app the task needs.
             Each turn you get the task, what you did so far, a screenshot, and the text on the screen with
             positions. Reply with exactly one tool call. After each action you will see the new screen.
 

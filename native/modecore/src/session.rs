@@ -105,6 +105,8 @@ struct Live {
     handshake: RsdHandshake,
     display: DisplayServiceClient<Box<dyn ReadWrite>>,
     drains: Vec<JoinHandle<()>>,
+    /// The video receiver socket and our SSRC, to say goodbye (RTCP BYE).
+    video: (std::sync::Arc<UdpSocketHandle>, u32),
     touch: UniversalHidServiceClient<Box<dyn ReadWrite>>,
     indigo: IndigoHidClient<Box<dyn ReadWrite>>,
     clock: Clock,
@@ -162,7 +164,7 @@ impl Session {
         mounted_disk_image: bool,
     ) -> Result<Session> {
         let live = rt.block_on(async {
-            let (display, drains) = open_screen_stream(&mut adapter, &mut handshake).await?;
+            let (display, drains, video) = open_screen_stream(&mut adapter, &mut handshake).await?;
             tokio::time::sleep(STREAM_SETTLE).await;
             let touch = UniversalHidServiceClient::connect_rsd(&mut adapter, &mut handshake)
                 .await
@@ -170,7 +172,7 @@ impl Session {
             let indigo = IndigoHidClient::connect_rsd(&mut adapter, &mut handshake)
                 .await
                 .map_err(|e| err("button/keyboard service", e))?;
-            Ok::<_, Error>(Live { adapter, handshake, display, drains, touch, indigo, clock: Clock::Mach })
+            Ok::<_, Error>(Live { adapter, handshake, display, drains, video, touch, indigo, clock: Clock::Mach })
         })?;
         Ok(Session { rt, live: Mutex::new(Some(live)), mounted_disk_image })
     }
@@ -327,8 +329,14 @@ impl Session {
     pub fn close(&self) {
         self.rt.block_on(async {
             if let Some(mut live) = self.live.lock().await.take() {
+                // Like Device Hub: release any held touch, tell the stream we
+                // are leaving (RTCP BYE), stop it, then close the tunnel.
+                let _ = live.touch.send_touchscreen(TOUCHSCREEN_STATE_RELEASE, 0, 0, stamp(live.clock)).await;
+                let (socket, ssrc) = &live.video;
+                let _ = socket.send_to(VIDEO_SENDER_PORT, rtcp_bye(*ssrc)).await;
                 let _ = live.display.stop_media_stream().await;
                 live.drains.iter().for_each(|d| d.abort());
+                tokio::time::sleep(Duration::from_millis(200)).await;
                 let _ = live.adapter.close().await;
             }
         });
@@ -465,7 +473,7 @@ async fn press(indigo: &mut IndigoHidClient<Box<dyn ReadWrite>>, usage: u64, mod
 async fn open_screen_stream(
     adapter: &mut AdapterHandle,
     handshake: &mut RsdHandshake,
-) -> Result<(DisplayServiceClient<Box<dyn ReadWrite>>, Vec<JoinHandle<()>>)> {
+) -> Result<(DisplayServiceClient<Box<dyn ReadWrite>>, Vec<JoinHandle<()>>, (std::sync::Arc<UdpSocketHandle>, u32))> {
     let mut display = DisplayServiceClient::connect_rsd(adapter, handshake)
         .await
         .map_err(|e| err("display service", e))?;
@@ -515,7 +523,7 @@ async fn open_screen_stream(
             &receiver_ip,
             video_udp.local_port(),
             &sender_ip,
-            50001,
+            VIDEO_SENDER_PORT,
             video_offer,
             CLIENT_SUPPORTED_FEATURES,
             1,
@@ -524,12 +532,65 @@ async fn open_screen_stream(
         .await
         .map_err(|e| err("start video stream (the phone refuses while an app uses the camera or mic)", e))?;
 
-    let drains = vec![tokio::spawn(drain(audio_udp)), tokio::spawn(drain(video_udp))];
-    Ok((display, drains))
+    let video_udp = std::sync::Arc::new(video_udp);
+    let drains = vec![tokio::spawn(drain(audio_udp)), tokio::spawn(receive_video(video_udp.clone(), ssrc))];
+    Ok((display, drains, (video_udp, ssrc)))
 }
+
+/// The device's RTP source port for video, as declared in our start parameters.
+const VIDEO_SENDER_PORT: u16 = 50001;
+/// How often we tell the phone the viewer is alive (Device Hub sends feedback every 50 ms).
+const LIVENESS_EVERY: Duration = Duration::from_millis(200);
 
 async fn drain(socket: UdpSocketHandle) {
     while socket.recv().await.is_ok() {}
+}
+
+/// Reads (and discards) the video RTP, and like Device Hub keeps sending RTCP
+/// receiver reports so the phone knows a viewer is alive. Without them the
+/// phone cannot tell when the viewer is gone, and its session (and the
+/// "viewing and controlling" icon) can outlive us.
+async fn receive_video(socket: std::sync::Arc<UdpSocketHandle>, our_ssrc: u32) {
+    use idevice::core_device::{ReportBlock, RtpPacket, build_liveness, is_rtcp};
+    let mut media_ssrc: Option<u32> = None;
+    let mut highest_seq: u32 = 0;
+    let mut cycles: u32 = 0;
+    let mut last_seq: Option<u16> = None;
+    let mut ticker = tokio::time::interval(LIVENESS_EVERY);
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            datagram = socket.recv() => {
+                let Ok(datagram) = datagram else { return };
+                if is_rtcp(&datagram.data) { continue; }
+                if let Some(packet) = RtpPacket::parse(&datagram.data) {
+                    media_ssrc = Some(packet.ssrc);
+                    if let Some(last) = last_seq {
+                        if packet.sequence_number < last && last - packet.sequence_number > 0x8000 {
+                            cycles = cycles.wrapping_add(1);
+                        }
+                    }
+                    last_seq = Some(packet.sequence_number);
+                    highest_seq = (cycles << 16) | packet.sequence_number as u32;
+                }
+            }
+            _ = ticker.tick() => {
+                let blocks: Vec<ReportBlock> = media_ssrc
+                    .map(|source| vec![ReportBlock { source_ssrc: source, highest_seq, ..Default::default() }])
+                    .unwrap_or_default();
+                if socket.send_to(VIDEO_SENDER_PORT, build_liveness(our_ssrc, "mode", &blocks)).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// RTCP BYE (RFC 3550 §6.6): this receiver is leaving.
+fn rtcp_bye(our_ssrc: u32) -> Vec<u8> {
+    let mut packet = vec![0x81, 203, 0x00, 0x01];
+    packet.extend_from_slice(&our_ssrc.to_be_bytes());
+    packet
 }
 
 fn lerp(a: u16, b: u16, t: f64) -> u16 {
@@ -563,6 +624,13 @@ fn mach_now() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bye_is_a_well_formed_rtcp_packet() {
+        let bye = rtcp_bye(0x01020304);
+        assert_eq!(bye, vec![0x81, 203, 0, 1, 1, 2, 3, 4]);
+        assert_eq!(bye.len() % 4, 0);
+    }
 
     #[test]
     fn lerp_hits_both_ends() {
