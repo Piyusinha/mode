@@ -332,17 +332,40 @@ class AgentTest {
     }
 
     @Test
-    fun scrollingBackAndForthHandsOverToTheStrongModel() = runTest {
-        // Each stop is a little different, as on the phone, so the same-screen count never fires.
+    fun scrollingBackAndForthIsHeldAndKeptGoingOneWay() = runTest {
+        // On the phone: up, down, up, down looking for "Snacks", just below the last section shown.
         val phone = FakePhone(List(12) { i -> listOf("Diary" to (100.0 to 200.0), "row ${i % 3}" to (100.0 to 300.0 + i)) })
-        fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Reviewing the diary")
+        fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Looking for Snacks")
         val model = ScriptedModel(
-            scroll("down"), scroll("up"), scroll("down"), scroll("up"),
+            scroll("down"), scroll("up"), scroll("down"), scroll("up"), scroll("down"),
             call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
         )
-        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong")).run("what did I eat yesterday")
-        assertEquals("strong", model.models[4], model.models.toString())
-        assertTrue("scrolled back and forth" in model.lastUserText, model.lastUserText)
+        Agent(phone, model, Gate(), noSettle).run("add protein to snacks")
+        assertEquals(4, phone.actions.count { it is Op.Scroll }, "the third reversal (up) is held; down goes on")
+        assertTrue("Keep scrolling down" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun scrollingOneWayAgainAndAgainSuggestsSortOrFilter() = runTest {
+        val phone = FakePhone(List(12) { i -> listOf("Results" to (100.0 to 200.0), "row $i" to (100.0 to 300.0)) })
+        fun down() = call("scroll", "direction" to "down", "reason" to "Looking for the highest rated")
+        val model = ScriptedModel(down(), down(), down(), call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("highest rated sushi")
+        assertTrue("Sort, Filter or Search" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun theStrongModelIsAskedAtMostThreeTimesAndOnlyWithBudget() = runTest {
+        val phone = FakePhone(List(5) { listOf("Same" to (100.0 to 300.0)) })
+        val plan = call("plan", "steps" to "1. x")
+        val churn = Array(12) { plan }
+        val model = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
+        Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14)).run("t")
+        assertEquals(3, model.models.count { it == "strong" }, model.models.toString())
+
+        val tight = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
+        Agent(phone, tight, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14, maxCostUsd = 0.03)).run("t")
+        assertEquals(0, tight.models.count { it == "strong" }, "a step-up would take too much of what is left")
     }
 
     @Test

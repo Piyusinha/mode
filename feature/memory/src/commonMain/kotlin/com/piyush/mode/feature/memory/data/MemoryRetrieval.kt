@@ -40,7 +40,14 @@ public class MemoryRetrieval(
         val items = memory.all()
         val words = Words.of(task)
         val facts = items.filter { it.kind == MemoryKind.Fact }
-        val skills = items.filter { it.kind == MemoryKind.Skill }
+        // A task that names its app ("on Swiggy") gets no skills from other apps: seen on the phone,
+        // a Zomato skill offered for a Swiggy task sent the agent looking it up three times.
+        val taskApp = APP_IN_TASK.findAll(task).map { Words.normal(it.groupValues[2]) }.toList()
+        fun otherApp(item: MemoryItem): Boolean {
+            val app = item.app?.let(Words::normal)?.takeIf { it.isNotEmpty() } ?: return false
+            return taskApp.isNotEmpty() && taskApp.none { it.contains(app) || app.contains(it) } && !appNamed(app, words)
+        }
+        val skills = items.filter { it.kind == MemoryKind.Skill && !otherApp(it) }
         val tips = items.filter { it.kind == MemoryKind.Tip }
         val people = facts.map { it.subject }.toSet()
 
@@ -64,7 +71,8 @@ public class MemoryRetrieval(
 
         return ForTask(
             aboutYou = shownFacts.map { it.text },
-            skills = listOfNotNull(best?.let(::skillInFull)) + named.map { "Also known: ${it.title} (recall \"${it.title}\" for the steps)" },
+            skills = listOfNotNull(best?.let(::skillInFull)) +
+                named.map { "Also known${it.app?.let { a -> " (in $a)" }.orEmpty()}: ${it.title} (recall \"${it.title}\" for the steps)" },
             tips = shownTips.map { "${it.title}: ${it.text}" },
             usedIds = (shownFacts + listOfNotNull(best) + shownTips).map { it.id },
         )
@@ -141,5 +149,8 @@ public class MemoryRetrieval(
         public const val MAX_TIPS: Int = 10
         public const val MAX_SKILL_NAMES: Int = 3
         public const val SKILL_THRESHOLD: Double = 0.5
+
+        /** "on Swiggy", "in MyFitnessPal", "using Uber": a capitalised name after a little word. */
+        private val APP_IN_TASK = Regex("""\b(on|in|from|using|via|with|open)\s+([A-Z][\w&'-]{2,})""")
     }
 }

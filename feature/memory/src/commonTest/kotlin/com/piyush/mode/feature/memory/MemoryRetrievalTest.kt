@@ -87,6 +87,15 @@ class MemoryRetrievalTest {
     }
 
     @Test
+    fun aTaskThatNamesItsAppGetsNoSkillsFromOtherApps() {
+        skill("Order sushi on Zomato from a highly rated restaurant", "1. open Zomato\n2. search sushi", listOf("order", "sushi", "rated", "restaurant"), "Zomato")
+        // On the phone: a Zomato skill offered for a Swiggy task sent the agent looking it up three times.
+        assertTrue(retrieval.forTask("Can you check on Swiggy the highest rated restaurant to order sushi").skills.isEmpty())
+        assertTrue(retrieval.forTask("order sushi from a highly rated restaurant").skills.isNotEmpty(), "no app named: it may help")
+        assertTrue(retrieval.forTask("order sushi on Zomato from a highly rated restaurant").skills.isNotEmpty())
+    }
+
+    @Test
     fun recallForATaskLeavesOutOtherAppsButKeepsPeople() {
         seed()
         skill("Check Swish food order status", "1. open Swish\n2. tap Track", listOf("order", "food", "track"), "Swish")

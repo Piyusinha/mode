@@ -168,6 +168,9 @@ class Agent(
         val ledger = ChangeLedger()
         /** Memory lookups made, by query, and the step they were made at. */
         val recalled = mutableMapOf<String, Int>()
+        var stepUps = 0
+        /** What the last strong-model step cost, to judge whether the budget allows another. */
+        var lastStrongCost: Double? = null
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -241,7 +244,10 @@ class Agent(
             (verdict as? StuckDetector.Verdict.StepUp)?.note?.let { note ->
                 if (history.isNotEmpty()) history[history.lastIndex] += " ($note)"
             }
-            val stepUp = verdict is StuckDetector.Verdict.StepUp && config.strongModel != null
+            // The strong model costs ~20× a step: at most a few per task, and only with budget to spare.
+            val stepUp = verdict is StuckDetector.Verdict.StepUp && config.strongModel != null && stepUps < MAX_STEP_UPS &&
+                (config.maxCostUsd == null || config.maxCostUsd - cost > STEP_UP_BUDGET_SHARE * (lastStrongCost ?: STRONG_STEP_GUESS_USD))
+            if (stepUp) stepUps++
 
             val messages = ContextBuilder.build(
                 ContextBuilder.Input(
@@ -264,10 +270,12 @@ class Agent(
             )
             inMode = false
             expectation = null
-            val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, messages, schema)
+            // A step-up's prompt is not cached: it is not asked again soon, so a cache write would be wasted.
+            val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, if (stepUp) uncached(messages) else messages, schema)
             val reply = answer.reply
             val model = answer.model
             cost += reply.usage.costUsd
+            if (stepUp && model == config.strongModel) lastStrongCost = reply.usage.costUsd
             val call = reply.toolCall
             var actionStarted = clock.markNow()
             lastWasPhoneAction = false
@@ -367,6 +375,7 @@ class Agent(
                     // Seen on the phone: the same lookup twice in one task, the same unrelated answer.
                     val asked = recalled[query.lowercase()]
                     if (asked != null) {
+                        stuck.badReply()
                         record("recall \"$query\" (again)", "", "you already looked this up at step $asked: use what it said, or act")
                         continue
                     }
@@ -422,6 +431,18 @@ class Agent(
                             continue
                         }
                     }
+                    if (op is Op.Scroll) {
+                        val direction = call.arguments.string("direction")
+                        stuck.holdReversal(direction)?.let { kept ->
+                            record(
+                                "$described (not done)", reason,
+                                "not done: you have scrolled back and forth. Keep scrolling $kept until you find it or the " +
+                                    "page ends (the section you want is usually just past the last one you saw); if your " +
+                                    "notes already answer the task, call done",
+                            )
+                            continue
+                        }
+                    }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
                     if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
@@ -454,6 +475,8 @@ class Agent(
                             ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof)
                             "ok" + appeared.takeIf { it.isNotEmpty() }?.let { a -> "; right after it the screen showed: " + a.joinToString(", ") { "\"$it\"" } }.orEmpty() +
                                 if (proof != null) DONE_IT else CHECK_IT
+                        } else if (op is Op.Scroll && stuck.scrollsSameWay() >= SCROLLS_BEFORE_HINT - 1) {
+                            "ok (several scrolls in a row: if the app has Sort, Filter or Search for this, use it; otherwise decide with what you've noted)"
                         } else {
                             "ok"
                         }
@@ -617,6 +640,11 @@ class Agent(
         return row.take(2).joinToString(" · ") { it.first.trim() }.take(ROW_LABEL_MAX)
     }
 
+    /** The same messages with no cache points. */
+    private fun uncached(messages: List<ChatMessage>): List<ChatMessage> = messages.map { m ->
+        ChatMessage(m.role, m.parts.map { p -> if (p is ChatMessage.Part.Text && p.cacheAfter) ChatMessage.Part.Text(p.text) else p })
+    }
+
     /** A readable action for the log, naming the text tapped, or the row of an icon. */
     private fun describe(call: ToolCall, op: Op, screen: Screen): String = when (op) {
         is Op.Tap -> {
@@ -670,6 +698,11 @@ class Agent(
         private const val STATUS_BAR_PT = 60.0
         /** What ticks up there: the clock, a timer, the battery percentage, Mode's own "Step 4" on the island. */
         private val TICKING = Regex("""^(?:step\s*)?\d{1,3}(?:[:.]\d{2}){0,2}%?$""", RegexOption.IGNORE_CASE)
+        /** At most this many strong-model steps per task, each only while the budget left is this many times one. */
+        private const val MAX_STEP_UPS = 3
+        private const val STEP_UP_BUDGET_SHARE = 3.0
+        private const val STRONG_STEP_GUESS_USD = 0.02
+        private const val SCROLLS_BEFORE_HINT = 3
         private const val CHECK_IT = ". This changed something: check it worked before any other change"
         private const val DONE_IT = ". That confirms it: it is in Mode's record of changes; do not do it again"
         private const val ADD_IS_NOT_A_CHECK =
@@ -703,7 +736,11 @@ class Agent(
             - Open apps with open_app. Apps reopen where they were left, so to go back use the screen's
               own Back / "<" / Cancel / Done / X button, or the back tool. Home then open_app does not reset
               an app.
-            - To see more of a list or page, use scroll (never swipe for scrolling). Search fields and
+            - To find the best, cheapest, nearest, highest-rated or newest, use the app's own Sort, Filter or
+              Search first; scroll through a long list only when there is none. Read what a list already shows
+              (ratings, prices, sizes); open an item only to act on it, or when the list does not say.
+            - To see more of a list or page, use scroll (never swipe for scrolling). Keep going one way until
+              you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - Tap a text field before typing into it.
             - If an action did not change the screen, do not repeat it: try another way.
@@ -726,6 +763,14 @@ class Agent(
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).
             - Work on your own. Do not ask the user how to navigate or whether to go back.
 
+            Read the task as the user means it:
+            - A short command is a request: "Beast Life protein in my snacks" means log it there.
+            - "Add" or "log" means a new entry, even if a similar one exists elsewhere or earlier (another
+              meal, another day, an earlier serving). Only your own repeat within this task is a duplicate.
+            - Dates mean today unless the user says otherwise. Apps reopen where they were left (yesterday's
+              diary, last week's view): check the date on screen and move to today first.
+            - What they hand you to decide is yours: "best", "highest rated", "cheapest". Break ties yourself
+              (more ratings, then faster or nearer) and say why in your answer.
             Use what the task gives you: names, times, places and message text. In "send a message to
             Sonali saying I'm late" or "message Sonali: sending this automatically", the words after the
             name are the message: type them. If the task wants a message sent but gives no text, write a

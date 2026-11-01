@@ -28,6 +28,10 @@ class StuckDetector(private val canStepUp: Boolean) {
     /** Scrolls in a row that went the other way from the one before (down, up, down…). */
     private var lastScroll: String? = null
     private var reversals = 0
+    /** Scrolls in a row the same way, for the Sort/Filter hint. */
+    private var sameWay = 0
+    /** A reversal was already held back in this run of scrolls. */
+    private var heldReversal = false
     /** Screens seen right after phone actions, newest last. */
     private val recent = ArrayDeque<String>()
 
@@ -59,8 +63,8 @@ class StuckDetector(private val canStepUp: Boolean) {
         if (reversals >= MAX_REVERSALS) {
             reversals = 0
             return stepUp(
-                "you have scrolled back and forth over the same page; your notes already hold what you read there. " +
-                    "If they answer the task, call done now; otherwise read the page once, top to bottom",
+                "you have scrolled back and forth over the same page. To find something further down, keep scrolling " +
+                    "the same way until it shows or the page ends; if your notes already answer the task, call done",
             )
         }
         return when {
@@ -85,8 +89,24 @@ class StuckDetector(private val canStepUp: Boolean) {
             lastScroll != null && direction != lastScroll -> reversals + 1
             else -> reversals
         }
+        sameWay = if (direction != null && direction == lastScroll) sameWay + 1 else if (direction != null) 1 else 0
+        if (direction == null) heldReversal = false
         lastScroll = direction
     }
+
+    /**
+     * Seen on the phone: up, down, up, down looking for a section just below the last one shown.
+     * After two reversals, the next scroll back the other way is held once: keep going instead.
+     */
+    fun holdReversal(direction: String?): String? {
+        val last = lastScroll
+        if (direction == null || last == null || direction == last || reversals < 2 || heldReversal) return null
+        heldReversal = true
+        return last
+    }
+
+    /** Scrolls in a row the same way so far (the hint to use the app's Sort or Filter comes at 3). */
+    fun scrollsSameWay(): Int = sameWay
 
     /** A reply with no usable action. */
     fun badReply() { badReplies++ }
