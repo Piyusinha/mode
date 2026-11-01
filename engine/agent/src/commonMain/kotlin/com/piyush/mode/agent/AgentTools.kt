@@ -55,6 +55,13 @@ object AgentTools {
         required = false,
     )
     /** Offered on phone actions: the model states what should happen, and checks it on the next screen. */
+    /** The plan item an action works on: progress on the Dynamic Island, without a step of its own. */
+    private val item = Param(
+        "item", "integer",
+        "Optional. When you have a plan: the number of the plan item this action works on.",
+        required = false,
+    )
+
     private val expect = Param(
         "expect", "string",
         "Optional. What the screen should show after this action, in a few words (\"Appearance page opens\").",
@@ -109,9 +116,9 @@ object AgentTools {
             listOf(Param("name", "string", "The app's name, as on its icon."), reason),
         ),
         Tool(
-            "plan", "Write or update your plan for a task with several parts: a short numbered list, marking " +
-                "items done as you go. It is shown back to you every step.", null,
-            listOf(Param("steps", "string", "The plan, one item per line, e.g. \"1. [done] turn off dark mode\\n2. set brightness\"")),
+            "plan", "Write your plan for a task with several parts: a short numbered list of a few words per item. " +
+                "It is shown back to you every step; each action's item field says which item it works on.", null,
+            listOf(Param("steps", "string", "The plan, one item per line, e.g. \"1. Turn off dark mode\\n2. Set brightness to half\"")),
         ),
         Tool(
             "recall", "Look up what Mode remembers: a person's details, a place, a preference, or the steps of a " +
@@ -147,8 +154,9 @@ object AgentTools {
     ).map { tool ->
         when {
             tool.name == "done" -> tool
-            tool.needs != null -> Tool(tool.name, tool.description, tool.needs, tool.params + note + expect)
-            else -> Tool(tool.name, tool.description, tool.needs, tool.params + note)
+            tool.name == "plan" -> Tool(tool.name, tool.description, tool.needs, tool.params + note)
+            tool.needs != null -> Tool(tool.name, tool.description, tool.needs, tool.params + note + item + expect)
+            else -> Tool(tool.name, tool.description, tool.needs, tool.params + note + item)
         }
     }
 
@@ -232,6 +240,8 @@ object AgentTools {
     fun expectOf(call: ToolCall): String? = call.arguments["expect"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 
     /** The fact the model asked to keep with this action, if any. */
+    fun itemOf(call: ToolCall): Int? = call.arguments["item"]?.jsonPrimitive?.contentOrNull?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+
     fun noteOf(call: ToolCall): String? = call.arguments["note"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
         // Notes reach the prompt and the run log on disk: a secret is never kept, whatever the model wrote.
         ?.let(SecretFilter::hide)

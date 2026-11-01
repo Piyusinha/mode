@@ -32,6 +32,8 @@ public data class TaskState(
     val paused: Boolean = false,
     /** The last screenshot the agent looked at (JPEG), for the live view. */
     val latestScreen: ByteArray? = null,
+    /** The agent's plan for a task with several parts, as it last wrote it. */
+    val plan: List<com.piyush.mode.agent.PlanItem> = emptyList(),
     /** When this task started running, epoch ms. */
     val startedAtMs: Long? = null,
     /** Facts about the user this task taught Mode, for "Remembered · Undo". Arrives a moment after the task ends. */

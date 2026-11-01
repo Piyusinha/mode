@@ -23,12 +23,23 @@ public interface BackgroundWork {
     public suspend fun <T> run(work: suspend () -> T): T
 }
 
+/** Other places a finished task's answer shows, so it isn't announced twice. */
+public object ResultSurfaces {
+    /** A Live Activity is showing the task, and will show its answer. */
+    public var onLockScreen: Boolean = false
+}
+
 /** Local notifications: a task finished, or Mode needs the user. */
 public interface Notifier {
     public fun requestPermission()
 
     /** Shown only while Mode is not on screen; in front, the app itself shows it. */
     public fun post(title: String, body: String)
+
+    /** A finished task's answer: skipped while the Lock Screen already shows it (the Live Activity). */
+    public fun postResult(title: String, body: String) {
+        if (!ResultSurfaces.onLockScreen) post(title, body)
+    }
 
     /** A notification at [atEpochMs], replacing any earlier one with the same [id]. Tapping it opens Mode. */
     public fun schedule(id: String, title: String, body: String, atEpochMs: Long) {}

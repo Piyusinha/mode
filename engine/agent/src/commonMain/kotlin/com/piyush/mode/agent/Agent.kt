@@ -71,6 +71,8 @@ class StepRecord(
     val outcome: String,
     val costUsd: Double,
     val millis: Long,
+    /** The plan item (1-based) the model said this action works on, when it has a plan. */
+    val planItem: Int? = null,
 )
 
 sealed interface AgentOutcome {
@@ -115,6 +117,8 @@ class Agent(
     private val pause: PauseGate? = null,
     /** Each screenshot the agent looks at, for the live view. */
     private val onScreen: (ByteArray) -> Unit = {},
+    /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
+    private val onPlan: (List<PlanItem>) -> Unit = {},
 ) {
     private val clock = TimeSource.Monotonic
 
@@ -253,7 +257,8 @@ class Agent(
             lastWasPhoneAction = false
 
             fun record(action: String, reason: String, outcome: String, op: String? = null) {
-                onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds))
+                onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds,
+                    planItem = call?.let(AgentTools::itemOf)))
                 trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
                 history += "$step. $action — $outcome"
             }
@@ -326,6 +331,7 @@ class Agent(
                 }
                 "plan" -> {
                     plan = call.arguments.string("steps")?.trim()?.take(1500)
+                    onPlan(PlanItem.parse(plan.orEmpty()))
                     // Seen on the phone: eight plan rewrites in one run, each a wasted step.
                     if (stuck.thought() >= 2) {
                         record("plan", "", "plan saved, but you planned again without acting: no more planning now, do the next item")
@@ -572,8 +578,9 @@ class Agent(
 
             Plan multi-part tasks:
             - If the task has several parts ("turn off dark mode, set brightness to half and open YouTube"),
-              first call plan with a short numbered list, then do the items in order. Call plan again to
-              mark items done or change course. Finish (done) only when every item is done.
+              first call plan with a short numbered list, then do the items in order. In each action, put
+              the number of the item it works on in the item field (the user sees this as progress). Call
+              plan again only to change course. Finish (done) only when every item is done.
 
             Know iOS and pick the fastest route (from wherever you are):
             - Settings has a search field at the top of its main page: searching a setting's name ("Dark

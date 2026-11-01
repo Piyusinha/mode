@@ -225,6 +225,7 @@ public class TaskRunner(
                 gate = gate(phone),
                 config = budget,
                 onStep = { step -> mutableState.update { it.copy(steps = it.steps + step) } },
+                onPlan = { items -> mutableState.update { it.copy(plan = items) } },
                 onStatus = ::status,
                 trace = recorder,
                 memory = prepared?.agentMemory,
@@ -240,7 +241,7 @@ public class TaskRunner(
             val line = describeResult(finished)
             mutableState.update { it.copy(lastResult = finished, status = line) }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
-            notifier.post("Mode", PlainText.fromMarkdown(reply))
+            notifier.postResult("Mode", PlainText.fromMarkdown(reply))
             // Come back so the user sees how it went.
             runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
             return finished

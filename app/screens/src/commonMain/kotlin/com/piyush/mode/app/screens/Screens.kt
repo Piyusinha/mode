@@ -4,6 +4,7 @@ import com.piyush.mode.app.screens.common.ScreenClock
 import com.piyush.mode.app.screens.conversation.ConversationPresenter
 import com.piyush.mode.app.screens.home.HomePresenter
 import com.piyush.mode.app.screens.repeat.RepeatPresenter
+import com.piyush.mode.app.screens.run.LiveActivityPresenter
 import com.piyush.mode.app.screens.run.LiveRunPresenter
 import com.piyush.mode.app.screens.run.RunScreensPresenter
 import com.piyush.mode.app.screens.memory.MemoryPresenter
@@ -56,6 +57,9 @@ public class Screens(
         ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock)
 
     public fun liveRun(): LiveRunPresenter = LiveRunPresenter(scope, runner, tasks)
+
+    /** The Live Activity: one for the app's lifetime. */
+    public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks)
 
     public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks)
 
