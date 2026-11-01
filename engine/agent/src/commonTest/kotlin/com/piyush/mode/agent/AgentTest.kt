@@ -686,6 +686,33 @@ class AgentTest {
         assertTrue("already listed below (a recent or suggested entry): then tap that" in model.lastUserText, model.lastUserText)
     }
 
+    // MyFitnessPal's quantity number pad, as OCR reads it: digits and their letter groups.
+    private val numberPad = listOf(
+        "1" to (70.0 to 610.0), "2" to (200.0 to 610.0), "ABC" to (200.0 to 625.0), "3" to (330.0 to 610.0), "DEF" to (330.0 to 625.0),
+        "4" to (70.0 to 665.0), "GHI" to (70.0 to 680.0), "5" to (200.0 to 665.0), "JKL" to (200.0 to 680.0), "6" to (330.0 to 665.0),
+        "7" to (70.0 to 720.0), "8" to (200.0 to 720.0), "9" to (330.0 to 720.0), "0" to (200.0 to 775.0),
+    )
+
+    @Test
+    fun aNumberPadIsAKeyboardToo() = runTest {
+        val form = listOf("Serving Size" to (60.0 to 215.0), "1 roll" to (360.0 to 215.0), "Number of Servings" to (80.0 to 263.0))
+        val phone = FakePhone(List(3) { form + numberPad })
+        val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("log 8 pieces")
+        assertTrue("KEYBOARD IS UP" in model.lastUserText, model.lastUserText)
+        assertTrue("\"GHI\"" !in model.lastUserText, "the pad's keys are left out")
+    }
+
+    @Test
+    fun typeTextCanReplaceWhatTheFieldHolds() = runTest {
+        val phone = FakePhone(List(3) { listOf("Number of Servings" to (80.0 to 263.0)) + numberPad })
+        val model = ScriptedModel(call("type_text", "text" to "8", "clear" to true, "reason" to "Setting 8 pieces"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("log 8 pieces")
+        val deletes = phone.actions.takeWhile { it is Op.PressKey }
+        assertTrue(deletes.size >= 8 && deletes.all { (it as Op.PressKey).combo == "delete" }, phone.actions.toString())
+        assertEquals(Op.TypeText("8"), phone.actions[deletes.size])
+    }
+
     // A focused search field with the keyboard up, as on the phone (run 14-11-27): the keys are single letters, low.
     private val keyboard = "QWERTYUIOPASDFGHJKL".mapIndexed { i, c -> c.toString() to (20.0 + (i % 10) * 38 to 640.0 + (i / 10) * 55) }
     private val searchWithKeyboard = listOf("Try 'Pizza'" to (200.0 to 134.0), "Popular searches" to (120.0 to 260.0)) + keyboard

@@ -544,6 +544,11 @@ class Agent(
                             delay(FOCUS_MS)
                         }
                     }
+                    // Replacing what a field holds (a quantity's 1): seen on the phone, the agent pressed delete,
+                    // tapped the field and pressed digits one at a time for ten steps.
+                    if (call.name == "type_text" && call.arguments["clear"]?.jsonPrimitive?.booleanOrNull == true) {
+                        repeat(CLEAR_KEYS) { runCatching { phone.send(Op.PressKey("delete")) } }
+                    }
                     if (op is Op.Scroll) {
                         val direction = call.arguments.string("direction")
                         stuck.holdReversal(direction)?.let { kept ->
@@ -867,6 +872,8 @@ class Agent(
             "SCROLLING; choose from it, or scroll the other way once if what you need was above"
         private val ROUTE_STEP = Regex("""^\d{1,2}[.)]\s*(.+)$""")
         private const val MAX_ROUTE_STEPS = 8
+        /** Deletes pressed to empty a field before typing (quantities, short entries). */
+        private const val CLEAR_KEYS = 12
         /** A scroll showing fewer new lines than this has reached the end. */
         private const val MIN_NEW_LINES = 2
         private const val BACK_DID_NOTHING =
@@ -959,7 +966,7 @@ class Agent(
               you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - To type into a field, use type_text with the field's id (or x and y): Mode taps it only if the
-              keyboard is not already up. Set submit true to press return (to search). When the screen says KEYBOARD IS UP,
+              keyboard is not already up. Set clear true to replace what the field holds (a quantity of 1). Set submit true to press return (to search). When the screen says KEYBOARD IS UP,
               the field is focused: just type_text, never tap the field again.
             - If an action did not change the screen, do not repeat it: try another way.
             - Changing things for the user (adding, logging, saving, sending, booking, buying, deleting) is
@@ -967,8 +974,13 @@ class Agent(
               1. Before: be sure it is the right item. In search results pick only one that matches what the
                  user asked (name, brand, size). If nothing matches, search again with another spelling or fewer
                  words (spoken tasks are often misheard), then ask. Ask BEFORE changing anything, never after.
-              2. Amounts: if the user gave an amount (100 g, 2 cups, 3 tickets), open the item (tap its name,
-                 not the + or Add beside it) to set the amount, then add it from there. + adds the default.
+              2. Amounts: if the user gave an amount (100 g, 8 pieces, 2 cups, 3 tickets), keep their unit. In
+                 search results, prefer an entry whose serving is in that unit ("4 piece") when the names fit
+                 equally. Open the item (tap its name, not the + or Add beside it): its serving size or unit is
+                 usually a menu, so open it and pick the user's unit (piece, gram, cup), then set the number
+                 (type_text with clear true replaces the old number). Never turn "8 pieces" into 8 of a bigger
+                 unit (8 rolls). Only when no such unit exists, convert sensibly and say so in your summary.
+                 + adds the default.
               3. Do it once. A + or Add button adds; it never checks anything.
               4. Check: Mode reads the screen right after and tells you what appeared ("Food logged!"); that is
                  proof. Without proof, go where the result lives: usually the page this one was opened from

@@ -120,6 +120,7 @@ object AgentTools {
                 Param("x", "number", "Optional. The field's centre, in screenshot pixels, to focus it.", required = false),
                 Param("y", "number", "Optional. The field's centre, in screenshot pixels.", required = false),
                 Param("submit", "boolean", "Optional. true presses return after typing (to search or send).", required = false),
+                Param("clear", "boolean", "Optional. true deletes what the field holds first (a quantity's 1), then types.", required = false),
                 reason,
             ),
         ),

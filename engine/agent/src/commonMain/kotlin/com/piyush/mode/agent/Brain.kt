@@ -223,6 +223,8 @@ class Brain(private val llm: LlmClient, private val model: String) {
               or where it is going, and continue it in the user's own voice (their language mix, length, tone,
               emoji), not ask the user what to say. Mode shows the user the message before it is sent.
             - "Add" or "log" means a new entry, even if a similar one exists.
+            - Amounts keep the user's unit: "8 pieces" is 8 servings of one piece (or a serving of 8 pieces),
+              never 8 rolls or 8 plates. Say to pick that unit in the item's serving options.
             - What the user hands over is yours to decide ("best", "highest rated", "cheapest", the obvious
               match): say how, including how to break ties (more ratings, then faster or nearer). Use the app's
               own search, sort and filter rather than scrolling long lists.
