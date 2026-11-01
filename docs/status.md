@@ -79,11 +79,8 @@ Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the
   by itself; the watch app also shows the step, a Stop button and the result.
 - **One way in for every source:** Watch, Siri, Shortcuts and the app all hand tasks to one
   task inbox (a feature module), so adding a source doesn't touch the agent.
-- **Test first, from the Mac, before building:**
-  1. Can Mode, woken in the background by the watch, keep running? (Its silent-audio
-     keep-awake may not be allowed to start from the background; same question as Siri.)
-  2. Does screen control work while the iPhone is locked? If not, the watch flow
-     becomes "unlock your iPhone and Mode starts".
+- **Two checks, done in the last steps once the app is complete** (see "Last"):
+  waking from the background and controlling a locked iPhone.
 - Designs: the "From your Apple Watch" row on the design canvas.
 
 ### Launch
@@ -96,8 +93,13 @@ Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the
 10. **Demo video.** A short, polished screen recording of real runs from the phone
     (for example the WhatsApp + Calendar task), for the landing page and sharing.
 
-### Last
-- Free build (`tools/gen-project.sh free`) with LocalDevVPN, on the phone.
+### Last (once the app is complete)
+1. **Woken by the watch (or Siri):** can Mode, started in the background, keep running a task?
+   Its silent-audio keep-awake may not be allowed to start from the background.
+2. **Locked iPhone:** does screen control work while the phone is locked? If not, the watch
+   and Siri flows become "unlock your iPhone and Mode starts" (and the unlock idea is checked
+   here too).
+3. **Free build** (`tools/gen-project.sh free`) with LocalDevVPN, on the phone.
 
 ## Commit history
 
