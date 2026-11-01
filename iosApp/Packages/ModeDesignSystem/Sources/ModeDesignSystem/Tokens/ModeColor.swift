@@ -26,6 +26,20 @@ public enum ModeColor {
     /// The two soft glows at the top of the page.
     public static let glowViolet = named("GlowViolet")
     public static let glowPink = named("GlowPink")
+    /// Tags and tiles from the boards.
+    public static let tagGreen = named("TagGreen")
+    public static let tagGreenText = named("TagGreenText")
+    public static let tileOrange = named("TileOrange")
+    public static let tileOrangeText = named("TileOrangeText")
+    public static let tileRed = named("TileRed")
+    public static let tileGray = named("TileGray")
+    /// Grey fills: secondary buttons (No, Pause), the Paste button.
+    public static let fill = named("Fill")
+    /// The Stop button.
+    public static let stopRed = named("StopRed")
+    /// The soft green glow behind a success page.
+    public static let glowGreen = named("GlowGreen")
+
     /// Behind sheets and dialogs.
     public static let scrim = named("Scrim")
 

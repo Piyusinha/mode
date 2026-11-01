@@ -38,7 +38,7 @@ public data class PermissionRow(
     val later: Boolean,
 )
 
-public enum class TestItemKind { OpenSettings, TapWifi, ComeBack }
+public enum class TestItemKind { Connected, OpenSettings, TapWifi, ComeBack }
 
 public enum class TestItemState { Pending, Running, Done, Failed }
 
@@ -208,7 +208,8 @@ public class OnboardingPresenter(
                         connectedMs = st.connectedMs ?: s.latestScreen?.let { started.elapsedNow().inWholeMilliseconds },
                         testShot = wifiScreen ?: st.testShot,
                         testItems = listOf(
-                            item(TestItemKind.OpenSettings, opened, running = opened == null),
+                            item(TestItemKind.Connected, st.connectedMs ?: s.latestScreen?.let { started.elapsedNow().inWholeMilliseconds }, running = s.latestScreen == null),
+                            item(TestItemKind.OpenSettings, opened, running = s.latestScreen != null && opened == null),
                             item(TestItemKind.TapWifi, tapped, running = opened != null && tapped == null),
                             item(TestItemKind.ComeBack, null, running = tapped != null),
                         ),

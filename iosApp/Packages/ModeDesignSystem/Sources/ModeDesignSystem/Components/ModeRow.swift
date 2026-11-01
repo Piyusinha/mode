@@ -7,6 +7,20 @@ public enum ModeRowLeading: Equatable, Sendable {
     case icon(ModeIcon, Color = ModeColor.tint)
     /// A round badge with a letter, for people.
     case initial(String)
+    /// A numbered step (Welcome).
+    case number(Int)
+    /// A green check: done or working.
+    case success
+    /// A red cross: failed.
+    case failure
+    /// An empty circle: not checked yet.
+    case pending
+    /// A spinner: happening now.
+    case progress
+    /// A rounded square with a letter, in a colour (model makers).
+    case letterTile(String, background: Color, foreground: Color)
+    /// A rounded square with an icon, in a colour (permissions, waiting tasks).
+    case iconTile(ModeIcon, background: Color, foreground: Color)
 }
 
 public struct ModeRow<Trailing: View>: View {
@@ -65,6 +79,33 @@ public struct ModeRow<Trailing: View>: View {
                 .modeText(.bodyEmphasis, color: ModeColor.tint)
                 .frame(width: ModeSize.avatar, height: ModeSize.avatar)
                 .background(ModeColor.tintSoft, in: .circle)
+                .accessibilityHidden(true)
+        case let .number(n):
+            Text(n, format: .number)
+                .modeText(.bodyEmphasis, color: ModeColor.tint)
+                .frame(width: ModeSize.badge, height: ModeSize.badge)
+                .background(ModeColor.tintSoft, in: .circle)
+                .accessibilityHidden(true)
+        case .success:
+            ModeIcon.done.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.success).accessibilityHidden(true)
+        case .failure:
+            ModeIcon.failed.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.danger).accessibilityHidden(true)
+        case .pending:
+            ModeIcon.emptyCircle.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.separator).accessibilityHidden(true)
+        case .progress:
+            ProgressView().tint(ModeColor.tint).frame(width: ModeSize.badge, height: ModeSize.badge)
+        case let .letterTile(letter, background, foreground):
+            Text(letter)
+                .modeText(.bodyEmphasis, color: foreground)
+                .frame(width: ModeSize.tile, height: ModeSize.tile)
+                .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))
+                .accessibilityHidden(true)
+        case let .iconTile(icon, background, foreground):
+            icon.image
+                .font(ModeTextStyle.callout.font)
+                .foregroundStyle(foreground)
+                .frame(width: ModeSize.tile, height: ModeSize.tile)
+                .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))
                 .accessibilityHidden(true)
         }
     }

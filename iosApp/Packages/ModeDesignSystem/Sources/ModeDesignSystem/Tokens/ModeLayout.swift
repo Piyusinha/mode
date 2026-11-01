@@ -38,6 +38,40 @@ public enum ModeSize {
     public static let dayButton: CGFloat = 40
     public static let separator: CGFloat = 1
     public static let thumbnailWidth: CGFloat = 150
+    /// The app mark on Welcome, and its corner radius.
+    public static let mark: CGFloat = 96
+    public static let markRadius: CGFloat = 26
+    /// A contact card's initials.
+    public static let contactAvatar: CGFloat = 56
+    /// The coloured square tiles (model letters, permission icons).
+    public static let tile: CGFloat = 40
+    public static let tileRadius: CGFloat = 12
+    /// The selection circle on a choice row.
+    public static let radio: CGFloat = 24
+    /// The step dots in setup: a dot, and the current step's longer bar.
+    public static let stepDot: CGFloat = 8
+    public static let stepDotCurrent: CGFloat = 24
+    /// The tab bar, the Speak button and the mini player above them.
+    public static let tabBarHeight: CGFloat = 64
+    public static let speakButton: CGFloat = 64
+    public static let miniPlayerHeight: CGFloat = 56
+    /// A suggestion card on Home.
+    public static let suggestionWidth: CGFloat = 168
+    public static let suggestionHeight: CGFloat = 150
+    /// The little phones in the setup test illustration.
+    public static let testPhoneWidth: CGFloat = 74
+    public static let testPhoneHeight: CGFloat = 140
+    /// The screenshot beside "What Mode did".
+    public static let resultShotWidth: CGFloat = 92
+    /// A success badge at the top of a page.
+    public static let successBadge: CGFloat = 60
+    /// The progress segments on the live panel.
+    public static let segmentHeight: CGFloat = 4
+    /// The small live dot.
+    public static let liveDot: CGFloat = 8
+    /// Grid cells on All screens.
+    public static let gridSpacing: CGFloat = 10
+
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520
     /// The glows behind the page's top edge, as a share of its width and height.
