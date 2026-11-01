@@ -177,6 +177,12 @@ class Agent(
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
+        /**
+         * Text seen while scrolling one list, in order. Seen on the phone: picking "the highest rated"
+         * means comparing across several screens; with only one screen in view the agent scrolled up and
+         * down again and again (the strong model too). Mode remembers the list for it.
+         */
+        val scrolled = LinkedHashSet<String>()
         /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
         var lastOp: String? = null
         var lastPage: List<String> = emptyList()
@@ -255,6 +261,13 @@ class Agent(
                 }
             }
             lastScreen = screen.signature
+            // Scrolling one list: add what is on screen now to what was seen; anything else starts afresh.
+            if (lastOp == "scroll") {
+                if (scrolled.isEmpty()) scrolled += lastPage
+                scrolled += screen.pageTexts()
+            } else {
+                scrolled.clear()
+            }
             // Proof on screen confirms the last change; a different page means the agent went to check.
             ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first }, navigated = lastOp != "scroll" && lastOp != "wait")
             // Right after an unconfirmed change, deciding whether it worked is what matters most.
@@ -288,6 +301,7 @@ class Agent(
                     lastApp = lastApp,
                     expectation = expectation,
                     done = ledger.lines(),
+                    seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
                     screen = ContextBuilder.Screen(screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts),
                     hideScreen = inMode,
                 ),
@@ -740,6 +754,8 @@ class Agent(
         private const val STEP_UP_BUDGET_SHARE = 3.0
         private const val STRONG_STEP_GUESS_USD = 0.02
         private const val SCROLLS_BEFORE_HINT = 3
+        /** How much of a scrolled list is kept for comparing (lines of text). */
+        private const val MAX_SEEN_LINES = 120
         private const val CHECK_IT = ". This changed something: check it worked before any other change"
         private const val DONE_IT = ". That confirms it: it is in Mode's record of changes; do not do it again"
         private const val ADD_IS_NOT_A_CHECK =
@@ -786,6 +802,10 @@ class Agent(
             - To find the best, cheapest, nearest, highest-rated or newest, use the app's own Sort, Filter or
               Search first; scroll through a long list only when there is none. Read what a list already shows
               (ratings, prices, sizes); open an item only to act on it, or when the list does not say.
+            - Comparing options (the best, highest rated, cheapest): Mode keeps everything that was on screen
+              while you scroll a list, under SEEN WHILE SCROLLING. Scroll through once, then choose from that
+              list and open your choice; never scroll back to re-check. Ignore ads and sponsored entries (AD,
+              Ad, Sponsored, Promoted) and entries that are not what was asked (a salad place for sushi).
             - To see more of a list or page, use scroll (never swipe for scrolling). Keep going one way until
               you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.

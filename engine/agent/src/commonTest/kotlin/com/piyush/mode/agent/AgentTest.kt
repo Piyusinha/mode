@@ -346,6 +346,34 @@ class AgentTest {
     }
 
     @Test
+    fun whatWasSeenWhileScrollingAListIsKeptForComparing() = runTest {
+        // On the phone: Matsuri 4.7 was on screen; scrolling down and up to "check the top" never ended.
+        val top = listOf("Rating (High to Low)" to (100.0 to 260.0), "WeFit - Protein Bowls 4.7 (186) AD" to (200.0 to 700.0), "Matsuri - The Chancery 4.7 (106)" to (200.0 to 920.0))
+        val next = listOf("Rating (High to Low)" to (100.0 to 260.0), "Yuki 4.6 (2.3K+)" to (200.0 to 370.0), "Noodle Bar 4.6 (2.0K+)" to (200.0 to 620.0))
+        val phone = FakePhone(listOf(top, next, next, next))
+        val model = ScriptedModel(
+            call("scroll", "direction" to "down", "reason" to "Seeing more restaurants"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("highest rated sushi")
+        val seen = model.lastUserText.substringAfter("SEEN WHILE SCROLLING").substringBefore("\n\n")
+        assertTrue("Matsuri - The Chancery 4.7 (106)" in seen && "Yuki 4.6 (2.3K+)" in seen, model.lastUserText)
+    }
+
+    @Test
+    fun everyFurtherReversalIsHeldUntilTheAgentActs() = runTest {
+        val phone = FakePhone(List(12) { i -> listOf("List" to (100.0 to 200.0), "row $i" to (100.0 to 300.0 + i)) })
+        fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Checking")
+        val model = ScriptedModel(
+            scroll("down"), scroll("up"), scroll("down"), scroll("up"), scroll("up"), scroll("down"), scroll("up"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("t")
+        // down, up, down go; up, up held; down goes; up held.
+        assertEquals(4, phone.actions.count { it is Op.Scroll }, phone.actions.toString())
+    }
+
+    @Test
     fun scrollingOneWayAgainAndAgainSuggestsSortOrFilter() = runTest {
         val phone = FakePhone(List(12) { i -> listOf("Results" to (100.0 to 200.0), "row $i" to (100.0 to 300.0)) })
         fun down() = call("scroll", "direction" to "down", "reason" to "Looking for the highest rated")

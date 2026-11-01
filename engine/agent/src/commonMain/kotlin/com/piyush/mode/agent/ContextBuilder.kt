@@ -57,6 +57,8 @@ object ContextBuilder {
         val expectation: String? = null,
         /** Mode's record of what was changed for the user, with proof; never summarised away. */
         val done: List<String> = emptyList(),
+        /** Every line of text seen while scrolling the current list, in order, so options can be compared. */
+        val seenWhileScrolling: List<String> = emptyList(),
         val screen: Screen,
         /** Mode's own screen is in front: describe it instead of showing it. */
         val hideScreen: Boolean,
@@ -140,6 +142,11 @@ object ContextBuilder {
             append('\n')
         }
         input.lastApp?.let { append("App you last opened: ").append(it).append("\n\n") }
+        if (input.seenWhileScrolling.isNotEmpty()) {
+            append("SEEN WHILE SCROLLING THIS LIST (everything that was on screen, top to bottom; compare and choose from this, no need to scroll back):\n")
+            input.seenWhileScrolling.forEach { append("- ").append(it).append('\n') }
+            append('\n')
+        }
         input.expectation?.let {
             append("YOU EXPECTED your last action to: ").append(it.clip(MAX_NOTE_CHARS))
             append(". Does the screen below show that? If not, deal with it before moving on.\n\n")

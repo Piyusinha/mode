@@ -95,12 +95,13 @@ class StuckDetector(private val canStepUp: Boolean) {
     }
 
     /**
-     * Seen on the phone: up, down, up, down looking for a section just below the last one shown.
-     * After two reversals, the next scroll back the other way is held once: keep going instead.
+     * Seen on the phone: up, down, up, down over one list, again and again, even with the strong
+     * model stepping in. After two reversals, every further scroll back the other way is held
+     * until the agent does something else (opens an item, taps, finishes).
      */
     fun holdReversal(direction: String?): String? {
         val last = lastScroll
-        if (direction == null || last == null || direction == last || reversals < 2 || heldReversal) return null
+        if (direction == null || last == null || direction == last || reversals < 2) return null
         heldReversal = true
         return last
     }
