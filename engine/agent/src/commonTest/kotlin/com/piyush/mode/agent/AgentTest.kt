@@ -106,6 +106,30 @@ class AgentTest {
     }
 
     @Test
+    fun aLearnedRouteIsThePlanWithoutABrief() = runTest {
+        val phone = FakePhone(List(4) { listOf("Settings" to (100.0 to 300.0)) })
+        val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        val route = "1. open Settings\n2. search \"Dark Mode\"\n3. Appearance → Light\nIf it goes wrong: use Control Center"
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong", brainModel = "brain"))
+            .run("turn off dark mode", context = TaskContext(knownRoute = route))
+        assertEquals(listOf("cheap"), model.models, "no brief: the learned route is the plan")
+        assertTrue("1. open Settings\n2. search \"Dark Mode\"\n3. Appearance → Light" in model.lastUserText, model.lastUserText)
+        assertTrue("If it goes wrong" !in model.lastUserText.substringAfter("YOUR PLAN"), "only the numbered steps")
+    }
+
+    @Test
+    fun withoutALearnedRouteTheBrainBriefs() = runTest {
+        val phone = FakePhone(List(4) { listOf("Settings" to (100.0 to 300.0)) })
+        val model = ScriptedModel(
+            call("brief", "intent" to "x", "start" to "fresh", "done_when" to "x", "steps" to listOf("a", "b", "c", "d", "e", "f"), "report" to "x"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong", brainModel = "brain")).run("turn off dark mode")
+        assertEquals("brain", model.models.first())
+        assertTrue("4. d" in model.lastUserText && "5. e" !in model.lastUserText, "at most four steps")
+    }
+
+    @Test
     fun riskyTapsNeedTheUsersYes() = runTest {
         val phone = FakePhone(listOf(listOf("Request Uber Go" to (201.0 to 800.0))))
         val gate = Gate(allow = false)

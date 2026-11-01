@@ -37,6 +37,7 @@ public class TaskMemory(
             aboutYou = found.aboutYou,
             skills = found.skills,
             appNotes = found.tips,
+            knownRoute = found.knownRoute,
             recentTasks = recentTasks(currentTaskId),
         )
         return Prepared(context, MemoryForAgent(retrieval), found.usedIds)

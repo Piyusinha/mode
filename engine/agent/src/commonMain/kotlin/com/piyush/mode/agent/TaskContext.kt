@@ -20,6 +20,8 @@ data class TaskContext(
     val earlierTurns: List<EarlierTurn> = emptyList(),
     /** The weekday, date and time now ("Sunday 1 November 2026, 19:05"), so "today" means today. */
     val today: String? = null,
+    /** A learned route that fits this task closely and has worked: numbered steps to follow, no brief needed. */
+    val knownRoute: String? = null,
 ) {
     data class EarlierTurn(val task: String, val outcome: String)
 

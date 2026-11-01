@@ -139,7 +139,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
             )
         }
 
-        const val MAX_STEPS = 6
+        const val MAX_STEPS = 4
 
         private val DECIDE_TOOLS: JsonArray = buildJsonArray {
             add(
@@ -155,7 +155,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
                                     "answer",
                                     buildJsonObject {
                                         put("type", "string")
-                                        put("description", "The choice and why in a few words, then exactly what to tap: quote its text as it appears.")
+                                        put("description", "One or two short sentences: the choice and why in a few words, then exactly what to tap (quote its text as it appears).")
                                     },
                                 )
                             }
@@ -198,7 +198,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
                                 arr("gather", "What to read or check before acting (the chat so far, the date shown, the list)."),
                                 arr("decide", "Choices the user handed over: decide them, and how (break ties)."),
                                 arr("ask", "Choices that are the user's (which dish, size, quantity): ask once, with options, before changing anything. Empty if none."),
-                                arr("steps", "2 to 6 short, concrete steps."),
+                                arr("steps", "2 to 4 short steps, each a result to reach."),
                                 str("report", "What to tell the user at the end."),
                             )
                             putJsonObject("properties") { props.forEach { (k, v) -> put(k, v) } }
@@ -233,7 +233,8 @@ class Brain(private val llm: LlmClient, private val model: String) {
               date: the screen decides.
 
             The steps: few and concrete, each a result to reach ("Open Sonali's chat", "Read her last messages
-            and his replies", "Write and send the reply"), not single taps. Say what to reach, not how: "Set the
+            and his replies", "Write and send the reply"), not single taps. Keep every field to a few words; leave
+            out what the hands already know (open the app, dismiss popups). Say what to reach, not how: "Set the
             drop to Bellandur", not "Search for Bellandur", because the app may already list it (a recent or
             suggested entry) and the hands take the quickest way they see. done_when: something visible.
         """.trimIndent()

@@ -34,6 +34,11 @@ public class MemoryRetrieval(
         public val tips: List<String>,
         /** Every item shown, to record how the task went with them. */
         public val usedIds: List<String>,
+        /**
+         * The steps of a skill that fits the task closely and has worked: the agent can follow it without
+         * asking the planning brain first (that call is most of a task's cost). Null otherwise.
+         */
+        public val knownRoute: String? = null,
     )
 
     public fun forTask(task: String): ForTask {
@@ -62,6 +67,9 @@ public class MemoryRetrieval(
             .filter { it.second > 0 }
             .sortedWith(compareByDescending<Pair<MemoryItem, Double>> { it.second }.thenByDescending { retention(it.first) })
         val best = ranked.firstOrNull()?.takeIf { it.second >= SKILL_THRESHOLD }?.first
+        val knownRoute = ranked.firstOrNull()
+            ?.takeIf { (s, score) -> score >= KNOWN_ROUTE && s.successes >= 1 && s.successes * 2 >= s.uses }
+            ?.first?.text
         val named = ranked.filter { it.first != best }.take(MAX_SKILL_NAMES).map { it.first }
 
         // Apps the task names, plus those a matched fact or the best skill points to.
@@ -75,6 +83,7 @@ public class MemoryRetrieval(
                 named.map { "Also known${it.app?.let { a -> " (in $a)" }.orEmpty()}: ${it.title} (recall \"${it.title}\" for the steps)" },
             tips = shownTips.map { "${it.title}: ${it.text}" },
             usedIds = (shownFacts + listOfNotNull(best) + shownTips).map { it.id },
+            knownRoute = knownRoute,
         )
     }
 
@@ -149,6 +158,8 @@ public class MemoryRetrieval(
         public const val MAX_TIPS: Int = 10
         public const val MAX_SKILL_NAMES: Int = 3
         public const val SKILL_THRESHOLD: Double = 0.5
+        /** A skill this close to the task, that has worked at least half the times it was used, needs no brief. */
+        public const val KNOWN_ROUTE: Double = 0.6
 
         /** "on Swiggy", "in MyFitnessPal", "using Uber": a capitalised name after a little word. */
         private val APP_IN_TASK = Regex("""\b(on|in|from|using|via|with|open)\s+([A-Z][\w&'-]{2,})""")

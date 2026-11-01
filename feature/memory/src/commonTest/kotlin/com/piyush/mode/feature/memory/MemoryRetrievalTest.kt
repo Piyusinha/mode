@@ -54,6 +54,25 @@ class MemoryRetrievalTest {
     }
 
     @Test
+    fun aCloseSkillThatWorkedIsAKnownRoute() {
+        seed()
+        assertEquals(null, retrieval.forTask("turn off dark mode").knownRoute, "not used yet: the brain still plans")
+        val darkMode = repo.all().first { it.title == "Turn off Dark Mode" }
+        repo.recordUse(listOf(darkMode.id), success = true)
+        assertEquals(darkMode.text, retrieval.forTask("turn off dark mode").knownRoute)
+        assertEquals(null, retrieval.forTask("send a mail").knownRoute)
+    }
+
+    @Test
+    fun aSkillThatFailsMoreThanItWorksIsNotAKnownRoute() {
+        seed()
+        val darkMode = repo.all().first { it.title == "Turn off Dark Mode" }
+        repo.recordUse(listOf(darkMode.id), success = true)
+        repeat(2) { repo.recordUse(listOf(darkMode.id), success = false) }
+        assertEquals(null, retrieval.forTask("turn off dark mode").knownRoute)
+    }
+
+    @Test
     fun aWeakMatchIsOnlyNamed() {
         seed()
         val r = retrieval.forTask("send a mail")

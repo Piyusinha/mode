@@ -152,14 +152,17 @@ class Agent(
         val ops = phone.ops()
         val brain = config.brainModel?.let { Brain(llm, it) }
         trace.runStarted(task, config, AgentTools.available(ops, recall = memory != null, brain = brain != null).map { it.name })
-        // The brain reads the request first (Brain); a failure just means no brief.
-        val brief = brain?.let { b ->
+        // A learned route that fits well is the plan: the brain's brief is most of a task's cost, and the
+        // route already worked. Otherwise the brain reads the request first (Brain); a failure means no brief.
+        val routeSteps = startContext.knownRoute?.let(::routeSteps)?.takeIf { it.isNotEmpty() }
+        if (routeSteps != null) trace.briefed("learned route", routeSteps.joinToString("\n"), 0.0, null)
+        val brief = brain?.takeIf { routeSteps == null }?.let { b ->
             onStatus(WORKING)
             val r = b.brief(task, startContext)
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
-        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null)
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null)
         val schema = AgentTools.schema(tools)
         val history = mutableListOf<String>()
         var cost = brief?.costUsd ?: 0.0
@@ -169,10 +172,11 @@ class Agent(
         /** The app the agent last opened, to return to after the user answers a question. */
         var lastApp: String? = null
         /** The model's own plan for multi-part tasks, shown back to it every step; the brain's steps first. */
-        var plan: String? = brief?.brief?.steps?.mapIndexed { i, s -> "${i + 1}. $s" }?.joinToString("\n")
-        brief?.brief?.let { b -> onPlan(b.steps.map { PlanItem(it, false) }) }
-        /** The brief says start fresh: the first time its app opens, it opens on its home page. */
-        var freshPending = brief?.brief?.fresh == true
+        val firstSteps = brief?.brief?.steps ?: routeSteps
+        var plan: String? = firstSteps?.mapIndexed { i, s -> "${i + 1}. $s" }?.joinToString("\n")
+        firstSteps?.let { steps -> onPlan(steps.map { PlanItem(it, false) }) }
+        /** A new task starts its app on its home page (a learned route starts there too). */
+        var freshPending = brief?.brief?.fresh == true || routeSteps != null
         var inMode = startsInMode
         /** The user's answers, shown on their own every step so they are not lost in the history. */
         val answers = mutableListOf<Pair<String, String>>()
@@ -754,6 +758,11 @@ class Agent(
         return seen.take(FLASH_TEXTS)
     }
 
+    /** The numbered lines of a learned route ("1. open Settings"), without the numbers and the extra notes. */
+    private fun routeSteps(route: String): List<String> =
+        route.lines().mapNotNull { ROUTE_STEP.matchEntire(it.trim())?.groupValues?.get(1)?.trim()?.takeIf(String::isNotEmpty) }
+            .take(MAX_ROUTE_STEPS)
+
     /** The held-back reply: which change to check, and where. */
     private fun checkFirst(last: ChangeLedger.Entry): String =
         "not done: first check your change at step ${last.step} (\"${last.target}\"). Look for proof it worked: on " +
@@ -856,6 +865,8 @@ class Agent(
         private const val UNCHANGED = " → screen did NOT change"
         private const val END_OF_LIST = " → end of the list: nothing new appeared. Everything seen is under SEEN WHILE " +
             "SCROLLING; choose from it, or scroll the other way once if what you need was above"
+        private val ROUTE_STEP = Regex("""^\d{1,2}[.)]\s*(.+)$""")
+        private const val MAX_ROUTE_STEPS = 8
         /** A scroll showing fewer new lines than this has reached the end. */
         private const val MIN_NEW_LINES = 2
         private const val BACK_DID_NOTHING =
