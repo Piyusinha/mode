@@ -174,6 +174,57 @@ enum L10n {
         }
     }
 
+    enum Memory {
+        static let subtitle = LocalizedStringResource("memory.subtitle", defaultValue: "What Mode has learned. Kept only on this iPhone.")
+        static let learn = LocalizedStringResource("memory.learn", defaultValue: "Learn from my tasks")
+        static let learnHint = LocalizedStringResource("memory.learnHint", defaultValue: "Mode still uses what it knows when this is off.")
+        static let aboutYou = LocalizedStringResource("memory.aboutYou", defaultValue: "About You")
+        static let skills = LocalizedStringResource("memory.skills", defaultValue: "Things Mode Can Do")
+        static let tips = LocalizedStringResource("memory.tips", defaultValue: "App Tips")
+        static let forgetEverything = LocalizedStringResource("memory.forgetEverything", defaultValue: "Forget Everything")
+        static let forgetConfirm = LocalizedStringResource("memory.forgetConfirm", defaultValue: "Forget everything Mode has learned? This can't be undone.")
+        static let emptyTitle = LocalizedStringResource("memory.empty.title", defaultValue: "Nothing learned yet")
+        static let emptyMessage = LocalizedStringResource("memory.empty.message", defaultValue: "As Mode does tasks, it remembers people, what you like and how your apps work.")
+
+        static func worked(_ successes: Int, of uses: Int) -> String {
+            String(localized: "memory.worked", defaultValue: "worked \(successes) of \(uses) times")
+        }
+
+        static func learned(_ day: String) -> String {
+            String(localized: "memory.learned", defaultValue: "learned \(day)")
+        }
+    }
+
+    enum Settings {
+        static let you = LocalizedStringResource("settings.you", defaultValue: "You")
+        static let name = LocalizedStringResource("settings.name", defaultValue: "Your name")
+        static let namePrompt = LocalizedStringResource("settings.namePrompt", defaultValue: "What should Mode call you?")
+        static let key = LocalizedStringResource("settings.key", defaultValue: "OpenRouter key")
+        static let keyPrompt = LocalizedStringResource("settings.keyPrompt", defaultValue: "sk-or-…")
+        static let saveKey = LocalizedStringResource("settings.saveKey", defaultValue: "Save key")
+        static let noKey = LocalizedStringResource("settings.noKey", defaultValue: "No key yet. Mode can't run tasks without one.")
+        static let model = LocalizedStringResource("settings.model", defaultValue: "Model")
+        static let whenStuck = LocalizedStringResource("settings.whenStuck", defaultValue: "When Mode is stuck")
+        static let never = LocalizedStringResource("settings.never", defaultValue: "Never use a stronger model")
+        static let search = LocalizedStringResource("settings.search", defaultValue: "Search all models")
+        static let limits = LocalizedStringResource("settings.limits", defaultValue: "Limits")
+        static let maxCost = LocalizedStringResource("settings.maxCost", defaultValue: "Most a task may cost")
+        static let dailyCap = LocalizedStringResource("settings.dailyCap", defaultValue: "Daily limit")
+        static let dailyCapOff = LocalizedStringResource("settings.dailyCapOff", defaultValue: "No daily limit")
+        static let memory = LocalizedStringResource("settings.memory", defaultValue: "Memory")
+        static let recommended = LocalizedStringResource("settings.tag.recommended", defaultValue: "Recommended")
+        static let cheapest = LocalizedStringResource("settings.tag.cheapest", defaultValue: "Cheapest")
+        static let strongest = LocalizedStringResource("settings.tag.strongest", defaultValue: "Strongest")
+
+        static func keyEnding(_ ending: String) -> String {
+            String(localized: "settings.keyEnding", defaultValue: "Saved in the Keychain · ends in \(ending)")
+        }
+
+        static func perTask(_ cost: String) -> String {
+            String(localized: "settings.perTask", defaultValue: "about \(cost) a task")
+        }
+    }
+
     enum Developer {
         static let title = LocalizedStringResource("developer.title", defaultValue: "Developer")
     }

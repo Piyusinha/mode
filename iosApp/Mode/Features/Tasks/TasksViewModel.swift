@@ -9,8 +9,8 @@ import Observation
 final class TasksViewModel {
     struct Running: Equatable {
         let title: String
-        let status: String
-        let waiting: Bool
+        let subtitle: String
+        let leading: ModeRowLeading
     }
 
     struct Item: Identifiable, Equatable {
@@ -83,7 +83,11 @@ final class TasksViewModel {
 
     private static func map(_ s: TasksUiState) -> State {
         State(
-            running: s.running.map { Running(title: $0.text, status: $0.status, waiting: $0.question != nil) },
+            running: s.running.map { r in
+                r.question != nil
+                    ? Running(title: r.text, subtitle: String(localized: L10n.Tasks.waitingForYou), leading: .icon(.waiting, ModeColor.warning))
+                    : Running(title: r.text, subtitle: r.status, leading: .icon(.running))
+            },
             upNext: s.upNext.map { Item(id: $0.taskId, title: $0.text, subtitle: [String(localized: source($0.source)), Format.day($0.day)].joined(separator: " · ")) },
             repeats: s.repeats.map { r in
                 let days = r.isoDays.isEmpty ? String(localized: L10n.Repeat.once) : daysLabel(Set(r.isoDays.map { Int(truncating: $0) }))

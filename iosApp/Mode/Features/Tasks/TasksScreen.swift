@@ -56,9 +56,7 @@ struct TasksScreen: View {
     }
 
     private func runningRow(_ running: TasksViewModel.Running) -> some View {
-        ModeRow(running.title, subtitle: running.waiting ? String(localized: L10n.Tasks.waitingForYou) : running.status,
-                leading: .icon(running.waiting ? .waiting : .running, running.waiting ? ModeColor.warning : ModeColor.tint),
-                action: { onEvent(.openLive) }) {
+        ModeRow(running.title, subtitle: running.subtitle, leading: running.leading, action: { onEvent(.openLive) }) {
             ModeIconButton(.stop, label: L10n.Common.stop) { onEvent(.stop) }
         }
     }

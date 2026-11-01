@@ -7,6 +7,7 @@ struct MainTabs: View {
     let app: AppModel
     @State private var tab: AppTab = .home
     @State private var run: RunStatusViewModel
+    @State private var showingLive = false
 
     init(app: AppModel) {
         self.app = app
@@ -22,7 +23,7 @@ struct MainTabs: View {
                 TabRoot(app: app) { navigate in TasksRoute(app: app, navigate: navigate) }
             } label: { Label { Text(L10n.Tab.tasks) } icon: { ModeIcon.tasks.image } }
             Tab(value: AppTab.memory) {
-                TabRoot(app: app) { _ in PlaceholderScreen() }
+                TabRoot(app: app) { _ in MemoryRoute(app: app) }
             } label: { Label { Text(L10n.Tab.memory) } icon: { ModeIcon.memory.image } }
             Tab(value: AppTab.ask, role: .search) {
                 TabRoot(app: app) { navigate in AskRoute(app: app, navigate: navigate) }
@@ -33,8 +34,10 @@ struct MainTabs: View {
         .tabViewBottomAccessory(isEnabled: run.state.running != nil) {
             if let running = run.state.running {
                 ModeRunningBar(title: running.title, status: running.status, stopLabel: L10n.Common.stop) { run.stop() }
+                    .onTapGesture { showingLive = true }
             }
         }
+        .sheet(isPresented: $showingLive) { NavigationStack { LiveRoute(app: app) } }
         .sheet(item: Binding(get: { run.state.question }, set: { _ in })) { question in
             QuestionSheet(question: question, onAnswer: run.answer, onStop: run.stopFromQuestion)
         }
@@ -56,7 +59,7 @@ private struct TabRoot<Content: View>: View {
                     case .developer: DeveloperView()
                     case .liveRun: LiveRoute(app: app)
                     case let .runScreens(taskId): RunScreensRoute(app: app, taskId: taskId)
-                    case .settings: PlaceholderScreen()
+                    case .settings: SettingsRoute(app: app, navigate: navigate)
                     }
                 }
         }

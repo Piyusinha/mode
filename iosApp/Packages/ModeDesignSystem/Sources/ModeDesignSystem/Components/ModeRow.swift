@@ -1,13 +1,16 @@
 import SwiftUI
 
 /// One row in a card: something on the left, a title and a line under it, something on the right.
+/// What sits at the start of a row.
+public enum ModeRowLeading: Equatable, Sendable {
+    case none
+    case icon(ModeIcon, Color = ModeColor.tint)
+    /// A round badge with a letter, for people.
+    case initial(String)
+}
+
 public struct ModeRow<Trailing: View>: View {
-    public enum Leading: Sendable {
-        case none
-        case icon(ModeIcon, Color = ModeColor.tint)
-        /// A round badge with a letter, for people.
-        case initial(String)
-    }
+    public typealias Leading = ModeRowLeading
 
     private let title: String
     private let subtitle: String?
