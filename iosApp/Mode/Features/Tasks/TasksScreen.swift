@@ -40,7 +40,7 @@ struct TasksScreen: View {
             if !state.done.isEmpty {
                 Section {
                     ForEach(state.done) { item in
-                        ModeRow(item.title, subtitle: item.subtitle, leading: .icon(item.icon)) { onEvent(.open(item)) }
+                        ModeRow(item.title, subtitle: item.subtitle, leading: .icon(item.icon), onTap: { onEvent(.open(item)) })
                     }
                 } header: { ModeSectionHeader(L10n.Tasks.done) }
             }

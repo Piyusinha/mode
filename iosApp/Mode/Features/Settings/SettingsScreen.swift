@@ -49,7 +49,7 @@ struct SettingsScreen: View {
 
             Section {
                 ModeToggleRow(L10n.Memory.learn, isOn: Binding(get: { state.learn }, set: { onEvent(.learn($0)) }))
-                ModeRow(String(localized: L10n.Developer.title), leading: .icon(.developer)) { onEvent(.openDeveloper) }
+                ModeRow(String(localized: L10n.Developer.title), leading: .icon(.developer), onTap: { onEvent(.openDeveloper) })
             } header: { ModeSectionHeader(L10n.Settings.memory) }
         }
         .listStyle(.insetGrouped)

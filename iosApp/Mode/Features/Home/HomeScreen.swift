@@ -15,7 +15,7 @@ struct HomeScreen: View {
                     .padding(.horizontal, ModeSpacing.xs)
                 if state.needsKey {
                     ModeCard {
-                        ModeRow(String(localized: L10n.Home.needsKeyTitle), subtitle: String(localized: L10n.Home.needsKeyMessage), leading: .icon(.key, ModeColor.warning)) { onEvent(.addKey) }
+                        ModeRow(String(localized: L10n.Home.needsKeyTitle), subtitle: String(localized: L10n.Home.needsKeyMessage), leading: .icon(.key, ModeColor.warning), onTap: { onEvent(.addKey) })
                     }
                 }
                 if state.isEmpty {
@@ -25,7 +25,7 @@ struct HomeScreen: View {
                     ModeSectionHeader(L10n.Home.suggested)
                     ModeCard {
                         ForEach(state.suggestions) { row in
-                            ModeRow(row.title, subtitle: row.subtitle, leading: .icon(row.icon)) { onEvent(.suggestion(row.title)) }
+                            ModeRow(row.title, subtitle: row.subtitle, leading: .icon(row.icon), onTap: { onEvent(.suggestion(row.title)) })
                         }
                     }
                 }
@@ -33,7 +33,7 @@ struct HomeScreen: View {
                     ModeSectionHeader(L10n.Home.recent)
                     ModeCard {
                         ForEach(state.recent) { row in
-                            ModeRow(row.title, subtitle: row.subtitle) { onEvent(.openConversation(row.id)) }
+                            ModeRow(row.title, subtitle: row.subtitle, onTap: { onEvent(.openConversation(row.id)) })
                         }
                     }
                 }

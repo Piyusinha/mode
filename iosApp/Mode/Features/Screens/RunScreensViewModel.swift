@@ -39,11 +39,3 @@ final class RunScreensViewModel {
     }
 }
 
-private extension KotlinByteArray {
-    func toData() -> Data {
-        let count = Int(size)
-        var bytes = [UInt8](repeating: 0, count: count)
-        for i in 0..<count { bytes[i] = UInt8(bitPattern: get(index: Int32(i))) }
-        return Data(bytes)
-    }
-}

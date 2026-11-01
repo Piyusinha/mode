@@ -61,8 +61,10 @@ public data class OnboardingUiState(
     val connected: Boolean = false,
     val signInError: String? = null,
     val models: List<ModelChoice> = emptyList(),
-    /** The model used when Mode gets stuck: the strongest pick, on or off. */
+    /** The model used when Mode gets stuck (the strongest pick by default), on or off. */
     val stuckModel: ModelChoice? = null,
+    /** What can be picked for when Mode gets stuck. */
+    val stuckChoices: List<ModelChoice> = emptyList(),
     val query: String = "",
     val results: List<ModelChoice> = emptyList(),
     val permissions: List<PermissionRow> = emptyList(),
@@ -108,7 +110,7 @@ public class OnboardingPresenter(
         set { it.copy(paired = phoneChecks.hasPairingFile(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
         scope.launch { catalog.refresh() }
         scope.launch { catalog.state.collect { refreshModels() } }
-        scope.launch { refreshPermissions() }
+        scope.launch { runCatching { refreshPermissions() } }
     }
 
     // Name
@@ -160,6 +162,12 @@ public class OnboardingPresenter(
         refreshModels()
     }
 
+    /** Picks the model used when Mode gets stuck; null turns stepping up off. */
+    public fun chooseStuck(id: String?) {
+        stuck = id
+        refreshModels()
+    }
+
     /** Turns the when-stuck model on or off. */
     public fun toggleStuck() {
         stuck = if (stuck == null) strongest()?.id else null
@@ -181,7 +189,7 @@ public class OnboardingPresenter(
                 PermissionKind.Siri -> permissions.request(Permission.Siri)
                 PermissionKind.Microphone -> permissions.request(Permission.Microphone)
             }
-            refreshPermissions()
+            runCatching { refreshPermissions() }
         }
     }
 
@@ -347,7 +355,8 @@ public class OnboardingPresenter(
         set { st ->
             st.copy(
                 models = models.recommended.filter { it.tag != ModelTag.Strongest }.map(::choice),
-                stuckModel = strongest?.let(::choice),
+                stuckModel = (stuck?.let { id -> (models.recommended + models.all).firstOrNull { it.id == id } } ?: strongest)?.let(::choice),
+                stuckChoices = models.recommended.map(::choice),
                 results = if (st.query.isBlank()) emptyList() else catalog.search(st.query).take(MAX_RESULTS).map(::choice),
             )
         }

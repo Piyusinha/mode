@@ -343,6 +343,11 @@ public struct ModeTestStrip: View {
                 }
             }
             .padding(.horizontal, ModeSpacing.s)
+            .overlay(alignment: .top) {
+                Circle().strokeBorder(ModeColor.accent, lineWidth: ModeSize.separator * 2)
+                    .frame(width: ModeSpacing.xxl, height: ModeSpacing.xxl)
+                    .offset(y: -ModeSpacing.s)
+            }
         default:
             ModeIcon.checkmark.image.font(ModeTextStyle.title.font.weight(.bold)).foregroundStyle(ModeColor.success.opacity(0.5))
         }

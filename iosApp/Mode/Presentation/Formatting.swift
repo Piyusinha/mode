@@ -36,7 +36,7 @@ enum Format {
     }
 
     static func money(_ usd: Double) -> String {
-        usd.formatted(.currency(code: "USD").precision(.fractionLength(usd < 0.01 ? 4 : 2)))
+        usd.formatted(.currency(code: "USD").precision(.fractionLength(usd < 0.01 ? 3 : 2)))
     }
 
     static func seconds(_ value: Double) -> String {

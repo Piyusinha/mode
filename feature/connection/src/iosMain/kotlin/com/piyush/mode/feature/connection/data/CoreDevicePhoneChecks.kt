@@ -24,7 +24,14 @@ import kotlin.time.TimeSource
 public class CoreDevicePhoneChecks : PhoneChecks {
     override fun hasPairingFile(): Boolean = PairingFile.load() != null
 
-    override suspend fun vpnAllowed(): Boolean = LoopbackVpn.isAllowed()
+    /** False when iOS can't say (the simulator has no VPN settings): asking again shows the prompt. */
+    override suspend fun vpnAllowed(): Boolean = try {
+        LoopbackVpn.isAllowed()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
 
     override suspend fun run(update: (List<PhoneCheckResult>) -> Unit) {
         val results = PhoneCheckId.entries.associateWith<PhoneCheckId, CheckState> { CheckState.NotChecked }.toMutableMap()

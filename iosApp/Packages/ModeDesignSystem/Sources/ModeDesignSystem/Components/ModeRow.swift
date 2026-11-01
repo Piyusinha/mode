@@ -9,8 +9,10 @@ public enum ModeRowLeading: Equatable, Sendable {
     case initial(String)
     /// A numbered step (Welcome).
     case number(Int)
-    /// A green check: done or working.
+    /// A green check in a filled circle: done or working (Welcome).
     case success
+    /// A plain green tick (lists of what happened).
+    case check
     /// A red cross: failed.
     case failure
     /// An empty circle: not checked yet.
@@ -23,21 +25,28 @@ public enum ModeRowLeading: Equatable, Sendable {
     case iconTile(ModeIcon, background: Color, foreground: Color)
 }
 
+/// Plain rows (lists) or prominent ones (setup, choices): a semibold title and a larger second line.
+public enum ModeRowEmphasis: Sendable { case standard, prominent }
+
 public struct ModeRow<Trailing: View>: View {
     public typealias Leading = ModeRowLeading
+    public typealias Emphasis = ModeRowEmphasis
 
     private let title: String
     private let subtitle: String?
     private let leading: Leading
     private let trailing: Trailing
     private let action: (() -> Void)?
+    private let emphasis: Emphasis
 
-    public init(_ title: String, subtitle: String? = nil, leading: Leading = .none, action: (() -> Void)? = nil, @ViewBuilder trailing: () -> Trailing) {
+    public init(_ title: String, subtitle: String? = nil, leading: Leading = .none, emphasis: Emphasis = .standard, action: (() -> Void)? = nil,
+                @ViewBuilder trailing: () -> Trailing) {
         self.title = title
         self.subtitle = subtitle
         self.leading = leading
         self.trailing = trailing()
         self.action = action
+        self.emphasis = emphasis
     }
 
     public var body: some View {
@@ -52,8 +61,8 @@ public struct ModeRow<Trailing: View>: View {
         HStack(spacing: ModeSpacing.m) {
             leadingView
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(title).modeText(.body)
-                if let subtitle { Text(subtitle).modeText(.footnote, color: ModeColor.textSecondary) }
+                Text(title).modeText(emphasis == .prominent ? .headline : .body)
+                if let subtitle { Text(subtitle).modeText(emphasis == .prominent ? .subheadline : .footnote, color: ModeColor.textSecondary) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             trailing
@@ -63,8 +72,20 @@ public struct ModeRow<Trailing: View>: View {
         .contentShape(.rect)
     }
 
-    @ViewBuilder
     private var leadingView: some View {
+        ModeLeadingView(leading)
+    }
+}
+
+/// The start of a row on its own, for rows built from other pieces.
+public struct ModeLeadingView: View {
+    private let leading: ModeRowLeading
+
+    public init(_ leading: ModeRowLeading) {
+        self.leading = leading
+    }
+
+    public var body: some View {
         switch leading {
         case .none: EmptyView()
         case let .icon(icon, color):
@@ -88,6 +109,8 @@ public struct ModeRow<Trailing: View>: View {
                 .accessibilityHidden(true)
         case .success:
             ModeIcon.done.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.success).accessibilityHidden(true)
+        case .check:
+            ModeIcon.checkmark.image.font(ModeTextStyle.headline.font).foregroundStyle(ModeColor.success).frame(width: ModeSize.badge).accessibilityHidden(true)
         case .failure:
             ModeIcon.failed.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.danger).accessibilityHidden(true)
         case .pending:
@@ -112,15 +135,16 @@ public struct ModeRow<Trailing: View>: View {
 }
 
 public extension ModeRow where Trailing == ModeChevron {
-    /// A row that opens something, with a chevron.
-    init(_ title: String, subtitle: String? = nil, leading: Leading = .none, action: @escaping () -> Void) {
-        self.init(title, subtitle: subtitle, leading: leading, action: action) { ModeChevron() }
+    /// A row that opens something, with a chevron. (A labelled argument, so a trailing
+    /// view is never mistaken for the tap action.)
+    init(_ title: String, subtitle: String? = nil, leading: Leading = .none, emphasis: Emphasis = .standard, onTap: @escaping () -> Void) {
+        self.init(title, subtitle: subtitle, leading: leading, emphasis: emphasis, action: onTap) { ModeChevron() }
     }
 }
 
 public extension ModeRow where Trailing == EmptyView {
-    init(_ title: String, subtitle: String? = nil, leading: Leading = .none) {
-        self.init(title, subtitle: subtitle, leading: leading, action: nil) { EmptyView() }
+    init(_ title: String, subtitle: String? = nil, leading: Leading = .none, emphasis: Emphasis = .standard) {
+        self.init(title, subtitle: subtitle, leading: leading, emphasis: emphasis, action: nil) { EmptyView() }
     }
 }
 
