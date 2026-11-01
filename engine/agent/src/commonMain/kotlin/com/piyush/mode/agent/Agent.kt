@@ -502,9 +502,14 @@ class Agent(
                     }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
-                    if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
-                        record(described, reason, "the user did not allow it; do not try again without asking")
-                        continue
+                    if (risky != null) {
+                        if (!gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
+                            record(described, reason, "the user did not allow it; do not try again without asking")
+                            continue
+                        }
+                        // Asking may have brought Mode to the front. Seen on the phone: after "yes", Rapido's "Book
+                        // now" was tapped on Mode's own screen, three times. Back to the app first, then tap.
+                        lastApp?.let { app -> runCatching { phone.send(Op.LaunchApp(app)) }.onSuccess { settle() } }
                     }
                     actionStarted = clock.markNow()
                     val outcome = try {

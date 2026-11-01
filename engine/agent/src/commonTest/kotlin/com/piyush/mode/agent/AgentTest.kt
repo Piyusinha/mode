@@ -552,6 +552,21 @@ class AgentTest {
     }
 
     @Test
+    fun afterARiskyTapIsAllowedTheAppIsReopenedBeforeTheTap() = runTest {
+        // On the phone: asking brought Mode forward and "Book now" was tapped on Mode's own screen.
+        val phone = FakePhone(List(6) { listOf("Book now" to (300.0 to 800.0), "Auto 163" to (100.0 to 700.0)) })
+        val model = ScriptedModel(
+            call("open_app", "name" to "Rapido", "reason" to "Opening Rapido"),
+            call("tap", "x" to 373, "y" to 915, "reason" to "Booking the Auto ride"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(allow = true), noSettle).run("book a ride")
+        val afterAsk = phone.actions.drop(1)
+        assertEquals(Op.LaunchApp("bundle.Rapido"), afterAsk.first(), "back to the app first (by its bundle id)")
+        assertIs<Op.Tap>(afterAsk[1])
+    }
+
+    @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
         val model = ScriptedModel(
