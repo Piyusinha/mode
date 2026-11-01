@@ -1,7 +1,9 @@
 # The harness: how Mode thinks, remembers and stays within budget
 
-Status: **proposal** (2026-11-01), to agree before building the SwiftUI app,
-since every screen shows what the harness produces.
+Status: **agreed** (2026-11-01), to build before the SwiftUI app, since every
+screen shows what the harness produces. Decided: memory saves by itself with a
+"Remembered · Undo" chip; the cost limit is $0.05 per task by default,
+changeable in Settings.
 
 The harness is everything around the model: what it is shown each step, what
 it can do, what Mode remembers between tasks, which settings shape it, and how
@@ -159,7 +161,7 @@ cache prompts (Anthropic through OpenRouter) can reuse them from step to step:
 | Model when stuck | Claude Sonnet 5.5 | Or none |
 | Model for reflection and summaries | Same as main | Small, cheap calls |
 | Max steps per task | 30 | |
-| **Max cost per task** | $0.05 | Stops with a summary; protects against loops |
+| **Max cost per task** | $0.05 | Changeable in Settings; stops with a summary; protects against loops |
 | Daily spend cap | Off | Optional |
 | Learn from tasks | On | Memory writing; reading still works when off |
 | Ask before sending, paying or deleting | Only very risky actions | Your preference: as few questions as possible |

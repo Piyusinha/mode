@@ -9,7 +9,7 @@ built this way.
 
 | Document | What it covers |
 |---|---|
-| [harness.md](harness.md) | How the agent thinks, remembers and stays within budget (proposal) |
+| [harness.md](harness.md) | How the agent thinks, remembers and stays within budget |
 | [status.md](status.md) | What is done, what is pending, and the commit history |
 | [architecture.md](architecture.md) | Layers, modules, data shapes, threading, build |
 | [flows.md](flows.md) | Sequence and flow diagrams: pairing, connecting, a look, a tap, the hands check, the planned agent loop |
