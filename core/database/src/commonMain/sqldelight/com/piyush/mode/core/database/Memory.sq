@@ -1,0 +1,58 @@
+-- What Mode remembers between tasks (docs/harness.md §4):
+--   fact  about the user: people, preferences, places (subject = the person or topic)
+--   skill a reusable route for one kind of task, with placeholders (subject = the intent)
+--   tip   a short note about one app (subject = the app)
+-- previous_text holds the text before the last change, so it can be undone.
+CREATE TABLE memory (
+    id TEXT NOT NULL PRIMARY KEY,
+    kind TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    title TEXT NOT NULL,
+    text TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    keywords TEXT NOT NULL DEFAULT '',
+    app TEXT,
+    source_task_id TEXT,
+    previous_text TEXT,
+    uses INTEGER NOT NULL DEFAULT 0,
+    successes INTEGER NOT NULL DEFAULT 0,
+    failures INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_used_at INTEGER
+);
+
+CREATE INDEX memory_kind_subject ON memory(kind, subject);
+CREATE INDEX memory_source_task ON memory(source_task_id);
+
+insert:
+INSERT INTO memory(id, kind, subject, title, text, evidence, keywords, app, source_task_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+change:
+UPDATE memory SET title = ?, text = ?, evidence = ?, keywords = ?, app = ?, source_task_id = ?, previous_text = text, updated_at = ?
+WHERE id = ?;
+
+restorePrevious:
+UPDATE memory SET text = previous_text, previous_text = NULL WHERE id = ? AND previous_text IS NOT NULL;
+
+recordUse:
+UPDATE memory SET uses = uses + 1, successes = successes + ?, failures = failures + ?, last_used_at = ? WHERE id = ?;
+
+delete:
+DELETE FROM memory WHERE id = ?;
+
+deleteAll:
+DELETE FROM memory;
+
+byId:
+SELECT * FROM memory WHERE id = ?;
+
+all:
+SELECT * FROM memory ORDER BY kind, updated_at DESC;
+
+byKind:
+SELECT * FROM memory WHERE kind = ? ORDER BY updated_at DESC;
+
+changedByTask:
+SELECT * FROM memory WHERE source_task_id = ? ORDER BY updated_at;

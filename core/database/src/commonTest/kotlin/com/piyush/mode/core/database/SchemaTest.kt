@@ -44,4 +44,19 @@ class SchemaTest {
         assertEquals("2026-11-01T08-00-00", db.runQueries.recent(10).executeAsList().first().id)
         assertEquals(listOf("2026-10-30T10-00-00"), db.runQueries.idsBeyond(2).executeAsList())
     }
+
+    @Test
+    fun aChangedMemoryCanBeUndoneToItsPreviousText() {
+        val db = testDatabase()
+        db.memoryQueries.insert("m1", "fact", "sonali", "Sonali", "on WhatsApp", "e", "", null, "k1", 1, 1)
+        db.memoryQueries.change("Sonali", "on Telegram", "e2", "", null, "k2", 2, "m1")
+        assertEquals("on WhatsApp", db.memoryQueries.byId("m1").executeAsOne().previous_text)
+        db.memoryQueries.restorePrevious("m1")
+        val back = db.memoryQueries.byId("m1").executeAsOne()
+        assertEquals("on WhatsApp", back.text)
+        assertNull(back.previous_text)
+
+        db.memoryQueries.recordUse(1, 0, 5, "m1")
+        assertEquals(1L, db.memoryQueries.byId("m1").executeAsOne().successes)
+    }
 }

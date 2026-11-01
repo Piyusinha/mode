@@ -3,8 +3,7 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
-// One on-device SQLite database for conversations, tasks and runs (memory joins
-// in a later migration). Features own the repositories; this module owns the schema.
+// One on-device SQLite database for conversations, tasks, runs and memory. Features own the repositories; this module owns the schema.
 kotlin {
     sourceSets {
         commonMain.dependencies {
@@ -16,6 +15,9 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(projects.testing)
+        }
+        jvmTest.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
         }
     }
 }
