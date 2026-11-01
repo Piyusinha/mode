@@ -10,7 +10,7 @@ import com.piyush.mode.feature.connection.domain.PhoneConnection
 import com.piyush.mode.feature.connection.domain.PhoneLink
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.runs.data.RunRepository
-import com.piyush.mode.feature.settings.data.AgentSettingsRepository
+import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.ops.PhoneUnavailable
@@ -57,7 +57,7 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
     val files = InMemoryFileStore()
     val notes = Notes()
     val activity = ActivityTracker()
-    val settings = AgentSettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also { it.apiKey = key }
+    val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also { it.apiKey = key }
     val runner = TaskRunner(
         session = PhoneSession(link, Duration.ZERO),
         settings = settings,

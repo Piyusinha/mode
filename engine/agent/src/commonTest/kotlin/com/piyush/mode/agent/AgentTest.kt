@@ -264,6 +264,19 @@ class AgentTest {
     }
 
     @Test
+    fun stopsBeforeAStepOnceTheCostLimitIsReached() = runTest {
+        val phone = FakePhone(List(20) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "go")
+        // Each scripted answer costs $0.001.
+        val model = ScriptedModel(tap, tap, tap, tap, tap, tap)
+        val result = Agent(phone, model, Gate(), AgentConfig(settleMs = 0, maxCostUsd = 0.0025, strongModel = null)).run("t")
+        val stopped = assertIs<AgentOutcome.Stopped>(result.outcome)
+        assertEquals("Reached the $0.0025 limit for this task after 3 steps. Last: tap \"s2\".", stopped.why)
+        assertEquals(3, result.steps)
+        assertEquals(3, model.models.size, "no fourth call")
+    }
+
+    @Test
     fun controlCenterSwipesDownFromTheTopRight() {
         val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
         val op = AgentTools.toOp(call("control_center", "reason" to "x"), g) as Op.Drag

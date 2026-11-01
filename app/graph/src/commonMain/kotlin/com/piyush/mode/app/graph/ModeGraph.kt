@@ -14,7 +14,7 @@ import com.piyush.mode.feature.connection.presentation.IdleDisconnectPolicy
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.runs.data.RunRepository
-import com.piyush.mode.feature.settings.data.AgentSettingsRepository
+import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
 import io.ktor.client.HttpClient
@@ -46,7 +46,7 @@ class ModeGraph(platform: PlatformServices) {
     val activity: ActivityTracker = ActivityTracker()
     val files: FileStore = platform.files
 
-    val settings: AgentSettingsRepository = AgentSettingsRepository(platform.secrets, platform.prefs)
+    val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
     val session: PhoneSession = PhoneSession(platform.phoneLink)
     val runs: RunRepository = RunRepository(platform.files)
 

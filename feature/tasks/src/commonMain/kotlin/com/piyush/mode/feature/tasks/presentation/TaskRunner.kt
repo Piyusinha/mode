@@ -14,7 +14,7 @@ import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.runs.data.RunRecorder
 import com.piyush.mode.feature.runs.data.RunRepository
 import com.piyush.mode.feature.runs.domain.describeResult
-import com.piyush.mode.feature.settings.data.AgentSettingsRepository
+import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
 import com.piyush.mode.feature.tasks.domain.TaskState
 import com.piyush.mode.llm.LlmClient
@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
  */
 public class TaskRunner(
     private val session: PhoneSession,
-    private val settings: AgentSettingsRepository,
+    private val settings: SettingsRepository,
     private val llm: LlmClient,
     private val files: FileStore,
     private val notifier: Notifier,
@@ -53,7 +53,7 @@ public class TaskRunner(
     private val runs = RunRepository(files)
 
     /** Starts [task] unless one is running. */
-    public fun start(task: String, config: AgentConfig = settings.config(), onFinished: (AgentResult?) -> Unit = {}) {
+    public fun start(task: String, config: AgentConfig = settings.agentConfig(), onFinished: (AgentResult?) -> Unit = {}) {
         if (state.value.running || task.isBlank()) return
         job = scope.launch { onFinished(runTask(task, config)) }
     }

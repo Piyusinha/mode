@@ -9,7 +9,7 @@ import com.piyush.mode.core.storage.FileStore
 import com.piyush.mode.feature.compare.domain.CompareRow
 import com.piyush.mode.feature.compare.domain.CompareState
 import com.piyush.mode.feature.connection.presentation.PhoneSession
-import com.piyush.mode.feature.settings.data.AgentSettingsRepository
+import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.ops.Op
 import kotlinx.coroutines.NonCancellable
@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
 public class CompareRunner(
     private val runner: TaskRunner,
     private val session: PhoneSession,
-    private val settings: AgentSettingsRepository,
+    private val settings: SettingsRepository,
     private val files: FileStore,
     private val activity: ActivityTracker,
 ) {
@@ -45,7 +45,7 @@ public class CompareRunner(
                     runCatching { session.phone().send(Op.Home) }
                     val result = runner.runTask(
                         task,
-                        AgentConfig(model = model, strongModel = null, maxSteps = settings.config().maxSteps),
+                        settings.agentConfig().let { AgentConfig(model = model, strongModel = null, maxSteps = it.maxSteps, maxCostUsd = it.maxCostUsd) },
                         tag = id,
                         stayConnected = true,
                     )

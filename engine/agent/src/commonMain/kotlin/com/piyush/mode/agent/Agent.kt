@@ -42,6 +42,8 @@ class AgentConfig(
     val waitForStill: Boolean = true,
     /** How many past steps the model is reminded of. */
     val historySteps: Int = 12,
+    /** Stop before a step once the task has cost this much (US dollars); null: no limit. */
+    val maxCostUsd: Double? = null,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -137,6 +139,15 @@ class Agent(
 
         for (step in 1..config.maxSteps) {
             currentCoroutineContext().ensureActive()
+            config.maxCostUsd?.let { limit ->
+                if (cost >= limit) {
+                    val last = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
+                    return result(
+                        AgentOutcome.Stopped("Reached the ${money(limit)} limit for this task after ${step - 1} steps.$last"),
+                        step - 1,
+                    )
+                }
+            }
             val stepStarted = clock.markNow()
             onStatus("Step $step: looking")
             val lookStarted = clock.markNow()
@@ -439,6 +450,8 @@ class Agent(
         val label = nearestText(op.x, op.y, screen) ?: return null
         return label.takeIf { RiskGuard.isRisky(it) }
     }
+
+    private fun money(usd: Double): String = "$" + ((usd * 10000).roundToInt() / 10000.0).toString()
 
     companion object {
         private const val MAX_TEXTS = 80

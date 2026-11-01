@@ -43,7 +43,7 @@ import com.piyush.mode.app.graph.ModeGraph
 import com.piyush.mode.feature.compare.presentation.CompareRunner
 import com.piyush.mode.feature.connection.domain.label
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
-import com.piyush.mode.feature.settings.data.AgentSettingsRepository
+import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.domain.ModelCatalog
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
@@ -189,11 +189,13 @@ private fun CompareScreen(compare: CompareRunner, runner: TaskRunner) {
 }
 
 @Composable
-private fun SettingsScreen(settings: AgentSettingsRepository) {
+private fun SettingsScreen(settings: SettingsRepository) {
+    val current by settings.settings.collectAsState()
     var key by remember { mutableStateOf(settings.apiKey.orEmpty()) }
-    var model by remember { mutableStateOf(settings.model) }
-    var strong by remember { mutableStateOf(settings.strongModel) }
-    var steps by remember { mutableStateOf(settings.maxSteps) }
+    var model by remember { mutableStateOf(current.model) }
+    var strong by remember { mutableStateOf(current.strongModel.orEmpty()) }
+    var steps by remember { mutableStateOf(current.maxSteps.toString()) }
+    var cost by remember { mutableStateOf(current.maxCostPerTaskUsd.toString()) }
     var saved by remember { mutableStateOf("") }
     Page {
         OutlinedTextField(
@@ -204,15 +206,24 @@ private fun SettingsScreen(settings: AgentSettingsRepository) {
         OutlinedTextField(model, { model = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Model") })
         OutlinedTextField(strong, { strong = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Stronger model when stuck (empty: never)") })
         OutlinedTextField(steps, { steps = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Max steps per task") })
+        OutlinedTextField(cost, { cost = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Max cost per task (US dollars)") })
         Text("Models to try ($ per million tokens, in · out):", style = MaterialTheme.typography.titleSmall)
         for (option in ModelCatalog.recommended) {
             TextButton(onClick = { model = option.id }) { Text("${option.id}  (${option.note})") }
         }
         Button(onClick = {
             settings.apiKey = key
-            settings.model = model.trim()
-            settings.strongModel = strong.trim()
-            settings.maxSteps = steps.trim()
+            settings.update {
+                it.copy(
+                    model = model,
+                    strongModel = strong,
+                    maxSteps = steps.trim().toIntOrNull() ?: it.maxSteps,
+                    maxCostPerTaskUsd = cost.trim().toDoubleOrNull() ?: it.maxCostPerTaskUsd,
+                )
+            }
+            val now = settings.settings.value
+            steps = now.maxSteps.toString()
+            cost = now.maxCostPerTaskUsd.toString()
             saved = "Saved."
         }) { Text("Save") }
         if (saved.isNotEmpty()) Text(saved)
