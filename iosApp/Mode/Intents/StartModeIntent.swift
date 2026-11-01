@@ -1,0 +1,50 @@
+import AppIntents
+import ModeKit
+
+/// "Hey Siri, start Mode": Siri asks what to do, takes down the words, and Mode
+/// starts on it. Also in Shortcuts ("Ask Mode to …") and on the Action Button.
+/// App Shortcuts need no Siri permission or entitlement, so free accounts get it too.
+struct StartModeIntent: AppIntent {
+    static let title: LocalizedStringResource = "Ask Mode"
+    static let description = IntentDescription("Tell Mode what to do on your iPhone, in your own words.")
+    /// Mode opens to start: its keep-awake can't start from the background yet (docs/status.md "Last").
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Task", requestValueDialog: IntentDialog("What should Mode do?"))
+    var task: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Ask Mode to \(\.$task)")
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let graph = IosModeGraphKt.iosModeGraph
+        guard !graph.screens.needsOnboarding else {
+            return .result(dialog: "Open Mode and finish setting it up first.")
+        }
+        guard let started = graph.inbox.submit(text: task, source: .siri, conversationId: nil, private: false) else {
+            return .result(dialog: "Tell me what Mode should do.")
+        }
+        // Mode shows the conversation while it works and when it comes back.
+        AppLinks.shared.pending = started.conversationId.map { .conversation(id: $0) }
+        return .result(dialog: "On it.")
+    }
+}
+
+/// The phrases Siri knows without any setup.
+struct ModeShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: StartModeIntent(),
+            phrases: [
+                "Start \(.applicationName)",
+                "Ask \(.applicationName)",
+                "Tell \(.applicationName)",
+                "\(.applicationName), do something",
+            ],
+            shortTitle: "Ask Mode",
+            systemImageName: "mic.fill"
+        )
+    }
+}

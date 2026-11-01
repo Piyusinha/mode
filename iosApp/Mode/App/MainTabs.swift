@@ -63,6 +63,11 @@ struct MainTabs: View {
             QuestionSheet(question: question, onAnswer: run.answer, onStop: run.stopFromQuestion)
         }
         .onOpenURL { url in DeepLink(url).map(open) }
+        .onChange(of: AppLinks.shared.pending, initial: true) { _, link in
+            guard let link else { return }
+            AppLinks.shared.pending = nil
+            open(link)
+        }
         #if DEBUG && targetEnvironment(simulator)
         .task { openForScreenshots() }
         .fullScreenCover(item: $previewActivity) { ActivityPreview(phase: $0) }

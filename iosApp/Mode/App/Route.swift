@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// Where a tab's navigation can go.
 enum Route: Hashable {
@@ -24,6 +25,14 @@ enum DeepLink: Equatable {
         default: return nil
         }
     }
+}
+
+/// A link for the app to follow from outside a view: Siri started a task in a conversation.
+@MainActor
+@Observable
+final class AppLinks {
+    static let shared = AppLinks()
+    var pending: DeepLink?
 }
 
 /// The tabs, plus Ask (the floating button beside them).

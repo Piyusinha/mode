@@ -35,14 +35,10 @@
 	<true/>
 	<key>ModeBuiltInVPN</key>
 	<true/>
-	<key>ModeSiri</key>
-	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mode listens when you speak a task, and stops before it starts working in your apps.</string>
-	<key>NSSiriUsageDescription</key>
-	<string>So you can say "Hey Siri, start Mode" and tell it what to do.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>

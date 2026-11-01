@@ -333,7 +333,7 @@ enum L10n {
         static let notifications = LocalizedStringResource("setup.permissions.notifications", defaultValue: "Notifications")
         static let notificationsWhy = LocalizedStringResource("setup.permissions.notificationsWhy", defaultValue: "When a task is done, or Mode needs you.")
         static let siri = LocalizedStringResource("setup.permissions.siri", defaultValue: "Siri")
-        static let siriWhy = LocalizedStringResource("setup.permissions.siriWhy", defaultValue: "So \u{201C}Hey Siri, start Mode\u{201D} works. Optional.")
+        static let siriWhy = LocalizedStringResource("setup.permissions.siriWhy", defaultValue: "Say \u{201C}Hey Siri, start Mode\u{201D}, then what to do. Nothing to allow.")
         static let microphone = LocalizedStringResource("setup.permissions.microphone", defaultValue: "Microphone")
         static let microphoneWhy = LocalizedStringResource("setup.permissions.microphoneWhy", defaultValue: "Asked the first time you speak a task.")
         static let allow = LocalizedStringResource("setup.permissions.allow", defaultValue: "Allow")

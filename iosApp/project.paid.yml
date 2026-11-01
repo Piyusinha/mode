@@ -11,14 +11,11 @@ targets:
     info:
       properties:
         ModeBuiltInVPN: true
-        # Paid accounts can sign the Siri entitlement (permissions: "Hey Siri, start Mode").
-        ModeSiri: true
     entitlements:
       path: Mode/Mode.entitlements
       properties:
         com.apple.developer.networking.networkextension:
           - packet-tunnel-provider
-        com.apple.developer.siri: true
   ModeTunnel:
     type: app-extension
     platform: iOS
