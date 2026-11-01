@@ -630,14 +630,24 @@ class Agent(
     private suspend fun settle() {
         delay(config.settleMs)
         if (!config.waitForStill) return
+        // Seen on the phone: a tap took 4.1 s median and 8.5-9 s on a screen with a blinking caret or a
+        // rotating placeholder, because "still" meant byte-identical. Now nearly the same size counts as
+        // still (a caret or a banner barely changes it, a new page does), and the wait is capped.
+        val started = clock.markNow()
         var previous = tinyShot() ?: return
-        repeat(6) {
-            delay(150)
+        // Bounded by checks as well as by time (each check is itself a capture).
+        for (check in 1..(SETTLE_CAP_MS / SETTLE_POLL_MS)) {
+            if (started.elapsedNow().inWholeMilliseconds >= SETTLE_CAP_MS) return
+            delay(SETTLE_POLL_MS)
             val current = tinyShot() ?: return
-            if (current.contentEquals(previous)) return
+            if (alike(current, previous)) return
             previous = current
         }
     }
+
+    /** Two small screenshots of a screen that stopped moving: equal, or within a sliver of each other's size. */
+    private fun alike(a: ByteArray, b: ByteArray): Boolean =
+        a.contentEquals(b) || abs(a.size - b.size) <= maxOf(a.size, b.size) * STILL_SIZE_TOLERANCE
 
     @OptIn(ExperimentalEncodingApi::class)
     private suspend fun tinyShot(): ByteArray? = runCatching {
@@ -815,6 +825,11 @@ class Agent(
         private const val SCROLLS_BEFORE_HINT = 3
         /** Taps this close vertically (points) are on the same row: the focused field. */
         private const val SAME_ROW_PT = 30.0
+        /** The longest wait for the screen to stop moving after an action, and how often it is checked. */
+        private const val SETTLE_CAP_MS = 1500L
+        private const val SETTLE_POLL_MS = 150L
+        /** Small screenshots within this share of each other's size are the same, still screen. */
+        private const val STILL_SIZE_TOLERANCE = 0.01
         /** After tapping a field to focus it, before typing. */
         private const val FOCUS_MS = 300L
         /** How much of the typed text is looked for on screen. */

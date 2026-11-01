@@ -202,11 +202,35 @@ class AgentTest {
     @Test
     fun waitsForTheScreenToBeStillBeforeLookingAgain() = runTest {
         val phone = FakePhone(listOf(listOf("A" to (1.0 to 1.0)), listOf("B" to (1.0 to 1.0))))
-        // Capture 1 is step 1's look; after Home the screen moves (BBBB, CCCC) until two match.
-        phone.frames = mutableListOf("AAAA", "BBBB", "CCCC", "CCCC", "CCCC")
+        // Capture 1 is step 1's look; after Home the screen moves (a big frame, then a small one) until two match.
+        phone.frames = mutableListOf("AAAA", "BBBBBBBBBBBBBBBB", "CCCC", "CCCC", "CCCC")
         val model = ScriptedModel(call("home", "reason" to "x"), call("done", "evidence" to "on screen", "summary" to "ok"))
         Agent(phone, model, Gate(), AgentConfig(settleMs = 0)).run("t")
         // look, then settle: BBBB, CCCC, CCCC (still), then step 2's look.
+        assertEquals(5, phone.captures)
+    }
+
+    @Test
+    fun aScreenThatNeverStopsMovingIsWaitedOnForAtMostTheCap() = runTest {
+        // On the phone: a blinking caret made every small screenshot differ, and a tap took 8.5-9 s.
+        val phone = FakePhone(listOf(listOf("A" to (1.0 to 1.0))))
+        phone.frames = MutableList(60) { if (it % 2 == 0) "AAAA" else "BBBBBBBBBBBBBBBB" }
+        val model = ScriptedModel(call("home", "reason" to "x"), call("done", "evidence" to "on screen", "summary" to "ok"))
+        Agent(phone, model, Gate(), AgentConfig(settleMs = 0)).run("t")
+        // One settle polls every 150 ms for at most 1.5 s (about 11 small shots), plus the looks around it;
+        // before the cap it kept going for every frame that differed.
+        assertTrue(phone.captures <= 16, "captured ${phone.captures} times")
+    }
+
+    @Test
+    fun aBlinkingCaretCountsAsStill() = runTest {
+        val phone = FakePhone(listOf(listOf("A" to (1.0 to 1.0))))
+        // Two frames a sliver apart in size (a caret on, then off): still at once.
+        phone.frames = mutableListOf("AAAA", "A".repeat(400), "B".repeat(400), "C".repeat(400))
+        val model = ScriptedModel(call("home", "reason" to "x"), call("done", "evidence" to "on screen", "summary" to "ok"))
+        Agent(phone, model, Gate(), AgentConfig(settleMs = 0)).run("t")
+        // look, two settle frames (still at once), then the looks for the done and its check: 5. Byte-exact
+        // comparison would have kept settling through every differing frame.
         assertEquals(5, phone.captures)
     }
 
