@@ -10,6 +10,10 @@ public class PendingQuestion(
     public val text: String,
     /** True for a yes/no confirmation; false for a free-text answer. */
     public val yesNo: Boolean,
+    /** Choices to tap (a typed answer still works); empty for a free question. */
+    public val options: List<String> = emptyList(),
+    /** The option the agent would pick. */
+    public val recommended: String? = null,
 ) {
     internal val answer: CompletableDeferred<String?> = CompletableDeferred()
 }

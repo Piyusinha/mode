@@ -335,10 +335,20 @@ public class TaskRunner(
 
         override suspend fun ask(question: String): String? = askUser(phone, question, yesNo = false)
             ?.let { "$it (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)" }
+
+        override suspend fun choose(question: String, options: List<String>, recommended: String?): String? =
+            askUser(phone, question, yesNo = false, options = options, recommended = recommended)
+                ?.let { "$it (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)" }
     }
 
-    private suspend fun askUser(phone: PhoneBackend, text: String, yesNo: Boolean): String? {
-        val pending = PendingQuestion(text, yesNo)
+    private suspend fun askUser(
+        phone: PhoneBackend,
+        text: String,
+        yesNo: Boolean,
+        options: List<String> = emptyList(),
+        recommended: String? = null,
+    ): String? {
+        val pending = PendingQuestion(text, yesNo, options, recommended)
         AppLog.log("agent", (if (yesNo) "confirm: " else "ask: ") + text)
         mutableState.update { it.copy(question = pending, status = "Waiting for you") }
         state.value.taskId?.let { tasks.setStatus(it, TaskStatus.WaitingForUser) }

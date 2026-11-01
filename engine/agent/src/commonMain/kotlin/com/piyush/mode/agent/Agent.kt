@@ -61,6 +61,12 @@ interface UserGate {
 
     /** A free-text answer, or null to stop the task. */
     suspend fun ask(question: String): String?
+
+    /**
+     * A question with [options] to tap (the [recommended] one marked), or a typed answer; null
+     * stops the task. Without options it is the same as [ask].
+     */
+    suspend fun choose(question: String, options: List<String>, recommended: String?): String? = ask(question)
 }
 
 /** One step, for the live log. */
@@ -160,6 +166,8 @@ class Agent(
         var answeredSinceAction = false
         /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
         val ledger = ChangeLedger()
+        /** Memory lookups made, by query, and the step they were made at. */
+        val recalled = mutableMapOf<String, Int>()
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -307,6 +315,8 @@ class Agent(
                 }
                 "ask_user" -> {
                     val question = call.arguments.string("question").orEmpty()
+                    val options = AgentTools.optionsOf(call)
+                    val recommended = call.arguments.string("recommended")?.trim()?.takeIf { it in options }
                     // Seen on the phone: four questions in a row about the same message,
                     // each answered. Nothing changed since the last answer, so act on it.
                     if (answeredSinceAction) {
@@ -322,7 +332,7 @@ class Agent(
                     onStatus("Waiting for you")
                     // After changing something, what to do with the answer matters: the strong model decides.
                     if (ledger.entries.isNotEmpty()) stuck.critical()
-                    val reply2 = gate.ask(question)
+                    val reply2 = if (options.size >= 2) gate.choose(question, options, recommended) else gate.ask(question)
                     if (reply2 == null) {
                         record("ask_user", question, "you stopped the task")
                         return result(AgentOutcome.Stopped("Stopped at: $question"), step)
@@ -353,8 +363,15 @@ class Agent(
                 }
                 "recall" -> {
                     val query = call.arguments.string("query")?.trim().orEmpty()
-                    val found = memory?.recall(query).orEmpty()
                     stuck.thought()
+                    // Seen on the phone: the same lookup twice in one task, the same unrelated answer.
+                    val asked = recalled[query.lowercase()]
+                    if (asked != null) {
+                        record("recall \"$query\" (again)", "", "you already looked this up at step $asked: use what it said, or act")
+                        continue
+                    }
+                    recalled[query.lowercase()] = step
+                    val found = memory?.recall(query, appsOpened.toList()).orEmpty()
                     trace.recalled(step, query, found)
                     record(
                         "recall \"$query\"", "",
@@ -717,10 +734,17 @@ class Agent(
             Do not ask for permission to send, pay, book, post or delete: Mode itself shows the user what
             you typed and asks them right before such a tap. So type the message and tap Send.
 
-            Ask the user (ask_user) only when you are truly blocked:
-            - a login, passcode, Face ID, verification code or payment details are needed;
-            - a choice only the user can make, with no sensible default (which of two contacts with the
-              same name, which address, which plan).
+            Ask the user (ask_user) when:
+            - you are blocked: a login, passcode, Face ID, verification code or payment details are needed;
+            - a choice is theirs to make. Decide yourself what the task handed to you ("a highly rated
+              restaurant", which screen or route, the obvious match for a name they gave). But when the task
+              leaves open something they will eat, wear, use or pay for (which dish or product, size,
+              quantity, seats, time slot) and there are several reasonable options, ask: once, BEFORE adding
+              anything, with 2 to 4 options that say what tells them apart (name, price, size, veg or not) and
+              your recommendation. Use what you know about them first (ABOUT THE USER, a preference they
+              stated); if they said "any", "you choose" or "surprise me", choose yourself.
+            - two people or things fit equally (two contacts with the same name, two addresses).
+            Never ask "are you sure?" or to confirm: Mode does that itself before sending or paying.
             Ask once. Their answer is final: act on it, and never ask again to confirm it.
             Never type passwords, passcodes or card numbers.
 

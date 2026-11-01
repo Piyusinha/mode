@@ -85,4 +85,15 @@ class MemoryRetrievalTest {
         assertTrue(retrieval.recall("Message [Person] on WhatsApp").first().startsWith("SKILL: Message"))
         assertTrue(retrieval.recall("   ").isEmpty())
     }
+
+    @Test
+    fun recallForATaskLeavesOutOtherAppsButKeepsPeople() {
+        seed()
+        skill("Check Swish food order status", "1. open Swish\n2. tap Track", listOf("order", "food", "track"), "Swish")
+        // On the phone: "order sushi on Zomato" matched a Swish skill on "order".
+        assertTrue(retrieval.recall("order food").any { "Swish" in it })
+        assertTrue(retrieval.recall("order food", apps = listOf("Zomato")).none { "Swish" in it })
+        assertTrue(retrieval.recall("Sonali", apps = listOf("Zomato")).first().contains("WhatsApp"), "facts about people stay")
+        assertTrue(retrieval.recall("message whatsapp", apps = listOf("WhatsApp")).any { it.startsWith("SKILL: Message") })
+    }
 }

@@ -56,7 +56,16 @@ public class FakePhone(
 
 public fun call(name: String, vararg args: Pair<String, Any>) = ToolCall(
     name,
-    JsonObject(args.associate { (k, v) -> k to (if (v is Number) JsonPrimitive(v) else if (v is Boolean) JsonPrimitive(v) else JsonPrimitive(v.toString())) }),
+    JsonObject(
+        args.associate { (k, v) ->
+            k to when (v) {
+                is Number -> JsonPrimitive(v)
+                is Boolean -> JsonPrimitive(v)
+                is List<*> -> kotlinx.serialization.json.JsonArray(v.map { JsonPrimitive(it.toString()) })
+                else -> JsonPrimitive(v.toString())
+            }
+        },
+    ),
 )
 
 /** Answers each step with the next scripted call and records which model was asked. */

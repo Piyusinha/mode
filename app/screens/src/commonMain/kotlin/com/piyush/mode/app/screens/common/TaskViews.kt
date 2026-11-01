@@ -20,7 +20,8 @@ public data class RunningTask(
     val startedAtMs: Long? = null,
 )
 
-public data class Question(val text: String, val yesNo: Boolean)
+/** The agent's question: a yes/no, a choice of [options] (the [recommended] one marked), or a free answer. */
+public data class Question(val text: String, val yesNo: Boolean, val options: List<String> = emptyList(), val recommended: String? = null)
 
 /** How a finished task ended, for its badge. */
 public enum class TaskBadge { Done, GaveUp, Stopped, Failed, NotStarted }
@@ -43,7 +44,7 @@ internal fun TaskState.running(tasks: TaskRepository): RunningTask? {
         conversationId = conversationId,
         steps = steps.size,
         status = now(),
-        question = question?.let { Question(it.text, it.yesNo) },
+        question = question?.let { Question(it.text, it.yesNo, it.options, it.recommended) },
         paused = paused,
         startedAtMs = startedAtMs,
     )

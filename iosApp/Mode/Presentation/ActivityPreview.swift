@@ -8,6 +8,13 @@ import SwiftUI
 struct ActivityPreview: View {
     let phase: ModeActivityAttributes.ContentState.Phase
 
+    /// A question with options, as the agent asks it, for the question sheet's screenshot.
+    static let sampleQuestion = RunStatusViewModel.PendingQuestion(
+        id: "preview", text: "YUKI (4.5★) has these sushi. Which would you like?", yesNo: false,
+        options: ["Ebi Tempura · ₹345 · prawn, most reordered", "Classic California Roll · ₹325 · crab", "Avocado Maki · ₹295 · veg"],
+        recommended: "Ebi Tempura · ₹345 · prawn, most reordered"
+    )
+
     private var state: ModeActivityAttributes.ContentState {
         switch phase {
         case .working:

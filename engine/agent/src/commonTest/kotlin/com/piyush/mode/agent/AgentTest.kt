@@ -32,8 +32,11 @@ import kotlin.test.assertTrue
 
 private class Gate(val allow: Boolean = true, val answer: String? = "yes") : UserGate {
     val asked = mutableListOf<String>()
+    val offered = mutableListOf<Pair<List<String>, String?>>()
     override suspend fun confirm(question: String) = allow.also { asked += question }
     override suspend fun ask(question: String) = answer.also { asked += question }
+    override suspend fun choose(question: String, options: List<String>, recommended: String?) =
+        answer.also { asked += question; offered += options to recommended }
 }
 
 private val noSettle = AgentConfig(settleMs = 0, maxSteps = 10)
@@ -343,6 +346,34 @@ class AgentTest {
     }
 
     @Test
+    fun aChoiceIsOfferedAsOptionsWithTheRecommendation() = runTest {
+        val phone = FakePhone(List(5) { listOf("Menu" to (100.0 to 300.0)) })
+        val gate = Gate(answer = "California Roll · ₹325")
+        val model = ScriptedModel(
+            call(
+                "ask_user", "question" to "Which sushi would you like?",
+                "options" to listOf("Ebi Tempura · ₹345 · prawn", "California Roll · ₹325", "Veg Maki · ₹295"),
+                "recommended" to "Ebi Tempura · ₹345 · prawn",
+            ),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, gate, noSettle).run("add a sushi to my cart")
+        assertEquals(listOf("Ebi Tempura · ₹345 · prawn", "California Roll · ₹325", "Veg Maki · ₹295") to "Ebi Tempura · ₹345 · prawn", gate.offered.single())
+        assertTrue("California Roll" in model.lastUserText, "the pick reaches the model")
+    }
+
+    @Test
+    fun theSameLookupTwiceIsNotRepeated() = runTest {
+        val phone = FakePhone(List(5) { listOf("Menu" to (100.0 to 300.0)) })
+        val memory = Remembers(mapOf("sushi on zomato" to listOf("Swish: track")))
+        val ask = call("recall", "query" to "sushi on zomato")
+        val model = ScriptedModel(ask, ask, call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle, memory = memory).run("t")
+        assertEquals(1, memory.asked.size)
+        assertTrue("already looked this up" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
         val model = ScriptedModel(
@@ -568,6 +599,7 @@ class AgentTest {
     private class Remembers(private val lines: Map<String, List<String>>, private val tips: Map<String, List<String>> = emptyMap()) : AgentMemory {
         val asked = mutableListOf<String>()
         override fun recall(query: String) = lines[query].orEmpty().also { asked += query }
+        override fun recall(query: String, apps: List<String>) = recall(query)
         override fun tipsFor(app: String) = tips[app].orEmpty()
     }
 

@@ -16,6 +16,9 @@ final class RunStatusViewModel {
         let id: String
         let text: String
         let yesNo: Bool
+        /** Choices to tap; empty for a free answer. */
+        var options: [String] = []
+        var recommended: String?
     }
 
     struct State: Equatable {
@@ -46,7 +49,9 @@ final class RunStatusViewModel {
         guard let running = s.running else { return State() }
         return State(
             running: Running(title: running.text, status: running.paused ? String(localized: L10n.Run.paused) : running.status, paused: running.paused),
-            question: running.question.map { PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo) }
+            question: running.question.map {
+                PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo, options: $0.options, recommended: $0.recommended)
+            }
         )
     }
 }

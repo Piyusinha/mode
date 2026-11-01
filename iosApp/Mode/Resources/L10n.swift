@@ -45,6 +45,8 @@ enum L10n {
         static let stopTask = LocalizedStringResource("question.stopTask", defaultValue: "Stop the task")
         static let allow = LocalizedStringResource("question.allow", defaultValue: "Allow")
         static let dontAllow = LocalizedStringResource("question.dontAllow", defaultValue: "Don't allow")
+        static let recommended = LocalizedStringResource("question.recommended", defaultValue: "Mode's pick")
+        static let somethingElse = LocalizedStringResource("question.somethingElse", defaultValue: "Or type something else")
     }
 
     enum Run {

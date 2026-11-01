@@ -34,6 +34,9 @@ interface AgentMemory {
     /** The best few remembered lines for [query]: a person, place, preference or a skill's name. */
     fun recall(query: String): List<String>
 
+    /** The same, leaving out what belongs to apps other than [apps] (people and preferences stay). */
+    fun recall(query: String, apps: List<String>): List<String> = recall(query)
+
     /** Tips remembered for [app], given when the agent opens it. */
     fun tipsFor(app: String): List<String>
 }

@@ -43,7 +43,15 @@ object AgentTools {
         val params: List<Param>,
     )
 
-    class Param(val name: String, val type: String, val description: String, val required: Boolean = true, val enum: List<String>? = null)
+    class Param(
+        val name: String,
+        val type: String,
+        val description: String,
+        val required: Boolean = true,
+        val enum: List<String>? = null,
+        /** For an array: the type of its items. */
+        val items: String? = null,
+    )
 
     private val reason = Param(
         "reason", "string",
@@ -134,10 +142,19 @@ object AgentTools {
             listOf(Param("seconds", "number", "1 to 10."), reason),
         ),
         Tool(
-            "ask_user", "Ask the user, only when blocked: a login, passcode or code is needed, or a choice only " +
-                "they can make. Not to confirm sending, paying or deleting (Mode confirms those itself), and never " +
-                "twice about the same thing.", null,
-            listOf(Param("question", "string", "One clear question.")),
+            "ask_user", "Ask the user when blocked (a login, passcode or code), or for a choice that is theirs to " +
+                "make (see the rules). Not to confirm sending, paying or deleting (Mode confirms those itself), and " +
+                "never twice about the same thing. Give options when there are a few to pick from: the user taps one.", null,
+            listOf(
+                Param("question", "string", "One clear, short question."),
+                Param(
+                    "options", "array",
+                    "Optional: 2 to 4 short choices the user can tap, each with what tells them apart " +
+                        "(\"Ebi Tempura · ₹345 · prawn\"). They can still type something else.",
+                    required = false, items = "string",
+                ),
+                Param("recommended", "string", "Optional: the option you would pick, exactly as written in options.", required = false),
+            ),
         ),
         Tool(
             "done", "The task is complete, or cannot be done. Check the screen first.", null,
@@ -183,6 +200,7 @@ object AgentTools {
                                 put("type", p.type)
                                 put("description", p.description)
                                 p.enum?.let { values -> putJsonArray("enum") { values.forEach { add(JsonPrimitive(it)) } } }
+                                p.items?.let { type -> putJsonObject("items") { put("type", type) } }
                             }
                         }
                         putJsonArray("required") { tool.params.filter { it.required }.forEach { add(JsonPrimitive(it.name)) } }
@@ -244,6 +262,14 @@ object AgentTools {
     fun expectOf(call: ToolCall): String? = call.arguments["expect"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 
     /** The fact the model asked to keep with this action, if any. */
+    /** The choices offered with a question, in order; empty when it is a free question. */
+    fun optionsOf(call: ToolCall): List<String> =
+        (call.arguments["options"] as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }
+            .distinct().take(MAX_OPTIONS)
+
+    const val MAX_OPTIONS = 4
+
     fun itemOf(call: ToolCall): Int? = call.arguments["item"]?.jsonPrimitive?.contentOrNull?.trim()?.toIntOrNull()?.takeIf { it > 0 }
 
     fun noteOf(call: ToolCall): String? = call.arguments["note"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }

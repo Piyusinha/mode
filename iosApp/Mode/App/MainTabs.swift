@@ -14,6 +14,7 @@ struct MainTabs: View {
     @State private var showingAsk = false
     #if DEBUG && targetEnvironment(simulator)
     @State private var previewActivity: ModeActivityAttributes.ContentState.Phase?
+    @State private var previewQuestion: RunStatusViewModel.PendingQuestion?
     #endif
 
     init(app: AppModel) {
@@ -71,6 +72,7 @@ struct MainTabs: View {
         #if DEBUG && targetEnvironment(simulator)
         .task { openForScreenshots() }
         .fullScreenCover(item: $previewActivity) { ActivityPreview(phase: $0) }
+        .sheet(item: $previewQuestion) { QuestionSheet(question: $0, onAnswer: { _ in }, onStop: {}) }
         #endif
     }
 
@@ -99,6 +101,7 @@ struct MainTabs: View {
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
         case "activity": previewActivity = ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
+        case "question": previewQuestion = ActivityPreview.sampleQuestion
         default: break
         }
     }

@@ -71,10 +71,17 @@ public class MemoryRetrieval(
     }
 
     /** Lines for a lookup in the middle of a task: the best few matches of any kind. */
-    public fun recall(query: String, limit: Int = 5): List<String> {
+    public fun recall(query: String, limit: Int = 5, apps: List<String> = emptyList()): List<String> {
         val words = Words.of(query)
         if (words.isEmpty()) return emptyList()
-        return memory.all()
+        // Seen on the phone: "order sushi on Zomato" brought back a Swish skill on common words.
+        // With apps given, what belongs to another app is left out; people and preferences stay.
+        val opened = apps.map(Words::normal).filter { it.isNotEmpty() }
+        fun forTheseApps(item: MemoryItem): Boolean {
+            val app = item.app?.let(Words::normal)?.takeIf { it.isNotEmpty() } ?: return true
+            return opened.isEmpty() || opened.any { it.contains(app) || app.contains(it) }
+        }
+        return memory.all().filter(::forTheseApps)
             .map {
                 val exactTitle = if (Words.normal(it.title) == Words.normal(query)) 100 else 0
                 it to exactTitle + (Words.of("${it.subject} ${it.title} ${it.text} ${it.keywords.joinToString(" ")} ${it.app.orEmpty()}") intersect words).size

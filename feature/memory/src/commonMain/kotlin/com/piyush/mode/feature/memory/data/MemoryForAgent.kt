@@ -6,5 +6,7 @@ import com.piyush.mode.agent.AgentMemory
 public class MemoryForAgent(private val retrieval: MemoryRetrieval) : AgentMemory {
     override fun recall(query: String): List<String> = retrieval.recall(query)
 
+    override fun recall(query: String, apps: List<String>): List<String> = retrieval.recall(query, apps = apps)
+
     override fun tipsFor(app: String): List<String> = retrieval.tipsFor(app)
 }
