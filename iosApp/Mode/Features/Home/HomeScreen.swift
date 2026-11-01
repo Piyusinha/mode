@@ -43,9 +43,10 @@ struct HomeScreen: View {
         }
         .modeScreen()
         .navigationTitle(state.greeting)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ModeIconButton(.settings, label: L10n.Common.settings) { onEvent(.openSettings) }
+                ModeToolbarButton(.settings, label: L10n.Common.settings) { onEvent(.openSettings) }
             }
         }
     }

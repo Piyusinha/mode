@@ -59,7 +59,7 @@ enum L10n {
         static let needsKeyTitle = LocalizedStringResource("home.needsKey.title", defaultValue: "Add your AI key")
         static let needsKeyMessage = LocalizedStringResource("home.needsKey.message", defaultValue: "Mode needs an OpenRouter key before it can do anything.")
         static let emptyTitle = LocalizedStringResource("home.empty.title", defaultValue: "Ask Mode anything")
-        static let emptyMessage = LocalizedStringResource("home.empty.message", defaultValue: "Tap the microphone and say what to do: \u{201C}Turn off dark mode\u{201D}, \u{201C}Text Sonali I'm on my way\u{201D}.")
+        static let emptyMessage = LocalizedStringResource("home.empty.message", defaultValue: "Tap Ask and say what to do: \u{201C}Turn off dark mode\u{201D}, \u{201C}Text Sonali I'm on my way\u{201D}.")
 
         static func greeting(_ part: PartOfDayName, name: String?) -> String {
             switch (part, name) {

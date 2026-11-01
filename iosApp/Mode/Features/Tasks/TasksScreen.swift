@@ -48,9 +48,10 @@ struct TasksScreen: View {
         .listStyle(.insetGrouped)
         .modeScreen()
         .navigationTitle(Text(L10n.Tab.tasks))
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ModeIconButton(.repeatTask, label: L10n.Tasks.newRepeat) { onEvent(.newRepeat) }
+                ModeToolbarButton(.repeatTask, label: L10n.Tasks.newRepeat) { onEvent(.newRepeat) }
             }
         }
     }

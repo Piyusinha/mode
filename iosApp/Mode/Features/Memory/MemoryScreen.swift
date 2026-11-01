@@ -29,6 +29,7 @@ struct MemoryScreen: View {
         .listStyle(.insetGrouped)
         .modeScreen()
         .navigationTitle(Text(L10n.Tab.memory))
+        .navigationBarTitleDisplayMode(.large)
         .confirmationDialog(Text(L10n.Memory.forgetConfirm), isPresented: $confirmingForget, titleVisibility: .visible) {
             Button(role: .destructive) { onEvent(.confirmForget) } label: { Text(L10n.Memory.forgetEverything) }
         }

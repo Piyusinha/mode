@@ -52,6 +52,24 @@ public struct ModeButton: View {
     }
 }
 
+/// An icon button for the navigation bar, which already draws the glass around it.
+public struct ModeToolbarButton: View {
+    private let icon: ModeIcon
+    private let label: LocalizedStringResource
+    private let action: () -> Void
+
+    public init(_ icon: ModeIcon, label: LocalizedStringResource, action: @escaping () -> Void) {
+        self.icon = icon
+        self.label = label
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) { icon.image }
+            .accessibilityLabel(Text(label))
+    }
+}
+
 /// A round glass button with only an icon; [label] is read by VoiceOver.
 public struct ModeIconButton: View {
     private let icon: ModeIcon

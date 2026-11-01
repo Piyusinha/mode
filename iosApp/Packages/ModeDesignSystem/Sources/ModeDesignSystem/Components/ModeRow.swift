@@ -44,6 +44,7 @@ public struct ModeRow<Trailing: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             trailing
         }
+        .padding(.vertical, ModeSpacing.s)
         .frame(minHeight: ModeSize.rowMin)
         .contentShape(.rect)
     }

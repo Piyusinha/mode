@@ -31,7 +31,7 @@ struct OnboardingScreen: View {
             .safeAreaInset(edge: .bottom) { buttons }
             .toolbar {
                 if state.canGoBack {
-                    ToolbarItem(placement: .topBarLeading) { ModeIconButton(.back, label: L10n.Common.back) { onEvent(.back) } }
+                    ToolbarItem(placement: .topBarLeading) { ModeToolbarButton(.back, label: L10n.Common.back) { onEvent(.back) } }
                 }
             }
             .animation(ModeMotion.standard, value: state.step)

@@ -20,6 +20,7 @@ struct AskScreen: View {
         }
         .modeScreen()
         .navigationTitle(Text(L10n.Ask.title))
+        .navigationBarTitleDisplayMode(.large)
         .safeAreaInset(edge: .bottom) {
             ModeComposer(
                 text: $draft,
