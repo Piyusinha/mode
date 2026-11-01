@@ -157,10 +157,11 @@ class Agent(
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
-        /** The screen the last tap was made on: the next tap on that same, unchanged screen is held back once. */
-        var lastTapScreen: String? = null
-        var lastWasTap = false
-        val heldBack = mutableSetOf<String>()
+        /**
+         * The last tap that added, sent or saved something, until the agent has checked it worked
+         * (any other action, or a wait). Another such tap waits for that check.
+         */
+        var unchecked: String? = null
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -219,7 +220,7 @@ class Agent(
             // Tell the model what its last action did, and notice when nothing changes.
             val changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
             if (changed != null && history.isNotEmpty()) {
-                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED + if (lastWasTap) TAP_MAY_HAVE_WORKED else ""
+                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
             }
             lastScreen = screen.signature
             val verdict = stuck.looked(screen.signature, changed)
@@ -355,6 +356,8 @@ class Agent(
                     )
                 }
                 "wait" -> {
+                    // A wait is a fresh look: it counts as checking the last change.
+                    unchecked = null
                     val waits = stuck.waited()
                     val seconds = (call.arguments["seconds"]?.jsonPrimitive?.doubleOrNull ?: 2.0).coerceIn(0.5, 10.0)
                     delay((seconds * 1000).toLong())
@@ -374,17 +377,15 @@ class Agent(
                         continue
                     }
                     val described = describe(call, op, screen)
-                    // Seen on the phone: an app showed "added" for a moment and the screen then looked
-                    // the same, so the agent tapped the same + three times; another time it tapped +
-                    // on four different wrong results. After a tap that changed nothing visible, the
-                    // next tap on that screen is held back once and the model checks first.
-                    if (op is Op.Tap) {
-                        val again = lastWasTap && lastTapScreen == screen.signature
-                        if (again && heldBack.add(screen.signature)) {
-                            stuck.badReply()
-                            record("$described (held back)", reason, REPEAT_HELD_BACK)
-                            continue
-                        }
+                    // Do it once, then check. Seen on the phone: an app confirmed "added" only for a
+                    // moment, and the agent added the same food seven times; another time it added four
+                    // wrong ones. A tap that adds, sends or saves waits until the last one was checked.
+                    val changes = op is Op.Tap && Changes.isChange(reason, nearestText(op.x, op.y, screen))
+                    val waiting = unchecked
+                    if (changes && waiting != null) {
+                        stuck.badReply()
+                        record("$described (held back)", reason, checkFirst(waiting))
+                        continue
                     }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
@@ -398,8 +399,7 @@ class Agent(
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
-                        lastWasTap = op is Op.Tap
-                        lastTapScreen = screen.signature
+                        unchecked = if (changes) described else null
                         stuck.acted()
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
@@ -411,7 +411,9 @@ class Agent(
                             }
                         }
                         expectation = AgentTools.expectOf(call)
-                        "ok"
+                        // Apps often confirm a change only for a moment ("Added", a check): read the
+                        // screen right away, so the proof is not lost before the next look.
+                        if (changes) "ok" + flashed(screen) + CHECK_IT else "ok"
                     } catch (e: Exception) {
                         "failed: ${e.message}"
                     }
@@ -505,7 +507,32 @@ class Agent(
             px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int,
             bounds.getValue("w").jsonPrimitive.double, bounds.getValue("h").jsonPrimitive.double,
         )
-        val texts = (phone.send(Op.ScreenText()) as JsonArray).map {
+        val texts = screenTexts(g)
+        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
+    }
+
+    /** Text that appeared right after a change and was not there before ("Added to Dinner"), if any. */
+    private suspend fun flashed(before: Screen): String {
+        delay(FLASH_MS)
+        val now = runCatching { screenTexts(before.geometry) }.getOrNull() ?: return ""
+        val had = before.texts.map { it.first.trim() }.toSet()
+        val new = now.filter { (text, _, y) ->
+            val t = text.trim()
+            t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && !(y <= before.geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(t))
+        }.map { it.first.trim() }.distinct().take(FLASH_TEXTS)
+        return if (new.isEmpty()) "" else "; right after it the screen showed: " + new.joinToString(", ") { "\"$it\"" }
+    }
+
+    /** The held-back reply: what to check, and where. */
+    private fun checkFirst(last: String): String =
+        "not done: check your last change first ($last). Look for proof it worked: on this screen (a check mark, " +
+            "\"added\", a count, the item listed), or where the result lives (go back to the diary or meal, the " +
+            "list, the cart, the chat). If it is there, move on; do it again only if it is truly missing. (Any " +
+            "other action, such as going back, scrolling or a wait, counts as checking.)"
+
+    /** The text on screen now, with centres in screenshot pixels. */
+    private suspend fun screenTexts(g: AgentTools.Geometry): List<Triple<String, Int, Int>> =
+        (phone.send(Op.ScreenText()) as JsonArray).map {
             val box = it.jsonObject
             Triple(
                 box.getValue("text").jsonPrimitive.contentOrNull.orEmpty(),
@@ -513,8 +540,6 @@ class Agent(
                 g.toPixelsY(box.getValue("y").jsonPrimitive.double).roundToInt(),
             )
         }
-        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
-    }
 
     /** A readable action for the log, naming the text tapped when there is one. */
     private fun describe(call: ToolCall, op: Op, screen: Screen): String = when (op) {
@@ -560,14 +585,11 @@ class Agent(
         private const val STATUS_BAR_PT = 60.0
         /** What ticks up there: the clock, a timer, the battery percentage. */
         private val TICKING = Regex("""^\d{1,3}(?:[:.]\d{2}){0,2}%?$""")
-        private const val TAP_MAY_HAVE_WORKED =
-            " (a tap that adds, sends or saves may still have worked: many apps confirm only for a moment)"
-        private const val REPEAT_HELD_BACK =
-            "not done: your last tap on this screen changed nothing visible. If it added, sent, bought, booked or saved " +
-                "something, it may already have worked (apps often confirm only for a moment), so another tap here could " +
-                "add a second or a wrong item. Check first, where it would show (the diary or meal, the list, the cart, " +
-                "the chat). If you are sure this tap is right (it really did not work, or a + raises a quantity), tap " +
-                "again and it will go through."
+        private const val CHECK_IT = ". This changed something: check it worked before doing it again"
+        /** How soon after a change the screen is read again, and how much of what appeared is kept. */
+        private const val FLASH_MS = 400L
+        private const val FLASH_TEXTS = 6
+        private const val FLASH_TEXT_MAX = 40
         /** What the user sees while the agent looks and thinks; never a model or a step number. */
         const val WORKING = "Working on it"
         private const val MAX_RECALL_CHARS = 1200
@@ -592,15 +614,18 @@ class Agent(
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - Tap a text field before typing into it.
             - If an action did not change the screen, do not repeat it: try another way.
-            - A tap that adds, sends, buys, books, posts or saves is not safe to repeat: doing it twice adds twice.
-              After it, look for proof it worked (a check, a count going up, the item in the list). Many apps
-              confirm for only a moment, so a screen that looks the same does not mean it failed: before tapping
-              again, check where it would show (the diary or meal, the cart, the chat, the list).
-            - Choosing from search results (food, products, contacts, places): read them from the screenshot and
-              pick only one that matches what the user asked (name, brand, size). A + or Add button adds the
-              item; it does not open or check it. If nothing matches, search again with another spelling or
-              fewer words (spoken tasks are often misheard); if still nothing matches, ask the user which one
-              they mean instead of adding something close.
+            - Changing things (adding, logging, saving, sending, booking, buying, deleting) goes like this:
+              1. Make sure it is the right item: in search results, pick only one that matches what the user
+                 asked (name, brand, size). A + or Add button adds the item; it does not open or check it.
+                 If nothing matches, search again with another spelling or fewer words (spoken tasks are
+                 often misheard), then ask the user rather than add something close.
+              2. Do it once.
+              3. Check it worked before anything else. Mode tells you what appeared on screen right after the
+                 tap. Proof is a check mark, "added"/"sent"/"saved", a count going up, or the item in its list.
+                 If you cannot see proof, go where the result lives (back to the diary or meal, the list, the
+                 cart, the chat) and look.
+              4. If it is there, move on (and mark that part of the plan done). Only if it is truly missing, do
+                 it again. Mode holds back a second change until you have checked.
             - Say in expect what the screen should show after an action ("Appearance page opens"); on the
               next screen, check it happened before going on.
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).

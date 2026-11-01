@@ -82,8 +82,8 @@ class AgentTest {
         fun tap(x: Int) = call("tap", "x" to x, "y" to 1, "reason" to "try")
         val model = ScriptedModel(tap(1), tap(200), tap(400), call("done", "evidence" to "on screen", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
-        // Taps change nothing (the second is held back for a check), so a later decision goes to the strong model.
-        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
+        // Two taps change nothing, so the third decision goes to the strong model, then back to cheap.
+        assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
     }
 
     @Test
@@ -294,33 +294,62 @@ class AgentTest {
     }
 
     @Test
-    fun aRepeatTapOnAnUnchangedScreenIsHeldBackOnceSoTheModelChecksFirst() = runTest {
+    fun aSecondAddWaitsUntilTheFirstWasCheckedThenGoesThrough() = runTest {
         val phone = FakePhone(List(10) { listOf("Chocolate oats" to (200.0 to 136.0)) })
-        val plus = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
-        val model = ScriptedModel(plus, plus, plus, call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
+        val add = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
+        val model = ScriptedModel(
+            add, add, add,
+            call("scroll", "direction" to "up", "reason" to "Checking the diary"),
+            add,
+            call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"),
+        )
         Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
-        // First tap goes through; the immediate repeat is held back; insisting goes through.
+        // The first add goes through; two more wait for a check; after the check one more may go.
         assertEquals(2, phone.actions.count { it is Op.Tap })
+    }
+
+    @Test
+    fun ordinaryTapsAreNeverHeldBack() = runTest {
+        val phone = FakePhone(List(10) { listOf("Same" to (200.0 to 300.0)) })
+        val model = ScriptedModel(
+            call("tap", "x" to 100, "y" to 600, "reason" to "Opening Settings"),
+            call("tap", "x" to 100, "y" to 600, "reason" to "Opening Wi-Fi"),
+            call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("open wifi")
+        assertEquals(2, phone.actions.count { it is Op.Tap })
+    }
+
+    @Test
+    fun whatAppearsRightAfterAnAddIsShownToTheModelAsProof() = runTest {
+        val phone = FakePhone(listOf(
+            listOf("Chocolate oats" to (200.0 to 136.0)),
+            listOf("Chocolate oats" to (200.0 to 136.0), "Added to Dinner" to (200.0 to 700.0)),
+        ))
+        val model = ScriptedModel(
+            call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner"),
+            call("done", "evidence" to "Added to Dinner", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("add oats")
+        assertTrue("right after it the screen showed: \"Added to Dinner\"" in model.lastUserText, model.lastUserText)
     }
 
     @Test
     fun aTickingClockInTheStatusBarIsNotAChange() = runTest {
         // The Dynamic Island's timer changes every second; the page below does not.
-        val phone = FakePhone(List(10) { i -> listOf("0:${10 + i}" to (330.0 to 20.0), "Chocolate oats" to (200.0 to 136.0)) })
-        val plus = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
-        val model = ScriptedModel(plus, plus, call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
-        Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
-        assertEquals(1, phone.actions.count { it is Op.Tap }, "the repeat is held back: only the clock moved")
+        val phone = FakePhone(List(10) { i -> listOf("0:${10 + i}" to (330.0 to 20.0), "Wi-Fi" to (200.0 to 300.0)) })
+        val model = ScriptedModel(call("tap", "x" to 100, "y" to 600, "reason" to "Opening Wi-Fi"), call("done", "evidence" to "on screen", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("open wifi")
+        assertTrue("screen did NOT change" in model.lastUserText, model.lastUserText)
     }
 
     @Test
-    fun afterATapThatChangedNothingTheNextTapOnThatScreenIsHeldBackEvenElsewhere() = runTest {
+    fun afterAnAddADifferentAddOnTheSameScreenAlsoWaits() = runTest {
         val phone = FakePhone(List(10) { listOf("Results" to (200.0 to 100.0)) })
         fun plus(y: Int) = call("tap", "x" to 411, "y" to y, "reason" to "Adding it")
         val model = ScriptedModel(plus(435), plus(355), call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
         Agent(phone, model, Gate(), noSettle).run("add oats to dinner")
         assertEquals(1, phone.actions.count { it is Op.Tap }, "the second row's + waits until the first was checked")
-        assertTrue("may already have worked" in model.lastUserText || "held back" in model.lastUserText, model.lastUserText)
     }
 
     @Test
