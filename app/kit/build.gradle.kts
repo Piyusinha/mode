@@ -1,5 +1,7 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    // Swift sees StateFlow as AsyncSequence, sealed classes as enums, suspend as async.
+    alias(libs.plugins.skie)
 }
 
 // ModeKit.framework: the one Kotlin framework the iOS app imports. It holds
@@ -38,5 +40,12 @@ kotlin {
             api(projects.engine.ops)
             implementation(projects.app.devUi)
         }
+    }
+}
+
+skie {
+    // An open-source build should not phone home.
+    analytics {
+        enabled.set(false)
     }
 }
