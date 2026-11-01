@@ -20,7 +20,7 @@ internal object Changes {
     /** What apps say when a change went through, for a moment or for good. */
     private val CONFIRMED = Regex(
         """\b(logged|added|saved|sent|booked|ordered|posted|created|scheduled|confirmed|paid|deleted|removed|""" +
-            """success|successful|successfully)\b|[✓✔]""",
+            """success|successful|successfully)\b|[✓✔]|\b\d+\s+items?\b|\bview cart\b""",
         RegexOption.IGNORE_CASE,
     )
 

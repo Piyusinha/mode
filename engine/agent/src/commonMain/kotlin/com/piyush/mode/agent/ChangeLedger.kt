@@ -38,12 +38,17 @@ internal class ChangeLedger {
     /** A confirmed change of this same target. */
     fun confirmedFor(target: String): Entry? = entries.lastOrNull { it.confirmed && same(it.target, target) }
 
-    /** Each look: proof on screen confirms the pending change; a different page counts as having checked. */
-    fun looked(page: Set<String>, texts: List<String>) {
+    /**
+     * Each look: proof on screen confirms the pending change; going to a different page counts as
+     * having checked. [navigated]: the last action moved between pages (a tap, back, opening an app),
+     * not a scroll: seen on the phone, a scroll down a long menu "left the page" and a second,
+     * different item was added before the first was checked.
+     */
+    fun looked(page: Set<String>, texts: List<String>, navigated: Boolean) {
         val entry = pending() ?: return
         // Only what was not already on the page it was made on ("Recently added" headers don't count).
         Changes.proof(texts.filter { norm(it) !in entry.page })?.let { entry.proof = it; return }
-        if (similarity(entry.page, page) < SAME_PAGE) entry.checked = true
+        if (navigated && similarity(entry.page, page) < SAME_PAGE) entry.checked = true
     }
 
     /** One line each, for the model. */

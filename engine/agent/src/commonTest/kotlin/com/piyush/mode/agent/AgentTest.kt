@@ -445,6 +445,53 @@ class AgentTest {
     }
 
     @Test
+    fun aPointOutsideTheScreenshotIsRefusedAndAPairIsRead() {
+        val g = AgentTools.Geometry(460, 1000, 402.0, 874.0)
+        // On the phone: x 659 on a 460-pixel screenshot became a tap at 576 pt, off a 402 pt screen.
+        val e = runCatching { AgentTools.toOp(call("tap", "x" to 659, "y" to 934), g) }.exceptionOrNull()
+        assertTrue(e is IllegalArgumentException && "outside the screenshot" in e.message!!, e?.message)
+        // And "x": [228, 269] (a point) for a tap.
+        val tap = AgentTools.toOp(call("tap", "x" to listOf(228, 269)), g) as Op.Tap
+        assertEquals(228 * 402.0 / 460, tap.x)
+        assertEquals(269 * 874.0 / 1000, tap.y)
+    }
+
+    @Test
+    fun aModelThatNeverAnswersIsAskedAgainThenTheRunGoesOn() = runTest {
+        val phone = FakePhone(List(5) { listOf("Home" to (100.0 to 300.0)) })
+        var calls = 0
+        val slowThenFine = LlmClient { _, _, _ ->
+            calls++
+            if (calls == 1) kotlinx.coroutines.awaitCancellation()
+            ChatResult(ToolCall("done", buildJsonObject { put("evidence", "x"); put("summary", "ok") }), "", Usage(0, 0, 0.0))
+        }
+        val result = Agent(phone, slowThenFine, Gate(), noSettle).run("t")
+        assertIs<AgentOutcome.Done>(result.outcome)
+        assertEquals(2, calls, "the silent first try was given up after the time limit")
+    }
+
+    @Test
+    fun scrollingIsNotCheckingAnAdd() = runTest {
+        // On the phone: a scroll down a long menu counted as leaving the page; a second dish was added unchecked.
+        fun menu(i: Int) = List(10) { k -> "dish ${i * 10 + k}" to (100.0 to 200.0 + k * 60) }
+        val phone = FakePhone(listOf(menu(0), menu(0), menu(1), menu(1)) + List(5) { menu(1) })
+        val add = call("tap", "x" to 411, "y" to 340, "reason" to "Adding it to the cart")
+        val model = ScriptedModel(
+            add, call("scroll", "direction" to "down", "reason" to "Checking the cart"), add,
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("add a sushi")
+        assertEquals(1, phone.actions.count { it is Op.Tap }, "the second add waits: a scroll is not a check")
+    }
+
+    @Test
+    fun aCartCountAppearingIsProof() {
+        assertEquals("1 item", Changes.proof(listOf("Yuki", "1 item")))
+        assertEquals("View Cart", Changes.proof(listOf("View Cart")))
+        assertEquals(null, Changes.proof(listOf("Items", "Push Pop Sushi")))
+    }
+
+    @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
         val model = ScriptedModel(

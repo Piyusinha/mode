@@ -10,6 +10,7 @@ import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.wireName
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -255,7 +256,7 @@ class Agent(
             }
             lastScreen = screen.signature
             // Proof on screen confirms the last change; a different page means the agent went to check.
-            ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first })
+            ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first }, navigated = lastOp != "scroll" && lastOp != "wait")
             // Right after an unconfirmed change, deciding whether it worked is what matters most.
             ledger.pending()?.takeIf { !it.escalated }?.let { it.escalated = true; stuck.critical() }
             val verdict = stuck.looked(screen.signature, changed)
@@ -537,7 +538,9 @@ class Agent(
             trace.asking(step, candidate, steppedUp && candidate != config.model, messages.last().text)
             val started = clock.markNow()
             try {
-                val reply = llm.chat(candidate, messages, schema)
+                // Seen on the phone: a provider that never answered; the run sat silent. A step gets a fixed time.
+                val reply = withTimeoutOrNull(STEP_ANSWER_MS) { llm.chat(candidate, messages, schema) }
+                    ?: throw LlmFailed("$candidate gave no answer in ${STEP_ANSWER_MS / 1000} s")
                 trace.answered(
                     step, candidate, reply.toolCall?.name, reply.toolCall?.arguments, reply.text, reply.usage,
                     started.elapsedNow().inWholeMilliseconds,
@@ -731,6 +734,8 @@ class Agent(
         /** What ticks up there: the clock, a timer, the battery percentage, Mode's own "Step 4" on the island. */
         private val TICKING = Regex("""^(?:step\s*)?\d{1,3}(?:[:.]\d{2}){0,2}%?$""", RegexOption.IGNORE_CASE)
         /** At most this many strong-model steps per task, each only while the budget left is this many times one. */
+        /** How long one decision may take before it is asked again (once). */
+        private const val STEP_ANSWER_MS = 25_000L
         private const val MAX_STEP_UPS = 3
         private const val STEP_UP_BUDGET_SHARE = 3.0
         private const val STRONG_STEP_GUESS_USD = 0.02

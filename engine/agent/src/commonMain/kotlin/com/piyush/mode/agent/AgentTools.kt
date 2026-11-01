@@ -226,8 +226,25 @@ object AgentTools {
      */
     fun toOp(call: ToolCall, g: Geometry): Op {
         val a = call.arguments
-        fun num(name: String): Double = a[name]?.jsonPrimitive?.doubleOrNull ?: throw IllegalArgumentException("'${call.name}' needs a number '$name'")
-        fun optNum(name: String): Double? = a[name]?.jsonPrimitive?.doubleOrNull
+        // Seen on the phone: one model sent "x": [228, 269] (a point) for a tap; read the pair.
+        fun pair(name: String): List<Double>? =
+            (a[name] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { it.jsonPrimitive.doubleOrNull }?.takeIf { it.size == 2 }
+        fun raw(name: String): Double? = a[name]?.let { v ->
+            (v as? kotlinx.serialization.json.JsonPrimitive)?.doubleOrNull
+                ?: pair(name)?.let { p -> if (name.startsWith("x")) p[0] else p[1] }
+                ?: if (name.startsWith("y")) pair("x" + name.drop(1))?.get(1) else null
+        } ?: if (name.startsWith("y")) pair("x" + name.drop(1))?.get(1) else null
+        // A point outside the screenshot is not tapped somewhere off screen: the model is told the range.
+        // (Seen: x 659 on a 460-pixel-wide screenshot, a tap at 576 pt on a 402 pt screen.)
+        fun inRange(name: String, v: Double): Double {
+            val max = if (name.startsWith("x")) g.imageWidth else g.imageHeight
+            require(v in 0.0..max.toDouble()) {
+                "'$name' $v is outside the screenshot: use screenshot pixels, 0 to $max (it is ${g.imageWidth}×${g.imageHeight})"
+            }
+            return v
+        }
+        fun num(name: String): Double = raw(name)?.let { inRange(name, it) } ?: throw IllegalArgumentException("'${call.name}' needs a number '$name'")
+        fun optNum(name: String): Double? = raw(name)?.let { inRange(name, it) }
         fun str(name: String): String = a[name]?.jsonPrimitive?.contentOrNull ?: throw IllegalArgumentException("'${call.name}' needs '$name'")
         return when (call.name) {
             "tap" -> Op.Tap(g.x(num("x")), g.y(num("y")))
