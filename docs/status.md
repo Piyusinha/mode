@@ -45,7 +45,13 @@ In this order; everything else below waits until these are done.
    secret filter, "Remembered · Undo", `recall`, private tasks.
 3. ~~**H4, queue and sources:**~~ done 2026-11-01: one task inbox and queue,
    recovery at launch, schedules with notifications.
-4. **SwiftUI app:** the screens from the design canvas, Liquid Glass, light and dark.
+4. ~~**SwiftUI app:**~~ built 2026-11-01:
+   - `app:screens` presenters;
+   - the `ModeDesignSystem` package with its literal check;
+   - tabs, Home, Ask, Conversation, Live run, All screens, Tasks, Repeat, Memory,
+     Settings and Onboarding.
+
+   On-phone pass pending.
 5. **Siri and the Live Activity:** "Hey Siri, start Mode", steps on the Dynamic Island,
    the answer on the Lock Screen.
 6. **Voice transcription:** speak a task instead of typing it. On-device speech to

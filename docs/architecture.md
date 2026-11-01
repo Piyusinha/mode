@@ -70,11 +70,14 @@ outside the layers and is used only by test source sets.
 | feature | `feature:schedules` | `ScheduleRule` (next run, local time), `ScheduleRepository`, `Scheduler` (due tasks to the inbox, notifications) |
 | feature | `feature:diagnostics` | `HandsCheck` |
 | feature | `feature:compare` | `CompareRunner` |
+| app | `app:screens` | One presenter per screen (`StateFlow<UiState>` plus intents): Home, Conversation, Live run, Run screens, Tasks, Repeat, Memory, Settings, Onboarding; `Screens` makes them. Shared with a future Android UI |
 | app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |
-| app | `app:dev-ui` | The Compose developer screens (Agent, Compare, Logs, Settings, Hands) until SwiftUI replaces them |
+| app | `app:dev-ui` | The Compose developer screens (Agent, Compare, Logs, Settings, Hands), reachable from Settings › Developer |
 | app | `app:kit` | Builds `ModeKit.framework` for Swift (SKIE on, analytics off); `IosEntryKt.MainViewController()` |
 | — | `native/modecore` | Rust: the live connection to the phone's services |
-| — | `iosApp/Mode`, `iosApp/ModeTunnel` | The Swift app and the loopback VPN extension (paid builds) |
+| — | `iosApp/Packages/ModeDesignSystem` | Swift package: every colour, font, size, radius, icon and component (Liquid Glass) |
+| — | `iosApp/Mode` | The SwiftUI app: `App/` (tabs, routes), `Features/<Screen>/` (a pure view plus its ViewModel), `Presentation/` (formatting, flow observing), `Resources/` (L10n, string catalog) |
+| — | `iosApp/ModeTunnel` | The loopback VPN extension (paid builds) |
 
 ### Inside a feature module
 
@@ -314,3 +317,33 @@ Kotlin 2.4.10, Gradle 9.6.1, SKIE 0.10.15, Compose Multiplatform 1.11.1, kotlinx
 kotlinx-serialization 1.11.0, Rust 1.99, idevice pinned at `8970209`,
 Xcode 27.1, deployment target iOS 26.0. CoreDevice remote control itself
 needs iOS 27.
+
+## The iOS UI: design system, dumb views, shared presenters
+
+```
+SwiftUI view (state in, events out; no logic)
+   ↑ display state          ↓ events
+Swift ViewModel (@Observable: observe the presenter, map to display state, forward events, navigate)
+   ↑ StateFlow<UiState>     ↓ intents
+Kotlin presenter (app:screens: every decision)
+   ↓
+feature modules
+```
+
+- **Design system (`ModeDesignSystem`):**
+  - **Tokens:** `ModeColor` (light and dark, from the design canvas), `ModeTextStyle`
+    (Instrument Sans headings, SF body, Dynamic Type), `ModeSpacing`, `ModeSize`,
+    `ModeRadius`, `ModeMotion`, `ModeIcon`.
+  - **Components:** buttons, cards, rows, chips, badges, fields, the message bar,
+    step rows, empty states, the running bar.
+  - Screens use these and nothing else.
+- **No literals in screens.** `tools/check-ui-literals.sh` runs on every Xcode
+  build. It fails the build when anything under `Mode/Features` or `Mode/App`
+  hard-codes a colour, font, number size, radius, SF Symbol name or visible
+  string. Strings live in `Resources/L10n.swift`, and the compiler fills
+  `Localizable.xcstrings`.
+- **Dumb views.** A screen is `XScreen(state:onEvent:)`. `XViewModel` owns the
+  presenter, maps its semantic state into words (with `Format`), and handles
+  events. `XRoute` connects the two. Decisions about data belong in the Kotlin
+  presenter, so an Android UI gets them for free.
+

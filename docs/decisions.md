@@ -387,3 +387,22 @@ the graph grows past what one file reads comfortably.
   opens Mode, which then runs it. A run missed by more than 2 hours is
   skipped. Waking in the background is tested last (status, "Last").
 
+## D31. Screen presenters in shared Kotlin; dumb SwiftUI over a design system
+
+- **Presenters** (`app:screens`) make every screen decision in Kotlin:
+  - what Home suggests;
+  - which conversation a running task belongs to;
+  - form validation;
+  - the onboarding steps.
+
+  They expose semantic, locale-neutral UI state (`RelativeDay`, `TaskBadge`,
+  `PartOfDay`). They are tested on the JVM, and a future Android UI reuses them.
+- **The Swift side has three thin layers.** ViewModels map state into words and
+  route; views only draw state and send events; and a Swift-package design system
+  holds every visual value.
+- **A build phase enforces it** by refusing literals in screens. This is the
+  user's rule: "never hardcode anything… presentation layer as dumb as possible".
+- **Native UI:** a native `TabView` with Liquid Glass, Ask as the search-role
+  tab, and the running task in the bottom accessory. Native controls give real
+  Liquid Glass and accessibility.
+
