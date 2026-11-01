@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -50,6 +51,8 @@ import com.piyush.mode.feature.settings.domain.ModelOption
 import com.piyush.mode.feature.memory.data.MemoryRepository
 import com.piyush.mode.feature.memory.domain.MemoryKind
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
+import com.piyush.mode.feature.schedules.domain.ScheduleRule
+import com.piyush.mode.feature.schedules.presentation.Scheduler
 import com.piyush.mode.feature.tasks.domain.TaskSource
 import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
@@ -91,7 +94,7 @@ fun App(graph: ModeGraph, decodeImage: (ByteArray) -> ImageBitmap) {
                     }
                 }
                 when (tab) {
-                    0 -> AgentScreen(graph.tasks, graph.inbox, connection.label)
+                    0 -> AgentScreen(graph.tasks, graph.inbox, graph.scheduler, connection.label)
                     1 -> CompareScreen(graph.compare, graph.tasks, graph.models)
                     2 -> LogsScreen(graph.files, graph.runs, decodeImage)
                     3 -> SettingsScreen(graph.settings, graph.models, graph.memory)
@@ -112,7 +115,7 @@ private fun Page(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun AgentScreen(runner: TaskRunner, inbox: TaskQueue, connection: String) {
+private fun AgentScreen(runner: TaskRunner, inbox: TaskQueue, scheduler: Scheduler, connection: String) {
     val state by runner.state.collectAsState()
     val waiting by inbox.queue.collectAsState()
     val focus = LocalFocusManager.current
@@ -144,6 +147,7 @@ private fun AgentScreen(runner: TaskRunner, inbox: TaskQueue, connection: String
                 TextButton(onClick = { inbox.cancel(w.id) }) { Text("Cancel") }
             }
         }
+        RepeatSection(scheduler, task)
         for (item in state.remembered) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Remembered: ${item.text}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
@@ -256,6 +260,37 @@ private fun SettingsScreen(settings: SettingsRepository, catalog: ModelCatalog, 
         }) { Text("Save") }
         if (saved.isNotEmpty()) Text(saved)
         MemorySection(settings, memory)
+    }
+}
+
+/** Make the task in the box repeat, and list what repeats. */
+@Composable
+private fun RepeatSection(scheduler: Scheduler, task: String) {
+    val schedules by scheduler.all.collectAsState(emptyList())
+    var time by remember { mutableStateOf("08:00") }
+    var days by remember { mutableStateOf(ScheduleRule.EVERY_DAY) }
+    var error by remember { mutableStateOf("") }
+    Text("Repeat", style = MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        OutlinedTextField(time, { time = it }, Modifier.width(90.dp), singleLine = true, label = { Text("Time") })
+        for ((label, set) in listOf("Daily" to ScheduleRule.EVERY_DAY, "Weekdays" to ScheduleRule.WEEKDAYS, "Once" to emptySet())) {
+            TextButton(onClick = { days = set }) { Text(if (days == set) "[$label]" else label) }
+        }
+    }
+    OutlinedButton(
+        onClick = {
+            val (h, m) = time.split(':').map { it.trim().toIntOrNull() }.let { (it.getOrNull(0) ?: -1) to (it.getOrNull(1) ?: -1) }
+            error = runCatching { scheduler.add(task.trim(), ScheduleRule(h, m, days)) }.fold({ "" }, { it.message ?: "invalid time" })
+        },
+        enabled = task.isNotBlank(),
+    ) { Text("Repeat the task above") }
+    if (error.isNotEmpty()) Text(error, style = MaterialTheme.typography.bodySmall)
+    for (s in schedules) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(s.enabled, { scheduler.setEnabled(s.id, it) })
+            Text("${s.text} · ${s.rule.label()}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { scheduler.delete(s.id) }) { Text("Delete") }
+        }
     }
 }
 

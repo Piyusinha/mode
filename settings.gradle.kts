@@ -45,6 +45,7 @@ include(":feature:connection")
 include(":feature:settings")
 include(":feature:runs")
 include(":feature:tasks")
+include(":feature:schedules")
 include(":feature:diagnostics")
 include(":feature:compare")
 // Test fakes shared by every module (test source sets only).

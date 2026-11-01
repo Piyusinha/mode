@@ -6,6 +6,7 @@ import platform.Foundation.NSBundle
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationWillTerminateNotification
 import platform.UIKit.UIBackgroundTaskInvalid
@@ -18,6 +19,12 @@ public class IosAppLifecycle : AppLifecycle {
     override fun onBackground(action: () -> Unit) {
         NSNotificationCenter.defaultCenter.addObserverForName(
             UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue,
+        ) { _ -> action() }
+    }
+
+    override fun onForeground(action: () -> Unit) {
+        NSNotificationCenter.defaultCenter.addObserverForName(
+            UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue,
         ) { _ -> action() }
     }
 

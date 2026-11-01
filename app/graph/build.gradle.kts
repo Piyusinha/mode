@@ -14,6 +14,7 @@ kotlin {
             api(projects.feature.compare)
             api(projects.feature.conversations)
             api(projects.feature.memory)
+            api(projects.feature.schedules)
             api(projects.core.database)
             api(projects.engine.llm)
             api(projects.core.storage)

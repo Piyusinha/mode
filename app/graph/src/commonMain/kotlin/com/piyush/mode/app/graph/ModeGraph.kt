@@ -26,6 +26,8 @@ import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.data.TaskRepository
+import com.piyush.mode.feature.schedules.data.ScheduleRepository
+import com.piyush.mode.feature.schedules.presentation.Scheduler
 import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
@@ -93,6 +95,9 @@ class ModeGraph(platform: PlatformServices) {
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
     val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope)
 
+    /** Tasks that repeat; due ones go to the inbox, with a notification for when Mode is closed. */
+    val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
+
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
 
@@ -101,6 +106,7 @@ class ModeGraph(platform: PlatformServices) {
         scope.launch { models.refresh() }
         // Tasks left from the last session: interrupted ones are marked, fresh ones run.
         inbox.recover()
+        scheduler.start(platform.lifecycle)
         scope.launch {
             runCatching { runs.backfill() }
                 .onSuccess { if (it > 0) AppLog.log("runs", "listed $it earlier runs") }

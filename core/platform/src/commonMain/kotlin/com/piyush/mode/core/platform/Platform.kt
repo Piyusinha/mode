@@ -11,6 +11,9 @@ public interface AppLifecycle {
     /** Calls [action] whenever Mode goes to the background (the user left it). */
     public fun onBackground(action: () -> Unit)
 
+    /** Calls [action] whenever Mode comes back to the front (opened, or a notification tapped). */
+    public fun onForeground(action: () -> Unit) {}
+
     /** Calls [action] when the OS is about to end Mode; it must finish quickly and not suspend. */
     public fun onTerminate(action: () -> Unit)
 }
@@ -26,4 +29,10 @@ public interface Notifier {
 
     /** Shown only while Mode is not on screen; in front, the app itself shows it. */
     public fun post(title: String, body: String)
+
+    /** A notification at [atEpochMs], replacing any earlier one with the same [id]. Tapping it opens Mode. */
+    public fun schedule(id: String, title: String, body: String, atEpochMs: Long) {}
+
+    /** Takes back a scheduled notification. */
+    public fun cancel(id: String) {}
 }

@@ -33,4 +33,4 @@ all:
 SELECT * FROM schedule ORDER BY hour, minute;
 
 due:
-SELECT * FROM schedule WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at;
+SELECT * FROM schedule WHERE enabled = 1 AND next_run_at <= ? ORDER BY next_run_at;
