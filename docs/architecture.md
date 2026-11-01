@@ -1,25 +1,121 @@
 # Architecture
 
-## The layers
+## Modules and layers
+
+Mode is split into small Gradle modules in four layers. A module may use
+modules in its own layer or below, never above:
 
 ```mermaid
 flowchart TB
-    subgraph app["Mode.app (one app on the iPhone)"]
-        direction TB
-        swift["iosApp/Mode: SwiftUI shell<br/>hosts the Compose UI"]
-        subgraph kit["ModeKit.framework (Kotlin Multiplatform)"]
-            direction TB
-            ui["composeApp<br/>App, HandsCheck, PhoneLink"]
-            cd["shared/phone-coredevice<br/>CoreDeviceBackend, PhoneConnector,<br/>LoopbackVpn, VisionTextReader, UIKitImageTools"]
-            ops["shared/core-ops<br/>Op, PhoneBackend, FakeBackend"]
-            native["native/modecore (Rust, static library)<br/>Session: tunnel, screen stream, HID,<br/>screenshot, clipboard, apps"]
-            ui --> cd --> ops
-            cd -- "cinterop over modecore.h" --> native
-        end
-        tunnel["iosApp/ModeTunnel<br/>packet-tunnel extension (paid builds)"]
-        swift --> ui
+    subgraph app["app: what ships"]
+        kit["app:kit<br/>ModeKit.framework (+ SKIE)"]
+        devui["app:dev-ui<br/>Compose developer screens"]
+        graph["app:graph<br/>ModeGraph: builds and wires everything"]
     end
-    native -- "TCP to 10.7.0.1:49152<br/>reflected by the VPN" --> tunnel
+    subgraph feature["feature: one module per feature"]
+        tasks["tasks<br/>TaskRunner, questions"]
+        compare["compare<br/>model bake-off"]
+        diag["diagnostics<br/>HandsCheck"]
+        conn["connection<br/>PhoneSession, PhoneLink"]
+        settings["settings<br/>key, models"]
+        runs["runs<br/>RunRecorder, history"]
+    end
+    subgraph engine["engine: the product's core logic"]
+        agent["agent<br/>look → decide → act"]
+        llm["llm<br/>LlmClient, OpenRouter"]
+        ops["ops<br/>Op, PhoneBackend"]
+        ios["phone-ios<br/>CoreDevice backend, VPN, pairing"]
+    end
+    subgraph core["core: plumbing, no product logic"]
+        common["common<br/>AppLog, ActivityTracker"]
+        storage["storage<br/>secrets, settings, files"]
+        platform["platform<br/>lifecycle, background, notifications"]
+        network["network<br/>HTTP client"]
+    end
+    kit --> devui --> graph
+    graph --> tasks & compare & diag
+    compare --> tasks
+    tasks --> conn & settings & runs
+    diag --> conn
+    tasks & runs & settings --> agent
+    agent --> llm & ops
+    conn --> ops
+    conn -. iOS .-> ios
+    ios --> ops
+    ios -- "cinterop" --> native["native/modecore (Rust)"]
+    feature --> core
+```
+
+`./gradlew checkModuleRules` (also part of `check`) fails the build when a
+module depends on a layer above it. `:testing` (fakes shared by tests) sits
+outside the layers and is used only by test source sets.
+
+| Layer | Module | Role |
+|---|---|---|
+| core | `core:common` | `AppLog` (event timeline), time ids, `ActivityTracker` (is anything using the phone?), `systemLog` on iOS |
+| core | `core:storage` | `SecretStore`, `KeyValueStore`, `FileStore`; iOS: Keychain, UserDefaults, Documents |
+| core | `core:platform` | `AppInfo`, `AppLifecycle`, `BackgroundWork`, `Notifier`; iOS: KeepAwake, background task, notifications |
+| core | `core:network` | The HTTP client (Darwin on iOS) |
+| engine | `engine:ops` | What can be asked of a phone: `Op`, `PhoneBackend`, `ResilientBackend`, `FakeBackend` |
+| engine | `engine:llm` | `LlmClient` and `OpenRouterClient` |
+| engine | `engine:agent` | The agent loop, its tools and `AgentTrace` |
+| engine | `engine:phone-ios` | The iPhone backend over CoreDevice, the VPN and the pairing file |
+| feature | `feature:connection` | `PhoneSession` (one shared session, `ConnectionState`), the `PhoneLink` port, `IdleDisconnectPolicy` |
+| feature | `feature:settings` | `AgentSettingsRepository`, `ModelCatalog` |
+| feature | `feature:runs` | `RunRecorder`, `RunRepository` (`RunSummary`, events, screenshots) |
+| feature | `feature:tasks` | `TaskRunner` (`TaskState`, `PendingQuestion`) |
+| feature | `feature:diagnostics` | `HandsCheck` |
+| feature | `feature:compare` | `CompareRunner` |
+| app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |
+| app | `app:dev-ui` | The Compose developer screens (Agent, Compare, Logs, Settings, Hands) until SwiftUI replaces them |
+| app | `app:kit` | Builds `ModeKit.framework` for Swift (SKIE on, analytics off); `IosEntryKt.MainViewController()` |
+| — | `native/modecore` | Rust: the live connection to the phone's services |
+| — | `iosApp/Mode`, `iosApp/ModeTunnel` | The Swift app and the loopback VPN extension (paid builds) |
+
+### Inside a feature module
+
+```
+feature/<name>/src/commonMain/kotlin/com/piyush/mode/feature/<name>/
+  domain/        models and interfaces (ports) other modules may use
+  data/          implementations (repositories, platform adapters)
+  presentation/  state holders: a StateFlow of state plus intent functions; no UI
+src/iosMain/…    iOS implementations of the module's ports
+src/commonTest/… tests on the JVM with the fakes from :testing
+```
+
+- **Explicit API**: only what other modules need is `public`; everything
+  else is `internal` (the `mode.kmp.feature` convention turns this on).
+- **State** is a `StateFlow` of an immutable state class. Compose collects it
+  with `collectAsState`; SwiftUI observes it through SKIE. No Compose state
+  outside UI modules.
+- **Dependencies come in through constructors.** Only `ModeGraph` constructs
+  features. There is no DI library.
+- **Features don't reach into each other's internals.** Cross-cutting needs go
+  through core (for example, `ActivityTracker` lets the connection feature
+  know whether a task, a check or a comparison is running).
+
+### Adding a feature
+
+1. Create `feature/<name>/build.gradle.kts` with `id("mode.kmp.feature")` and
+   only the dependencies it needs; add `include(":feature:<name>")` to
+   `settings.gradle.kts`.
+2. Put models and ports in `domain/`, implementations in `data/`, and a state
+   holder in `presentation/`.
+3. Write tests in `commonTest` with `:testing` fakes; run `./gradlew jvmTest`.
+4. Construct it in `ModeGraph` and, if Swift needs it, `export` it in
+   `app/kit/build.gradle.kts`.
+5. `./gradlew check` must pass, including `checkModuleRules`.
+
+## The runtime path
+
+```mermaid
+flowchart TB
+    subgraph phone["Mode.app (one app on the iPhone)"]
+        swift["iosApp/Mode (Swift)"] --> kit2["ModeKit.framework"]
+        kit2 -- "cinterop over modecore.h" --> native2["native/modecore (Rust)"]
+        tunnel["iosApp/ModeTunnel<br/>packet-tunnel extension (paid builds)"]
+    end
+    native2 -- "TCP to 10.7.0.1:49152<br/>reflected by the VPN" --> tunnel
     tunnel -- "looks like a paired computer" --> rpd["remotepairingd"]
     rpd --> svc["CoreDevice services<br/>HID, display, screen capture,<br/>pasteboard, app service"]
 ```
@@ -27,19 +123,7 @@ flowchart TB
 On free builds there is no `ModeTunnel`; the LocalDevVPN app plays the same
 role with the same addresses.
 
-## Modules
-
-| Module | Language | Role | Key files |
-|---|---|---|---|
-| `shared/core-ops` | Kotlin (common) | What can be asked of a phone, independent of platform | `Op.kt`, `PhoneBackend.kt`, `FakeBackend.kt` |
-| `shared/phone-coredevice` | Kotlin (common + iOS) | The iPhone backend over CoreDevice | `CoreDeviceBackend.kt` (common), `ModecoreSession.kt`, `PhoneConnector.kt`, `LoopbackVpn.kt`, `VisionTextReader.kt` (iOS) |
-| `native/modecore` | Rust | The live connection to the phone's services | `session.rs`, `ffi.rs`, `keys.rs`, `pairing.rs`, `include/modecore.h` |
-| `composeApp` | Kotlin + Compose | The UI; today a hands-check screen | `App.kt`, `HandsCheck.kt`, `PhoneLink.kt`, `IosEntry.kt` |
-| `iosApp/Mode` | Swift | App entry; hosts the Compose view controller | `ModeApp.swift` |
-| `iosApp/ModeTunnel` | Swift | Loopback VPN (paid builds only) | `PacketTunnelProvider.swift` |
-| `tools/` | Shell | Build and setup | `build-native.sh`, `make-pairing.sh`, `gen-project.sh` |
-
-## The op model (`shared/core-ops`)
+## The op model (`engine:ops`)
 
 Everything the agent can ask of a phone is an `Op`: a serializable sealed
 interface named for what it means, never for how a platform does it. The wire
@@ -197,7 +281,7 @@ cinterop `.def` (`staticLibraries`), so it ends up inside `ModeKit.framework`.
 
 ```mermaid
 flowchart LR
-    main["Main thread<br/>Compose UI, UIScreen"] -- "coroutine" --> io["Dispatchers.IO<br/>blocking FFI calls"]
+    main["Main thread<br/>UI, ModeGraph scope, UIScreen"] -- "coroutine" --> io["Dispatchers.IO<br/>blocking FFI calls"]
     io -- "block_on" --> rt["modecore tokio runtime<br/>(2 workers)"]
     rt --> tcp["userspace TCP stack task"]
     rt --> drain["RTP drain tasks"]
@@ -209,7 +293,7 @@ flowchart LR
 flowchart LR
     cargo["tools/build-native.sh<br/>cargo → libmodecore.a<br/>(iphoneos + simulator)"] --> cinterop["Gradle cinterop<br/>(depends on buildModecore)"]
     cinterop --> klib["phone-coredevice klib<br/>(library embedded)"]
-    klib --> fw["composeApp → ModeKit.framework<br/>(static)"]
+    klib --> fw["app:kit → ModeKit.framework<br/>(static, SKIE)"]
     gen["tools/gen-project.sh paid|free<br/>XcodeGen"] --> xcode["Mode.xcodeproj"]
     fw --> xcode
     xcode --> ipa["Mode.app<br/>(+ ModeTunnel.appex on paid)"]
@@ -222,7 +306,7 @@ flowchart LR
 
 ## Versions
 
-Kotlin 2.4.10, Compose Multiplatform 1.11.1, kotlinx-coroutines 1.11.0,
+Kotlin 2.4.10, Gradle 9.6.1, SKIE 0.10.15, Compose Multiplatform 1.11.1, kotlinx-coroutines 1.11.0,
 kotlinx-serialization 1.11.0, Rust 1.99, idevice pinned at `8970209`,
 Xcode 27.1, deployment target iOS 26.0. CoreDevice remote control itself
 needs iOS 27.

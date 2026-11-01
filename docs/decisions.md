@@ -292,3 +292,32 @@ comparison or hands check ends, and whenever the user leaves Mode while it is
 idle. Each task then reconnects, which costs about 1 s. Cleanup runs even
 after Stop.
 
+## D24. Modular clean architecture: one module per feature
+
+Mode is becoming a production app (SwiftUI screens, Live Activity, Siri,
+memory, a Mac setup app, Android later). The app logic had grown inside the
+Compose UI module, mixed with Compose state that SwiftUI cannot use. It is
+now split into layers (core → engine → feature → app) with one Gradle module
+per feature, each with `domain` / `data` / `presentation` packages, an
+explicit public API, and `StateFlow` state. Convention plugins in
+`build-logic` keep every module's build to a few lines, and
+`checkModuleRules` fails the build if a dependency points up a layer.
+
+A feature is one module, not an `api` + `impl` pair: `internal` hides the
+implementation, and splitting later is cheap if build times call for it.
+
+## D25. Native UI per platform over a shared presentation layer
+
+The iOS screens will be SwiftUI (Liquid Glass, Live Activities, App Intents
+and widgets need Swift anyway), and Android's will be Jetpack Compose. Both
+use the same Kotlin features through their state holders. SKIE makes Kotlin
+`StateFlow`, sealed types and `suspend` functions natural in Swift. The
+Compose screens stay as `app:dev-ui` until SwiftUI replaces them.
+
+## D26. Manual dependency injection
+
+`ModeGraph` constructs every feature once, with constructor injection, from
+the `PlatformServices` a platform provides. It needs no library, the compiler
+checks it, and Swift uses it directly. Koin (or similar) can come later if
+the graph grows past what one file reads comfortably.
+

@@ -9,10 +9,11 @@ As of 2026-11-01.
 | 0 | Commit the XCUITest baseline, then remove it | ✅ Done |
 | 1 | Prove CoreDevice remote control from a Mac: no overlay, taps land, Unicode | ✅ Done |
 | 2 | `native/modecore`: our own Rust session on idevice, with a C API | ✅ Done |
-| 3 | `shared/phone-coredevice`: the Kotlin `PhoneBackend` for iOS | ✅ Done |
+| 3 | `engine:phone-ios` (was `shared/phone-coredevice`): the Kotlin `PhoneBackend` for iOS | ✅ Done |
 | 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake, clean session end | 🟡 All but mobile data and the long soak |
 | 5 | Docs | 🟡 Needs a pass for everything since the agent |
-| 6 | The agent: task in, AI picks each action, Mode executes | ✅ Working on the phone (52 tests); tuning continues |
+| 6 | The agent: task in, AI picks each action, Mode executes | ✅ Working on the phone; tuning continues |
+| P1 | Production step 1: modular clean architecture (layers, one module per feature, StateFlow state, ModeGraph, SKIE) | ✅ Done, 74 tests; on-phone check pending (see below) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
 ## Proven on the phone (iPhone 17 Pro, iOS 27.2)
@@ -55,6 +56,8 @@ In order. Items 1–7 are engineering; 8–10 are for launch; the free build sta
 7. **Docs.** Bring architecture, decisions, flows and setup up to date.
 
 ### Production iOS app (designed 2026-11-01)
+Step 1, the restructure, is done (D24–D26, `docs/architecture.md`). Next: step 2, the SwiftUI app.
+
 Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the owner).
 
 - **Hands-free flow.** "Hey Siri, start Mode" → Mode listens on a Live Activity →
