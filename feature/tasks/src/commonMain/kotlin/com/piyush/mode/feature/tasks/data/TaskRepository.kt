@@ -40,6 +40,9 @@ public class TaskRepository(
         db.taskQueries.finish(status.stored, now(), summary, steps?.toLong(), costUsd, id)
     }
 
+    /** What tasks created since [epochMs] have cost, in US dollars. */
+    public fun spentSince(epochMs: Long): Double = db.taskQueries.costSince(epochMs).executeAsOne()
+
     public fun get(id: String): Task? = db.taskQueries.byId(id).executeAsOneOrNull()?.toDomain()
 
     /** The newest tasks first. */

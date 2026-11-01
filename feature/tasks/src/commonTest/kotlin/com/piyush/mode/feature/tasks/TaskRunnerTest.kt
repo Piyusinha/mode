@@ -198,4 +198,44 @@ class TaskRunnerTest {
         assertNull(f.runner.state.value.conversationId)
         assertTrue(f.conversations.recent().first().isEmpty())
     }
+
+    private fun Fixture.alreadySpentToday(usd: Double) {
+        val earlier = tasks.create("earlier task", com.piyush.mode.feature.tasks.domain.TaskSource.App, null)
+        tasks.finish(earlier.id, TaskStatus.Done, "ok", 5, usd)
+    }
+
+    @Test
+    fun onceTodaysCapIsSpentATaskDoesNotStart() = runTest {
+        val model = ScriptedModel()
+        val f = Fixture(this, model)
+        f.settings.update { it.copy(dailyCapUsd = 0.25) }
+        f.alreadySpentToday(0.30)
+
+        assertNull(f.runner.runTask("Turn off dark mode", quick))
+        assertTrue(model.models.isEmpty(), "the model was never asked")
+        assertEquals(0, f.link.connects)
+        val saved = f.tasks.recent().first().single { it.text == "Turn off dark mode" }
+        assertEquals(TaskStatus.NotStarted, saved.status)
+        assertTrue("spending limit" in saved.summary!!, saved.summary)
+    }
+
+    @Test
+    fun whatIsLeftOfTodaysCapBecomesThisTasksLimit() = runTest {
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "try")
+        val f = Fixture(this, ScriptedModel(tap, tap, tap, tap))
+        f.settings.update { it.copy(dailyCapUsd = 0.2025) }
+        f.alreadySpentToday(0.20)
+
+        val result = f.runner.runTask("Turn off dark mode", AgentConfig(settleMs = 0, maxSteps = 10, maxCostUsd = 0.05))
+        val stopped = assertIs<AgentOutcome.Stopped>(result!!.outcome)
+        assertTrue(stopped.why.startsWith("Reached the $0.0025 limit"), stopped.why)
+        assertEquals(3, result.steps)
+    }
+
+    @Test
+    fun withNoDailyCapTheTasksOwnLimitStands() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "ok")))
+        f.alreadySpentToday(99.0)
+        assertIs<AgentOutcome.Done>(f.runner.runTask("Turn off dark mode", quick)!!.outcome)
+    }
 }

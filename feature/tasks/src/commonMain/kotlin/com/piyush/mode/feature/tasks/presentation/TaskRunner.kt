@@ -7,6 +7,7 @@ import com.piyush.mode.agent.AgentResult
 import com.piyush.mode.agent.UserGate
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.common.startOfTodayMillis
 import com.piyush.mode.core.platform.AppInfo
 import com.piyush.mode.core.platform.BackgroundWork
 import com.piyush.mode.core.platform.Notifier
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * Runs agent tasks: saves the task and its conversation, connects, records
@@ -55,6 +57,8 @@ public class TaskRunner(
     private val appInfo: AppInfo,
     private val activity: ActivityTracker,
     private val scope: CoroutineScope,
+    /** Midnight today, for the daily spend cap. */
+    private val startOfToday: () -> Long = ::startOfTodayMillis,
 ) {
     private val mutableState = MutableStateFlow(TaskState())
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
@@ -128,6 +132,15 @@ public class TaskRunner(
                 recorder.failedToStart(task, "no API key")
                 return null
             }
+            val budget = withinDailyCap(config)
+            if (budget == null) {
+                outcome = TaskStatus.NotStarted
+                reply = "Today's spending limit of ${money(settings.settings.value.dailyCapUsd ?: 0.0)} is reached. " +
+                    "You can change it in Settings."
+                status(reply)
+                recorder.failedToStart(task, "daily limit reached")
+                return null
+            }
             status("Connecting to the phone…")
             val phone = try {
                 session.phone()
@@ -139,7 +152,7 @@ public class TaskRunner(
                 phone = phone,
                 llm = llm,
                 gate = gate(phone),
-                config = config,
+                config = budget,
                 onStep = { step -> mutableState.update { it.copy(steps = it.steps + step) } },
                 onStatus = ::status,
                 trace = recorder,
@@ -176,6 +189,19 @@ public class TaskRunner(
             if (!stayConnected) withContext(NonCancellable) { session.disconnect() }
         }
     }
+
+    /**
+     * [config] with its per-task limit cut to what is left of today's cap, or null
+     * when the cap is already spent. Unchanged when there is no daily cap.
+     */
+    private fun withinDailyCap(config: AgentConfig): AgentConfig? {
+        val cap = settings.settings.value.dailyCapUsd ?: return config
+        val left = cap - tasks.spentSince(startOfToday())
+        if (left <= 0.0) return null
+        return config.copy(maxCostUsd = minOf(config.maxCostUsd ?: left, left))
+    }
+
+    private fun money(usd: Double): String = "$" + ((usd * 100).roundToInt() / 100.0).toString()
 
     private fun status(text: String) {
         mutableState.update { it.copy(status = text) }

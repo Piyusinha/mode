@@ -28,7 +28,7 @@ import kotlin.time.TimeSource
 
 private fun JsonElement.jsonPrimitiveOrNull(): String? = (this as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
 
-class AgentConfig(
+data class AgentConfig(
     /** OpenRouter model id for every step. */
     val model: String = DEFAULT_MODEL,
     /** Used for one step after the cheap model makes no progress twice; null to never step up. */
@@ -44,6 +44,8 @@ class AgentConfig(
     val historySteps: Int = 12,
     /** Stop before a step once the task has cost this much (US dollars); null: no limit. */
     val maxCostUsd: Double? = null,
+    /** Stop before a step once the task has run this long; null: no limit. */
+    val maxMillis: Long? = 15 * 60_000L,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -119,9 +121,7 @@ class Agent(
         var cost = 0.0
         var lastScreen: String? = null
         var lastWasPhoneAction = false
-        var noProgress = 0
-        var badReplies = 0
-        var waits = 0
+        val stuck = StuckDetector(canStepUp = config.strongModel != null)
         /** The app the agent last opened, to return to after the user answers a question. */
         var lastApp: String? = null
         /** The model's own plan for multi-part tasks, shown back to it every step. */
@@ -141,13 +141,23 @@ class Agent(
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
 
+        /** " Last: tap "Send"." for a stop message, from the latest step. */
+        fun lastAction() = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
+
         for (step in 1..config.maxSteps) {
             currentCoroutineContext().ensureActive()
             config.maxCostUsd?.let { limit ->
                 if (cost >= limit) {
-                    val last = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
                     return result(
-                        AgentOutcome.Stopped("Reached the ${money(limit)} limit for this task after ${step - 1} steps.$last"),
+                        AgentOutcome.Stopped("Reached the ${money(limit)} limit for this task after ${step - 1} steps.${lastAction()}"),
+                        step - 1,
+                    )
+                }
+            }
+            config.maxMillis?.let { limit ->
+                if (started.elapsedNow().inWholeMilliseconds >= limit) {
+                    return result(
+                        AgentOutcome.Stopped("Took longer than ${limit / 60_000} minutes, so stopped after ${step - 1} steps.${lastAction()}"),
                         step - 1,
                     )
                 }
@@ -162,19 +172,20 @@ class Agent(
             )
 
             // Tell the model what its last action did, and notice when nothing changes.
-            if (lastWasPhoneAction) {
-                val changed = screen.signature != lastScreen
-                noProgress = if (changed) 0 else noProgress + 1
-                if (history.isNotEmpty()) {
-                    history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
-                }
+            val changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
+            if (changed != null && history.isNotEmpty()) {
+                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
             }
             lastScreen = screen.signature
-            val stepUp = config.strongModel != null && (noProgress >= 2 || badReplies >= 2)
-            if (stepUp) {
-                noProgress = 0
-                badReplies = 0
+            val verdict = stuck.looked(screen.signature, changed)
+            if (verdict is StuckDetector.Verdict.Stop) {
+                trace.stuck(step, verdict.why)
+                return result(AgentOutcome.Stopped("Stuck: ${verdict.why}.${lastAction()}"), step - 1)
             }
+            (verdict as? StuckDetector.Verdict.StepUp)?.note?.let { note ->
+                if (history.isNotEmpty()) history[history.lastIndex] += " ($note)"
+            }
+            val stepUp = verdict is StuckDetector.Verdict.StepUp && config.strongModel != null
 
             val messages = ContextBuilder.build(
                 ContextBuilder.Input(
@@ -209,7 +220,7 @@ class Agent(
             }
 
             if (call == null || tools.none { it.name == call.name }) {
-                badReplies++
+                stuck.badReply()
                 record("(no valid action)", reply.text.take(120), "ignored: always call exactly one of the listed tools")
                 continue
             }
@@ -244,7 +255,7 @@ class Agent(
                     // Seen on the phone: four questions in a row about the same message,
                     // each answered. Nothing changed since the last answer, so act on it.
                     if (answeredSinceAction) {
-                        badReplies++
+                        stuck.badReply()
                         record(
                             "ask_user (not asked)", question,
                             "not asked: the user already answered \"${answers.last().second}\" and nothing has " +
@@ -276,23 +287,21 @@ class Agent(
                     record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
                 }
                 "wait" -> {
-                    waits++
+                    val waits = stuck.waited()
                     val seconds = (call.arguments["seconds"]?.jsonPrimitive?.doubleOrNull ?: 2.0).coerceIn(0.5, 10.0)
                     delay((seconds * 1000).toLong())
-                    // Waiting again and again is not progress: say so, and step up.
+                    // Waiting again and again is not progress: say so (the detector steps up).
                     if (waits >= 3) {
-                        noProgress = 2
                         record("wait ${seconds}s", reason, "waited $waits times in a row; waiting is not getting anywhere, act instead")
                     } else {
                         record("wait ${seconds}s", reason, "waited")
                     }
                 }
                 else -> {
-                    waits = 0
                     val op = try {
                         AgentTools.toOp(call, screen.geometry)
                     } catch (e: IllegalArgumentException) {
-                        badReplies++
+                        stuck.badReply()
                         record(call.name, reason, "not done: ${e.message}")
                         continue
                     }
@@ -309,7 +318,7 @@ class Agent(
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
-                        badReplies = 0
+                        stuck.acted()
                         if (op is Op.LaunchApp) lastApp = result.jsonPrimitiveOrNull() ?: op.name
                         "ok"
                     } catch (e: Exception) {

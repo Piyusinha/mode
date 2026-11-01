@@ -361,4 +361,25 @@ class AgentTest {
         val model = ScriptedModel(call("done", "summary" to "no such setting", "success" to false))
         assertEquals(1, Agent(phone, model, Gate(), noSettle).run("t").steps)
     }
+
+    @Test
+    fun aRunThatGetsNowhereStopsWithAReasonInsteadOfUsingEveryStep() = runTest {
+        val phone = FakePhone(List(40) { listOf("Same" to (1.0 to 1.0)) })
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "try")
+        val model = ScriptedModel(*Array(30) { tap })
+        val result = Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 30)).run("t")
+        val stopped = assertIs<AgentOutcome.Stopped>(result.outcome)
+        assertTrue(stopped.why.startsWith("Stuck: the screen stopped changing"), stopped.why)
+        assertTrue("Last: tap" in stopped.why, stopped.why)
+        assertTrue(result.steps < 10, "stopped after ${result.steps} steps")
+    }
+
+    @Test
+    fun stopsOnceTheTimeLimitIsReached() = runTest {
+        val phone = FakePhone(listOf(listOf("x" to (1.0 to 1.0))))
+        val result = Agent(phone, ScriptedModel(), Gate(), AgentConfig(settleMs = 0, maxMillis = 0)).run("t")
+        val stopped = assertIs<AgentOutcome.Stopped>(result.outcome)
+        assertTrue(stopped.why.startsWith("Took longer than"), stopped.why)
+        assertEquals(0, result.steps)
+    }
 }

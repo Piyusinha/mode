@@ -29,6 +29,9 @@ interface AgentTrace {
     /** A `done` that was sent back once to be checked against the screen. */
     fun verifyRejected(step: Int, why: String) {}
 
+    /** The run was stopped because it was getting nowhere. */
+    fun stuck(step: Int, why: String) {}
+
     fun runEnded(result: AgentResult) {}
 
     object None : AgentTrace

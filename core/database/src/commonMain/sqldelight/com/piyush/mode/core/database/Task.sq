@@ -36,3 +36,6 @@ SELECT * FROM task ORDER BY created_at DESC LIMIT ?;
 
 withStatus:
 SELECT * FROM task WHERE status = ? ORDER BY created_at;
+
+costSince:
+SELECT COALESCE(SUM(cost_usd), 0.0) AS total FROM task WHERE created_at >= ?;
