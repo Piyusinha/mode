@@ -304,7 +304,8 @@ object AgentTools {
             "scroll" -> {
                 val x = optNum("x")?.let(g::x) ?: (g.screenWidth / 2)
                 val y = optNum("y")?.let(g::y) ?: (g.screenHeight / 2)
-                val v = g.screenHeight * 0.4
+                // Most of a screen: fewer scrolls through a list, with overlap (SEEN WHILE SCROLLING keeps every line).
+                val v = g.screenHeight * SCROLL_SHARE
                 val h = g.screenWidth * 0.6
                 when (str("direction")) {
                     "down" -> Op.Scroll(x, y, dy = -v)
@@ -339,6 +340,7 @@ object AgentTools {
             .distinct().take(MAX_OPTIONS)
 
     const val MAX_OPTIONS = 4
+    const val SCROLL_SHARE = 0.6
 
     /** Where type_text was told the field is (screen points), when it gave x and y inside the screenshot. */
     fun focusPoint(call: ToolCall, g: Geometry): Pair<Double, Double>? {

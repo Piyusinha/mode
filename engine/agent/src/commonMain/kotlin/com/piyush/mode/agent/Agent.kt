@@ -267,12 +267,20 @@ class Agent(
             var changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
             // A rotating banner or an ad makes any page "change"; most of its text the same is the same page.
             val samePage = ChangeLedger.similarity(ChangeLedger.page(lastPage), ChangeLedger.page(screen.pageTexts())) >= SAME_PAGE
+            // A scroll that brought (almost) nothing new reached the end of the list. Seen on the phone: with
+            // no such signal the agent scrolled a diary up and down six times looking for more.
+            val endOfList = lastOp == "scroll" && changed != null && run {
+                val seenBefore = (scrolled + lastPage).map { it.trim() }.toSet()
+                screen.pageTexts().map { it.trim() }.filter { it.length > 1 }.count { it !in seenBefore } < MIN_NEW_LINES
+            }
             if (changed != null) {
                 // Progress: a scroll that moved, or a different page. A tap that left the same page is not.
-                if (changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")) stuck.progressed() else stuck.stalled()
+                val moved = changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")
+                if (moved && !endOfList) stuck.progressed() else stuck.stalled()
             }
             if (changed != null && history.isNotEmpty()) {
                 history[history.lastIndex] += when {
+                    endOfList -> END_OF_LIST
                     lastOp == "back" && samePage -> { changed = false; BACK_DID_NOTHING }
                     !changed -> UNCHANGED
                     samePage && lastOp == "tap" -> " → same page (only small parts changed)"
@@ -846,6 +854,10 @@ class Agent(
     companion object {
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        private const val END_OF_LIST = " → end of the list: nothing new appeared. Everything seen is under SEEN WHILE " +
+            "SCROLLING; choose from it, or scroll the other way once if what you need was above"
+        /** A scroll showing fewer new lines than this has reached the end. */
+        private const val MIN_NEW_LINES = 2
         private const val BACK_DID_NOTHING =
             " → same page: the back swipe did nothing here. Tap the page's own ← (top left), X, Cancel or Done instead"
         /** Pages sharing this much of their text are the same page. */

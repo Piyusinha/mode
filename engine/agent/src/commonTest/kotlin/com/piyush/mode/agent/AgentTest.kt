@@ -87,6 +87,25 @@ class AgentTest {
     }
 
     @Test
+    fun aScrollThatShowsNothingNewIsTheEndOfTheList() = runTest {
+        val top = List(8) { "meal $it" to (100.0 to 120.0 + it * 80) }
+        val bottom = List(8) { "meal ${it + 4}" to (100.0 to 120.0 + it * 80) }
+        val phone = FakePhone(listOf(top, bottom, bottom.map { (t, p) -> t to (p.first to p.second - 2) }))
+        val down = call("scroll", "direction" to "down", "reason" to "Reading the diary")
+        val model = ScriptedModel(down, down, call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("what did I eat")
+        assertTrue("end of the list: nothing new appeared" in model.lastUserText, model.lastUserText)
+        assertEquals(1, Regex("end of the list").findAll(model.lastUserText).count(), "the first scroll showed new meals")
+    }
+
+    @Test
+    fun aScrollMovesMostOfAScreen() {
+        val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
+        val op = AgentTools.toOp(call("scroll", "direction" to "down", "reason" to "r"), g) as Op.Scroll
+        assertEquals(-874.0 * 0.6, op.dy, 1e-9)
+    }
+
+    @Test
     fun riskyTapsNeedTheUsersYes() = runTest {
         val phone = FakePhone(listOf(listOf("Request Uber Go" to (201.0 to 800.0))))
         val gate = Gate(allow = false)
@@ -439,7 +458,7 @@ class AgentTest {
 
     @Test
     fun goingBackAndForthHandsTheChoiceToTheBrain() = runTest {
-        val phone = FakePhone(List(12) { i -> listOf("List" to (100.0 to 200.0), "row $i" to (100.0 to 300.0 + i)) })
+        val phone = FakePhone(List(12) { i -> listOf("List" to (100.0 to 200.0), "row $i" to (100.0 to 300.0 + i), "info $i" to (100.0 to 340.0)) })
         fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Checking the top")
         val model = ScriptedModel(
             call("brief", "intent" to "x", "start" to "continue", "done_when" to "x", "steps" to listOf("a"), "report" to "x"),
@@ -809,7 +828,8 @@ class AgentTest {
 
     @Test
     fun aNoteStaysInViewLongAfterItsStepIsSummarised() = runTest {
-        val phone = FakePhone(List(30) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        // Each scroll brings new lines (a scroll that brings nothing new is the end of the list).
+        val phone = FakePhone(List(30) { i -> listOf("s$i" to (100.0 to 300.0), "t$i" to (100.0 to 340.0)) })
         val scroll = call("scroll", "direction" to "down", "reason" to "more")
         val model = ScriptedModel(
             call("scroll", "direction" to "down", "reason" to "read", "note" to "09:30 Standup"),
