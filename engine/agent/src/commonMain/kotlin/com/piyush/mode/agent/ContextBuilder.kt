@@ -163,7 +163,8 @@ object ContextBuilder {
         }
         val s = input.screen
         if (s.keyboardUp) {
-            append("KEYBOARD IS UP: a text field is focused and ready. Type with type_text now; do not tap the field again. ")
+            append("KEYBOARD IS UP: a text field is focused and ready. Type with type_text, unless what you want is ")
+            append("already listed below (a recent or suggested entry): then tap that. Do not tap the field again. ")
             append("(Its keys are left out of the text below.)\n")
         }
         append("THE SCREEN NOW: the screenshot is ${s.imageWidth}×${s.imageHeight} pixels. ")

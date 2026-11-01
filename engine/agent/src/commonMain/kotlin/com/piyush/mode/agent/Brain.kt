@@ -229,7 +229,9 @@ class Brain(private val llm: LlmClient, private val model: String) {
               date: the screen decides.
 
             The steps: few and concrete, each a result to reach ("Open Sonali's chat", "Read her last messages
-            and his replies", "Write and send the reply"), not single taps. done_when: something visible.
+            and his replies", "Write and send the reply"), not single taps. Say what to reach, not how: "Set the
+            drop to Bellandur", not "Search for Bellandur", because the app may already list it (a recent or
+            suggested entry) and the hands take the quickest way they see. done_when: something visible.
         """.trimIndent()
     }
 }

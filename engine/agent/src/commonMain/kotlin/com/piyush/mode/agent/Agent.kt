@@ -551,6 +551,8 @@ class Agent(
                         // Asking may have brought Mode to the front. Seen on the phone: after "yes", Rapido's "Book
                         // now" was tapped on Mode's own screen, three times. Back to the app first, then tap.
                         lastApp?.let { app -> runCatching { phone.send(Op.LaunchApp(app)) }.onSuccess { settle() } }
+                        // What was typed has been shown once; a later confirmation names only newer typing.
+                        lastTyped = null
                     }
                     actionStarted = clock.markNow()
                     val outcome = try {
@@ -899,6 +901,9 @@ class Agent(
             How to act:
             - Coordinates are screenshot pixels. To tap a piece of text, use its listed centre. For icons
               without text, read the position off the screenshot.
+            - Use what is already on screen before searching or typing: a recent, suggested, saved or favourite
+              entry that matches (a recent destination or search, a suggested contact or item) is one tap. Type
+              only when what you want is not listed.
             - Open apps with open_app. Apps reopen where they were left, so to go back use the screen's
               own Back / "<" / Cancel / Done / X button, or the back tool. Home then open_app does not reset
               an app.
@@ -991,6 +996,8 @@ class Agent(
             something you already noted wastes the user's time. To read a long page, go through it once.
 
             Finishing:
+            - When your planning mind (decide) says the task is done, call done now with what is on screen;
+              do not open more pages just to add detail to your summary.
             - Before calling done, look at the screen: does it really show the task happened (the switch is
               off, the message shows as sent)? If your last action did nothing, fix that first.
             - Call done with the evidence on screen and a summary: your reply to the user, shown in a chat

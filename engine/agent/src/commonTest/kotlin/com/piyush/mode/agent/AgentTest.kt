@@ -594,6 +594,34 @@ class AgentTest {
         assertIs<Op.Tap>(afterAsk[1])
     }
 
+    @Test
+    fun aSecondConfirmationDoesNotRepeatWhatWasTypedBefore() = runTest {
+        // On the phone: "Confirm pickup" was asked with "It typed: Bellandur", already shown for "Book now".
+        val search = listOf("Drop location" to (200.0 to 200.0), "Recent places" to (120.0 to 300.0))
+        val rides = listOf("Book now" to (300.0 to 800.0), "Auto 163" to (100.0 to 500.0), "Bike 99" to (100.0 to 560.0), "Cab 250" to (100.0 to 620.0))
+        val pickup = listOf("Confirm booking" to (300.0 to 600.0), "Pickup point" to (120.0 to 300.0), "Drag map to move" to (200.0 to 350.0), "Select a pickup point" to (200.0 to 400.0))
+        val phone = FakePhone(listOf(search, rides, pickup, pickup, pickup))
+        val gate = Gate(allow = true)
+        val model = ScriptedModel(
+            call("type_text", "text" to "Bellandur", "reason" to "Entering the drop"),
+            call("tap", "x" to 373, "y" to 915, "reason" to "Booking the ride"),
+            call("tap", "x" to 373, "y" to 686, "reason" to "Confirming the booking"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, gate, noSettle).run("book a ride")
+        assertEquals(2, gate.asked.size, gate.asked.toString())
+        assertTrue("Bellandur" in gate.asked[0])
+        assertTrue("Bellandur" !in gate.asked[1], gate.asked[1])
+    }
+
+    @Test
+    fun withTheKeyboardUpAListedEntryIsPreferredToTyping() = runTest {
+        val phone = FakePhone(List(5) { searchWithKeyboard })
+        val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("search sushi")
+        assertTrue("already listed below (a recent or suggested entry): then tap that" in model.lastUserText, model.lastUserText)
+    }
+
     // A focused search field with the keyboard up, as on the phone (run 14-11-27): the keys are single letters, low.
     private val keyboard = "QWERTYUIOPASDFGHJKL".mapIndexed { i, c -> c.toString() to (20.0 + (i % 10) * 38 to 640.0 + (i / 10) * 55) }
     private val searchWithKeyboard = listOf("Try 'Pizza'" to (200.0 to 134.0), "Popular searches" to (120.0 to 260.0)) + keyboard
