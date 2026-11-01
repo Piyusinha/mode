@@ -59,4 +59,20 @@ class SchemaTest {
         db.memoryQueries.recordUse(1, 0, 5, "m1")
         assertEquals(1L, db.memoryQueries.byId("m1").executeAsOne().successes)
     }
+
+    @Test
+    fun queuedTasksComeOutOldestFirstAndARelaunchTidiesUp() {
+        val db = testDatabase()
+        db.taskQueries.insert("old", null, "old queued", "siri", "queued", 10)
+        db.taskQueries.insert("a", null, "first", "app", "queued", 100)
+        db.taskQueries.insert("b", null, "second", "watch", "queued", 200)
+        db.taskQueries.insert("r", null, "was running", "app", "running", 50)
+        assertEquals(listOf("old", "a", "b"), db.taskQueries.queued().executeAsList().map { it.id })
+
+        db.taskQueries.interruptRunning(300)
+        db.taskQueries.expireQueued(300, 50)
+        assertEquals("failed", db.taskQueries.byId("r").executeAsOne().status)
+        assertEquals("not_started", db.taskQueries.byId("old").executeAsOne().status)
+        assertEquals(listOf("a", "b"), db.taskQueries.queued().executeAsList().map { it.id })
+    }
 }

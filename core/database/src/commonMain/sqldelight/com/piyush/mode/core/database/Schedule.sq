@@ -1,0 +1,36 @@
+-- A task that repeats: at hour:minute on the days in the bitmask (bit 0 = Monday … bit 6 = Sunday),
+-- or once when days = 0. next_run_at is worked out by the scheduler (local time, epoch ms).
+CREATE TABLE schedule (
+    id TEXT NOT NULL PRIMARY KEY,
+    text TEXT NOT NULL,
+    hour INTEGER NOT NULL,
+    minute INTEGER NOT NULL,
+    days INTEGER NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    next_run_at INTEGER,
+    last_run_at INTEGER,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX schedule_next ON schedule(enabled, next_run_at);
+
+insert:
+INSERT INTO schedule(id, text, hour, minute, days, enabled, next_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+setEnabled:
+UPDATE schedule SET enabled = ?, next_run_at = ? WHERE id = ?;
+
+ran:
+UPDATE schedule SET last_run_at = ?, next_run_at = ?, enabled = ? WHERE id = ?;
+
+delete:
+DELETE FROM schedule WHERE id = ?;
+
+byId:
+SELECT * FROM schedule WHERE id = ?;
+
+all:
+SELECT * FROM schedule ORDER BY hour, minute;
+
+due:
+SELECT * FROM schedule WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at;

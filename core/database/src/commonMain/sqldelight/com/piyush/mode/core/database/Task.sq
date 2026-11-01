@@ -42,3 +42,14 @@ SELECT COALESCE(SUM(cost_usd), 0.0) AS total FROM task WHERE created_at >= ?;
 
 addCost:
 UPDATE task SET cost_usd = COALESCE(cost_usd, 0) + ? WHERE id = ?;
+
+queued:
+SELECT * FROM task WHERE status = 'queued' ORDER BY created_at, rowid;
+
+interruptRunning:
+UPDATE task SET status = 'failed', ended_at = ?, summary = 'Mode was closed during this task.'
+WHERE status IN ('running', 'waiting');
+
+expireQueued:
+UPDATE task SET status = 'not_started', ended_at = ?, summary = 'Not run: it waited over an hour while Mode was closed.'
+WHERE status = 'queued' AND created_at < ?;
