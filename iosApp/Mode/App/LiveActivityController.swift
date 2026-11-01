@@ -84,12 +84,12 @@ final class LiveActivityController {
             let line = "update \(content.phase.rawValue) step \(content.step)"
             send { [presenter] in
                 await activity.update(ActivityContent(state: content, staleDate: stale))
-                presenter.log(line + " (\(activity.activityState))")
+                presenter.log(message: line + " (\(activity.activityState))")
             }
             return
         }
         if let previous = activity {
-            presenter.log("replacing the activity (\(previous.activityState))")
+            presenter.log(message: "replacing the activity (\(previous.activityState))")
             send { await previous.end(nil, dismissalPolicy: .immediate) }
         }
         do {
@@ -100,12 +100,12 @@ final class LiveActivityController {
             taskId = id
             shown = content
             presenter.showing(on: true)
-            presenter.log("started \(content.phase.rawValue) step \(content.step)")
+            presenter.log(message: "started \(content.phase.rawValue) step \(content.step)")
         } catch {
             // Live Activities are off for Mode: the notification tells the answer instead.
             activity = nil
             presenter.showing(on: false)
-            presenter.log("could not start: \(error.localizedDescription)")
+            presenter.log(message: "could not start: \(error.localizedDescription)")
         }
     }
 
@@ -118,7 +118,7 @@ final class LiveActivityController {
         send { [presenter] in
             await activity.end(nil, dismissalPolicy: .immediate)
             presenter.showing(on: false)
-            presenter.log("ended")
+            presenter.log(message: "ended")
         }
     }
 
@@ -131,7 +131,7 @@ final class LiveActivityController {
         send { [presenter] in
             await activity.end(ActivityContent(state: content, staleDate: nil), dismissalPolicy: .after(until))
             presenter.showing(on: false)
-            presenter.log("finished (\(content.outcome?.rawValue ?? ""))")
+            presenter.log(message: "finished (\(content.outcome?.rawValue ?? ""))")
         }
     }
 
