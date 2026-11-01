@@ -1,11 +1,13 @@
 import SwiftUI
 import UIKit
 import ModeKit
+import ModeDesignSystem
 
 @main
 struct ModeApp: App {
     init() {
-        ModeFonts.check()
+        if !ModeTypography.registerFonts() { NSLog("Mode: Instrument Sans did not load; headings use SF Pro") }
+        ModeAppearance.apply()
     }
 
     var body: some Scene {

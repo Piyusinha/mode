@@ -19,3 +19,7 @@ __pycache__/
 .build/
 native/*/target/
 native/out/
+
+# Swift package build output
+iosApp/Packages/*/.build/
+iosApp/Packages/*/.swiftpm/

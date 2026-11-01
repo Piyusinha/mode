@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
+packages:
+  # Mode's design system: every colour, font, size, icon and component screens use.
+  ModeDesignSystem:
+    path: Packages/ModeDesignSystem
 settings:
   SWIFT_VERSION: "5.0"
   CODE_SIGN_STYLE: Automatic
@@ -31,11 +35,14 @@ targets:
         UIBackgroundModes:
           - audio
         NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
-        # Instrument Sans (SIL Open Font License, Fonts/OFL.txt) for titles and headings.
-        UIAppFonts:
-          - InstrumentSans-Variable.ttf
-          - InstrumentSans-Italic-Variable.ttf
+    dependencies:
+      - package: ModeDesignSystem
     preBuildScripts:
+      # Screens use the design system and the string catalog, never literals.
+      - name: Check UI literals
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/../tools/check-ui-literals.sh"
       # Builds the Kotlin side (ModeKit.framework) for the SDK and configuration Xcode is building.
       - name: Build ModeKit
         basedOnDependencyAnalysis: false
@@ -56,6 +63,10 @@ targets:
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode
       PRODUCT_NAME: Mode
+      # Swift symbols for the string catalog's keys.
+      STRING_CATALOG_GENERATE_SYMBOLS: YES
+      LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      SWIFT_EMIT_LOC_STRINGS: YES
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       # ModeKit's database uses the system SQLite.
       OTHER_LDFLAGS:
