@@ -23,8 +23,27 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
-/** One message to the model. [image] is a JPEG shown alongside [text]. */
-class ChatMessage(val role: String, val text: String, val image: ByteArray? = null)
+/**
+ * One message to the model, as ordered parts. A text part marked [Part.Text.cacheAfter]
+ * ends a prefix that stays the same from step to step, so providers that cache prompts
+ * can reuse everything up to it.
+ */
+class ChatMessage(val role: String, val parts: List<Part>) {
+    /** A plain message: [text], then [image] (a JPEG) when given. */
+    constructor(role: String, text: String, image: ByteArray? = null) :
+        this(role, buildList { add(Part.Text(text)); image?.let { add(Part.Image(it)) } })
+
+    /** All the text parts, joined. */
+    val text: String get() = parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }
+
+    /** The first image, if any. */
+    val image: ByteArray? get() = parts.filterIsInstance<Part.Image>().firstOrNull()?.jpeg
+
+    sealed interface Part {
+        class Text(val text: String, val cacheAfter: Boolean = false) : Part
+        class Image(val jpeg: ByteArray) : Part
+    }
+}
 
 /** The single tool call the model chose, with its arguments. */
 class ToolCall(val name: String, val arguments: JsonObject)
@@ -36,7 +55,15 @@ class ChatResult(
     val usage: Usage,
 )
 
-class Usage(val promptTokens: Int, val completionTokens: Int, val costUsd: Double)
+class Usage(
+    val promptTokens: Int,
+    val completionTokens: Int,
+    val costUsd: Double,
+    /** Prompt tokens read from the provider's cache (billed at a fraction). */
+    val cachedTokens: Int = 0,
+    /** Prompt tokens written to the cache on this call. */
+    val cacheWriteTokens: Int = 0,
+)
 
 /** A chat model that can call tools. */
 fun interface LlmClient {
@@ -77,7 +104,8 @@ class OpenRouterClient(
     private suspend fun post(key: String, model: String, messages: List<ChatMessage>, tools: JsonArray, toolChoice: String): ChatResult {
         val body = buildJsonObject {
             put("model", model)
-            put("messages", buildJsonArray { messages.forEach { add(it.toJson()) } })
+            val markers = cacheMarkersAllowed(model)
+            put("messages", buildJsonArray { messages.forEach { add(it.toJson(markers)) } })
             put("tools", tools)
             put("tool_choice", toolChoice)
             put("parallel_tool_calls", false)
@@ -106,27 +134,45 @@ class OpenRouterClient(
         fun forcedToolChoiceAllowed(model: String): Boolean =
             listOf("claude-sonnet-5.5", "claude-opus-5.5", "claude-fable-5.1", "claude-mythos-5.1").none { it in model }
 
+        /**
+         * Models whose providers cache only up to explicit `cache_control` markers
+         * (Anthropic, Gemini). Others cache a repeated prefix by themselves, so they get
+         * the same stable-first layout without markers.
+         */
+        fun cacheMarkersAllowed(model: String): Boolean =
+            model.startsWith("anthropic/") || model.startsWith("google/gemini")
+
         @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-        private fun ChatMessage.toJson(): JsonElement = buildJsonObject {
+        internal fun ChatMessage.toJson(markers: Boolean): JsonElement = buildJsonObject {
             put("role", role)
-            if (image == null) {
+            val onlyText = parts.all { it is ChatMessage.Part.Text }
+            val anyMarker = markers && parts.any { it is ChatMessage.Part.Text && it.cacheAfter }
+            if (onlyText && !anyMarker) {
                 put("content", text)
-            } else {
-                put(
-                    "content",
-                    buildJsonArray {
-                        add(buildJsonObject { put("type", "text"); put("text", text) })
-                        add(
+                return@buildJsonObject
+            }
+            put(
+                "content",
+                buildJsonArray {
+                    for (part in parts) when (part) {
+                        is ChatMessage.Part.Text -> add(
+                            buildJsonObject {
+                                put("type", "text")
+                                put("text", part.text)
+                                if (markers && part.cacheAfter) putJsonObject("cache_control") { put("type", "ephemeral") }
+                            },
+                        )
+                        is ChatMessage.Part.Image -> add(
                             buildJsonObject {
                                 put("type", "image_url")
                                 putJsonObject("image_url") {
-                                    put("url", "data:image/jpeg;base64," + kotlin.io.encoding.Base64.encode(image))
+                                    put("url", "data:image/jpeg;base64," + kotlin.io.encoding.Base64.encode(part.jpeg))
                                 }
                             },
                         )
-                    },
-                )
-            }
+                    }
+                },
+            )
         }
 
         /** OpenRouter's message plus the provider's own reason (metadata.raw), which says what was wrong. */
@@ -153,6 +199,7 @@ class OpenRouterClient(
                 ToolCall(name, args)
             }
             val usage = root["usage"]?.jsonObject
+            val details = usage?.get("prompt_tokens_details") as? JsonObject
             return ChatResult(
                 toolCall = toolCall,
                 text = message["content"]?.jsonPrimitive?.contentOrNull.orEmpty(),
@@ -160,6 +207,8 @@ class OpenRouterClient(
                     promptTokens = usage?.get("prompt_tokens")?.jsonPrimitive?.intOrNull ?: 0,
                     completionTokens = usage?.get("completion_tokens")?.jsonPrimitive?.intOrNull ?: 0,
                     costUsd = usage?.get("cost")?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                    cachedTokens = details?.get("cached_tokens")?.jsonPrimitive?.intOrNull ?: 0,
+                    cacheWriteTokens = details?.get("cache_write_tokens")?.jsonPrimitive?.intOrNull ?: 0,
                 ),
             )
         }
