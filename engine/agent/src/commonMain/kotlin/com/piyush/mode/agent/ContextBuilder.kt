@@ -35,6 +35,8 @@ object ContextBuilder {
         val imageHeight: Int,
         /** Text with its centre in screenshot pixels. */
         val texts: List<Triple<String, Int, Int>>,
+        /** The keyboard is up: a field is focused (its keys are left out of [texts]). */
+        val keyboardUp: Boolean = false,
     )
 
     class Input(
@@ -160,6 +162,10 @@ object ContextBuilder {
             return@buildString
         }
         val s = input.screen
+        if (s.keyboardUp) {
+            append("KEYBOARD IS UP: a text field is focused and ready. Type with type_text now; do not tap the field again. ")
+            append("(Its keys are left out of the text below.)\n")
+        }
         append("THE SCREEN NOW: the screenshot is ${s.imageWidth}×${s.imageHeight} pixels. ")
         append("Text on it, with each piece's centre in screenshot pixels:\n")
         if (s.texts.isEmpty()) append("(no text found)\n")

@@ -566,6 +566,43 @@ class AgentTest {
         assertIs<Op.Tap>(afterAsk[1])
     }
 
+    // A focused search field with the keyboard up, as on the phone (run 14-11-27): the keys are single letters, low.
+    private val keyboard = "QWERTYUIOPASDFGHJKL".mapIndexed { i, c -> c.toString() to (20.0 + (i % 10) * 38 to 640.0 + (i / 10) * 55) }
+    private val searchWithKeyboard = listOf("Try 'Pizza'" to (200.0 to 134.0), "Popular searches" to (120.0 to 260.0)) + keyboard
+
+    @Test
+    fun theKeyboardIsNamedAndItsKeysLeftOut() = runTest {
+        val phone = FakePhone(List(5) { searchWithKeyboard })
+        val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("search sushi")
+        assertTrue("KEYBOARD IS UP" in model.lastUserText, model.lastUserText)
+        assertTrue("\"Q\" at" !in model.lastUserText, "keys are not listed as text")
+        assertTrue("Try 'Pizza'" in model.lastUserText)
+    }
+
+    @Test
+    fun tappingTheFocusedFieldAgainIsRefused() = runTest {
+        val phone = FakePhone(List(8) { searchWithKeyboard })
+        val focus = call("tap", "x" to 249, "y" to 176, "reason" to "Focus search field")
+        val model = ScriptedModel(focus, focus, call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("search sushi")
+        assertEquals(1, phone.actions.count { it is Op.Tap }, "the second tap on the focused field is refused")
+        assertTrue("keyboard is already up" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun typeTextFocusesTheFieldWhenTheKeyboardIsDownAndCanSubmit() = runTest {
+        val phone = FakePhone(List(6) { listOf("Search for 'Biryani'" to (200.0 to 268.0)) })
+        val model = ScriptedModel(
+            call("type_text", "text" to "sushi", "x" to 249, "y" to 307, "submit" to true, "reason" to "Searching for sushi"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("search sushi")
+        assertIs<Op.Tap>(phone.actions[0], "focused first")
+        assertEquals(Op.TypeText("sushi"), phone.actions[1])
+        assertEquals(Op.PressKey("return"), phone.actions[2])
+    }
+
     @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })

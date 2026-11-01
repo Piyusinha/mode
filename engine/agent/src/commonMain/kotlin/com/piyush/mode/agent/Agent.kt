@@ -195,6 +195,9 @@ class Agent(
             trace.decided(question, d.answer, d.costUsd, d.error)
             return d.answer?.let { "your planning mind decided: $it. Do that now" } ?: "your planning mind could not decide (${d.error}): choose yourself"
         }
+        /** Where the last tap landed (screen points), and whether a tap on the focused field was refused already. */
+        var lastTapAt: Pair<Double, Double>? = null
+        var focusTapRefused = false
         /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
         var lastOp: String? = null
         var lastPage: List<String> = emptyList()
@@ -315,7 +318,9 @@ class Agent(
                     expectation = expectation,
                     done = ledger.lines(),
                     seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
-                    screen = ContextBuilder.Screen(screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts),
+                    screen = ContextBuilder.Screen(
+                        screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.visibleTexts, keyboardUp = screen.keyboardUp,
+                    ),
                     hideScreen = inMode,
                 ),
             )
@@ -490,6 +495,21 @@ class Agent(
                             continue
                         }
                     }
+                    // The keyboard is up: the field is focused. Tapping it again does nothing (seen: six taps).
+                    if (op is Op.Tap && screen.keyboardUp && !focusTapRefused &&
+                        lastTapAt?.let { abs(it.second - op.y) < SAME_ROW_PT } == true
+                    ) {
+                        focusTapRefused = true
+                        record("$described (not done)", reason, "not done: the keyboard is already up, so that field is focused. Type with type_text now")
+                        continue
+                    }
+                    // type_text with the field's position taps it first, but only when the keyboard is down.
+                    if (call.name == "type_text" && !screen.keyboardUp) {
+                        AgentTools.focusPoint(call, screen.geometry)?.let { (fx, fy) ->
+                            runCatching { phone.send(Op.Tap(fx, fy)) }
+                            delay(FOCUS_MS)
+                        }
+                    }
                     if (op is Op.Scroll) {
                         val direction = call.arguments.string("direction")
                         stuck.holdReversal(direction)?.let { kept ->
@@ -516,7 +536,12 @@ class Agent(
                         val result = phone.send(op)
                         lastWasPhoneAction = true
                         answeredSinceAction = false
-                        if (op is Op.TypeText) lastTyped = op.text
+                        if (op is Op.TypeText) {
+                            lastTyped = op.text
+                            if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
+                        }
+                        if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
+                        if (!screen.keyboardUp) focusTapRefused = false
                         lastOp = call.name
                         lastPage = screen.pageTexts()
                         stuck.acted()
@@ -549,7 +574,13 @@ class Agent(
                     }
                     // Never look (or tap) while the screen is still moving.
                     if (lastWasPhoneAction) settle()
-                    record(described, reason, outcome, op.toString())
+                    // Typing is checked: does the text now show? (A field that wasn't focused takes nothing.)
+                    val typedNote = (op as? Op.TypeText)?.takeIf { lastWasPhoneAction && call.arguments["submit"]?.jsonPrimitive?.booleanOrNull != true }?.let { t ->
+                        val now = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
+                        if (now.any { it.first.contains(t.text.take(TYPED_PROBE), ignoreCase = true) }) "; the field shows \"${t.text.take(TYPED_PROBE)}\""
+                        else "; \"${t.text.take(TYPED_PROBE)}\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
+                    }.orEmpty()
+                    record(described, reason, outcome + typedNote, op.toString())
                 }
             }
         }
@@ -629,8 +660,15 @@ class Agent(
         val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(it.first.trim()) }
             .joinToString("|") { "${it.first}@${it.third / 12}" }
 
-        /** The page's words, without the status bar: to tell one page from another. */
-        fun pageTexts(): List<String> = texts.filter { it.third > geometry.toPixelsY(STATUS_BAR_PT) }.map { it.first }
+        /** Where the keyboard starts (screenshot pixels) when it is up. */
+        val keyboardTop: Int? = Keyboard.top(texts, geometry.imageHeight)
+        val keyboardUp: Boolean get() = keyboardTop != null
+
+        /** What the model is shown: the page's text, without the keyboard's keys. */
+        val visibleTexts: List<Triple<String, Int, Int>> = keyboardTop?.let { top -> texts.filter { it.third < top } } ?: texts
+
+        /** The page's words, without the status bar or the keyboard: to tell one page from another. */
+        fun pageTexts(): List<String> = visibleTexts.filter { it.third > geometry.toPixelsY(STATUS_BAR_PT) }.map { it.first }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -775,6 +813,12 @@ class Agent(
         private const val STEP_UP_BUDGET_SHARE = 3.0
         private const val STRONG_STEP_GUESS_USD = 0.02
         private const val SCROLLS_BEFORE_HINT = 3
+        /** Taps this close vertically (points) are on the same row: the focused field. */
+        private const val SAME_ROW_PT = 30.0
+        /** After tapping a field to focus it, before typing. */
+        private const val FOCUS_MS = 300L
+        /** How much of the typed text is looked for on screen. */
+        private const val TYPED_PROBE = 12
         /** How much of a scrolled list is kept for comparing (lines of text). */
         private const val MAX_SEEN_LINES = 120
         private const val CHECK_IT = ". This changed something: check it worked before any other change"
@@ -831,7 +875,9 @@ class Agent(
             - To see more of a list or page, use scroll (never swipe for scrolling). Keep going one way until
               you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
-            - Tap a text field before typing into it.
+            - To type into a field, use type_text with the field's x and y: Mode taps it only if the keyboard is
+              not already up. Set submit true to press return (to search). When the screen says KEYBOARD IS UP,
+              the field is focused: just type_text, never tap the field again.
             - If an action did not change the screen, do not repeat it: try another way.
             - Changing things for the user (adding, logging, saving, sending, booking, buying, deleting) is
               where trust is won or lost. Work like a careful assistant:

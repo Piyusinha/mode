@@ -105,8 +105,15 @@ object AgentTools {
             ),
         ),
         Tool(
-            "type_text", "Type into the focused text field (tap the field first). Any language works.", "input.text",
-            listOf(Param("text", "string", "The text to type."), reason),
+            "type_text", "Type into a text field. Give the field's x and y: Mode taps it first if the keyboard is not up. " +
+                "Any language works.", "input.text",
+            listOf(
+                Param("text", "string", "The text to type."),
+                Param("x", "number", "Optional. The field's centre, in screenshot pixels, to focus it.", required = false),
+                Param("y", "number", "Optional. The field's centre, in screenshot pixels.", required = false),
+                Param("submit", "boolean", "Optional. true presses return after typing (to search or send).", required = false),
+                reason,
+            ),
         ),
         Tool(
             "press_key", "Press one keyboard key, such as return to submit a search.", "input.keys",
@@ -310,6 +317,13 @@ object AgentTools {
             .distinct().take(MAX_OPTIONS)
 
     const val MAX_OPTIONS = 4
+
+    /** Where type_text was told the field is (screen points), when it gave x and y inside the screenshot. */
+    fun focusPoint(call: ToolCall, g: Geometry): Pair<Double, Double>? {
+        if (call.arguments["x"] == null || call.arguments["y"] == null) return null
+        val tap = runCatching { toOp(ToolCall("tap", call.arguments), g) }.getOrNull() as? Op.Tap ?: return null
+        return tap.x to tap.y
+    }
 
     fun itemOf(call: ToolCall): Int? = call.arguments["item"]?.jsonPrimitive?.contentOrNull?.trim()?.toIntOrNull()?.takeIf { it > 0 }
 
