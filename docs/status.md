@@ -72,6 +72,20 @@ Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the
   speech; the agent, memory, tasks, model client and logs stay shared Kotlin so the
   Android app reuses them.
 
+### Apple Watch (requested 2026-11-01)
+- **Watch app (SwiftUI):** Ask Mode (tap or the Ultra's Action button) → speak → check → Send. The
+  task goes to the iPhone over WatchConnectivity; Mode runs it like any other.
+- **Progress on the wrist:** the iPhone Live Activity appears in the watch's Smart Stack
+  by itself; the watch app also shows the step, a Stop button and the result.
+- **One way in for every source:** Watch, Siri, Shortcuts and the app all hand tasks to one
+  task inbox (a feature module), so adding a source doesn't touch the agent.
+- **Test first, from the Mac, before building:**
+  1. Can Mode, woken in the background by the watch, keep running? (Its silent-audio
+     keep-awake may not be allowed to start from the background; same question as Siri.)
+  2. Does screen control work while the iPhone is locked? If not, the watch flow
+     becomes "unlock your iPhone and Mode starts".
+- Designs: the "From your Apple Watch" row on the design canvas.
+
 ### Launch
 8. **Mac setup app: one click.** A small Mac app that does the whole first-time setup
    in one click: installs Mode on the phone, makes and pushes the pairing file over
