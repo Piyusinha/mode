@@ -19,7 +19,7 @@ struct MainTabs: View {
                 TabRoot(app: app) { navigate in HomeRoute(app: app, navigate: navigate) }
             } label: { Label { Text(L10n.Tab.home) } icon: { ModeIcon.home.image } }
             Tab(value: AppTab.tasks) {
-                TabRoot(app: app) { _ in PlaceholderScreen() }
+                TabRoot(app: app) { navigate in TasksRoute(app: app, navigate: navigate) }
             } label: { Label { Text(L10n.Tab.tasks) } icon: { ModeIcon.tasks.image } }
             Tab(value: AppTab.memory) {
                 TabRoot(app: app) { _ in PlaceholderScreen() }
@@ -54,7 +54,9 @@ private struct TabRoot<Content: View>: View {
                     switch route {
                     case let .conversation(id): ConversationRoute(app: app, conversationId: id, navigate: navigate)
                     case .developer: DeveloperView()
-                    case .liveRun, .runScreens, .settings: PlaceholderScreen()
+                    case .liveRun: LiveRoute(app: app)
+                    case let .runScreens(taskId): RunScreensRoute(app: app, taskId: taskId)
+                    case .settings: PlaceholderScreen()
                     }
                 }
         }

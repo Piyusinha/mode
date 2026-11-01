@@ -108,6 +108,72 @@ enum L10n {
         }
     }
 
+    enum Tasks {
+        static let now = LocalizedStringResource("tasks.now", defaultValue: "Now")
+        static let upNext = LocalizedStringResource("tasks.upNext", defaultValue: "Up next")
+        static let repeats = LocalizedStringResource("tasks.repeats", defaultValue: "Repeats")
+        static let done = LocalizedStringResource("tasks.done", defaultValue: "Done")
+        static let waitingForYou = LocalizedStringResource("tasks.waitingForYou", defaultValue: "Waiting for you")
+        static let newRepeat = LocalizedStringResource("tasks.newRepeat", defaultValue: "Repeat a task")
+        static let emptyTitle = LocalizedStringResource("tasks.empty.title", defaultValue: "Nothing yet")
+        static let emptyMessage = LocalizedStringResource("tasks.empty.message", defaultValue: "Tasks you ask for, and ones that repeat, show up here.")
+
+        static func cancel(_ task: String) -> String {
+            String(localized: "tasks.cancel", defaultValue: "Cancel \(task)")
+        }
+
+        static func steps(_ count: Int) -> String {
+            String(localized: "tasks.steps", defaultValue: "\(count) steps")
+        }
+
+        static func nextRun(_ when: String) -> String {
+            String(localized: "tasks.nextRun", defaultValue: "Next \(when)")
+        }
+    }
+
+    enum Source {
+        static let app = LocalizedStringResource("source.app", defaultValue: "From Mode")
+        static let siri = LocalizedStringResource("source.siri", defaultValue: "From Siri")
+        static let watch = LocalizedStringResource("source.watch", defaultValue: "From your Watch")
+        static let shortcut = LocalizedStringResource("source.shortcut", defaultValue: "From Shortcuts")
+        static let schedule = LocalizedStringResource("source.schedule", defaultValue: "Repeats")
+    }
+
+    enum Repeat {
+        static let title = LocalizedStringResource("repeat.title", defaultValue: "Repeat")
+        static let task = LocalizedStringResource("repeat.task", defaultValue: "Task")
+        static let taskPrompt = LocalizedStringResource("repeat.taskPrompt", defaultValue: "What should Mode do?")
+        static let time = LocalizedStringResource("repeat.time", defaultValue: "Time")
+        static let everyDay = LocalizedStringResource("repeat.everyDay", defaultValue: "Every day")
+        static let weekdays = LocalizedStringResource("repeat.weekdays", defaultValue: "Weekdays")
+        static let weekends = LocalizedStringResource("repeat.weekends", defaultValue: "Weekends")
+        static let once = LocalizedStringResource("repeat.once", defaultValue: "Once")
+
+        static func note(_ first: String) -> String {
+            String(localized: "repeat.note", defaultValue: "First run \(first). If Mode isn't open then, you'll get a notification: tap it and Mode does the task.")
+        }
+    }
+
+    enum Live {
+        static let title = LocalizedStringResource("live.title", defaultValue: "Live")
+        static let idleTitle = LocalizedStringResource("live.idle.title", defaultValue: "Nothing running")
+        static let idleMessage = LocalizedStringResource("live.idle.message", defaultValue: "When Mode works on a task, each step shows here.")
+
+        static func summary(steps: Int, seconds: String, cost: String) -> String {
+            String(localized: "live.summary", defaultValue: "\(steps) steps · \(seconds) · \(cost)")
+        }
+    }
+
+    enum Screens {
+        static let title = LocalizedStringResource("screens.title", defaultValue: "All screens")
+        static let emptyTitle = LocalizedStringResource("screens.empty.title", defaultValue: "No screens saved")
+        static let emptyMessage = LocalizedStringResource("screens.empty.message", defaultValue: "Screens are kept for the latest runs only.")
+
+        static func step(_ n: Int) -> String {
+            String(localized: "screens.step", defaultValue: "Step \(n)")
+        }
+    }
+
     enum Developer {
         static let title = LocalizedStringResource("developer.title", defaultValue: "Developer")
     }
