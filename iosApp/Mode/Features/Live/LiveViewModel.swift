@@ -2,16 +2,19 @@ import Foundation
 import ModeDesignSystem
 import ModeKit
 import Observation
+import UIKit
 
-/// The running task, step by step.
+/// The running task, as on the Live run board: the screen Mode sees, and the panel.
 @MainActor
 @Observable
 final class LiveViewModel {
-    struct Step: Identifiable, Equatable {
-        let id: Int
-        let title: String
-        let detail: String
-        let state: ModeStepRow.State
+    struct Running: Equatable {
+        let badge: String
+        let startedAt: Date?
+        let paused: Bool
+        let task: String
+        let now: String
+        let steps: [String]
     }
 
     struct Finished: Equatable {
@@ -23,27 +26,32 @@ final class LiveViewModel {
     }
 
     struct State: Equatable {
-        var title = ""
-        var status = ""
-        var isRunning = false
-        var steps: [Step] = []
+        var running: Running?
+        var screen: UIImage?
         var finished: Finished?
+
+        static func == (a: State, b: State) -> Bool { a.running == b.running && a.screen === b.screen && a.finished == b.finished }
     }
 
-    enum Event { case stop }
+    enum Event { case stop, togglePause, close }
 
     private(set) var state = State()
     private let presenter: LiveRunPresenter
+    private let close: () -> Void
     private var updates: Updates?
+    private var lastScreen: KotlinByteArray?
 
-    init(screens: Screens) {
+    init(screens: Screens, close: @escaping () -> Void) {
         presenter = screens.liveRun()
-        updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
+        self.close = close
+        updates = observe(presenter.state) { [weak self] s in self?.apply(s) }
     }
 
     func send(_ event: Event) {
         switch event {
         case .stop: presenter.stop()
+        case .togglePause: if state.running?.paused == true { presenter.resume() } else { presenter.pause() }
+        case .close: close()
         }
     }
 
@@ -52,23 +60,30 @@ final class LiveViewModel {
         presenter.close()
     }
 
-    private static func map(_ s: LiveRunUiState) -> State {
-        let running = s.running != nil
-        var steps = s.steps.map { step in
-            Step(id: Int(step.index), title: step.reason.isEmpty ? step.action : step.reason, detail: step.action, state: step.worked ? .done : .failed)
+    private func apply(_ s: LiveRunUiState) {
+        // Decode the screenshot only when it changed.
+        if s.screen !== lastScreen {
+            lastScreen = s.screen
+            state.screen = s.screen.flatMap { UIImage(data: $0.toData()) }
         }
-        if running, let last = steps.last {
-            steps[steps.count - 1] = Step(id: last.id, title: last.title, detail: last.detail, state: .current)
+        state.running = s.running.map { r in
+            Running(
+                badge: L10n.Run.liveBadge(step: Int(r.steps)),
+                startedAt: r.startedAtMs.map { Date(timeIntervalSince1970: TimeInterval(truncating: $0) / 1000) },
+                paused: r.paused,
+                task: r.text,
+                now: r.paused ? String(localized: L10n.Run.paused) : (s.now ?? r.status),
+                steps: s.steps.map { Self.short($0.action) }
+            )
         }
-        return State(
-            title: s.running?.text ?? "",
-            status: s.running?.status ?? "",
-            isRunning: running,
-            steps: steps,
-            finished: s.finished.map {
-                Finished(badge: Format.badge($0.badge), summary: $0.summary,
-                         line: L10n.Live.summary(steps: Int($0.steps), seconds: Format.seconds(Double($0.seconds)), cost: Format.money($0.costUsd)))
-            }
-        )
+        state.finished = s.finished.map {
+            Finished(badge: Format.badge($0.badge), summary: $0.summary,
+                     line: L10n.Live.summary(steps: Int($0.steps), seconds: Format.seconds(Double($0.seconds)), cost: Format.money($0.costUsd)))
+        }
+    }
+
+    /// "open WhatsApp" → "Open WhatsApp", for the step labels.
+    private static func short(_ action: String) -> String {
+        action.prefix(1).uppercased() + action.dropFirst()
     }
 }

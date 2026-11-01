@@ -3,12 +3,12 @@ import ModeDesignSystem
 import ModeKit
 import Observation
 
-/// Home: maps the presenter's state to what the screen shows, and handles its events.
+/// Home: maps the presenter's state to what the Home board shows, and handles its events.
 @MainActor
 @Observable
 final class HomeViewModel {
-    struct Row: Identifiable, Equatable {
-        let id: String
+    struct Suggestion: Identifiable, Equatable {
+        var id: String { title }
         let title: String
         let subtitle: String
         let icon: ModeIcon
@@ -18,11 +18,12 @@ final class HomeViewModel {
         let id: String
         let title: String
         let subtitle: String
+        let leading: ModeRowLeading
     }
 
     struct State: Equatable {
         var greeting = ""
-        var suggestions: [Row] = []
+        var suggestions: [Suggestion] = []
         var recent: [RecentRow] = []
         var needsKey = false
         var isEmpty: Bool { suggestions.isEmpty && recent.isEmpty }
@@ -65,17 +66,34 @@ final class HomeViewModel {
             greeting: L10n.Home.greeting(partOfDay(s.partOfDay), name: s.name),
             suggestions: s.suggestions.map { suggestion in
                 switch onEnum(of: suggestion.reason) {
-                case let .often(o): Row(id: suggestion.text, title: suggestion.text, subtitle: L10n.Home.askedOften(Int(o.times)), icon: .repeatTask)
-                case let .learned(l): Row(id: suggestion.text, title: suggestion.text, subtitle: L10n.Home.learned(app: l.app), icon: .skill)
+                case let .often(o): Suggestion(title: suggestion.text, subtitle: L10n.Home.askedOften(Int(o.times)), icon: .repeatTask)
+                case let .learned(l): Suggestion(title: suggestion.text, subtitle: L10n.Home.learned(app: l.app), icon: .skill)
                 }
             },
             recent: s.recent.map { c in
-                let day = Format.day(c.day)
-                let badge = c.badge.map { String(localized: Format.badge($0).text) }
-                return RecentRow(id: c.conversationId, title: c.title, subtitle: [day, badge].compactMap { $0 }.joined(separator: " · "))
+                RecentRow(id: c.conversationId, title: c.title, subtitle: when(c), leading: leading(c.badge))
             },
             needsKey: s.needsKey
         )
+    }
+
+    /// "Today 8:13 · 62 s", "Yesterday · 37 s".
+    private static func when(_ c: RecentConversation) -> String {
+        let day = Format.day(c.day)
+        var time: String?
+        if case .today = onEnum(of: c.day) { time = Format.timeOfDay(epochMs: c.atMs) }
+        let duration = c.durationSeconds.map { Format.seconds(Double(truncating: $0)) }
+        return [[day, time].compactMap { $0 }.joined(separator: " "), duration].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private static func leading(_ badge: TaskBadge?) -> ModeRowLeading {
+        switch badge {
+        case .done: .success
+        case .failed: .failure
+        case .gaveUp: .icon(.warning, ModeColor.warning)
+        case .stopped, .notStarted: .icon(.stopped, ModeColor.textSecondary)
+        case nil: .progress
+        }
     }
 
     static func partOfDay(_ p: PartOfDay) -> L10n.PartOfDayName {

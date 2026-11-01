@@ -47,6 +47,17 @@ enum L10n {
         static let dontAllow = LocalizedStringResource("question.dontAllow", defaultValue: "Don't allow")
     }
 
+    enum Run {
+        static let pause = LocalizedStringResource("run.pause", defaultValue: "Pause")
+        static let resume = LocalizedStringResource("run.resume", defaultValue: "Resume")
+        static let paused = LocalizedStringResource("run.paused", defaultValue: "Paused")
+        static let shrink = LocalizedStringResource("run.shrink", defaultValue: "Shrink to the Dynamic Island")
+
+        static func liveBadge(step: Int) -> String {
+            String(localized: "run.liveBadge", defaultValue: "Live · step \(step) ·")
+        }
+    }
+
     enum Placeholder {
         static let title = LocalizedStringResource("placeholder.title", defaultValue: "Being built")
         static let message = LocalizedStringResource("placeholder.message", defaultValue: "This screen arrives in the next update.")
@@ -54,6 +65,7 @@ enum L10n {
 
     enum Home {
         static let subtitle = LocalizedStringResource("home.subtitle", defaultValue: "What can I do for you?")
+        static let profile = LocalizedStringResource("home.profile", defaultValue: "Profile and settings")
         static let suggested = LocalizedStringResource("home.suggested", defaultValue: "Suggested")
         static let recent = LocalizedStringResource("home.recent", defaultValue: "Recent")
         static let needsKeyTitle = LocalizedStringResource("home.needsKey.title", defaultValue: "Add your AI key")
@@ -91,6 +103,7 @@ enum L10n {
         static let prompt = LocalizedStringResource("ask.prompt", defaultValue: "What should Mode do?")
         static let followUpPrompt = LocalizedStringResource("ask.followUpPrompt", defaultValue: "Ask for more")
         static let send = LocalizedStringResource("ask.send", defaultValue: "Send")
+        static let add = LocalizedStringResource("ask.add", defaultValue: "More")
         static let privateOn = LocalizedStringResource("ask.privateOn", defaultValue: "Private: nothing is remembered")
         static let privateOff = LocalizedStringResource("ask.privateOff", defaultValue: "Make this private")
         static let voiceSoon = LocalizedStringResource("ask.voiceSoon", defaultValue: "Speaking a task is coming soon. Type it for now.")
@@ -98,6 +111,12 @@ enum L10n {
 
     enum Conversation {
         static let working = LocalizedStringResource("conversation.working", defaultValue: "Working on it")
+        static let spoken = LocalizedStringResource("conversation.spoken", defaultValue: "Spoken")
+        static let share = LocalizedStringResource("conversation.share", defaultValue: "Share")
+        static let more = LocalizedStringResource("conversation.more", defaultValue: "More")
+        static let repeatTask = LocalizedStringResource("conversation.repeat", defaultValue: "Repeat this task…")
+        static let delete = LocalizedStringResource("conversation.delete", defaultValue: "Delete conversation")
+        static let deleteConfirm = LocalizedStringResource("conversation.deleteConfirm", defaultValue: "Delete this conversation? Its tasks stay in Tasks.")
 
         static func seeScreens(_ count: Int) -> String {
             String(localized: "conversation.seeScreens", defaultValue: "See all \(count) screens")
@@ -110,6 +129,10 @@ enum L10n {
 
     enum Tasks {
         static let now = LocalizedStringResource("tasks.now", defaultValue: "Now")
+        static let scheduled = LocalizedStringResource("tasks.scheduled", defaultValue: "Scheduled")
+        static let running = LocalizedStringResource("tasks.running", defaultValue: "Running")
+        static let open = LocalizedStringResource("tasks.open", defaultValue: "Open")
+        static let newTask = LocalizedStringResource("tasks.newTask", defaultValue: "New task")
         static let upNext = LocalizedStringResource("tasks.upNext", defaultValue: "Up next")
         static let repeats = LocalizedStringResource("tasks.repeats", defaultValue: "Repeats")
         static let done = LocalizedStringResource("tasks.done", defaultValue: "Done")
@@ -166,6 +189,8 @@ enum L10n {
 
     enum Screens {
         static let title = LocalizedStringResource("screens.title", defaultValue: "All screens")
+        static let grid = LocalizedStringResource("screens.grid", defaultValue: "Grid")
+        static let play = LocalizedStringResource("screens.play", defaultValue: "Play")
         static let emptyTitle = LocalizedStringResource("screens.empty.title", defaultValue: "No screens saved")
         static let emptyMessage = LocalizedStringResource("screens.empty.message", defaultValue: "Screens are kept for the latest runs only.")
 
@@ -182,6 +207,16 @@ enum L10n {
         static let skills = LocalizedStringResource("memory.skills", defaultValue: "Things Mode Can Do")
         static let tips = LocalizedStringResource("memory.tips", defaultValue: "App Tips")
         static let forgetEverything = LocalizedStringResource("memory.forgetEverything", defaultValue: "Forget Everything")
+        static let edit = LocalizedStringResource("memory.edit", defaultValue: "Edit")
+        static let whatModeKnows = LocalizedStringResource("memory.whatModeKnows", defaultValue: "What Mode knows")
+
+        static func deleteSelected(_ count: Int) -> String {
+            String(localized: "memory.deleteSelected", defaultValue: "Delete \(count)")
+        }
+
+        static func learnedFrom(_ evidence: String) -> String {
+            String(localized: "memory.learnedFrom", defaultValue: "Learned from: \(evidence)")
+        }
         static let forgetConfirm = LocalizedStringResource("memory.forgetConfirm", defaultValue: "Forget everything Mode has learned? This can't be undone.")
         static let emptyTitle = LocalizedStringResource("memory.empty.title", defaultValue: "Nothing learned yet")
         static let emptyMessage = LocalizedStringResource("memory.empty.message", defaultValue: "As Mode does tasks, it remembers people, what you like and how your apps work.")

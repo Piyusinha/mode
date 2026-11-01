@@ -13,6 +13,8 @@ public enum ModeRowLeading: Equatable, Sendable {
     case success
     /// A plain green tick (lists of what happened).
     case check
+    /// A plain icon, no background (a clock on a waiting task).
+    case symbol(ModeIcon, Color)
     /// A red cross: failed.
     case failure
     /// An empty circle: not checked yet.
@@ -109,6 +111,8 @@ public struct ModeLeadingView: View {
                 .accessibilityHidden(true)
         case .success:
             ModeIcon.done.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.success).accessibilityHidden(true)
+        case let .symbol(icon, color):
+            icon.image.font(ModeTextStyle.title2.font).foregroundStyle(color).frame(width: ModeSize.badge).accessibilityHidden(true)
         case .check:
             ModeIcon.checkmark.image.font(ModeTextStyle.headline.font).foregroundStyle(ModeColor.success).frame(width: ModeSize.badge).accessibilityHidden(true)
         case .failure:

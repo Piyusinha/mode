@@ -9,6 +9,7 @@ final class RunStatusViewModel {
     struct Running: Equatable {
         let title: String
         let status: String
+        let paused: Bool
     }
 
     struct PendingQuestion: Identifiable, Equatable {
@@ -33,6 +34,10 @@ final class RunStatusViewModel {
 
     func stop() { presenter.stop() }
 
+    func togglePause() {
+        if state.running?.paused == true { presenter.resume() } else { presenter.pause() }
+    }
+
     func answer(_ text: String) { presenter.answer(text: text) }
 
     func stopFromQuestion() { presenter.answer(text: nil) }
@@ -40,7 +45,7 @@ final class RunStatusViewModel {
     private static func map(_ s: LiveRunUiState) -> State {
         guard let running = s.running else { return State() }
         return State(
-            running: Running(title: running.text, status: running.status),
+            running: Running(title: running.text, status: running.paused ? String(localized: L10n.Run.paused) : running.status, paused: running.paused),
             question: running.question.map { PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo) }
         )
     }

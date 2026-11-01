@@ -3,76 +3,77 @@ import ModeDesignSystem
 import ModeKit
 import Observation
 
-/// Tasks: what runs now, what waits, what repeats, what finished.
+/// Tasks, as on its board: Now (running, waiting for you, up next, repeats), Scheduled, Done.
 @MainActor
 @Observable
 final class TasksViewModel {
-    struct Running: Equatable {
+    enum Filter: Hashable { case now, scheduled, done }
+
+    struct Row: Identifiable, Equatable {
+        let id: String
         let title: String
         let subtitle: String
         let leading: ModeRowLeading
     }
 
-    struct Item: Identifiable, Equatable {
-        let id: String
-        let title: String
-        let subtitle: String
-    }
-
-    struct RepeatItem: Identifiable, Equatable {
+    struct RepeatRow: Identifiable, Equatable {
         let id: String
         let title: String
         let subtitle: String
         let enabled: Bool
     }
 
-    struct DoneItem: Identifiable, Equatable {
+    struct DoneRow: Identifiable, Equatable {
         let id: String
         let title: String
         let subtitle: String
+        let leading: ModeRowLeading
         let conversationId: String?
-        let icon: ModeIcon
     }
 
     struct State: Equatable {
-        var running: Running?
-        var upNext: [Item] = []
-        var repeats: [RepeatItem] = []
-        var done: [DoneItem] = []
-        var isEmpty: Bool { running == nil && upNext.isEmpty && repeats.isEmpty && done.isEmpty }
+        var running: Row?
+        var waiting: Row?
+        var upNext: [Row] = []
+        var repeats: [RepeatRow] = []
+        var done: [DoneRow] = []
+        var nowIsEmpty: Bool { running == nil && waiting == nil && upNext.isEmpty && repeats.isEmpty }
     }
 
     enum Event {
         case openLive
-        case stop
         case cancel(String)
         case setRepeat(String, Bool)
         case deleteRepeat(String)
         case newRepeat
-        case open(DoneItem)
+        case newTask
+        case open(DoneRow)
     }
 
     private(set) var state = State()
+    var filter: Filter = .now { didSet { presenter.setFilter(f: Self.kotlin(filter)) } }
     var showingRepeat = false
     private let presenter: TasksPresenter
     private let navigate: (Route) -> Void
+    private let newTask: () -> Void
     private var updates: Updates?
 
-    init(screens: Screens, navigate: @escaping (Route) -> Void) {
+    init(screens: Screens, navigate: @escaping (Route) -> Void, newTask: @escaping () -> Void) {
         presenter = screens.tasks()
         self.navigate = navigate
+        self.newTask = newTask
         updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
     }
 
     func send(_ event: Event) {
         switch event {
         case .openLive: navigate(.liveRun)
-        case .stop: presenter.stopRunning()
         case let .cancel(id): presenter.cancel(taskId: id)
         case let .setRepeat(id, on): presenter.setRepeatEnabled(scheduleId: id, enabled: on)
         case let .deleteRepeat(id): presenter.deleteRepeat(scheduleId: id)
         case .newRepeat: showingRepeat = true
-        case let .open(item): if let id = item.conversationId { navigate(.conversation(id: id)) }
+        case .newTask: newTask()
+        case let .open(row): if let id = row.conversationId { navigate(.conversation(id: id)) }
         }
     }
 
@@ -81,34 +82,47 @@ final class TasksViewModel {
         presenter.close()
     }
 
+    private static func kotlin(_ f: Filter) -> TaskFilter {
+        switch f {
+        case .now: .now
+        case .scheduled: .scheduled
+        case .done: .done
+        }
+    }
+
     private static func map(_ s: TasksUiState) -> State {
-        State(
-            running: s.running.map { r in
-                r.question != nil
-                    ? Running(title: r.text, subtitle: String(localized: L10n.Tasks.waitingForYou), leading: .icon(.waiting, ModeColor.warning))
-                    : Running(title: r.text, subtitle: r.status, leading: .icon(.running))
+        let running = s.running.flatMap { r in r.question == nil ? r : nil }
+        let waiting = s.running.flatMap { r in r.question != nil ? r : nil }
+        return State(
+            running: running.map { r in
+                Row(id: r.taskId, title: r.text, subtitle: r.paused ? String(localized: L10n.Run.paused) : r.status, leading: .progress)
             },
-            upNext: s.upNext.map { Item(id: $0.taskId, title: $0.text, subtitle: [String(localized: source($0.source)), Format.day($0.day)].joined(separator: " · ")) },
+            waiting: waiting.map { r in
+                Row(id: r.taskId, title: r.text, subtitle: r.question?.text ?? "", leading: .iconTile(.lockFilled, background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText))
+            },
+            upNext: s.upNext.map { q in
+                Row(id: q.taskId, title: q.text, subtitle: [Format.day(q.day), Format.timeOfDay(epochMs: q.queuedAtMs)].joined(separator: " "),
+                    leading: .symbol(.clock, ModeColor.textSecondary))
+            },
             repeats: s.repeats.map { r in
                 let days = r.isoDays.isEmpty ? String(localized: L10n.Repeat.once) : daysLabel(Set(r.isoDays.map { Int(truncating: $0) }))
-                let next = r.nextRunAtMs.map { L10n.Tasks.nextRun(Format.moment(epochMs: Int64(truncating: $0))) }
-                return RepeatItem(id: r.scheduleId, title: r.text, subtitle: [Format.time(hour: r.hour, minute: r.minute), days, next].compactMap { $0 }.joined(separator: " · "), enabled: r.enabled)
+                return RepeatRow(id: r.scheduleId, title: r.text, subtitle: [Format.time(hour: r.hour, minute: r.minute), days].joined(separator: " · "), enabled: r.enabled)
             },
             done: s.done.map { d in
                 let badge = Format.badge(d.badge)
                 let steps = d.steps.map { L10n.Tasks.steps(Int(truncating: $0)) }
-                return DoneItem(id: d.taskId, title: d.text, subtitle: [String(localized: badge.text), Format.day(d.day), steps].compactMap { $0 }.joined(separator: " · "), conversationId: d.conversationId, icon: badge.icon)
+                return DoneRow(id: d.taskId, title: d.text, subtitle: [Format.day(d.day), steps].compactMap { $0 }.joined(separator: " · "),
+                               leading: leading(d.badge), conversationId: d.conversationId)
             }
         )
     }
 
-    private static func source(_ s: TaskSource) -> LocalizedStringResource {
-        switch s {
-        case .app: L10n.Source.app
-        case .siri: L10n.Source.siri
-        case .watch: L10n.Source.watch
-        case .shortcut: L10n.Source.shortcut
-        case .schedule: L10n.Source.schedule
+    private static func leading(_ badge: TaskBadge) -> ModeRowLeading {
+        switch badge {
+        case .done: .success
+        case .failed: .failure
+        case .gaveUp: .icon(.warning, ModeColor.warning)
+        case .stopped, .notStarted: .icon(.stopped, ModeColor.textSecondary)
         }
     }
 

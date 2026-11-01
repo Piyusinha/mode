@@ -202,10 +202,13 @@ public struct ModeMessageBar: View {
 /// "● Live · step 7 · 0:41", the glass label at the top of Live run.
 public struct ModeLiveBadge: View {
     private let text: String
+    private let since: Date?
     private let paused: Bool
 
-    public init(_ text: String, paused: Bool) {
+    /// [text] such as "Live · step 7"; [since] adds a ticking timer (" · 0:41").
+    public init(_ text: String, since: Date?, paused: Bool) {
         self.text = text
+        self.since = since
         self.paused = paused
     }
 
@@ -213,6 +216,9 @@ public struct ModeLiveBadge: View {
         HStack(spacing: ModeSpacing.s) {
             Circle().fill(paused ? ModeColor.textSecondary : ModeColor.stopRed).frame(width: ModeSize.liveDot, height: ModeSize.liveDot)
             Text(text).modeText(.bodyEmphasis).monospacedDigit()
+            if let since {
+                Text(since, style: .timer).modeText(.bodyEmphasis).monospacedDigit()
+            }
         }
         .padding(.horizontal, ModeSpacing.l)
         .frame(minHeight: ModeSize.touch)

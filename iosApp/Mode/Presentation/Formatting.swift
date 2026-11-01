@@ -31,6 +31,11 @@ enum Format {
         return date.formatted(date: .omitted, time: .shortened)
     }
 
+    /// "8:13", in the user's clock style.
+    static func timeOfDay(epochMs: Int64) -> String {
+        Date(timeIntervalSince1970: TimeInterval(epochMs) / 1000).formatted(date: .omitted, time: .shortened)
+    }
+
     static func moment(epochMs: Int64) -> String {
         Date(timeIntervalSince1970: TimeInterval(epochMs) / 1000).formatted(.relative(presentation: .named))
     }
@@ -39,8 +44,10 @@ enum Format {
         usd.formatted(.currency(code: "USD").precision(.fractionLength(usd < 0.01 ? 3 : 2)))
     }
 
+    /// "62 s", "0.9 s": durations in seconds, as the boards show them.
     static func seconds(_ value: Double) -> String {
-        Duration.seconds(value).formatted(.units(allowed: [.minutes, .seconds], width: .narrow))
+        Measurement(value: value, unit: UnitDuration.seconds)
+            .formatted(.measurement(width: .narrow, numberFormatStyle: .number.precision(.fractionLength(value < 10 ? 0...1 : 0...0))))
     }
 
     struct BadgeStyle {

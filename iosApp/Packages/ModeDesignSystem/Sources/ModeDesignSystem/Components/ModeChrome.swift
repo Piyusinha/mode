@@ -172,8 +172,9 @@ public struct ModeSuggestionCard: View {
                     .frame(width: ModeSize.tile, height: ModeSize.tile)
                     .background(ModeColor.tintSoft, in: .circle)
                 Spacer(minLength: ModeSpacing.s)
-                Text(title).modeText(.headline).lineLimit(2).multilineTextAlignment(.leading)
+                Text(title).modeText(.headline).lineLimit(2).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 Text(subtitle).modeText(.subheadline, color: ModeColor.textSecondary).lineLimit(2).multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(ModeSpacing.l)
             .frame(width: ModeSize.suggestionWidth, height: ModeSize.suggestionHeight, alignment: .leading)

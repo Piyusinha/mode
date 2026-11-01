@@ -1,89 +1,124 @@
 import ModeDesignSystem
 import SwiftUI
 
-/// A conversation: your messages, Mode's replies, what's running, and the message bar.
+/// A conversation, as on the Chat board. Draws state, sends events.
 struct ConversationScreen: View {
     let state: ConversationViewModel.State
+    let thumbnails: [String: [Image]]
     @Binding var draft: String
+    let canSend: Bool
     let onEvent: (ConversationViewModel.Event) -> Void
 
     var body: some View {
         ScrollViewReader { scroller in
             ScrollView {
-                LazyVStack(spacing: ModeSpacing.m) {
-                    ForEach(state.bubbles) { bubble in
-                        BubbleView(bubble: bubble, onScreens: { onEvent(.openScreens($0)) }).id(bubble.id)
+                VStack(alignment: .leading, spacing: ModeSpacing.l) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        Text(state.title).modeText(.title)
+                        Text(state.when).modeText(.subheadline, color: ModeColor.textSecondary)
+                    }
+                    ForEach(state.messages) { message in
+                        MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? []) { onEvent(.openScreens($0)) }
+                            .id(message.id)
                     }
                     if let working = state.working {
-                        ModeRunningBar(title: String(localized: L10n.Conversation.working), status: working, stopLabel: L10n.Common.stop) { onEvent(.stop) }
-                            .padding(.vertical, ModeSpacing.s)
-                            .glassEffect(.regular, in: .capsule)
+                        ModeMiniPlayer(title: String(localized: L10n.Conversation.working), status: working, paused: false,
+                                       pauseLabel: L10n.Run.pause, resumeLabel: L10n.Run.resume, stopLabel: L10n.Common.stop,
+                                       onPauseToggle: {}, onStop: { onEvent(.stop) }, onOpen: {})
                     }
-                    ForEach(state.remembered, id: \.id) { item in
-                        ModeChip(item.text, icon: .sparkle, actionTitle: L10n.Common.undo) { onEvent(.undo(item.id)) }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(state.remembered) { item in
+                        ModeRememberedChip(item.text, undoTitle: L10n.Common.undo) { onEvent(.undo(item.id)) }
                     }
                 }
                 .padding(.horizontal, ModeSpacing.screenEdge)
                 .padding(.bottom, ModeSpacing.l)
             }
-            .onChange(of: state.bubbles.last?.id) { _, last in
+            .scrollEdgeEffectStyle(.soft, for: .all)
+            .onChange(of: state.messages.last?.id) { _, last in
                 if let last { withAnimation(ModeMotion.standard) { scroller.scrollTo(last, anchor: .bottom) } }
             }
         }
         .modeScreen()
-        .navigationTitle(state.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                ModeToolbarButton(.share, label: L10n.Conversation.share) { onEvent(.share) }
+                Menu {
+                    Button { onEvent(.repeatTask) } label: { Label { Text(L10n.Conversation.repeatTask) } icon: { ModeIcon.repeatTask.image } }
+                    Button(role: .destructive) { onEvent(.askDelete) } label: { Label { Text(L10n.Conversation.delete) } icon: { ModeIcon.trash.image } }
+                } label: { ModeIcon.more.image }
+                .accessibilityLabel(Text(L10n.Conversation.more))
+            }
+        }
         .safeAreaInset(edge: .bottom) {
-            ModeComposer(
-                text: $draft,
-                isPrivate: state.isPrivate,
-                labels: .init(prompt: L10n.Ask.followUpPrompt, send: L10n.Ask.send, privateOn: L10n.Ask.privateOn, privateOff: L10n.Ask.privateOff),
-                onTogglePrivate: { onEvent(.togglePrivate) },
-                onSend: { onEvent(.send) }
-            )
+            ModeMessageBar(
+                text: $draft, isPrivate: state.isPrivate, canSend: canSend,
+                labels: .init(prompt: L10n.Ask.followUpPrompt, add: L10n.Ask.add, send: L10n.Ask.send, speak: L10n.Tab.ask,
+                              privateOn: L10n.Ask.privateOn, privateOff: L10n.Ask.privateOff),
+                onTogglePrivate: { onEvent(.togglePrivate) }, onSend: { onEvent(.send) }, onSpeak: { onEvent(.speak) }
+            ) {
+                Button { onEvent(.repeatTask) } label: { Label { Text(L10n.Conversation.repeatTask) } icon: { ModeIcon.repeatTask.image } }
+                Button { onEvent(.togglePrivate) } label: { Label { Text(L10n.Ask.privateOff) } icon: { ModeIcon.privateOff.image } }
+            }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.s)
         }
     }
 }
 
-private struct BubbleView: View {
-    let bubble: ConversationViewModel.Bubble
+/// One message: yours in an accent bubble; Mode's as plain text, with timetables and its screens.
+private struct MessageView: View {
+    let message: ConversationViewModel.Message
+    let thumbnails: [Image]
     let onScreens: (String) -> Void
 
     var body: some View {
-        VStack(alignment: bubble.fromUser ? .trailing : .leading, spacing: ModeSpacing.xs) {
-            Text(bubble.text)
-                .modeText(.body, color: bubble.fromUser ? ModeColor.onAccent : ModeColor.textPrimary)
-                .padding(ModeSpacing.m)
-                .background(bubble.fromUser ? ModeColor.accent : ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
-            HStack(spacing: ModeSpacing.s) {
-                if let badge = bubble.badge { ModeBadge(badge.text, icon: badge.icon, tone: badge.tone) }
-                Text(bubble.day).modeText(.caption, color: ModeColor.textSecondary)
-            }
-            if let screens = bubble.screens {
-                Button { onScreens(screens.taskId) } label: {
-                    Label { Text(screens.label) } icon: { ModeIcon.screens.image }
-                        .modeText(.subheadline, color: ModeColor.tint)
-                        .frame(minHeight: ModeSize.touch)
+        if message.fromUser {
+            ModeUserBubble(message.text, tag: message.spoken ? L10n.Conversation.spoken : nil)
+        } else {
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
+                    switch part {
+                    case let .text(text): Text(text).modeText(.body)
+                    case let .times(rows): ModeTimeTable(rows: rows.map { (time: $0.time, text: $0.text) })
+                    }
                 }
-                .buttonStyle(.plain)
+                if let screens = message.screens {
+                    ModeScreensLink(title: screens.label, thumbnails: thumbnails) { onScreens(screens.taskId) }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: bubble.fromUser ? .trailing : .leading)
     }
 }
 
-/// Connects a conversation to its ViewModel.
+/// Connects a conversation to its ViewModel and its sheets.
 struct ConversationRoute: View {
+    @Environment(\.dismiss) private var dismiss
+    let app: AppModel
+    let conversationId: String
+    let navigate: (Route) -> Void
+
+    var body: some View {
+        ConversationContent(app: app, conversationId: conversationId, navigate: navigate, close: { dismiss() })
+    }
+}
+
+private struct ConversationContent: View {
+    let app: AppModel
     @State private var model: ConversationViewModel
 
-    init(app: AppModel, conversationId: String, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: ConversationViewModel(screens: app.screens, conversationId: conversationId, navigate: navigate))
+    init(app: AppModel, conversationId: String, navigate: @escaping (Route) -> Void, close: @escaping () -> Void) {
+        self.app = app
+        _model = State(initialValue: ConversationViewModel(screens: app.screens, conversationId: conversationId, navigate: navigate, close: close))
     }
 
     var body: some View {
-        ConversationScreen(state: model.state, draft: $model.draft, onEvent: model.send)
+        ConversationScreen(state: model.state, thumbnails: model.thumbnails, draft: $model.draft, canSend: model.canSend, onEvent: model.send)
+            .sheet(item: $model.sharing) { ShareSheet(text: $0.text) }
+            .sheet(item: $model.repeating) { RepeatRoute(app: app, text: $0.text) }
+            .confirmationDialog(Text(L10n.Conversation.deleteConfirm), isPresented: $model.confirmingDelete, titleVisibility: .visible) {
+                Button(role: .destructive) { model.send(.confirmDelete) } label: { Text(L10n.Conversation.delete) }
+            }
     }
 }

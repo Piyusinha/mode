@@ -1,52 +1,59 @@
 import ModeDesignSystem
 import SwiftUI
 
-/// Home: a greeting, suggestions and recent conversations. Draws state, sends events.
+/// Home, as on the board: the greeting, "What can I do for you?", suggestion
+/// cards and recent conversations. Draws state, sends events.
 struct HomeScreen: View {
     let state: HomeViewModel.State
     let onEvent: (HomeViewModel.Event) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(spacing: ModeSpacing.s) {
-                Text(L10n.Home.subtitle)
-                    .modeText(.callout, color: ModeColor.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, ModeSpacing.xs)
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                    Text(state.greeting).modeText(.callout, color: ModeColor.textSecondary)
+                    Text(L10n.Home.subtitle).modeText(.largeTitle)
+                }
+                .padding(.horizontal, ModeSpacing.screenEdge)
                 if state.needsKey {
                     ModeCard {
-                        ModeRow(String(localized: L10n.Home.needsKeyTitle), subtitle: String(localized: L10n.Home.needsKeyMessage), leading: .icon(.key, ModeColor.warning), onTap: { onEvent(.addKey) })
+                        ModeRow(String(localized: L10n.Home.needsKeyTitle), subtitle: String(localized: L10n.Home.needsKeyMessage),
+                                leading: .icon(.key, ModeColor.warning), emphasis: .prominent, onTap: { onEvent(.addKey) })
                     }
+                    .padding(.horizontal, ModeSpacing.screenEdge)
                 }
                 if state.isEmpty {
-                    ModeEmptyState(icon: .ask, title: L10n.Home.emptyTitle, message: L10n.Home.emptyMessage)
+                    ModeEmptyState(icon: .ask, title: L10n.Home.emptyTitle, message: L10n.Home.emptyMessage).frame(maxWidth: .infinity)
                 }
                 if !state.suggestions.isEmpty {
-                    ModeSectionHeader(L10n.Home.suggested)
-                    ModeCard {
-                        ForEach(state.suggestions) { row in
-                            ModeRow(row.title, subtitle: row.subtitle, leading: .icon(row.icon), onTap: { onEvent(.suggestion(row.title)) })
+                    ModeSectionHeader(L10n.Home.suggested).padding(.horizontal, ModeSpacing.screenEdge).padding(.top, ModeSpacing.l)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: ModeSpacing.m) {
+                            ForEach(state.suggestions) { s in
+                                ModeSuggestionCard(icon: s.icon, title: s.title, subtitle: s.subtitle) { onEvent(.suggestion(s.title)) }
+                            }
                         }
+                        .padding(.horizontal, ModeSpacing.screenEdge)
                     }
+                    .scrollIndicators(.hidden)
                 }
                 if !state.recent.isEmpty {
-                    ModeSectionHeader(L10n.Home.recent)
+                    ModeSectionHeader(L10n.Home.recent).padding(.horizontal, ModeSpacing.screenEdge).padding(.top, ModeSpacing.l)
                     ModeCard {
                         ForEach(state.recent) { row in
-                            ModeRow(row.title, subtitle: row.subtitle, onTap: { onEvent(.openConversation(row.id)) })
+                            ModeRow(row.title, subtitle: row.subtitle, leading: row.leading, onTap: { onEvent(.openConversation(row.id)) })
                         }
                     }
+                    .padding(.horizontal, ModeSpacing.screenEdge)
                 }
             }
-            .padding(.horizontal, ModeSpacing.screenEdge)
-            .padding(.bottom, ModeSpacing.xxxl)
+            .padding(.bottom, ModeSpacing.xxl)
         }
+        .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .navigationTitle(state.greeting)
-        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ModeToolbarButton(.settings, label: L10n.Common.settings) { onEvent(.openSettings) }
+                ModeToolbarButton(.profile, label: L10n.Home.profile) { onEvent(.openSettings) }
             }
         }
     }

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Spacing on a 4-point grid.
 public enum ModeSpacing {
+    public static let none: CGFloat = 0
     public static let xxs: CGFloat = 2
     public static let xs: CGFloat = 4
     public static let s: CGFloat = 8
@@ -56,8 +57,8 @@ public enum ModeSize {
     public static let speakButton: CGFloat = 64
     public static let miniPlayerHeight: CGFloat = 56
     /// A suggestion card on Home.
-    public static let suggestionWidth: CGFloat = 168
-    public static let suggestionHeight: CGFloat = 150
+    public static let suggestionWidth: CGFloat = 176
+    public static let suggestionHeight: CGFloat = 168
     /// The little phones in the setup test illustration.
     public static let testPhoneWidth: CGFloat = 74
     public static let testPhoneHeight: CGFloat = 140
@@ -69,6 +70,8 @@ public enum ModeSize {
     public static let segmentHeight: CGFloat = 4
     /// The small live dot.
     public static let liveDot: CGFloat = 8
+    /// An iPhone screen's width to height, for screenshot cells.
+    public static let screenAspect: CGFloat = 9.0 / 19.5
     /// Grid cells on All screens.
     public static let gridSpacing: CGFloat = 10
 
