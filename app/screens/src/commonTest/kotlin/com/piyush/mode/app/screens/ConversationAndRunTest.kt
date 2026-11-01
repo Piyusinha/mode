@@ -41,7 +41,7 @@ class ConversationAndRunTest {
         testScheduler.advanceUntilIdle()
         val after = p.state.awaitState { it.turns.size == 4 }
         assertFalse(after.privateNext, "private applies to one message")
-        assertTrue(f.tasks.latest(1).single().private)
+        assertTrue(f.tasks.latest(10).single { it.text == "Turn it back on" }.private)
         assertFalse(p.send("   "))
     }
 
