@@ -265,9 +265,13 @@ class Agent(
 
             // Tell the model what its last action did, and notice when nothing changes.
             var changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
+            // A rotating banner or an ad makes any page "change"; most of its text the same is the same page.
+            val samePage = ChangeLedger.similarity(ChangeLedger.page(lastPage), ChangeLedger.page(screen.pageTexts())) >= SAME_PAGE
+            if (changed != null) {
+                // Progress: a scroll that moved, or a different page. A tap that left the same page is not.
+                if (changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")) stuck.progressed() else stuck.stalled()
+            }
             if (changed != null && history.isNotEmpty()) {
-                // A rotating banner or an ad makes any page "change"; most of its text the same is the same page.
-                val samePage = ChangeLedger.similarity(ChangeLedger.page(lastPage), ChangeLedger.page(screen.pageTexts())) >= SAME_PAGE
                 history[history.lastIndex] += when {
                     lastOp == "back" && samePage -> { changed = false; BACK_DID_NOTHING }
                     !changed -> UNCHANGED
@@ -285,9 +289,9 @@ class Agent(
                 scrolled.clear()
             }
             // Proof on screen confirms the last change; a different page means the agent went to check.
+            val confirmedBefore = ledger.entries.count { it.confirmed }
             ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first }, navigated = lastOp != "scroll" && lastOp != "wait")
-            // Right after an unconfirmed change, deciding whether it worked is what matters most.
-            ledger.pending()?.takeIf { !it.escalated }?.let { it.escalated = true; stuck.critical() }
+            if (ledger.entries.count { it.confirmed } > confirmedBefore) stuck.progressed()
             val verdict = stuck.looked(screen.signature, changed)
             if (verdict is StuckDetector.Verdict.Stop) {
                 trace.stuck(step, verdict.why)
@@ -296,9 +300,17 @@ class Agent(
             (verdict as? StuckDetector.Verdict.StepUp)?.note?.let { note ->
                 if (history.isNotEmpty()) history[history.lastIndex] += " ($note)"
             }
+            // No progress for a few steps: the brain decides from what was seen (text only, ~$0.005).
+            if (verdict is StuckDetector.Verdict.Decide && brain != null && history.isNotEmpty()) {
+                history[history.lastIndex] += " (no progress in the last few steps; " +
+                    askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\"). What should it do now?") + ")"
+            }
             // The strong model costs ~20× a step: at most a few per task, and only with budget to spare.
-            val stepUp = verdict is StuckDetector.Verdict.StepUp && config.strongModel != null && stepUps < MAX_STEP_UPS &&
-                (config.maxCostUsd == null || config.maxCostUsd - cost > STEP_UP_BUDGET_SHARE * (lastStrongCost ?: STRONG_STEP_GUESS_USD))
+            val wantsStrong = verdict is StuckDetector.Verdict.StepUp || (verdict is StuckDetector.Verdict.Decide && brain == null)
+            // The brief is budgeted on its own: what is left for step-ups excludes it.
+            val forSteps = cost - (brief?.costUsd ?: 0.0)
+            val stepUp = wantsStrong && config.strongModel != null && stepUps < MAX_STEP_UPS &&
+                (config.maxCostUsd == null || config.maxCostUsd - forSteps > STEP_UP_BUDGET_SHARE * (lastStrongCost ?: STRONG_STEP_GUESS_USD))
             if (stepUp) stepUps++
 
             val messages = ContextBuilder.build(
@@ -394,8 +406,6 @@ class Agent(
                         continue
                     }
                     onStatus("Waiting for you")
-                    // After changing something, what to do with the answer matters: the strong model decides.
-                    if (ledger.entries.isNotEmpty()) stuck.critical()
                     val reply2 = if (options.size >= 2) gate.choose(question, options, recommended) else gate.ask(question)
                     if (reply2 == null) {
                         record("ask_user", question, "you stopped the task")
@@ -417,7 +427,6 @@ class Agent(
                     // Seen on the phone: nine plan rewrites in a 30-step run. A plan right after a plan is
                     // refused; progress is tracked by each action's item field and Mode's record of changes.
                     if (stuck.thought() >= 2) {
-                        stuck.critical()
                         record("plan (not saved)", "", "not saved: you just planned. Do the next item of your plan now with a phone action")
                     } else {
                         plan = call.arguments.string("steps")?.trim()?.take(1500)
@@ -478,19 +487,17 @@ class Agent(
                     val changes = op is Op.Tap && Changes.isChange(reason, label)
                     if (op is Op.Tap && Changes.isChangeButton(label) && Changes.isChecking(reason)) {
                         stuck.badReply()
-                        stuck.critical()
                         record("$described (not done)", reason, ADD_IS_NOT_A_CHECK)
                         continue
                     }
                     if (changes) {
                         ledger.confirmedFor(target)?.let { done ->
-                            stuck.critical()
+                            stuck.stalled()
                             record("$described (not done)", reason, alreadyDone(done))
                             continue
                         }
                         ledger.pending()?.let { last ->
                             stuck.badReply()
-                            stuck.critical()
                             record("$described (held back)", reason, checkFirst(last))
                             continue
                         }

@@ -60,9 +60,19 @@ class StuckDetectorTest {
     }
 
     @Test
-    fun threeWaitsInARowStepUp() {
+    fun threeWaitsInARowAreThreeStepsWithoutProgress() {
         val d = StuckDetector(canStepUp = true)
         repeat(3) { d.waited() }
-        assertIs<Verdict.StepUp>(d.looked("loading", changed = null))
+        // Three steps without progress: the brain decides (or, without one, the strong model steps in).
+        assertIs<Verdict.Decide>(d.looked("loading", changed = null))
+    }
+
+    @Test
+    fun sixStepsWithoutProgressStop() {
+        val d = StuckDetector(canStepUp = true)
+        repeat(6) { d.stalled() }
+        assertIs<Verdict.Stop>(d.looked("same", changed = null))
+        d.progressed()
+        assertIs<Verdict.Fine>(d.looked("same", changed = null), "progress resets the meter")
     }
 }

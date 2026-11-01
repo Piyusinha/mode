@@ -11,6 +11,8 @@ class StuckDetector(private val canStepUp: Boolean) {
         data object Fine : Verdict
         /** Ask the stronger model this step; [note] is added to the step history when set. */
         class StepUp(val note: String? = null) : Verdict
+        /** Several steps without progress: the brain should decide what to do (cheaper than a strong step). */
+        data object Decide : Verdict
         class Stop(val why: String) : Verdict
     }
 
@@ -25,6 +27,13 @@ class StuckDetector(private val canStepUp: Boolean) {
     private var steppedUp = false
     /** A moment that matters (a change held back, plan churn): the next decision goes to the strong model. */
     private var critical = false
+    /**
+     * Steps in a row that moved nothing forward: a plan, a repeated lookup, a refused or held action,
+     * a wait, a tap that left the same page. Seen on the phone: 16 steps alternating "plan saved / not
+     * saved", six taps on a focused field: separate counters never added up to a stop.
+     */
+    private var stalls = 0
+    private var decideAsked = false
     /** Scrolls in a row that went the other way from the one before (down, up, down…). */
     private var lastScroll: String? = null
     private var reversals = 0
@@ -54,6 +63,11 @@ class StuckDetector(private val canStepUp: Boolean) {
             return Verdict.Stop("the screen stopped changing after $unchanged tries")
         }
         if (visits >= STOP_VISITS) return Verdict.Stop("it kept coming back to the same screen ($visits times in $WINDOW steps)")
+        if (stalls >= STOP_STALLS) return Verdict.Stop("it made no progress in $stalls steps")
+        if (stalls >= DECIDE_STALLS && !decideAsked) {
+            decideAsked = true
+            return Verdict.Decide
+        }
         if (critical) {
             critical = false
             return stepUp(null)
@@ -109,17 +123,26 @@ class StuckDetector(private val canStepUp: Boolean) {
     /** Scrolls in a row the same way so far (the hint to use the app's Sort or Filter comes at 3). */
     fun scrollsSameWay(): Int = sameWay
 
+    /** The step moved things forward: a new page, a confirmed change. */
+    fun progressed() {
+        stalls = 0
+        decideAsked = false
+    }
+
+    /** The step moved nothing forward. */
+    fun stalled() { stalls++ }
+
     /** A reply with no usable action. */
-    fun badReply() { badReplies++ }
+    fun badReply() { badReplies++; stalls++ }
 
     /** A phone action went through. */
     fun acted() { badReplies = 0; waits = 0; plans = 0 }
 
     /** The model planned or looked something up instead of acting; returns how many times in a row. */
-    fun thought(): Int = ++plans
+    fun thought(): Int { stalls++; return ++plans }
 
     /** The model chose to wait; returns how many waits in a row. */
-    fun waited(): Int = ++waits
+    fun waited(): Int { stalls++; return ++waits }
 
     private fun stepUp(note: String?): Verdict {
         sinceStepUp = 0
@@ -137,6 +160,9 @@ class StuckDetector(private val canStepUp: Boolean) {
         const val STOP_UNCHANGED = 4
         const val WARN_VISITS = 4
         const val STOP_VISITS = 6
+        /** Steps without progress before the brain decides, and before the run stops. */
+        const val DECIDE_STALLS = 3
+        const val STOP_STALLS = 6
         /** Changes of scroll direction in a row before the strong model takes over. */
         const val MAX_REVERSALS = 3
     }

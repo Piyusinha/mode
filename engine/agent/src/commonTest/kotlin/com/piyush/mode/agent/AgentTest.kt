@@ -86,7 +86,8 @@ class AgentTest {
         val model = ScriptedModel(tap(1), tap(200), tap(400), call("done", "evidence" to "on screen", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         // Two taps change nothing, so the third decision goes to the strong model, then back to cheap.
-        assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
+        // Two taps change nothing: the third decision goes to the strong model; the next stall too.
+        assertEquals(listOf("cheap", "cheap", "strong", "strong"), model.models)
     }
 
     @Test
@@ -445,7 +446,9 @@ class AgentTest {
         val churn = Array(12) { plan }
         val model = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14)).run("t")
-        assertEquals(3, model.models.count { it == "strong" }, model.models.toString())
+        // Plans are steps without progress: after six the run stops, having asked the strong model at most a few times.
+        assertTrue(model.models.count { it == "strong" } in 1..3, model.models.toString())
+        assertTrue(model.models.size <= 8, "stopped after six steps without progress: ${model.models}")
 
         val tight = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, tight, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14, maxCostUsd = 0.03)).run("t")
@@ -625,6 +628,21 @@ class AgentTest {
         assertIs<Op.Tap>(phone.actions[0], "focused first")
         assertEquals(Op.TypeText("sushi"), phone.actions[1])
         assertEquals(Op.PressKey("return"), phone.actions[2])
+    }
+
+    @Test
+    fun withABrainThreeStepsWithoutProgressGetADecisionNotAStrongStep() = runTest {
+        val phone = FakePhone(List(8) { listOf("Results" to (100.0 to 300.0)) })
+        fun wait() = call("wait", "seconds" to 1, "reason" to "loading")
+        val model = ScriptedModel(
+            call("brief", "intent" to "x", "start" to "continue", "done_when" to "x", "steps" to listOf("a"), "report" to "x"),
+            wait(), wait(), wait(),
+            call("decision", "answer" to "Open the first result: tap \"Results\""),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong", brainModel = "brain")).run("t")
+        assertTrue("your planning mind decided: Open the first result" in model.lastUserText, model.lastUserText)
+        assertTrue("strong" !in model.models, "a decision, not a strong step: ${model.models}")
     }
 
     @Test
@@ -809,8 +827,8 @@ class AgentTest {
         val plan = call("plan", "steps" to "1. find it")
         val model = ScriptedModel(plan, plan, plan, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
-        // The second plan is refused and the strong model takes the next decision.
-        assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
+        // Plans make no progress: after three, the strong model takes the next decision.
+        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
         assertTrue("not saved: you just planned" in model.lastUserText, model.lastUserText)
     }
 
