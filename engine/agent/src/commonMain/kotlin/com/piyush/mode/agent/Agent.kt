@@ -418,6 +418,7 @@ class Agent(
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
                         stuck.acted()
+                        stuck.scrolled(if (op is Op.Scroll) call.arguments.string("direction") else null)
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
                             if (op.name !in appsOpened) {
@@ -551,7 +552,8 @@ class Agent(
             val now = runCatching { screenTexts(before.geometry) }.getOrNull() ?: continue
             now.filter { (text, _, y) ->
                 val t = text.trim()
-                t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && !(y <= before.geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(t))
+                // Nothing in the status bar is proof of a change (the clock, the island).
+                t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
             }.forEach { if (it.first.trim() !in seen) seen += it.first.trim() }
             if (Changes.proof(seen) != null) break
         }
@@ -649,8 +651,8 @@ class Agent(
         private const val UNCHANGED = " → screen did NOT change"
         /** The status bar and Dynamic Island, in screen points from the top. */
         private const val STATUS_BAR_PT = 60.0
-        /** What ticks up there: the clock, a timer, the battery percentage. */
-        private val TICKING = Regex("""^\d{1,3}(?:[:.]\d{2}){0,2}%?$""")
+        /** What ticks up there: the clock, a timer, the battery percentage, Mode's own "Step 4" on the island. */
+        private val TICKING = Regex("""^(?:step\s*)?\d{1,3}(?:[:.]\d{2}){0,2}%?$""", RegexOption.IGNORE_CASE)
         private const val CHECK_IT = ". This changed something: check it worked before any other change"
         private const val DONE_IT = ". That confirms it: it is in Mode's record of changes; do not do it again"
         private const val ADD_IS_NOT_A_CHECK =
@@ -743,6 +745,8 @@ class Agent(
             action. Notes are facts for the user's answer, not your progress (that is tracked already), and
             each fact is noted once. Notes stay with you for the whole task; older steps are only summarised.
             Never note passwords, passcodes or card numbers.
+            Once your notes hold what the task asks for, finish (done) with them: scrolling back to re-check
+            something you already noted wastes the user's time. To read a long page, go through it once.
 
             Finishing:
             - Before calling done, look at the screen: does it really show the task happened (the switch is

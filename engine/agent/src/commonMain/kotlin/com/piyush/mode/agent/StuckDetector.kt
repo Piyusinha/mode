@@ -25,6 +25,9 @@ class StuckDetector(private val canStepUp: Boolean) {
     private var steppedUp = false
     /** A moment that matters (a change held back, plan churn): the next decision goes to the strong model. */
     private var critical = false
+    /** Scrolls in a row that went the other way from the one before (down, up, down…). */
+    private var lastScroll: String? = null
+    private var reversals = 0
     /** Screens seen right after phone actions, newest last. */
     private val recent = ArrayDeque<String>()
 
@@ -51,6 +54,15 @@ class StuckDetector(private val canStepUp: Boolean) {
             critical = false
             return stepUp(null)
         }
+        // Seen on the phone: ten scrolls down and up over one diary page, the answer already in the notes.
+        // Each stop is a little different, so the same-screen count never saw it.
+        if (reversals >= MAX_REVERSALS) {
+            reversals = 0
+            return stepUp(
+                "you have scrolled back and forth over the same page; your notes already hold what you read there. " +
+                    "If they answer the task, call done now; otherwise read the page once, top to bottom",
+            )
+        }
         return when {
             visits >= WARN_VISITS -> stepUp(
                 "you have been on this screen $visits times in the last $WINDOW steps: this route is not working, try a different one",
@@ -65,6 +77,16 @@ class StuckDetector(private val canStepUp: Boolean) {
 
     /** The next decision matters more than usual: ask the strong model (when there is one). */
     fun critical() { critical = true }
+
+    /** Each phone action: the scroll's direction, or null for anything else (which ends a back-and-forth). */
+    fun scrolled(direction: String?) {
+        reversals = when {
+            direction == null -> 0
+            lastScroll != null && direction != lastScroll -> reversals + 1
+            else -> reversals
+        }
+        lastScroll = direction
+    }
 
     /** A reply with no usable action. */
     fun badReply() { badReplies++ }
@@ -94,5 +116,7 @@ class StuckDetector(private val canStepUp: Boolean) {
         const val STOP_UNCHANGED = 4
         const val WARN_VISITS = 4
         const val STOP_VISITS = 6
+        /** Changes of scroll direction in a row before the strong model takes over. */
+        const val MAX_REVERSALS = 3
     }
 }

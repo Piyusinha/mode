@@ -329,6 +329,20 @@ class AgentTest {
     }
 
     @Test
+    fun scrollingBackAndForthHandsOverToTheStrongModel() = runTest {
+        // Each stop is a little different, as on the phone, so the same-screen count never fires.
+        val phone = FakePhone(List(12) { i -> listOf("Diary" to (100.0 to 200.0), "row ${i % 3}" to (100.0 to 300.0 + i)) })
+        fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Reviewing the diary")
+        val model = ScriptedModel(
+            scroll("down"), scroll("up"), scroll("down"), scroll("up"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong")).run("what did I eat yesterday")
+        assertEquals("strong", model.models[4], model.models.toString())
+        assertTrue("scrolled back and forth" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
         val model = ScriptedModel(
