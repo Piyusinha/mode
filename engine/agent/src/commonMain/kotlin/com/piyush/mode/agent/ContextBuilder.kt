@@ -53,6 +53,8 @@ object ContextBuilder {
         val lastApp: String?,
         /** What the model said its last action would do, shown once so it can check. */
         val expectation: String? = null,
+        /** Mode's record of what was changed for the user, with proof; never summarised away. */
+        val done: List<String> = emptyList(),
         val screen: Screen,
         /** Mode's own screen is in front: describe it instead of showing it. */
         val hideScreen: Boolean,
@@ -113,6 +115,11 @@ object ContextBuilder {
     /** Changes every step. */
     fun perStep(input: Input): String = buildString {
         append("STEP ").append(input.step).append(" of at most ").append(input.maxSteps).append("\n\n")
+        if (input.done.isNotEmpty()) {
+            append("DONE SO FAR (Mode's record of what you changed for the user; trust it over how the screen looks now, and never repeat a confirmed one):\n")
+            input.done.forEach { append("- ").append(it).append('\n') }
+            append('\n')
+        }
         if (input.notes.isNotEmpty()) {
             append("YOUR NOTES (facts you kept; use them in your final summary):\n")
             val hidden = input.notes.size - MAX_NOTES

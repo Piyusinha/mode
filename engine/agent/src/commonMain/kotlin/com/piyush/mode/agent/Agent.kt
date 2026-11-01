@@ -22,6 +22,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.time.TimeSource
@@ -157,11 +158,8 @@ class Agent(
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
-        /**
-         * The last tap that added, sent or saved something, until the agent has checked it worked
-         * (any other action, or a wait). Another such tap waits for that check.
-         */
-        var unchecked: String? = null
+        /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
+        val ledger = ChangeLedger()
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -223,6 +221,10 @@ class Agent(
                 history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
             }
             lastScreen = screen.signature
+            // Proof on screen confirms the last change; a different page means the agent went to check.
+            ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first })
+            // Right after an unconfirmed change, deciding whether it worked is what matters most.
+            ledger.pending()?.takeIf { !it.escalated }?.let { it.escalated = true; stuck.critical() }
             val verdict = stuck.looked(screen.signature, changed)
             if (verdict is StuckDetector.Verdict.Stop) {
                 trace.stuck(step, verdict.why)
@@ -247,6 +249,7 @@ class Agent(
                     recentSteps = config.historySteps,
                     lastApp = lastApp,
                     expectation = expectation,
+                    done = ledger.lines(),
                     screen = ContextBuilder.Screen(screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts),
                     hideScreen = inMode,
                 ),
@@ -317,6 +320,8 @@ class Agent(
                         continue
                     }
                     onStatus("Waiting for you")
+                    // After changing something, what to do with the answer matters: the strong model decides.
+                    if (ledger.entries.isNotEmpty()) stuck.critical()
                     val reply2 = gate.ask(question)
                     if (reply2 == null) {
                         record("ask_user", question, "you stopped the task")
@@ -335,13 +340,15 @@ class Agent(
                     )
                 }
                 "plan" -> {
-                    plan = call.arguments.string("steps")?.trim()?.take(1500)
-                    onPlan(PlanItem.parse(plan.orEmpty()))
-                    // Seen on the phone: eight plan rewrites in one run, each a wasted step.
+                    // Seen on the phone: nine plan rewrites in a 30-step run. A plan right after a plan is
+                    // refused; progress is tracked by each action's item field and Mode's record of changes.
                     if (stuck.thought() >= 2) {
-                        record("plan", "", "plan saved, but you planned again without acting: no more planning now, do the next item")
+                        stuck.critical()
+                        record("plan (not saved)", "", "not saved: you just planned. Do the next item of your plan now with a phone action")
                     } else {
-                        record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
+                        plan = call.arguments.string("steps")?.trim()?.take(1500)
+                        onPlan(PlanItem.parse(plan.orEmpty()))
+                        record("plan", "", "plan saved; it is shown to you every step: now do the next open item")
                     }
                 }
                 "recall" -> {
@@ -356,8 +363,6 @@ class Agent(
                     )
                 }
                 "wait" -> {
-                    // A wait is a fresh look: it counts as checking the last change.
-                    unchecked = null
                     val waits = stuck.waited()
                     val seconds = (call.arguments["seconds"]?.jsonPrimitive?.doubleOrNull ?: 2.0).coerceIn(0.5, 10.0)
                     delay((seconds * 1000).toLong())
@@ -377,15 +382,28 @@ class Agent(
                         continue
                     }
                     val described = describe(call, op, screen)
-                    // Do it once, then check. Seen on the phone: an app confirmed "added" only for a
-                    // moment, and the agent added the same food seven times; another time it added four
-                    // wrong ones. A tap that adds, sends or saves waits until the last one was checked.
-                    val changes = op is Op.Tap && Changes.isChange(reason, nearestText(op.x, op.y, screen))
-                    val waiting = unchecked
-                    if (changes && waiting != null) {
+                    // Do it once, then check (see ChangeLedger). Nothing here knows any app.
+                    val label = (op as? Op.Tap)?.let { nearestText(it.x, it.y, screen) }
+                    val target = (op as? Op.Tap)?.let { rowLabel(it.x, it.y, screen) ?: label } ?: described
+                    val changes = op is Op.Tap && Changes.isChange(reason, label)
+                    if (op is Op.Tap && Changes.isChangeButton(label) && Changes.isChecking(reason)) {
                         stuck.badReply()
-                        record("$described (held back)", reason, checkFirst(waiting))
+                        stuck.critical()
+                        record("$described (not done)", reason, ADD_IS_NOT_A_CHECK)
                         continue
+                    }
+                    if (changes) {
+                        ledger.confirmedFor(target)?.let { done ->
+                            stuck.critical()
+                            record("$described (not done)", reason, alreadyDone(done))
+                            continue
+                        }
+                        ledger.pending()?.let { last ->
+                            stuck.badReply()
+                            stuck.critical()
+                            record("$described (held back)", reason, checkFirst(last))
+                            continue
+                        }
                     }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
@@ -399,7 +417,6 @@ class Agent(
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
-                        unchecked = if (changes) described else null
                         stuck.acted()
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
@@ -412,8 +429,16 @@ class Agent(
                         }
                         expectation = AgentTools.expectOf(call)
                         // Apps often confirm a change only for a moment ("Added", a check): read the
-                        // screen right away, so the proof is not lost before the next look.
-                        if (changes) "ok" + flashed(screen) + CHECK_IT else "ok"
+                        // screen right away, twice, so the proof is not lost before the next look.
+                        if (changes) {
+                            val appeared = flashed(screen)
+                            val proof = Changes.proof(appeared)
+                            ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof)
+                            "ok" + appeared.takeIf { it.isNotEmpty() }?.let { a -> "; right after it the screen showed: " + a.joinToString(", ") { "\"$it\"" } }.orEmpty() +
+                                if (proof != null) DONE_IT else CHECK_IT
+                        } else {
+                            "ok"
+                        }
                     } catch (e: Exception) {
                         "failed: ${e.message}"
                     }
@@ -496,6 +521,9 @@ class Agent(
          */
         val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(it.first.trim()) }
             .joinToString("|") { "${it.first}@${it.third / 12}" }
+
+        /** The page's words, without the status bar: to tell one page from another. */
+        fun pageTexts(): List<String> = texts.filter { it.third > geometry.toPixelsY(STATUS_BAR_PT) }.map { it.first }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -511,24 +539,36 @@ class Agent(
         return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
     }
 
-    /** Text that appeared right after a change and was not there before ("Added to Dinner"), if any. */
-    private suspend fun flashed(before: Screen): String {
-        delay(FLASH_MS)
-        val now = runCatching { screenTexts(before.geometry) }.getOrNull() ?: return ""
+    /**
+     * Text that appeared right after a change and was not there before ("Food logged!"). Read
+     * twice, at once and a moment later, since some apps confirm late; text only, no model cost.
+     */
+    private suspend fun flashed(before: Screen): List<String> {
         val had = before.texts.map { it.first.trim() }.toSet()
-        val new = now.filter { (text, _, y) ->
-            val t = text.trim()
-            t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && !(y <= before.geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(t))
-        }.map { it.first.trim() }.distinct().take(FLASH_TEXTS)
-        return if (new.isEmpty()) "" else "; right after it the screen showed: " + new.joinToString(", ") { "\"$it\"" }
+        val seen = mutableListOf<String>()
+        for (wait in FLASH_READS_MS) {
+            delay(wait)
+            val now = runCatching { screenTexts(before.geometry) }.getOrNull() ?: continue
+            now.filter { (text, _, y) ->
+                val t = text.trim()
+                t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && !(y <= before.geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(t))
+            }.forEach { if (it.first.trim() !in seen) seen += it.first.trim() }
+            if (Changes.proof(seen) != null) break
+        }
+        return seen.take(FLASH_TEXTS)
     }
 
-    /** The held-back reply: what to check, and where. */
-    private fun checkFirst(last: String): String =
-        "not done: check your last change first ($last). Look for proof it worked: on this screen (a check mark, " +
-            "\"added\", a count, the item listed), or where the result lives (go back to the diary or meal, the " +
-            "list, the cart, the chat). If it is there, move on; do it again only if it is truly missing. (Any " +
-            "other action, such as going back, scrolling or a wait, counts as checking.)"
+    /** The held-back reply: which change to check, and where. */
+    private fun checkFirst(last: ChangeLedger.Entry): String =
+        "not done: first check your change at step ${last.step} (\"${last.target}\"). Look for proof it worked: on " +
+            "this screen (a check mark, \"added\", a count), or where the result lives. That is usually the page " +
+            "this one was opened from (close it with X, Back, Cancel or Done) or the list it adds to; look for the " +
+            "item there. Do it again only if it is truly missing. Waiting or scrolling here is not a check."
+
+    /** The reply when a confirmed change is tried again. */
+    private fun alreadyDone(done: ChangeLedger.Entry): String =
+        "not done: this was already done at step ${done.step} (confirmed: \"${done.proof}\"). Doing it again would " +
+            "add it twice. If the task is complete, call done and say what you changed; otherwise do the next part."
 
     /** The text on screen now, with centres in screenshot pixels. */
     private suspend fun screenTexts(g: AgentTools.Geometry): List<Triple<String, Int, Int>> =
@@ -541,9 +581,35 @@ class Agent(
             )
         }
 
-    /** A readable action for the log, naming the text tapped when there is one. */
+    /**
+     * The row a tap is on, for icons with no text of their own (a + beside a result): the
+     * text left of it on the same line, title then detail ("Dark chocolate oats · 392 cal, 100 gram").
+     */
+    private fun rowLabel(x: Double, y: Double, screen: Screen): String? {
+        val g = screen.geometry
+        val px = g.toPixelsX(x)
+        val py = g.toPixelsY(y)
+        val half = g.toPixelsY(ROW_HALF_PT)
+        val row = screen.texts
+            .filter { abs(it.third - py) <= half && it.second < px - g.toPixelsX(ROW_GAP_PT) }
+            .filter { !Changes.isChangeButton(it.first) }
+            .sortedBy { it.third }
+        if (row.isEmpty()) return null
+        return row.take(2).joinToString(" · ") { it.first.trim() }.take(ROW_LABEL_MAX)
+    }
+
+    /** A readable action for the log, naming the text tapped, or the row of an icon. */
     private fun describe(call: ToolCall, op: Op, screen: Screen): String = when (op) {
-        is Op.Tap -> "tap " + (nearestText(op.x, op.y, screen)?.let { "\"$it\"" } ?: "(${pixel(op.x, op.y, screen)})")
+        is Op.Tap -> {
+            val label = nearestText(op.x, op.y, screen)
+            val row = if (label == null || label.trim().length <= 3) rowLabel(op.x, op.y, screen) else null
+            "tap " + when {
+                label != null && row != null -> "\"$label\" beside \"$row\""
+                label != null -> "\"$label\""
+                row != null -> "beside \"$row\""
+                else -> "(${pixel(op.x, op.y, screen)})"
+            }
+        }
         is Op.LongPress -> "long press " + (nearestText(op.x, op.y, screen)?.let { "\"$it\"" } ?: "(${pixel(op.x, op.y, screen)})")
         is Op.TypeText -> "type \"${op.text}\""
         is Op.LaunchApp -> "open ${op.name}"
@@ -585,9 +651,17 @@ class Agent(
         private const val STATUS_BAR_PT = 60.0
         /** What ticks up there: the clock, a timer, the battery percentage. */
         private val TICKING = Regex("""^\d{1,3}(?:[:.]\d{2}){0,2}%?$""")
-        private const val CHECK_IT = ". This changed something: check it worked before doing it again"
-        /** How soon after a change the screen is read again, and how much of what appeared is kept. */
-        private const val FLASH_MS = 400L
+        private const val CHECK_IT = ". This changed something: check it worked before any other change"
+        private const val DONE_IT = ". That confirms it: it is in Mode's record of changes; do not do it again"
+        private const val ADD_IS_NOT_A_CHECK =
+            "not done: this button adds (or sends); tapping it does not check anything and would add again. To check, " +
+                "look for the item where it would show: the list this page adds to (close this page with X, Back or Done)."
+        /** When the screen is read after a change, from the tap: at once, then a moment later. */
+        private val FLASH_READS_MS = listOf(400L, 800L)
+        /** A row: half its height, and the gap between its text and the icon tapped (screen points). */
+        private const val ROW_HALF_PT = 28.0
+        private const val ROW_GAP_PT = 8.0
+        private const val ROW_LABEL_MAX = 90
         private const val FLASH_TEXTS = 6
         private const val FLASH_TEXT_MAX = 40
         /** What the user sees while the agent looks and thinks; never a model or a step number. */
@@ -614,18 +688,20 @@ class Agent(
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - Tap a text field before typing into it.
             - If an action did not change the screen, do not repeat it: try another way.
-            - Changing things (adding, logging, saving, sending, booking, buying, deleting) goes like this:
-              1. Make sure it is the right item: in search results, pick only one that matches what the user
-                 asked (name, brand, size). A + or Add button adds the item; it does not open or check it.
-                 If nothing matches, search again with another spelling or fewer words (spoken tasks are
-                 often misheard), then ask the user rather than add something close.
-              2. Do it once.
-              3. Check it worked before anything else. Mode tells you what appeared on screen right after the
-                 tap. Proof is a check mark, "added"/"sent"/"saved", a count going up, or the item in its list.
-                 If you cannot see proof, go where the result lives (back to the diary or meal, the list, the
-                 cart, the chat) and look.
-              4. If it is there, move on (and mark that part of the plan done). Only if it is truly missing, do
-                 it again. Mode holds back a second change until you have checked.
+            - Changing things for the user (adding, logging, saving, sending, booking, buying, deleting) is
+              where trust is won or lost. Work like a careful assistant:
+              1. Before: be sure it is the right item. In search results pick only one that matches what the
+                 user asked (name, brand, size). If nothing matches, search again with another spelling or fewer
+                 words (spoken tasks are often misheard), then ask. Ask BEFORE changing anything, never after.
+              2. Amounts: if the user gave an amount (100 g, 2 cups, 3 tickets), open the item (tap its name,
+                 not the + or Add beside it) to set the amount, then add it from there. + adds the default.
+              3. Do it once. A + or Add button adds; it never checks anything.
+              4. Check: Mode reads the screen right after and tells you what appeared ("Food logged!"); that is
+                 proof. Without proof, go where the result lives: usually the page this one was opened from
+                 (close it with X, Back, Cancel or Done) or the list it adds to, and look for the item there.
+              5. DONE SO FAR is Mode's record of your changes and their proof. Trust it: apps often show a + or
+                 Add again a moment later even though it worked. Never repeat a confirmed change; Mode will
+                 refuse it. When every part is confirmed, call done and say what you changed and where.
             - Say in expect what the screen should show after an action ("Appearance page opens"); on the
               next screen, check it happened before going on.
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).
@@ -686,7 +762,8 @@ class Agent(
               - Short: a few lines unless the user asked for detail. No closing offers or questions.
               If it cannot be done, call done with success false: say why in one sentence, then what the
               user could try, as a short list if there is more than one thing.
-            - Plan once, then act. Update the plan only after finishing an item or changing course.
+            - Plan once, then act. Plan again only to change course; progress is tracked for you (each action's
+              item field, and DONE SO FAR).
             - Keep each reason to a few words.
         """.trimIndent()
     }

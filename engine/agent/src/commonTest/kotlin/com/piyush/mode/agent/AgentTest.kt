@@ -294,18 +294,61 @@ class AgentTest {
     }
 
     @Test
-    fun aSecondAddWaitsUntilTheFirstWasCheckedThenGoesThrough() = runTest {
-        val phone = FakePhone(List(10) { listOf("Chocolate oats" to (200.0 to 136.0)) })
-        val add = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
+    fun aConfirmedAddIsNeverRepeatedEvenWhenThePlusComesBack() = runTest {
+        // This run's shape: + on a result; "Food logged!" right after; later the row shows + again.
+        val results = listOf("Dark chocolate oats - high protein" to (120.0 to 272.0), "392 cal, 100 gram" to (120.0 to 291.0))
+        val phone = FakePhone(listOf(results, results + ("Food logged!" to (200.0 to 700.0))) + List(10) { results })
+        val add = call("tap", "x" to 411, "y" to 340, "reason" to "Adding the 100 g oats to Dinner")
         val model = ScriptedModel(
-            add, add, add,
-            call("scroll", "direction" to "up", "reason" to "Checking the diary"),
-            add,
-            call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"),
+            add, add,
+            call("done", "evidence" to "Food logged!", "summary" to "x"), call("done", "evidence" to "Food logged!", "summary" to "x"),
         )
-        Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
-        // The first add goes through; two more wait for a check; after the check one more may go.
-        assertEquals(2, phone.actions.count { it is Op.Tap })
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong")).run("add oats 100 g to dinner")
+        assertEquals(1, phone.actions.count { it is Op.Tap }, "the second + is refused: it was confirmed")
+        assertTrue("already done at step 1" in model.lastUserText || "DONE SO FAR" in model.lastUserText, model.lastUserText)
+        assertTrue("Dark chocolate oats - high protein" in model.lastUserText, "the record names the item")
+    }
+
+    @Test
+    fun waitingOrScrollingIsNotACheckButLeavingThePageIs() = runTest {
+        val results = listOf("Chocolate oats" to (120.0 to 272.0), "196 cal" to (120.0 to 291.0), "Search Results" to (100.0 to 200.0))
+        val diary = listOf("Dinner" to (100.0 to 300.0), "Breakfast" to (100.0 to 200.0), "Calories remaining" to (200.0 to 150.0))
+        // The fake phone moves to its next screen on each phone action: add → results, close → the diary.
+        val phone = FakePhone(listOf(results, results, diary, results) + List(10) { results })
+        val add = call("tap", "x" to 411, "y" to 340, "reason" to "Adding the oats")
+        val model = ScriptedModel(
+            add,                                                                        // goes through, no proof
+            call("wait", "seconds" to 1, "reason" to "checking"),
+            add,                                                                        // held: a wait is not a check
+            call("tap", "x" to 30, "y" to 100, "reason" to "Closing the search to see the diary"), // leaves the page
+            add,                                                                        // now allowed
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("add oats")
+        assertEquals(2, phone.actions.count { it is Op.Tap && it.x > 300 }, "the add after the wait waited; after leaving the page it went")
+    }
+
+    @Test
+    fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
+        val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
+        val model = ScriptedModel(
+            call("tap", "x" to 411, "y" to 340, "reason" to "Check the item is logged"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("add oats")
+        assertEquals(0, phone.actions.count { it is Op.Tap })
+        assertTrue("this button adds" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun aTapOnAnIconIsDescribedByItsRow() = runTest {
+        val phone = FakePhone(List(10) { listOf("Dark chocolate oats - high protein" to (120.0 to 272.0), "392 cal, 100 gram" to (120.0 to 291.0)) })
+        val model = ScriptedModel(
+            call("tap", "x" to 411, "y" to 340, "reason" to "Opening it"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertTrue("tap beside \"Dark chocolate oats - high protein · 392 cal, 100 gram\"" in model.lastUserText, model.lastUserText)
     }
 
     @Test
@@ -467,9 +510,9 @@ class AgentTest {
         val plan = call("plan", "steps" to "1. find it")
         val model = ScriptedModel(plan, plan, plan, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
-        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
-        assertTrue("planned again without acting" in model.lastUserText)
-        assertTrue("planned or looked things up 3 times in a row" in model.lastUserText, model.lastUserText)
+        // The second plan is refused and the strong model takes the next decision.
+        assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
+        assertTrue("not saved: you just planned" in model.lastUserText, model.lastUserText)
     }
 
     @Test

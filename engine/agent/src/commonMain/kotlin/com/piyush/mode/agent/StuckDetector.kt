@@ -23,6 +23,8 @@ class StuckDetector(private val canStepUp: Boolean) {
     /** plan and recall calls in a row with no phone action between them. */
     private var plans = 0
     private var steppedUp = false
+    /** A moment that matters (a change held back, plan churn): the next decision goes to the strong model. */
+    private var critical = false
     /** Screens seen right after phone actions, newest last. */
     private val recent = ArrayDeque<String>()
 
@@ -45,6 +47,10 @@ class StuckDetector(private val canStepUp: Boolean) {
             return Verdict.Stop("the screen stopped changing after $unchanged tries")
         }
         if (visits >= STOP_VISITS) return Verdict.Stop("it kept coming back to the same screen ($visits times in $WINDOW steps)")
+        if (critical) {
+            critical = false
+            return stepUp(null)
+        }
         return when {
             visits >= WARN_VISITS -> stepUp(
                 "you have been on this screen $visits times in the last $WINDOW steps: this route is not working, try a different one",
@@ -56,6 +62,9 @@ class StuckDetector(private val canStepUp: Boolean) {
             else -> Verdict.Fine
         }
     }
+
+    /** The next decision matters more than usual: ask the strong model (when there is one). */
+    fun critical() { critical = true }
 
     /** A reply with no usable action. */
     fun badReply() { badReplies++ }
