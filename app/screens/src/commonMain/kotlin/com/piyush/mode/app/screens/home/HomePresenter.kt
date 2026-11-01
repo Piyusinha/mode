@@ -44,6 +44,10 @@ public data class RecentConversation(
     val conversationId: String,
     val title: String,
     val day: RelativeDay,
+    /** When it was last active, epoch ms (for the time of day). */
+    val atMs: Long,
+    /** How long its latest task took, in seconds. */
+    val durationSeconds: Long?,
     /** How its latest task ended; null while it is still going. */
     val badge: TaskBadge?,
 )
@@ -69,7 +73,9 @@ public class HomePresenter(
                     name = s.userName,
                     suggestions = suggestions(recentTasks.map { it.text }, items.filter { it.kind == MemoryKind.Skill }.sortedByDescending { it.successes }.map { it.title to it.app }),
                     recent = convs.map { c ->
-                        RecentConversation(c.id, c.title, clock.relativeDay(c.updatedAt), latestByConversation[c.id]?.firstOrNull()?.status?.badge())
+                        val latest = latestByConversation[c.id]?.firstOrNull()
+                        val seconds = latest?.let { t -> t.startedAt?.let { s -> t.endedAt?.let { e -> (e - s) / 1000 } } }
+                        RecentConversation(c.id, c.title, clock.relativeDay(c.updatedAt), c.updatedAt, seconds, latest?.status?.badge())
                     },
                     running = run.running(tasks),
                     needsKey = !s.hasApiKey,

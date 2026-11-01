@@ -15,6 +15,9 @@ public data class RunningTask(
     val status: String,
     /** The agent is waiting for the user's answer. */
     val question: Question?,
+    val paused: Boolean = false,
+    /** When it started, epoch ms, for the elapsed time. */
+    val startedAtMs: Long? = null,
 )
 
 public data class Question(val text: String, val yesNo: Boolean)
@@ -41,5 +44,7 @@ internal fun TaskState.running(tasks: TaskRepository): RunningTask? {
         steps = steps.size,
         status = status,
         question = question?.let { Question(it.text, it.yesNo) },
+        paused = paused,
+        startedAtMs = startedAtMs,
     )
 }

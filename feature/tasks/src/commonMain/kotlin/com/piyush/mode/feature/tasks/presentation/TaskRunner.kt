@@ -4,6 +4,7 @@ import com.piyush.mode.agent.Agent
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
+import com.piyush.mode.agent.PauseGate
 import com.piyush.mode.agent.TaskContext
 import com.piyush.mode.agent.UserGate
 import com.piyush.mode.core.common.ActivityTracker
@@ -75,6 +76,9 @@ public class TaskRunner(
     private var job: Job? = null
     /** The task running now, to stop it without stopping the queue. */
     private var current: Job? = null
+    /** Pause for the task running now. */
+    private var pauseGate: PauseGate? = null
+
     /** One phone: a queued task and a comparison run never drive it at once. */
     private val phoneLock = Mutex()
 
@@ -102,6 +106,17 @@ public class TaskRunner(
         job?.cancel()
         current?.cancel()
         state.value.question?.answer?.complete(null)
+    }
+
+    /** Pauses the running task after its current step. */
+    public fun pause() {
+        pauseGate?.pause()
+        mutableState.update { it.copy(paused = true, status = "Paused") }
+    }
+
+    public fun resume() {
+        pauseGate?.resume()
+        mutableState.update { it.copy(paused = false) }
     }
 
     /** Answers the pending question; null stops the task. */
@@ -166,7 +181,8 @@ public class TaskRunner(
         val conversation = saved.conversationId
         // A follow-up sees how the earlier tasks in its conversation went (not this task's own turn).
         val earlier = conversation?.let { earlierTurns(it, excluding = saved.id) }.orEmpty()
-        mutableState.update { TaskState(running = true, taskId = saved.id, conversationId = conversation) }
+        mutableState.update { TaskState(running = true, taskId = saved.id, conversationId = conversation, startedAtMs = startOfNow()) }
+        val gate = PauseGate().also { pauseGate = it }
         notifier.requestPermission()
         runs.prune()
         val recorder = RunRecorder(files, tag = tag, index = runs, taskId = saved.id)
@@ -211,6 +227,8 @@ public class TaskRunner(
                 onStatus = ::status,
                 trace = recorder,
                 memory = prepared?.agentMemory,
+                pause = gate,
+                onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
             )
             // Started from Mode's own screen; the agent goes straight to the app it needs.
             val finished = background.run { agent.run(task, startsInMode = true, context = prepared?.context ?: base) }
@@ -240,7 +258,8 @@ public class TaskRunner(
         } finally {
             tasks.finish(saved.id, outcome, reply, result?.steps, result?.costUsd)
             conversation?.let { conversations.addTurn(it, TurnRole.Mode, reply, saved.id) }
-            mutableState.update { it.copy(running = false, question = null) }
+            mutableState.update { it.copy(running = false, question = null, paused = false) }
+            pauseGate = null
             // Also after Stop: cleanup must not be cancelled with the task.
             if (!stayConnected) withContext(NonCancellable) { session.disconnect() }
         }
@@ -297,6 +316,8 @@ public class TaskRunner(
     }
 
     private fun money(usd: Double): String = "$" + ((usd * 100).roundToInt() / 100.0).toString()
+
+    private fun startOfNow(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
     private fun status(text: String) {
         mutableState.update { it.copy(status = text) }

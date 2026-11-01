@@ -29,6 +29,8 @@ public data class MemoryEntry(
     val learned: RelativeDay,
     val uses: Int,
     val successes: Int,
+    /** Where Mode learned it: the step or answer it came from. */
+    val evidence: String,
 )
 
 /** Memory: what Mode has learned, by kind; delete one, forget everything, stop learning. */
@@ -56,9 +58,23 @@ public class MemoryPresenter(
         memory.forget(id)
     }
 
+    /** The user corrects what Mode remembered. */
+    public fun edit(id: String, text: String) {
+        memory.update(id, text, evidence = EDITED_BY_YOU)
+    }
+
+    public fun deleteMany(ids: Collection<String>) {
+        ids.forEach(memory::forget)
+    }
+
     public fun forgetEverything() {
         memory.forgetEverything()
     }
 
-    private fun MemoryItem.entry() = MemoryEntry(id, title, text, app, clock.relativeDay(createdAt), uses, successes)
+    private fun MemoryItem.entry() = MemoryEntry(id, title, text, app, clock.relativeDay(createdAt), uses, successes, evidence)
+
+    public companion object {
+        /** The evidence on an item the user wrote themselves. */
+        public const val EDITED_BY_YOU: String = "edited by you"
+    }
 }

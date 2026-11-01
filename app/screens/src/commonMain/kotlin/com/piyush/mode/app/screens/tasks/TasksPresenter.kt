@@ -17,7 +17,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.datetime.isoDayNumber
 
+/** Which part of Tasks is showing. */
+public enum class TaskFilter { Now, Scheduled, Done }
+
 public data class TasksUiState(
+    val filter: TaskFilter = TaskFilter.Now,
     val running: RunningTask? = null,
     val upNext: List<QueuedTask> = emptyList(),
     val repeats: List<RepeatingTask> = emptyList(),
@@ -62,8 +66,9 @@ public class TasksPresenter(
 
     init {
         scope.launch {
-            combine(runner.state, queue.queue, scheduler.all, tasks.recent(MAX_DONE)) { run, waiting, schedules, recent ->
+            combine(runner.state, queue.queue, scheduler.all, tasks.recent(MAX_DONE), filter) { run, waiting, schedules, recent, f ->
                 TasksUiState(
+                    filter = f,
                     running = run.running(tasks),
                     upNext = waiting.map { QueuedTask(it.id, it.text, it.source, clock.relativeDay(it.createdAt), it.createdAt) },
                     repeats = schedules.map {
@@ -76,6 +81,10 @@ public class TasksPresenter(
                 )
             }.collect { mutableState.value = it }
         }
+    }
+
+    public fun setFilter(f: TaskFilter) {
+        filter.value = f
     }
 
     public fun cancel(taskId: String) {
@@ -97,6 +106,8 @@ public class TasksPresenter(
     public fun deleteRepeat(scheduleId: String) {
         scheduler.delete(scheduleId)
     }
+
+    private val filter = kotlinx.coroutines.flow.MutableStateFlow(TaskFilter.Now)
 
     private companion object {
         const val MAX_DONE = 30L

@@ -111,6 +111,10 @@ class Agent(
     private val trace: AgentTrace = AgentTrace.None,
     /** What Mode remembers; null runs without recall or app tips. */
     private val memory: AgentMemory? = null,
+    /** Pausing between steps; null: the task can't be paused. */
+    private val pause: PauseGate? = null,
+    /** Each screenshot the agent looks at, for the live view. */
+    private val onScreen: (ByteArray) -> Unit = {},
 ) {
     private val clock = TimeSource.Monotonic
 
@@ -187,11 +191,18 @@ class Agent(
                     )
                 }
             }
+            pause?.let { gate ->
+                if (gate.isPaused.value) {
+                    onStatus("Paused")
+                    gate.awaitRunning()
+                }
+            }
             val stepStarted = clock.markNow()
             onStatus("Step $step: looking")
             val lookStarted = clock.markNow()
             val screen = look()
             finalScreen = screen.jpeg
+            onScreen(screen.jpeg)
             trace.looked(
                 step, screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts,
                 lookStarted.elapsedNow().inWholeMilliseconds,
@@ -585,6 +596,8 @@ class Agent(
               off, the message shows as sent)? If your last action did nothing, fix that first.
             - Call done with a short summary (include what the user asked to know, from your notes) and the
               evidence on screen. Give the facts as they finally are; do not talk about your notes or steps.
+              When you list things with times (calendar events, reminders), put each on its own line as
+              "HH:MM what", for example "14:00 Biozyme with lunch".
               If it cannot be done, call done with success false and say why.
             - Plan once, then act. Update the plan only after finishing an item or changing course.
             - Keep each reason to a few words.

@@ -28,6 +28,12 @@ public data class TaskState(
     val taskId: String? = null,
     /** The conversation it belongs to; null for comparison runs. */
     val conversationId: String? = null,
+    /** Paused by the user between steps. */
+    val paused: Boolean = false,
+    /** The last screenshot the agent looked at (JPEG), for the live view. */
+    val latestScreen: ByteArray? = null,
+    /** When this task started running, epoch ms. */
+    val startedAtMs: Long? = null,
     /** Facts about the user this task taught Mode, for "Remembered · Undo". Arrives a moment after the task ends. */
     val remembered: List<MemoryItem> = emptyList(),
 )

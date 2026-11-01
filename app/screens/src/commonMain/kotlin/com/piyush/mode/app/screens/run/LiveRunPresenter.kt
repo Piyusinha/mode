@@ -15,6 +15,10 @@ import kotlinx.coroutines.launch
 
 public data class LiveRunUiState(
     val running: RunningTask? = null,
+    /** The app Mode is using, as it last saw it (JPEG). */
+    val screen: ByteArray? = null,
+    /** What it is doing now, in its own words. */
+    val now: String? = null,
     val steps: List<LiveStep> = emptyList(),
     /** How the last task ended, once it has. */
     val finished: FinishedRun? = null,
@@ -44,6 +48,8 @@ public class LiveRunPresenter(
             runner.state.collect { s ->
                 mutableState.value = LiveRunUiState(
                     running = s.running(tasks),
+                    screen = s.latestScreen.takeIf { s.running },
+                    now = s.steps.lastOrNull()?.let { it.reason.ifBlank { it.action } },
                     steps = s.steps.map { LiveStep(it.index, it.reason, it.action, !it.outcome.startsWith("failed") && !it.outcome.startsWith("not "), it.millis / 1000.0) },
                     finished = s.lastResult?.takeIf { !s.running }?.let { r ->
                         val (badge, summary) = when (val o = r.outcome) {
@@ -60,6 +66,14 @@ public class LiveRunPresenter(
 
     public fun stop() {
         runner.stop()
+    }
+
+    public fun pause() {
+        runner.pause()
+    }
+
+    public fun resume() {
+        runner.resume()
     }
 
     /** Answers the agent's question; null stops the task. */

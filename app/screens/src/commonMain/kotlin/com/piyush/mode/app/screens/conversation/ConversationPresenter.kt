@@ -41,7 +41,43 @@ public data class TurnItem(
     val badge: TaskBadge?,
     /** On Mode's replies: how many screens the agent saw, for "See all N screens". */
     val screens: Int,
+    /** The text split into paragraphs and lists of timed items. */
+    val parts: List<ReplyPart>,
+    /** On your messages: where the task came from (Siri and the Watch show as spoken). */
+    val source: TaskSource?,
+    val atMs: Long,
 )
+
+/** Part of a message: a paragraph, or consecutive "HH:MM thing" lines shown as a timetable. */
+public sealed interface ReplyPart {
+    public data class Text(val text: String) : ReplyPart
+    public data class Times(val rows: List<TimeRow>) : ReplyPart
+}
+
+public data class TimeRow(val time: String, val text: String)
+
+/** Splits [text] into paragraphs and runs of timed lines. */
+internal fun replyParts(text: String): List<ReplyPart> {
+    val timed = Regex("""^\s*(?:[-•*]\s*)?(\d{1,2}[:.]\d{2}|All day)\s*[-–·:]?\s+(.+)$""", RegexOption.IGNORE_CASE)
+    val parts = mutableListOf<ReplyPart>()
+    val paragraph = mutableListOf<String>()
+    val rows = mutableListOf<TimeRow>()
+    fun flushParagraph() { if (paragraph.isNotEmpty()) parts += ReplyPart.Text(paragraph.joinToString("\n").trim()); paragraph.clear() }
+    fun flushRows() { if (rows.isNotEmpty()) parts += ReplyPart.Times(rows.toList()); rows.clear() }
+    for (line in text.lines()) {
+        val m = timed.find(line)
+        if (m != null) {
+            flushParagraph()
+            rows += TimeRow(m.groupValues[1].replace('.', ':'), m.groupValues[2].trim())
+        } else {
+            flushRows()
+            if (line.isNotBlank()) paragraph += line.trim()
+        }
+    }
+    flushParagraph()
+    flushRows()
+    return parts.ifEmpty { listOf(ReplyPart.Text(text)) }
+}
 
 public data class Remembered(val itemId: String, val text: String)
 
@@ -74,6 +110,9 @@ public class ConversationPresenter(
                             taskId = t.taskId,
                             badge = if (reply) task?.status?.badge() else null,
                             screens = if (reply) task?.runId?.let { runs.shots(it).size } ?: 0 else 0,
+                            parts = if (reply) replyParts(t.text) else listOf(ReplyPart.Text(t.text)),
+                            source = if (reply) null else task?.source,
+                            atMs = t.createdAt,
                         )
                     },
                     running = run.running(tasks)?.takeIf { it.conversationId == conversationId },
@@ -101,6 +140,17 @@ public class ConversationPresenter(
 
     public fun stop() {
         runner.stop()
+    }
+
+    /** The conversation as plain text, to share. */
+    public fun transcript(): String = state.value.turns.joinToString("\n\n") { (if (it.fromUser) "› " else "") + it.text }
+
+    /** The first thing asked here, to repeat on a schedule. */
+    public fun taskToRepeat(): String = state.value.turns.firstOrNull { it.fromUser }?.text.orEmpty()
+
+    /** Deletes the conversation and its turns; its tasks stay in Tasks. */
+    public fun delete() {
+        conversations.delete(conversationId)
     }
 
     private companion object {

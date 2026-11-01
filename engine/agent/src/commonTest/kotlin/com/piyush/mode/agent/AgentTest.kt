@@ -12,6 +12,7 @@ import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.testing.FakePhone
 import com.piyush.mode.testing.ScriptedModel
 import com.piyush.mode.testing.call
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -483,5 +484,26 @@ class AgentTest {
         Agent(phone, model, Gate(), noSettle, memory = memory).run("read my calendar")
         assertEquals(1, Regex("Calendar: the list button is top right").findAll(model.lastUserText).count())
         assertTrue("TIPS FOR THESE APPS" in model.lastUserText)
+    }
+
+    @Test
+    fun aPausedTaskWaitsBeforeItsNextStepAndShowsEachScreen() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val gate = PauseGate()
+        val screens = mutableListOf<ByteArray>()
+        val statuses = mutableListOf<String>()
+        val model = ScriptedModel(call("home", "reason" to "x"), call("done", "evidence" to "x", "summary" to "ok"))
+        gate.pause()
+        var result: AgentResult? = null
+        val job = launch {
+            result = Agent(phone, model, Gate(), noSettle, onStatus = { statuses += it }, pause = gate, onScreen = { screens += it }).run("t")
+        }
+        testScheduler.runCurrent()
+        assertEquals(listOf("Paused"), statuses, "nothing happens while paused")
+        assertTrue(model.models.isEmpty())
+        gate.resume()
+        job.join()
+        assertIs<AgentOutcome.Done>(result!!.outcome)
+        assertEquals(2, screens.size)
     }
 }
