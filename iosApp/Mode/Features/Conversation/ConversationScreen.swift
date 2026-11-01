@@ -18,13 +18,12 @@ struct ConversationScreen: View {
                         Text(state.when).modeText(.subheadline, color: ModeColor.textSecondary)
                     }
                     ForEach(state.messages) { message in
-                        MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? []) { onEvent(.openScreens($0)) }
+                        MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? [], onEvent: onEvent)
                             .id(message.id)
                     }
                     if let working = state.working {
-                        ModeMiniPlayer(title: String(localized: L10n.Conversation.working), status: working, paused: false,
-                                       pauseLabel: L10n.Run.pause, resumeLabel: L10n.Run.resume, stopLabel: L10n.Common.stop,
-                                       onPauseToggle: {}, onStop: { onEvent(.stop) }, onOpen: {})
+                        ModeWorkingLine(status: working, stopLabel: L10n.Common.stop, onOpen: { onEvent(.openLive) }, onStop: { onEvent(.stop) })
+                            .transition(.opacity)
                     }
                     ForEach(state.remembered) { item in
                         ModeRememberedChip(item.text, undoTitle: L10n.Common.undo) { onEvent(.undo(item.id)) }
@@ -66,26 +65,28 @@ struct ConversationScreen: View {
     }
 }
 
-/// One message: yours in an accent bubble; Mode's as plain text, with timetables and its screens.
+/// One message: yours in an accent bubble; Mode's as a rich reply (how it ended if it didn't
+/// work, the answer, its screens), with Copy, Try again and Share under it.
 private struct MessageView: View {
     let message: ConversationViewModel.Message
     let thumbnails: [Image]
-    let onScreens: (String) -> Void
+    let onEvent: (ConversationViewModel.Event) -> Void
 
     var body: some View {
         if message.fromUser {
             ModeUserBubble(message.text, tag: message.spoken ? L10n.Conversation.spoken : nil)
         } else {
             VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
-                    switch part {
-                    case let .text(text): Text(text).modeText(.body)
-                    case let .times(rows): ModeTimeTable(rows: rows.map { (time: $0.time, text: $0.text) })
-                    }
-                }
+                if let status = message.status { ModeBadge(status.text, icon: status.icon, tone: status.tone) }
+                ModeReply(message.blocks)
                 if let screens = message.screens {
-                    ModeScreensLink(title: screens.label, thumbnails: thumbnails) { onScreens(screens.taskId) }
+                    ModeScreensLink(title: screens.label, thumbnails: thumbnails) { onEvent(.openScreens(screens.taskId)) }
                 }
+                ModeReplyActions([
+                    .init(.copy, label: L10n.Conversation.copy) { onEvent(.copy(message)) },
+                    .init(.runAgain, label: L10n.Conversation.tryAgain) { onEvent(.retry(message)) },
+                    .init(.share, label: L10n.Conversation.shareReply) { onEvent(.shareReply(message)) },
+                ])
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

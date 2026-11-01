@@ -74,6 +74,14 @@ public enum ModeSize {
     public static let screenAspect: CGFloat = 9.0 / 19.5
     /// Grid cells on All screens.
     public static let gridSpacing: CGFloat = 10
+    /// Replies: the time column and accent bar of an agenda, a list's mark column, a quote's bar,
+    /// the small buttons under a reply, and how far the working shimmer travels.
+    public static let agendaTime: CGFloat = 52
+    public static let agendaBar: CGFloat = 3
+    public static let listMark: CGFloat = 14
+    public static let quoteBar: CGFloat = 3
+    public static let replyAction: CGFloat = 34
+    public static let shimmerTravel: CGFloat = 160
 
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520
@@ -86,4 +94,13 @@ public enum ModeSize {
 public enum ModeMotion {
     public static let quick = Animation.snappy(duration: 0.2)
     public static let standard = Animation.smooth(duration: 0.35)
+    /// One sweep of the working shimmer.
+    public static let shimmerSeconds: Double = 1.4
+}
+
+/// Opacities for effects.
+public enum ModeOpacity {
+    /// The brightest point of the working shimmer, and its width as a share of the text.
+    public static let shimmer: Double = 0.55
+    public static let shimmerWidth: CGFloat = 0.5
 }

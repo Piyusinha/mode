@@ -112,6 +112,10 @@ enum L10n {
     enum Conversation {
         static let working = LocalizedStringResource("conversation.working", defaultValue: "Working on it")
         static let spoken = LocalizedStringResource("conversation.spoken", defaultValue: "Spoken")
+        static let allDay = LocalizedStringResource("conversation.allDay", defaultValue: "All day")
+        static let copy = LocalizedStringResource("conversation.copy", defaultValue: "Copy")
+        static let tryAgain = LocalizedStringResource("conversation.tryAgain", defaultValue: "Try again")
+        static let shareReply = LocalizedStringResource("conversation.shareReply", defaultValue: "Share reply")
         static let share = LocalizedStringResource("conversation.share", defaultValue: "Share")
         static let more = LocalizedStringResource("conversation.more", defaultValue: "More")
         static let repeatTask = LocalizedStringResource("conversation.repeat", defaultValue: "Repeat this task…")

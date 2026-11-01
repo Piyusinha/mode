@@ -3,32 +3,28 @@ import ModeDesignSystem
 import ModeKit
 import Observation
 import SwiftUI
+import UIKit
 
 /// One conversation, as on the Chat board.
 @MainActor
 @Observable
 final class ConversationViewModel {
-    enum Part: Equatable {
-        case text(String)
-        case times([TimeRow])
-    }
-
-    struct TimeRow: Equatable {
-        let time: String
-        let text: String
-    }
-
     struct Message: Identifiable, Equatable {
         let id: String
         let fromUser: Bool
         let spoken: Bool
+        /// The raw text, for Copy.
         let text: String
-        let parts: [Part]
+        /// Mode's reply, drawn block by block.
+        let blocks: [ModeReplyBlock]
+        /// How the task ended, when it didn't simply work ("Couldn't finish", "Stopped").
+        let status: Format.BadgeStyle?
         /// "See all 11 screens" and the task it opens.
         let screens: (label: String, taskId: String)?
 
         static func == (a: Message, b: Message) -> Bool {
-            a.id == b.id && a.text == b.text && a.parts == b.parts && a.screens?.label == b.screens?.label
+            a.id == b.id && a.text == b.text && a.blocks == b.blocks && a.status?.text.key == b.status?.text.key
+                && a.screens?.label == b.screens?.label
         }
     }
 
@@ -36,6 +32,7 @@ final class ConversationViewModel {
         var title = ""
         var when = ""
         var messages: [Message] = []
+        /// What Mode is doing now, while this conversation's task runs.
         var working: String?
         var remembered: [Remembered] = []
         var isPrivate = false
@@ -48,6 +45,7 @@ final class ConversationViewModel {
 
     enum Event {
         case send, speak, togglePrivate, undo(String), openScreens(String), stop, share, repeatTask, askDelete, confirmDelete
+        case copy(Message), retry(Message), shareReply(Message), openLive
     }
 
     private(set) var state = State()
@@ -83,6 +81,10 @@ final class ConversationViewModel {
         case .stop: presenter.stop()
         case .share: sharing = SharedText(text: presenter.transcript())
         case .repeatTask: repeating = SharedText(text: presenter.taskToRepeat())
+        case let .copy(message): UIPasteboard.general.string = message.text
+        case let .retry(message): _ = presenter.retry(turnId: message.id)
+        case let .shareReply(message): sharing = SharedText(text: message.text)
+        case .openLive: navigate(.liveRun)
         case .askDelete: confirmingDelete = true
         case .confirmDelete:
             presenter.delete()
@@ -110,6 +112,23 @@ final class ConversationViewModel {
         }
     }
 
+    private static func block(_ part: ReplyPart) -> ModeReplyBlock {
+        switch onEnum(of: part) {
+        case let .paragraph(p): .paragraph(p.text)
+        case let .heading(p): .heading(level: Int(p.level), p.text)
+        case let .bullets(p): .bullets(p.items)
+        case let .numbered(p): .numbered(start: Int(p.start), p.items)
+        case let .agenda(p):
+            .agenda(p.rows.map { row in
+                ModeAgendaRow(time: row.start ?? String(localized: L10n.Conversation.allDay), end: row.end, text: row.text, allDay: row.start == nil)
+            })
+        case let .table(p): .table(header: p.header, rows: p.rows)
+        case let .quote(p): .quote(p.text)
+        case let .code(p): .code(p.text)
+        case .divider: .divider
+        }
+    }
+
     private static func map(_ s: ConversationUiState) -> State {
         State(
             title: s.title,
@@ -120,16 +139,12 @@ final class ConversationViewModel {
                     fromUser: t.fromUser,
                     spoken: t.source == .siri || t.source == .watch,
                     text: t.text,
-                    parts: t.parts.map { part in
-                        switch onEnum(of: part) {
-                        case let .text(p): .text(p.text)
-                        case let .times(p): .times(p.rows.map { TimeRow(time: $0.time, text: $0.text) })
-                        }
-                    },
+                    blocks: t.parts.map(block),
+                    status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
                     screens: t.screens > 0 ? t.taskId.map { (L10n.Conversation.seeScreens(Int(t.screens)), $0) } : nil
                 )
             },
-            working: s.running?.status,
+            working: s.running.map { $0.paused ? String(localized: L10n.Run.paused) : $0.status },
             remembered: s.remembered.map { Remembered(id: $0.itemId, text: L10n.Conversation.remembered($0.text)) },
             isPrivate: s.privateNext
         )

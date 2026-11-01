@@ -250,9 +250,10 @@ public class TaskRunner(
             throw e
         } catch (e: Exception) {
             outcome = TaskStatus.Failed
-            reply = "Failed: ${e.message}"
+            // The chat shows "Failed" as a tag; the reply is just what went wrong.
+            reply = e.message ?: "Something went wrong."
             AppLog.error("agent", "run ${recorder.id} failed", e)
-            status(reply)
+            status("Failed: $reply")
             notifier.post("Mode", "Task failed: ${e.message}")
             return null
         } finally {
@@ -354,10 +355,10 @@ public class TaskRunner(
         is AgentOutcome.Failed -> TaskStatus.Failed
     }
 
-    /** What Mode says in the conversation when a task ends. */
+    /** What Mode says in the conversation when a task ends; how it ended shows as a tag beside it. */
     private fun replyFor(outcome: AgentOutcome): String = when (outcome) {
-        is AgentOutcome.Done -> if (outcome.success) outcome.summary else "I couldn't finish: ${outcome.summary}"
+        is AgentOutcome.Done -> outcome.summary
         is AgentOutcome.Stopped -> outcome.why
-        is AgentOutcome.Failed -> "Failed: ${outcome.why}"
+        is AgentOutcome.Failed -> outcome.why
     }
 }

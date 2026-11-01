@@ -26,6 +26,8 @@ public enum ModeTextStyle: CaseIterable, Sendable {
 
 public enum ModeTypography {
     public static let displayFamily = "Instrument Sans"
+    /// Code blocks in replies.
+    public static let code = Font.system(.callout, design: .monospaced)
 
     /// Registers the bundled fonts; call once at launch. Returns false if they didn't load
     /// (headings then fall back to SF Pro).

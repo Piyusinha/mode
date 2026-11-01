@@ -131,7 +131,11 @@ object AgentTools {
         Tool(
             "done", "The task is complete, or cannot be done. Check the screen first.", null,
             listOf(
-                Param("summary", "string", "Short summary for the user, including anything they asked to know (use your notes)."),
+                Param(
+                    "summary", "string",
+                    "Your reply to the user, in Markdown, like a helpful chat answer: the answer first, then any " +
+                        "details they asked to know (from your notes). Not your steps or notes.",
+                ),
                 Param("success", "boolean", "Whether the task was achieved."),
                 Param(
                     "evidence", "string",

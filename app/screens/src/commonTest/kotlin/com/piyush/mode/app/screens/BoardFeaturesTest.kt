@@ -29,13 +29,13 @@ class BoardFeaturesTest {
         val parts = replyParts("Done. I sent \"Leaving in 10\" to Sonali.\nHere's your day:\n14:00 Biozyme with lunch\n21:00 – Shelcal, fish oil\n- 23.00 Softovac before bed\nThat's all.")
         assertEquals(
             listOf(
-                ReplyPart.Text("Done. I sent \"Leaving in 10\" to Sonali.\nHere's your day:"),
-                ReplyPart.Times(listOf(TimeRow("14:00", "Biozyme with lunch"), TimeRow("21:00", "Shelcal, fish oil"), TimeRow("23:00", "Softovac before bed"))),
-                ReplyPart.Text("That's all."),
+                ReplyPart.Paragraph("Done. I sent \"Leaving in 10\" to Sonali.\nHere's your day:"),
+                ReplyPart.Agenda(listOf(TimeRow("14:00", null, "Biozyme with lunch"), TimeRow("21:00", null, "Shelcal, fish oil"), TimeRow("23:00", null, "Softovac before bed"))),
+                ReplyPart.Paragraph("That's all."),
             ),
             parts,
         )
-        assertEquals(listOf(ReplyPart.Text("Dark mode is off.")), replyParts("Dark mode is off."))
+        assertEquals(listOf(ReplyPart.Paragraph("Dark mode is off.")), replyParts("Dark mode is off."))
     }
 
     @Test

@@ -594,11 +594,21 @@ class Agent(
             Finishing:
             - Before calling done, look at the screen: does it really show the task happened (the switch is
               off, the message shows as sent)? If your last action did nothing, fix that first.
-            - Call done with a short summary (include what the user asked to know, from your notes) and the
-              evidence on screen. Give the facts as they finally are; do not talk about your notes or steps.
-              When you list things with times (calendar events, reminders), put each on its own line as
-              "HH:MM what", for example "14:00 Biozyme with lunch".
-              If it cannot be done, call done with success false and say why.
+            - Call done with the evidence on screen and a summary: your reply to the user, shown in a chat
+              that renders Markdown. Write it like a good chat answer:
+              - First line: the answer or what you did, in one short sentence.
+              - Several things: a list, one item per line starting with "- ".
+              - Timed things (calendar events, reminders, schedules): one per line as "- HH:MM – what"
+                ("- 14:00 – Biozyme with lunch", "- 14:00–15:00 – Team call"); all-day ones as
+                "- All day – what". 24-hour times, in order.
+              - **Bold** the one or two facts that matter most (a price, a name, a code). Use a table only
+                to compare several things across several details, and a "### Heading" only when the reply
+                has separate parts.
+              - Only the facts as they finally are. Never mention your notes, steps, screens or earlier
+                guesses; if something is uncertain, say so once in plain words ("about 22:00").
+              - Short: a few lines unless the user asked for detail. No closing offers or questions.
+              If it cannot be done, call done with success false: say why in one sentence, then what the
+              user could try, as a short list if there is more than one thing.
             - Plan once, then act. Update the plan only after finishing an item or changing course.
             - Keep each reason to a few words.
         """.trimIndent()
