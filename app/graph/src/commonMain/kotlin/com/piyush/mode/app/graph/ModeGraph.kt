@@ -106,7 +106,7 @@ class ModeGraph(platform: PlatformServices) {
     /** Each screen's presenter, for the native UI. */
     val screens: Screens = Screens(
         scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session,
-        platform.permissions, platform.phoneChecks, com.piyush.mode.llm.OpenRouterAuth(platform.http),
+        platform.permissions, platform.phoneChecks, com.piyush.mode.llm.OpenRouterAuth(platform.http), platform.lifecycle,
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)

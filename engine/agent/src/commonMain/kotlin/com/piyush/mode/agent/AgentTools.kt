@@ -96,8 +96,8 @@ object AgentTools {
             ),
         ),
         Tool(
-            "back", "Go back one screen with the iOS edge swipe. Prefer the screen's own Back / \"<\" button when " +
-                "there is one.", "input.drag", listOf(reason),
+            "back", "Go back one screen inside the current app with the iOS edge swipe. Prefer the screen's own " +
+                "Back / \"<\" button when there is one. To return to a different app, use open_app with its name.", "input.drag", listOf(reason),
         ),
         Tool(
             "control_center", "Open Control Center (quick toggles: Wi-Fi, Bluetooth, brightness, Focus, " +

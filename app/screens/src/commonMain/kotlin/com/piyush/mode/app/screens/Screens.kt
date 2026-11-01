@@ -10,6 +10,7 @@ import com.piyush.mode.app.screens.memory.MemoryPresenter
 import com.piyush.mode.app.screens.onboarding.OnboardingPresenter
 import com.piyush.mode.app.screens.settings.SettingsPresenter
 import com.piyush.mode.feature.connection.presentation.PhoneSession
+import com.piyush.mode.core.platform.AppLifecycle
 import com.piyush.mode.core.platform.Permissions
 import com.piyush.mode.feature.connection.domain.PhoneChecks
 import com.piyush.mode.llm.OpenRouterAuth
@@ -44,6 +45,7 @@ public class Screens(
     private val permissions: Permissions,
     private val phoneChecks: PhoneChecks,
     private val auth: OpenRouterAuth,
+    private val lifecycle: AppLifecycle,
     private val clock: ScreenClock = ScreenClock(),
 ) {
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
@@ -61,7 +63,7 @@ public class Screens(
 
     public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog)
 
-    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth)
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle)
 
     /** Whether first-run setup still has to be shown. */
     public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone

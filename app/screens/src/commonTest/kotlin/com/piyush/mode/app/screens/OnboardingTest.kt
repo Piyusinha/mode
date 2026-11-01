@@ -5,6 +5,7 @@ import com.piyush.mode.app.screens.onboarding.OnboardingStep
 import com.piyush.mode.app.screens.onboarding.PermissionKind
 import com.piyush.mode.app.screens.onboarding.TestItemKind
 import com.piyush.mode.app.screens.onboarding.TestItemState
+import com.piyush.mode.core.platform.AppLifecycle
 import com.piyush.mode.core.platform.PermissionStatus
 import com.piyush.mode.feature.connection.domain.CheckState
 import com.piyush.mode.llm.OpenRouterAuth
@@ -30,7 +31,18 @@ class OnboardingTest {
     }))
 
     private fun TestScope.onboarding(f: Fixture) =
-        OnboardingPresenter(backgroundScope, f.settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth)
+        OnboardingPresenter(backgroundScope, f.settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth, lifecycle)
+
+    private val lifecycle = FakeLifecycle()
+
+    /** Lets a test bring Mode "back to the front". */
+    class FakeLifecycle : AppLifecycle {
+        private val foreground = mutableListOf<() -> Unit>()
+        override fun onBackground(action: () -> Unit) {}
+        override fun onForeground(action: () -> Unit) { foreground += action }
+        override fun onTerminate(action: () -> Unit) {}
+        fun comeToFront() = foreground.forEach { it() }
+    }
 
     @Test
     fun welcomeKnowsWhetherThisIPhoneIsPaired() = runTest {
@@ -109,12 +121,25 @@ class OnboardingTest {
         val f = Fixture(this, ScriptedModel(
             call("open_app", "name" to "Settings", "reason" to "open Settings"),
             call("tap", "x" to 100, "y" to 200, "reason" to "Wi-Fi"),
+            // A real step takes seconds; this pause is when Mode comes back in front.
+            call("wait", "seconds" to 1, "reason" to "coming back"),
             // The fake screen never changes, so the first done is sent back once for a check.
             call("done", "evidence" to "Wi-Fi page", "summary" to "Opened Wi-Fi and came back."),
             call("done", "evidence" to "Wi-Fi page", "summary" to "Opened Wi-Fi and came back."),
         ))
         val p = onboarding(f)
         p.runTest()
+        // Back in front after Wi-Fi: "Come back here" ticks at once, while the run is still going.
+        var ticks = 0
+        while (p.state.value.testItems.single { i -> i.kind == TestItemKind.TapWifi }.state != TestItemState.Done && ticks++ < 10_000) {
+            testScheduler.advanceTimeBy(10)
+            testScheduler.runCurrent()
+        }
+        assertTrue(p.state.value.testRunning, "still running when Mode is back in front")
+        lifecycle.comeToFront()
+        val back = p.state.value.testItems.single { it.kind == TestItemKind.ComeBack }
+        assertEquals(TestItemState.Done, back.state)
+        assertNotNull(back.ms)
         testScheduler.advanceUntilIdle()
         val result = p.state.awaitState { it.step == OnboardingStep.Result }
         assertEquals(TestItemState.Done, result.testItems.single { it.kind == TestItemKind.OpenSettings }.state)

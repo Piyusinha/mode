@@ -37,7 +37,7 @@ internal val zone = TimeZone.of("Asia/Kolkata")
 internal fun nov(day: Int, hour: Int, minute: Int = 0): Long = LocalDateTime(2026, 11, day, hour, minute).toInstant(zone).toEpochMilliseconds()
 
 private class Link : PhoneLink {
-    override suspend fun connect() = PhoneConnection(FakePhone(List(10) { listOf("Settings" to (100.0 to 100.0)) }), "test", "")
+    override suspend fun connect() = PhoneConnection(FakePhone(List(10) { listOf("Settings" to (100.0 to 100.0), "Wi-Fi" to (100.0 to 200.0)) }), "test", "")
     override suspend fun release() {}
 }
 

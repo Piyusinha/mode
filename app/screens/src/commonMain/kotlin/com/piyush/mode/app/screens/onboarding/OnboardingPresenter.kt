@@ -3,6 +3,7 @@ package com.piyush.mode.app.screens.onboarding
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.app.screens.settings.ModelChoice
+import com.piyush.mode.core.platform.AppLifecycle
 import com.piyush.mode.core.platform.Permission
 import com.piyush.mode.core.platform.PermissionStatus
 import com.piyush.mode.core.platform.Permissions
@@ -19,6 +20,7 @@ import com.piyush.mode.llm.OpenRouterAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -100,14 +102,22 @@ public class OnboardingPresenter(
     private val permissions: Permissions,
     private val phoneChecks: PhoneChecks,
     private val auth: OpenRouterAuth,
+    lifecycle: AppLifecycle,
 ) : Presenter<OnboardingUiState>(parent, OnboardingUiState()) {
     private var verifier: String? = null
+
+    /** When the test tapped Wi-Fi, and how long Mode then took to be back in front. */
+    private var wifiTappedAt: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
+    private var cameBackMs: Long? = null
     private var selected: String? = settings.settings.value.model
     private var stuck: String? = settings.settings.value.strongModel
 
     init {
         val s = settings.settings.value
         set { it.copy(paired = phoneChecks.hasPairingFile(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
+        // "Come back here" ticks the moment Mode is in front again, not when the run ends:
+        // the agent reads this screen to know it's finished.
+        lifecycle.onForeground { if (scope.isActive) cameBack() }
         scope.launch { catalog.refresh() }
         scope.launch { catalog.state.collect { refreshModels() } }
         scope.launch { runCatching { refreshPermissions() } }
@@ -202,6 +212,8 @@ public class OnboardingPresenter(
     public fun runTest() {
         set { it.copy(step = OnboardingStep.Test, testRunning = true, testSummary = null, testShot = null, connectedMs = null,
             testItems = TestItemKind.entries.map { k -> TestItem(k, TestItemState.Pending, null) }) }
+        wifiTappedAt = null
+        cameBackMs = null
         val started = kotlin.time.TimeSource.Monotonic.markNow()
         val watch = scope.launch {
             var wifiScreen: ByteArray? = null
@@ -211,6 +223,7 @@ public class OnboardingPresenter(
                 val opened = doneAt { it.startsWith("open Settings") }
                 val tapped = doneAt { "wi-fi" in it.lowercase() }
                 if (tapped != null && wifiScreen == null && s.latestScreen != null) wifiScreen = s.latestScreen
+                if (tapped != null && wifiTappedAt == null) wifiTappedAt = kotlin.time.TimeSource.Monotonic.markNow()
                 set { st ->
                     st.copy(
                         connectedMs = st.connectedMs ?: s.latestScreen?.let { started.elapsedNow().inWholeMilliseconds },
@@ -219,7 +232,7 @@ public class OnboardingPresenter(
                             item(TestItemKind.Connected, st.connectedMs ?: s.latestScreen?.let { started.elapsedNow().inWholeMilliseconds }, running = s.latestScreen == null),
                             item(TestItemKind.OpenSettings, opened, running = s.latestScreen != null && opened == null),
                             item(TestItemKind.TapWifi, tapped, running = opened != null && tapped == null),
-                            item(TestItemKind.ComeBack, null, running = tapped != null),
+                            item(TestItemKind.ComeBack, cameBackMs, running = tapped != null),
                         ),
                     )
                 }
@@ -250,6 +263,14 @@ public class OnboardingPresenter(
                 )
             }
         }
+    }
+
+    private fun cameBack() {
+        val tapped = wifiTappedAt ?: return
+        if (!state.value.testRunning || cameBackMs != null) return
+        val ms = tapped.elapsedNow().inWholeMilliseconds
+        cameBackMs = ms
+        set { st -> st.copy(testItems = st.testItems.map { if (it.kind == TestItemKind.ComeBack) item(it.kind, ms, running = true) else it }) }
     }
 
     /** The user saw it work (or not). Not working opens Diagnose and runs the checks. */
