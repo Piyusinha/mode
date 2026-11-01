@@ -1,5 +1,8 @@
 package com.piyush.mode.feature.tasks
 
+import kotlin.test.assertNotNull
+import com.piyush.mode.ops.Op
+import com.piyush.mode.core.platform.QuestionKind
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.core.common.ActivityTracker
@@ -54,20 +57,25 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 private class Link(private val fail: String? = null) : PhoneLink {
+    var phone: FakePhone? = null
     var connects = 0
     var releases = 0
     override suspend fun connect(): PhoneConnection {
         connects++
         fail?.let { throw PhoneUnavailable(it) }
-        return PhoneConnection(FakePhone(List(10) { listOf("Settings" to (100.0 to 100.0)) }), "test", "")
+        return PhoneConnection(FakePhone(List(10) { listOf("Settings" to (100.0 to 100.0)) }).also { phone = it }, "test", "")
     }
     override suspend fun release() { releases++ }
 }
 
 private class Notes : Notifier {
     val posted = mutableListOf<String>()
+    val asked = mutableListOf<Triple<String, QuestionKind, List<String>>>()
+    var inPlace = false
     override fun requestPermission() {}
     override fun post(title: String, body: String) { posted += "$title: $body" }
+    override fun ask(id: String, text: String, kind: QuestionKind, options: List<String>) { asked += Triple(id, kind, options) }
+    override fun canAskInPlace() = inPlace
 }
 
 private object Inline : BackgroundWork {
@@ -154,6 +162,27 @@ class TaskRunnerTest {
         testScheduler.advanceUntilIdle()
         assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome)
         assertNull(f.runner.state.value.question)
+    }
+
+    @Test
+    fun withNotificationsTheQuestionIsAnsweredInPlaceAndMatchedById() = runTest {
+        // On the phone: asking opened Mode, and the confirmed "Book now" landed on Mode's own screen.
+        val f = Fixture(this, ScriptedModel(
+            call("ask_user", "question" to "Which size?", "options" to listOf("4 pcs", "8 pcs")),
+            call("done", "evidence" to "on screen", "summary" to "added"),
+        ))
+        f.notes.inPlace = true
+        f.runner.start("Add sushi", quick)
+        testScheduler.runCurrent()
+        val question = f.runner.state.value.question!!
+        assertEquals(Triple(question.id, QuestionKind.Choice, listOf("4 pcs", "8 pcs")), f.notes.asked.single())
+        assertTrue(f.link.phone!!.actions.none { it == Op.LaunchApp("com.piyush.mode") }, "Mode stays behind")
+
+        f.runner.answer("some-other-question", "8 pcs")
+        assertNotNull(f.runner.state.value.question, "an answer to another question is ignored")
+        f.runner.answer(question.id, "8 pcs")
+        testScheduler.advanceUntilIdle()
+        assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome)
     }
 
     @Test

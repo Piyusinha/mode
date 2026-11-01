@@ -27,6 +27,7 @@ final class LiveActivityController {
     init(screens: Screens) {
         presenter = screens.liveActivity()
         ModeActivityActions.onStop = { [presenter] in presenter.stop() }
+        ModeActivityActions.onAnswer = { [presenter] id, answer in presenter.answer(questionId: id, text: answer) }
         // A task from an earlier launch can't still be running.
         for old in Activity<ModeActivityAttributes>.activities {
             Updates { await old.end(nil, dismissalPolicy: .immediate) }
@@ -64,7 +65,9 @@ final class LiveActivityController {
                 plan: w.plan.map { ModeSegments.Segment($0.label, state: Self.segment($0.state)) }
             ))
         case let .waiting(w):
-            show(taskId: w.taskId, task: w.task, conversationId: w.conversationId, content: Content(phase: .waiting, question: w.question))
+            show(taskId: w.taskId, task: w.task, conversationId: w.conversationId, content: Content(
+                phase: .waiting, question: w.question, questionId: w.questionId, yesNo: w.yesNo, options: w.options
+            ))
         case let .finished(f):
             finish(taskId: f.taskId, content: Content(
                 phase: .finished,

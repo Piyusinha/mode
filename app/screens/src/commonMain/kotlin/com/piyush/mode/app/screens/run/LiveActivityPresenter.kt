@@ -38,7 +38,16 @@ public sealed interface ActivityUiState {
     public data class Ended(val taskId: String) : ActivityUiState
 
     /** The agent asked something only the user can answer. */
-    public data class Waiting(val taskId: String, val task: String, val question: String, val conversationId: String?) : ActivityUiState
+    public data class Waiting(
+        val taskId: String,
+        val task: String,
+        val question: String,
+        val conversationId: String?,
+        /** Answers come back with this id (from a Live Activity button or a notification). */
+        val questionId: String = "",
+        val yesNo: Boolean = false,
+        val options: List<String> = emptyList(),
+    ) : ActivityUiState
 
     public data class Finished(
         val taskId: String,
@@ -85,6 +94,11 @@ public class LiveActivityPresenter(
         runner.stop()
     }
 
+    /** An answer tapped on the Live Activity. */
+    public fun answer(questionId: String, text: String) {
+        runner.answer(questionId, text)
+    }
+
     /** What happened to the Live Activity (started, updated, ended, refused), for the logs. */
     public fun log(message: String) {
         AppLog.log("activity", message)
@@ -100,7 +114,9 @@ public class LiveActivityPresenter(
         val task = tasks.get(id)?.text.orEmpty()
         val result = s.lastResult
         return when {
-            s.running && s.question != null -> ActivityUiState.Waiting(id, task, s.question!!.text, s.conversationId)
+            s.running && s.question != null -> s.question!!.let { q ->
+                ActivityUiState.Waiting(id, task, q.text, s.conversationId, q.id, q.yesNo, q.options)
+            }
             s.running -> ActivityUiState.Working(
                 taskId = id,
                 task = task,

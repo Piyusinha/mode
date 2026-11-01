@@ -30,6 +30,8 @@ kotlin {
             export(projects.app.screens)
             export(projects.engine.agent)
             export(projects.engine.ops)
+            // The notifier's question ids and actions, for the app's notification-answer handler.
+            export(projects.core.platform)
         }
     }
 
@@ -48,6 +50,7 @@ kotlin {
             api(projects.app.screens)
             api(projects.engine.agent)
             api(projects.engine.ops)
+            api(projects.core.platform)
             implementation(projects.app.devUi)
         }
     }

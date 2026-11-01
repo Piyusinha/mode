@@ -23,6 +23,9 @@ public interface BackgroundWork {
     public suspend fun <T> run(work: suspend () -> T): T
 }
 
+/** What kind of answer a question wants: Allow / Don't allow, one of a few options, or words. */
+public enum class QuestionKind { YesNo, Choice, Text }
+
 /** Other places a finished task's answer shows, so it isn't announced twice. */
 public object ResultSurfaces {
     /** A Live Activity is showing the task, and will show its answer. */
@@ -35,6 +38,17 @@ public interface Notifier {
 
     /** Shown only while Mode is not on screen; in front, the app itself shows it. */
     public fun post(title: String, body: String)
+
+    /**
+     * The agent's question, answerable from the notification itself (Yes/No, option buttons, or a typed
+     * reply) so Mode need not come to the front. [id] comes back with the answer.
+     */
+    public fun ask(id: String, text: String, kind: QuestionKind, options: List<String> = emptyList()) {
+        post("Mode needs you", text)
+    }
+
+    /** Questions can be answered from a notification (allowed by the user); otherwise Mode opens to ask. */
+    public fun canAskInPlace(): Boolean = false
 
     /** A finished task's answer: skipped while the Lock Screen already shows it (the Live Activity). */
     public fun postResult(title: String, body: String) {

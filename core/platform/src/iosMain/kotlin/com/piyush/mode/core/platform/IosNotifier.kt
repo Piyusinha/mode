@@ -12,12 +12,100 @@ import platform.UserNotifications.UNNotificationRequest
 import platform.UserNotifications.UNNotificationSound
 import platform.UserNotifications.UNTimeIntervalNotificationTrigger
 import platform.UserNotifications.UNUserNotificationCenter
+import platform.UserNotifications.UNAuthorizationStatusProvisional
+import platform.UserNotifications.UNAuthorizationStatusAuthorized
+import platform.UserNotifications.UNTextInputNotificationAction
+import platform.UserNotifications.UNNotificationCategoryOptionNone
+import platform.UserNotifications.UNNotificationCategory
+import platform.UserNotifications.UNNotificationActionOptionDestructive
+import platform.UserNotifications.UNNotificationActionOptionNone
+import platform.UserNotifications.UNNotificationAction
 
 /** Local notifications through UNUserNotificationCenter. Main thread. */
 public class IosNotifier : Notifier {
+    /** Notifications are allowed, so questions can be answered from them. Kept fresh from the settings. */
+    private var allowed = false
+
+    init {
+        refreshAllowed()
+    }
+
+    private fun refreshAllowed() {
+        UNUserNotificationCenter.currentNotificationCenter().getNotificationSettingsWithCompletionHandler { settings ->
+            allowed = settings?.authorizationStatus == UNAuthorizationStatusAuthorized ||
+                settings?.authorizationStatus == UNAuthorizationStatusProvisional
+        }
+    }
+
     override fun requestPermission() {
         UNUserNotificationCenter.currentNotificationCenter()
-            .requestAuthorizationWithOptions(UNAuthorizationOptionAlert or UNAuthorizationOptionSound) { _, _ -> }
+            .requestAuthorizationWithOptions(UNAuthorizationOptionAlert or UNAuthorizationOptionSound) { granted, _ ->
+                allowed = granted
+            }
+    }
+
+    override fun canAskInPlace(): Boolean {
+        refreshAllowed()
+        return allowed
+    }
+
+    /**
+     * The question as a notification with its answers on it: Allow / Don't allow, the options, or a
+     * reply field. The app's own handler (QuestionAnswers.swift) passes the answer to the runner by [id].
+     */
+    override fun ask(id: String, text: String, kind: QuestionKind, options: List<String>) {
+        val category = when (kind) {
+            QuestionKind.YesNo -> CATEGORY_YES_NO
+            QuestionKind.Text -> CATEGORY_TEXT
+            QuestionKind.Choice -> CATEGORY_CHOICE
+        }
+        registerCategories(options.take(MAX_OPTIONS))
+        val content = UNMutableNotificationContent().apply {
+            setTitle("Mode needs you")
+            setBody(text)
+            setSound(UNNotificationSound.defaultSound)
+            setCategoryIdentifier(category)
+            setUserInfo(mapOf<Any?, Any?>(KEY_QUESTION to id, KEY_OPTIONS to options.take(MAX_OPTIONS)))
+        }
+        val request = UNNotificationRequest.requestWithIdentifier(id, content, null)
+        UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request, null)
+    }
+
+    /** The three kinds of question; the choice one carries this question's options as its buttons. */
+    private fun registerCategories(options: List<String>) {
+        val center = UNUserNotificationCenter.currentNotificationCenter()
+        val yesNo = UNNotificationCategory.categoryWithIdentifier(
+            CATEGORY_YES_NO,
+            listOf(
+                UNNotificationAction.actionWithIdentifier(ACTION_YES, "Allow", UNNotificationActionOptionNone),
+                UNNotificationAction.actionWithIdentifier(ACTION_NO, "Don't allow", UNNotificationActionOptionDestructive),
+            ),
+            emptyList<String>(), UNNotificationCategoryOptionNone,
+        )
+        val reply = UNTextInputNotificationAction.actionWithIdentifier(
+            ACTION_TEXT, "Reply", UNNotificationActionOptionNone, "Reply", "Your answer",
+        )
+        val text = UNNotificationCategory.categoryWithIdentifier(CATEGORY_TEXT, listOf(reply), emptyList<String>(), UNNotificationCategoryOptionNone)
+        val choice = UNNotificationCategory.categoryWithIdentifier(
+            CATEGORY_CHOICE,
+            options.mapIndexed { i, o -> UNNotificationAction.actionWithIdentifier("$ACTION_OPTION$i", o, UNNotificationActionOptionNone) } +
+                UNTextInputNotificationAction.actionWithIdentifier(ACTION_TEXT, "Something else…", UNNotificationActionOptionNone, "Send", "Your answer"),
+            emptyList<String>(), UNNotificationCategoryOptionNone,
+        )
+        center.setNotificationCategories(setOf(yesNo, text, choice))
+    }
+
+    public companion object {
+        public const val CATEGORY_YES_NO: String = "mode.yesno"
+        public const val CATEGORY_TEXT: String = "mode.text"
+        public const val CATEGORY_CHOICE: String = "mode.choice"
+        public const val ACTION_YES: String = "answer.yes"
+        public const val ACTION_NO: String = "answer.no"
+        public const val ACTION_TEXT: String = "answer.text"
+        public const val ACTION_OPTION: String = "answer.option."
+        public const val KEY_QUESTION: String = "question"
+        public const val KEY_OPTIONS: String = "options"
+        private const val MAX_OPTIONS = 4
     }
 
     override fun post(title: String, body: String) {

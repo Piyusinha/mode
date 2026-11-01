@@ -1,5 +1,6 @@
 import ModeKit
 import Observation
+import UserNotifications
 
 /// The app's one shared model: the Kotlin graph, and whether setup still has to run.
 @MainActor
@@ -14,6 +15,8 @@ final class AppModel {
     init() {
         needsOnboarding = IosModeGraphKt.iosModeGraph.screens.needsOnboarding
         liveActivity = LiveActivityController(screens: IosModeGraphKt.iosModeGraph.screens)
+        // Questions can be answered from their notifications.
+        UNUserNotificationCenter.current().delegate = QuestionAnswers.shared
     }
 
     func onboardingFinished() {

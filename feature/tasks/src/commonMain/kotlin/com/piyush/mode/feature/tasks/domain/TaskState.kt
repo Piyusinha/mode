@@ -14,6 +14,8 @@ public class PendingQuestion(
     public val options: List<String> = emptyList(),
     /** The option the agent would pick. */
     public val recommended: String? = null,
+    /** Matches an answer from a notification or the Live Activity to this question. */
+    public val id: String = "q" + kotlin.random.Random.nextLong().toULong().toString(36),
 ) {
     internal val answer: CompletableDeferred<String?> = CompletableDeferred()
 }

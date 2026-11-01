@@ -109,17 +109,42 @@ struct ModeActivityWorkingBody: View {
     }
 }
 
-/// The question (two lines at most), and Open: it's answered in Mode.
+/// The question (two lines at most) and its answers right here: Allow / Don't allow, up to three
+/// options, or Reply (typed in Mode). The app being used stays in front.
 struct ModeActivityWaitingBody: View {
     let state: ModeActivityAttributes.ContentState
 
     var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.s) {
             Text(state.question ?? "").modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
-            Link(destination: ModeLinks.open) { ModeActivityButtonLabel(ActivityL10n.open, icon: nil, prominent: true) }
+            HStack(spacing: ModeSpacing.s) {
+                if let id = state.questionId, state.yesNo {
+                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.no)) {
+                        ModeActivityButtonLabel(ActivityL10n.dontAllow, icon: nil, prominent: false)
+                    }.buttonStyle(.plain)
+                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.yes)) {
+                        ModeActivityButtonLabel(ActivityL10n.allow, icon: nil, prominent: true)
+                    }.buttonStyle(.plain)
+                } else if let id = state.questionId, !state.options.isEmpty {
+                    ForEach(Array(state.options.prefix(ModeActivityAnswer.maxOptions).enumerated()), id: \.offset) { index, option in
+                        Button(intent: AnswerIntent(questionId: id, answer: option)) {
+                            ModeActivityButtonLabel(LocalizedStringResource(stringLiteral: option), icon: nil, prominent: index == 0)
+                        }.buttonStyle(.plain)
+                    }
+                } else {
+                    Link(destination: ModeLinks.open) { ModeActivityButtonLabel(ActivityL10n.reply, icon: nil, prominent: true) }
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+/// What the runner expects back, and how many options fit on the Live Activity.
+enum ModeActivityAnswer {
+    static let yes = "yes"
+    static let no = "no"
+    static let maxOptions = 3
 }
 
 /// The start of the answer (a line and two rows), Open chat and Another task.

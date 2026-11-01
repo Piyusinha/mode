@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.tasks.presentation
 
+import com.piyush.mode.core.platform.QuestionKind
 import kotlinx.datetime.toLocalDateTime
 import com.piyush.mode.core.common.PlainText
 import com.piyush.mode.agent.Agent
@@ -121,6 +122,18 @@ public class TaskRunner(
     }
 
     /** Answers the pending question; null stops the task. */
+    /** Mode came to the front for the last question (no notifications), so the agent must reopen its app. */
+    private var askedInMode = true
+
+    private fun whereAnswered(answer: String): String =
+        if (askedInMode) "$answer (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)"
+        else "$answer (The user answered from the notification; the app you were using is still in front.)"
+
+    /** An answer to the question [questionId] (from a notification or the Live Activity); ignored if it was already answered. */
+    public fun answer(questionId: String, text: String?) {
+        if (state.value.question?.id == questionId) answer(text)
+    }
+
     public fun answer(text: String?) {
         state.value.question?.answer?.complete(text)
         mutableState.update { it.copy(question = null) }
@@ -342,12 +355,10 @@ public class TaskRunner(
     private fun gate(phone: PhoneBackend) = object : UserGate {
         override suspend fun confirm(question: String): Boolean = askUser(phone, question, yesNo = true) == "yes"
 
-        override suspend fun ask(question: String): String? = askUser(phone, question, yesNo = false)
-            ?.let { "$it (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)" }
+        override suspend fun ask(question: String): String? = askUser(phone, question, yesNo = false)?.let(::whereAnswered)
 
         override suspend fun choose(question: String, options: List<String>, recommended: String?): String? =
-            askUser(phone, question, yesNo = false, options = options, recommended = recommended)
-                ?.let { "$it (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)" }
+            askUser(phone, question, yesNo = false, options = options, recommended = recommended)?.let(::whereAnswered)
     }
 
     private suspend fun askUser(
@@ -361,8 +372,16 @@ public class TaskRunner(
         AppLog.log("agent", (if (yesNo) "confirm: " else "ask: ") + text)
         mutableState.update { it.copy(question = pending, status = "Waiting for you") }
         state.value.taskId?.let { tasks.setStatus(it, TaskStatus.WaitingForUser) }
-        notifier.post("Mode needs you", text)
-        runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+        // Answerable from the notification and the Live Activity: the app being used stays in front.
+        // Without notifications Mode opens to ask (and the agent reopens the app after).
+        val kind = when {
+            yesNo -> QuestionKind.YesNo
+            options.size >= 2 -> QuestionKind.Choice
+            else -> QuestionKind.Text
+        }
+        notifier.ask(pending.id, text, kind, options)
+        askedInMode = !notifier.canAskInPlace()
+        if (askedInMode) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
         return pending.answer.await().also {
             AppLog.log("agent", "user answered: ${it ?: "(stopped)"}")
             mutableState.update { state -> state.copy(question = null) }

@@ -21,7 +21,7 @@ struct ActivityPreview: View {
             .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Sonali",
                   plan: [.init("Open WhatsApp", state: .done), .init("Send message", state: .now), .init("Read calendar", state: .next)])
         case .waiting:
-            .init(phase: .waiting, step: 6, question: "Two contacts are called Sonali. Which one: Sonali Yadav or Sonali (work)?")
+            .init(phase: .waiting, step: 6, question: "Mode is about to tap \"Book now\" (Auto to Bellandur, ₹163). Allow it?", questionId: "preview", yesNo: true)
         case .finished:
             .init(phase: .finished, outcome: .done, seconds: 62, reply: [
                 .paragraph("Sent **“Leaving in 10”** to Sonali on WhatsApp. Here's your day:"),

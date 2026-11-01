@@ -21,8 +21,11 @@ struct ModeActivityAttributes: ActivityAttributes {
         var now: String = ""
         var paused = false
         var plan: [ModeSegments.Segment] = []
-        /// Waiting: what the agent asks.
+        /// Waiting: what the agent asks, its id (answers carry it), and how it can be answered.
         var question: String?
+        var questionId: String?
+        var yesNo = false
+        var options: [String] = []
         /// Finished: how it ended, how long it took, the start of the answer, how much more is in the chat.
         var outcome: Outcome?
         var seconds = 0
@@ -59,13 +62,39 @@ struct StopTaskIntent: LiveActivityIntent {
     }
 }
 
+/// An answer to the agent's question, tapped on the Live Activity (Allow, Don't allow, an option).
+struct AnswerIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Answer Mode"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Question") var questionId: String
+    @Parameter(title: "Answer") var answer: String
+
+    init() {}
+
+    init(questionId: String, answer: String) {
+        self.questionId = questionId
+        self.answer = answer
+    }
+
+    func perform() async throws -> some IntentResult {
+        await ModeActivityActions.answer(questionId, answer)
+        return .result()
+    }
+}
+
 /// What the Live Activity's buttons do, set by the app at launch (nothing in the extension).
 @MainActor
 enum ModeActivityActions {
     static var onStop: (() -> Void)?
+    static var onAnswer: ((String, String) -> Void)?
 
     static func stop() {
         onStop?()
+    }
+
+    static func answer(_ questionId: String, _ answer: String) {
+        onAnswer?(questionId, answer)
     }
 }
 
