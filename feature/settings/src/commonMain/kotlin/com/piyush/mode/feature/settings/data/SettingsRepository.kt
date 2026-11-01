@@ -50,6 +50,19 @@ public class SettingsRepository(
     /** What the agent runs with now. */
     public fun agentConfig(): AgentConfig = state.value.agentConfig()
 
+    /**
+     * The stored limit. The old default (0.05) stored before the brain existed was never chosen: it
+     * moves to the new default once; after that whatever is stored is the user's choice.
+     */
+    private fun storedMaxCost(): Double? {
+        val stored = prefs.getString(MAX_COST)?.toDoubleOrNull()
+        if (prefs.getString(MAX_COST_MOVED) != null) return stored
+        prefs.putString(MAX_COST_MOVED, "1")
+        if (stored != ModeSettings.OLD_DEFAULT_MAX_COST_USD) return stored
+        prefs.putString(MAX_COST, ModeSettings.DEFAULT_MAX_COST_USD.toString())
+        return ModeSettings.DEFAULT_MAX_COST_USD
+    }
+
     private fun read(): ModeSettings {
         val defaults = ModeSettings()
         val storedStrong = prefs.getString(STRONG_MODEL)
@@ -58,7 +71,7 @@ public class SettingsRepository(
             strongModel = if (storedStrong == null) defaults.strongModel else storedStrong.ifBlank { null },
             reflectionModel = prefs.getString(REFLECTION_MODEL)?.ifBlank { null },
             maxSteps = prefs.getString(MAX_STEPS)?.trim()?.toIntOrNull() ?: defaults.maxSteps,
-            maxCostPerTaskUsd = prefs.getString(MAX_COST)?.toDoubleOrNull() ?: defaults.maxCostPerTaskUsd,
+            maxCostPerTaskUsd = storedMaxCost() ?: defaults.maxCostPerTaskUsd,
             dailyCapUsd = prefs.getString(DAILY_CAP)?.toDoubleOrNull(),
             learnFromTasks = prefs.getString(LEARN)?.toBooleanStrictOrNull() ?: defaults.learnFromTasks,
             askBeforeRisky = prefs.getString(ASK_BEFORE_RISKY)
@@ -77,6 +90,8 @@ public class SettingsRepository(
         const val MAX_STEPS = "agent_max_steps"
         const val REFLECTION_MODEL = "reflection_model"
         const val MAX_COST = "max_cost_per_task_usd"
+        /** Set once the old default limit was moved to the new one, so a limit chosen later is kept. */
+        const val MAX_COST_MOVED = "max_cost_moved_to_brain_default"
         const val DAILY_CAP = "daily_cap_usd"
         const val LEARN = "learn_from_tasks"
         const val ASK_BEFORE_RISKY = "ask_before_risky"

@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.tasks.presentation
 
+import kotlinx.datetime.toLocalDateTime
 import com.piyush.mode.core.common.PlainText
 import com.piyush.mode.agent.Agent
 import com.piyush.mode.agent.AgentConfig
@@ -216,7 +217,7 @@ public class TaskRunner(
                 throw e
             }
             val useMemory = !private && tag == null
-            val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier)
+            val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier, today = today())
             val prepared = memory?.prepare(task, base, useMemory, saved.id)
             val agent = Agent(
                 phone = phone,
@@ -321,6 +322,14 @@ public class TaskRunner(
     private fun money(usd: Double): String = "$" + ((usd * 100).roundToInt() / 100.0).toString()
 
     private fun startOfNow(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+
+    /** "Sunday 1 November 2026, 19:05", for the brain: "today" means today. */
+    private fun today(): String {
+        val now = kotlin.time.Clock.System.now().toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault())
+        fun name(s: String) = s.lowercase().replaceFirstChar(Char::uppercaseChar)
+        return "${name(now.dayOfWeek.name)} ${now.day} ${name(now.month.name)} ${now.year}, " +
+            "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
+    }
 
     private fun status(text: String) {
         mutableState.update { it.copy(status = text) }

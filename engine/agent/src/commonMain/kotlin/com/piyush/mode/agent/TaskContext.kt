@@ -18,6 +18,8 @@ data class TaskContext(
     val recentTasks: List<String> = emptyList(),
     /** Earlier tasks in the same conversation and how they ended, oldest first. */
     val earlierTurns: List<EarlierTurn> = emptyList(),
+    /** The weekday, date and time now ("Sunday 1 November 2026, 19:05"), so "today" means today. */
+    val today: String? = null,
 ) {
     data class EarlierTurn(val task: String, val outcome: String)
 

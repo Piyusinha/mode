@@ -90,6 +90,8 @@ class OnboardingTest {
     @Test
     fun theModelStepPicksAMainModelAndTheWhenStuckOne() = runTest {
         val f = Fixture(this)
+        // The fixture runs without a strong model; setup starts from the real default.
+        f.settings.update { it.copy(strongModel = com.piyush.mode.agent.AgentConfig.DEFAULT_STRONG_MODEL) }
         val p = onboarding(f)
         repeat(3) { p.next(); if (p.state.value.step == OnboardingStep.Name) p.setNameFromCard("P", "") }
         assertEquals(OnboardingStep.Model, p.state.value.step)

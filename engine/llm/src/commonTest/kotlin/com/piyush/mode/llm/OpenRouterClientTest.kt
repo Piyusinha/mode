@@ -53,6 +53,23 @@ class OpenRouterClientTest {
     }
 
     @Test
+    fun handsModelsAreAskedNotToReasonAndARefusalIsRemembered() = runTest {
+        // On the phone: Qwen3.8-Omni-Flash reasoned before every tap, 8–26 s a step.
+        assertEquals("false", requestFor("qwen/qwen3.8-omni-flash", listOf(ChatMessage("user", "hi")))["reasoning"]!!.jsonObject["enabled"]!!.jsonPrimitive.content)
+        assertEquals(null, requestFor("anthropic/claude-haiku-5.5", listOf(ChatMessage("user", "hi")))["reasoning"], "Claude does not reason unless asked")
+
+        val bodies = mutableListOf<String>()
+        val refusesNoReasoning = """{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled."}}"""
+        val c = client({ body ->
+            bodies += body
+            if ("\"reasoning\"" in body) HttpStatusCode.BadRequest to refusesNoReasoning else HttpStatusCode.OK to ok
+        }, mutableListOf())
+        c.chat("some/thinker", listOf(ChatMessage("user", "hi")), JsonArray(emptyList()))
+        c.chat("some/thinker", listOf(ChatMessage("user", "hi")), JsonArray(emptyList()))
+        assertEquals(listOf(true, false, false), bodies.map { "\"reasoning\"" in it }, "retried with reasoning, then never asked again")
+    }
+
+    @Test
     fun errorsCarryTheProvidersOwnReason() = runTest {
         val c = client({ HttpStatusCode.BadRequest to forcedRejected }, mutableListOf())
         val e = runCatching { c.chat("anthropic/claude-sonnet-5.5", listOf(ChatMessage("user", "hi")), JsonArray(emptyList())) }.exceptionOrNull()

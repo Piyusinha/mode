@@ -7,6 +7,7 @@ import com.piyush.mode.coredevice.native.mc_bytes_free
 import com.piyush.mode.coredevice.native.mc_button
 import com.piyush.mode.coredevice.native.mc_key_named
 import com.piyush.mode.coredevice.native.mc_launch
+import com.piyush.mode.coredevice.native.mc_launch_fresh
 import com.piyush.mode.coredevice.native.mc_list_apps
 import com.piyush.mode.coredevice.native.mc_paste_text
 import com.piyush.mode.coredevice.native.mc_screenshot
@@ -72,7 +73,8 @@ class ModecoreSession private constructor(
         }
     }
 
-    override fun launch(bundleId: String) = check(mc_launch(live(), bundleId))
+    override fun launch(bundleId: String, fresh: Boolean) =
+        check(if (fresh) mc_launch_fresh(live(), bundleId) else mc_launch(live(), bundleId))
 
     override fun listApps(): List<InstalledApp> = memScoped {
         val out = alloc<CPointerVar<ByteVar>>()

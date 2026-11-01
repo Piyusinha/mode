@@ -13,6 +13,8 @@ kotlin {
             api(projects.feature.memory)
             api(projects.core.platform)
             api(projects.core.common)
+            // "Today" for the brain: the weekday, date and time on this phone.
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(projects.testing)

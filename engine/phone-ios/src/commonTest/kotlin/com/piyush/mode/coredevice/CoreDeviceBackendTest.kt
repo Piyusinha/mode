@@ -36,7 +36,7 @@ private class FakeSession(
     override fun typeAscii(text: String) { calls += "type $text" }
     override fun pasteText(text: String) { calls += "paste $text" }
     override fun screenshotPng(): ByteArray = byteArrayOf(1, 2, 3).also { shots++ }
-    override fun launch(bundleId: String) { calls += "launch $bundleId" }
+    override fun launch(bundleId: String, fresh: Boolean) { calls += if (fresh) "launch fresh $bundleId" else "launch $bundleId" }
     override fun listApps(): List<InstalledApp> = apps.also { listCalls++ }
     override fun close() { calls += "close" }
 }
@@ -157,10 +157,17 @@ class CoreDeviceBackendTest {
     fun whatCoreDeviceCannotDoIsUnsupported() = runTest {
         val phone = FakeSession()
         val b = backend(phone)
-        for (op in listOf(Op.Tree, Op.CurrentApp, Op.OpenUrl("https://example.com"), Op.LaunchApp("Uber", fresh = true))) {
+        for (op in listOf(Op.Tree, Op.CurrentApp, Op.OpenUrl("https://example.com"))) {
             assertFailsWith<Unsupported>(op.wireName) { b.send(op) }
         }
         assertTrue(phone.calls.isEmpty())
+    }
+
+    @Test
+    fun aFreshLaunchClosesTheRunningCopyFirst() = runTest {
+        val phone = FakeSession()
+        backend(phone).send(Op.LaunchApp("com.swiggy.app", fresh = true))
+        assertEquals(listOf("launch fresh com.swiggy.app"), phone.calls)
     }
 
     @Test

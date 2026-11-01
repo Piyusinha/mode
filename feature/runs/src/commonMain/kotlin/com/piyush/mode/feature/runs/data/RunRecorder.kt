@@ -98,6 +98,16 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
         if (outcome.startsWith("failed")) AppLog.error("agent", "step $step $action: $outcome")
     }
 
+    override fun briefed(model: String, brief: String?, costUsd: Double, error: String?) {
+        event("brief", buildJsonObject {
+            put("model", model)
+            brief?.let { put("brief", it) }
+            put("cost_usd", costUsd)
+            error?.let { put("error", it) }
+        })
+        AppLog.log("agent", if (brief != null) "brief by $model:\n$brief" else "no brief ($model): ${error ?: "unknown"}")
+    }
+
     override fun noted(step: Int, text: String) {
         event("note", buildJsonObject { put("step", step); put("text", text) })
     }

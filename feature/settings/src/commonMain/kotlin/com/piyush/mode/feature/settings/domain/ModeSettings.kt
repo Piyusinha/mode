@@ -46,11 +46,16 @@ public data class ModeSettings(
         strongModel = strongModel,
         maxSteps = maxSteps,
         maxCostUsd = maxCostPerTaskUsd,
+        // The strong model is also the brain: it briefs the hands before the first tap.
+        brainModel = strongModel,
     )
 
     public companion object {
         public const val DEFAULT_MAX_STEPS: Int = 30
-        public const val DEFAULT_MAX_COST_USD: Double = 0.05
+        /** Room for the brain's brief plus the steps (raised from 0.05 with the brain). */
+        public const val DEFAULT_MAX_COST_USD: Double = 0.10
+        /** The old default: a stored value equal to it was never chosen, so it moves to the new one. */
+        public const val OLD_DEFAULT_MAX_COST_USD: Double = 0.05
         public val STEPS_RANGE: IntRange = 1..200
         public val COST_RANGE: ClosedFloatingPointRange<Double> = 0.005..5.0
         public val DAILY_CAP_RANGE: ClosedFloatingPointRange<Double> = 0.01..100.0

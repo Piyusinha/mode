@@ -397,6 +397,54 @@ class AgentTest {
     }
 
     @Test
+    fun theBrainBriefsFirstAndItsStepsBecomeThePlan() = runTest {
+        val phone = FakePhone(List(5) { listOf("Chats" to (100.0 to 300.0)) })
+        val plans = mutableListOf<List<PlanItem>>()
+        val model = ScriptedModel(
+            call(
+                "brief", "intent" to "Log Beast Life protein in today's Snacks", "app" to "MyFitnessPal", "start" to "fresh",
+                "done_when" to "Today's Snacks lists it", "steps" to listOf("Open today's diary", "Log it under Snacks"), "report" to "What was logged",
+            ),
+            call("open_app", "name" to "MyFitnessPal", "reason" to "Opening MyFitnessPal"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", brainModel = "brain"), onPlan = { plans += it })
+            .run("Beast Life protein in my snacks")
+        assertEquals("brain", model.models.first())
+        assertEquals(listOf("Open today's diary", "Log it under Snacks"), plans.first().map { it.text })
+        assertTrue("THE BRIEF" in model.lastUserText && "Today's Snacks lists it" in model.lastUserText, model.lastUserText)
+        assertEquals(Op.LaunchApp("MyFitnessPal", fresh = true), phone.actions.first(), "a new task starts the app fresh")
+    }
+
+    @Test
+    fun withoutABriefTheTaskStillRuns() = runTest {
+        val phone = FakePhone(List(5) { listOf("Home" to (100.0 to 300.0)) })
+        val model = ScriptedModel(
+            call("not_a_brief"),
+            call("done", "evidence" to "x", "summary" to "ok"), call("done", "evidence" to "x", "summary" to "ok"),
+        )
+        val result = Agent(phone, model, Gate(), noSettle.copy(brainModel = "brain")).run("t")
+        assertIs<AgentOutcome.Done>(result.outcome)
+    }
+
+    @Test
+    fun aBackSwipeThatLeavesTheSamePageSaysToUseThePagesOwnButton() = runTest {
+        // On the phone: Swiggy ignores the back swipe; only its rotating offer banner changed.
+        fun page(offer: String) = listOf("Hunaaan" to (100.0 to 220.0), offer to (150.0 to 300.0), "Search for dishes" to (200.0 to 440.0),
+            "Ratings 4.0+" to (220.0 to 500.0), "Bestseller" to (320.0 to 500.0), "Related to your search (42)" to (150.0 to 580.0),
+            "Vegetable Bang Bang Sushi 4Pc" to (100.0 to 850.0), "ADD" to (300.0 to 910.0)) +
+            // A real page carries ~30 pieces of text; one rotating banner is a small part of it.
+            List(14) { "dish $it" to (100.0 + it to 600.0 + it * 10) }
+        val phone = FakePhone(listOf(page("30% OFF UPTO 300"), page("10% OFF UPTO 50")) + List(5) { page("30% OFF UPTO 300") })
+        val model = ScriptedModel(
+            call("back", "reason" to "Back to the results"),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertTrue("the back swipe did nothing here" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun aPlusTappedToCheckIsAnsweredNotTapped() = runTest {
         val phone = FakePhone(List(10) { listOf("十" to (330.0 to 272.0), "Oats" to (120.0 to 272.0)) })
         val model = ScriptedModel(

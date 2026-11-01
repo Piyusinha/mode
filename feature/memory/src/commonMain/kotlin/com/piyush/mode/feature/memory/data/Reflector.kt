@@ -212,6 +212,9 @@ public class Reflector(
             - If the task failed, say why in failure_type and root_cause; add tips about what to avoid, or add
               "If it goes wrong:" lines to an existing skill. Never make a new skill from a failure.
             - Never store passwords, passcodes, one-time codes, card or bank numbers, or ID numbers.
+            - Never store what is on a list today: prices, ratings, offers, availability, delivery times, which
+              items or restaurants were shown. It goes out of date. Keep how to get things done in an app, and
+              lasting facts and preferences about the user.
             - Nothing worth keeping? Call save_memory with no changes.
         """.trimIndent()
 

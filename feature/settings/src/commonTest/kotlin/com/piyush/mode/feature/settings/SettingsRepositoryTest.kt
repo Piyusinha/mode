@@ -18,7 +18,7 @@ class SettingsRepositoryTest {
         assertEquals(AgentConfig.DEFAULT_MODEL, s.model)
         assertEquals(AgentConfig.DEFAULT_STRONG_MODEL, s.strongModel)
         assertEquals(30, s.maxSteps)
-        assertEquals(0.05, s.maxCostPerTaskUsd)
+        assertEquals(0.10, s.maxCostPerTaskUsd)
         assertNull(s.dailyCapUsd)
         assertTrue(s.learnFromTasks)
         assertEquals(RiskConfirmation.OnlyVeryRisky, s.askBeforeRisky)
@@ -69,5 +69,20 @@ class SettingsRepositoryTest {
         assertTrue(repo.settings.value.hasApiKey)
         repo.apiKey = ""
         assertFalse(repo.settings.value.hasApiKey)
+    }
+
+    @Test
+    fun theOldDefaultLimitMovesToTheBrainDefaultOnceAndTheBrainIsTheStrongModel() {
+        val prefs = InMemoryKeyValueStore()
+        prefs.putString("max_cost_per_task_usd", "0.05")
+        val first = SettingsRepository(InMemorySecretStore(), prefs)
+        assertEquals(0.10, first.settings.value.maxCostPerTaskUsd)
+        assertEquals(first.settings.value.strongModel, first.agentConfig().brainModel)
+        // Chosen later, 0.05 is the user's choice and stays.
+        prefs.putString("max_cost_per_task_usd", "0.05")
+        assertEquals(0.05, SettingsRepository(InMemorySecretStore(), prefs).settings.value.maxCostPerTaskUsd)
+        // Any other stored limit was the user's choice all along.
+        val other = InMemoryKeyValueStore().also { it.putString("max_cost_per_task_usd", "0.2") }
+        assertEquals(0.2, SettingsRepository(InMemorySecretStore(), other).settings.value.maxCostPerTaskUsd)
     }
 }

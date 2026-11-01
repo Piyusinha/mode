@@ -26,7 +26,8 @@ interface DeviceSession : AutoCloseable {
     /** The screen as a full-resolution PNG. */
     fun screenshotPng(): ByteArray
 
-    fun launch(bundleId: String)
+    /** [fresh]: close a running copy first, so the app starts on its home page. */
+    fun launch(bundleId: String, fresh: Boolean = false)
 
     fun listApps(): List<InstalledApp>
 }

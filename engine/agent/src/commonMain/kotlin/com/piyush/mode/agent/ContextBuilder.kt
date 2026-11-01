@@ -40,6 +40,8 @@ object ContextBuilder {
     class Input(
         val systemPrompt: String,
         val task: String,
+        /** The brain's brief for this task, if it wrote one. */
+        val brief: String? = null,
         val context: TaskContext,
         val step: Int,
         val maxSteps: Int,
@@ -104,6 +106,7 @@ object ContextBuilder {
             append('\n')
         }
         append("TASK: ").append(input.task).append('\n')
+        input.brief?.let { append("\nTHE BRIEF (from your planning mind; follow it):\n").append(it).append('\n') }
         if (input.answers.isNotEmpty()) {
             append("\nTHE USER'S ANSWERS (final: act on them, never ask about the same thing again):\n")
             input.answers.takeLast(MAX_ANSWERS).forEach { (q, a) ->

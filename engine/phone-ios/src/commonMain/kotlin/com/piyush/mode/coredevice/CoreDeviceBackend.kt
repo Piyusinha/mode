@@ -111,9 +111,8 @@ class CoreDeviceBackend(
     }
 
     private fun launch(name: String, fresh: Boolean): String {
-        if (fresh) throw Unsupported("this iPhone cannot relaunch an app fresh over CoreDevice yet")
         val bundleId = if (AppNames.looksLikeBundleId(name)) name else findApp(name).bundleId
-        session.launch(bundleId)
+        session.launch(bundleId, fresh)
         return bundleId
     }
 

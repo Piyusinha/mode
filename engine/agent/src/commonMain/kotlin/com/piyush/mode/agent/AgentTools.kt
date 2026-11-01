@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -125,7 +126,15 @@ object AgentTools {
         Tool("home", "Go to the Home Screen.", "nav.home", listOf(reason)),
         Tool(
             "open_app", "Open an installed app by its name (or bundle id). Faster than finding its icon.", "apps.launch",
-            listOf(Param("name", "string", "The app's name, as on its icon."), reason),
+            listOf(
+                Param("name", "string", "The app's name, as on its icon."),
+                Param(
+                    "fresh", "boolean",
+                    "Optional. true starts the app on its home page (closes where it was left); use it to begin a new task in that app.",
+                    required = false,
+                ),
+                reason,
+            ),
         ),
         Tool(
             "plan", "Write your plan for a task with several parts: a short numbered list of a few words per item. " +
@@ -251,7 +260,7 @@ object AgentTools {
             "control_center" -> Op.Drag(g.screenWidth - 30, 2.0, g.screenWidth - 30, g.screenHeight * 0.55, duration = 0.35)
             // The iOS back gesture: from the very left edge, across, at mid height.
             "back" -> Op.Drag(1.0, g.screenHeight * 0.45, g.screenWidth * 0.75, g.screenHeight * 0.45, duration = 0.25)
-            "open_app" -> Op.LaunchApp(str("name"))
+            "open_app" -> Op.LaunchApp(str("name"), fresh = call.arguments["fresh"]?.jsonPrimitive?.booleanOrNull == true)
             else -> throw IllegalArgumentException("unknown action '${call.name}'")
         }
     }

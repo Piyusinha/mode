@@ -1,0 +1,48 @@
+package com.piyush.mode.agent
+
+import com.piyush.mode.llm.LlmClient
+import com.piyush.mode.llm.LlmFailed
+import com.piyush.mode.testing.ScriptedModel
+import com.piyush.mode.testing.call
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class BrainTest {
+    private val sonali = call(
+        "brief",
+        "intent" to "Continue the WhatsApp chat with Sonali in Piyush's voice",
+        "app" to "WhatsApp",
+        "start" to "continue",
+        "done_when" to "A reply to her latest message is sent",
+        "gather" to listOf("Her last few messages and his replies: what is unanswered, his language mix and length"),
+        "decide" to listOf("What to say, in his style"),
+        "steps" to listOf("Open Sonali's chat", "Read recent messages", "Write and send the reply"),
+        "report" to "What was sent",
+    )
+
+    @Test
+    fun aBriefIsReadFromTheBrainsToolCall() = runTest {
+        val model = ScriptedModel(sonali)
+        val r = Brain(model, "strong").brief("talk with Sonali", TaskContext(userName = "Piyush", today = "Sunday 1 November 2026, 19:05"))
+        val b = assertNotNull(r.brief)
+        assertEquals("WhatsApp", b.app)
+        assertEquals(false, b.fresh, "continue keeps the chat where it is")
+        assertEquals(3, b.steps.size)
+        assertTrue("Gather first: Her last few messages" in b.text())
+        assertEquals(listOf("strong"), model.models)
+        assertTrue("NOW: Sunday 1 November 2026" in model.lastUserText, "the brain knows what today is")
+    }
+
+    @Test
+    fun aMissingOrFailedBriefIsNoBriefNotAFailedTask() = runTest {
+        assertNull(Brain(ScriptedModel(call("brief", "intent" to "x")), "strong").brief("t", TaskContext()).brief, "no steps")
+        val failing = LlmClient { _, _, _ -> throw LlmFailed("down") }
+        val r = Brain(failing, "strong").brief("t", TaskContext())
+        assertNull(r.brief)
+        assertEquals("down", r.error)
+    }
+}

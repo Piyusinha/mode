@@ -86,22 +86,48 @@ class OpenRouterClient(
 
     /** Models that answered a forced tool choice with a 400 this session. */
     private val noForcedToolChoice = mutableSetOf<String>()
+    /** Models that refused having their reasoning turned off with a 400 this session. */
+    private val mustReason = mutableSetOf<String>()
 
     override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
         val key = apiKey()?.takeIf { it.isNotBlank() } ?: throw LlmFailed("No OpenRouter API key: add it in Settings.")
         val forced = forcedToolChoiceAllowed(model) && model !in noForcedToolChoice
         return try {
-            post(key, model, messages, tools, if (forced) "required" else "auto")
+            postQuick(key, model, messages, tools, if (forced) "required" else "auto")
         } catch (e: LlmFailed) {
             // Newer models reject forced tool use with a 400; ask again with "auto"
             // (the prompt already says to always call exactly one tool).
             if (!forced || !e.status400) throw e
             noForcedToolChoice += model
-            post(key, model, messages, tools, "auto")
+            postQuick(key, model, messages, tools, "auto")
         }
     }
 
-    private suspend fun post(key: String, model: String, messages: List<ChatMessage>, tools: JsonArray, toolChoice: String): ChatResult {
+    /**
+     * Seen on the phone: a hybrid model (Qwen3.8-Omni-Flash) thought before every tap and took
+     * 8–26 s a step. One action at a time needs no long reasoning: it is turned off where the
+     * model allows, and left on for a model that refuses (remembered for the session).
+     */
+    private suspend fun postQuick(key: String, model: String, messages: List<ChatMessage>, tools: JsonArray, toolChoice: String): ChatResult {
+        val quiet = reasoningOffAllowed(model) && model !in mustReason
+        return try {
+            post(key, model, messages, tools, toolChoice, reasoningOff = quiet)
+        } catch (e: LlmFailed) {
+            // Only a refusal about reasoning itself; any other 400 is someone else's to handle.
+            if (!quiet || !e.status400 || e.message?.contains("reason", ignoreCase = true) != true) throw e
+            mustReason += model
+            post(key, model, messages, tools, toolChoice, reasoningOff = false)
+        }
+    }
+
+    private suspend fun post(
+        key: String,
+        model: String,
+        messages: List<ChatMessage>,
+        tools: JsonArray,
+        toolChoice: String,
+        reasoningOff: Boolean = false,
+    ): ChatResult {
         val body = buildJsonObject {
             put("model", model)
             val markers = cacheMarkersAllowed(model)
@@ -111,6 +137,7 @@ class OpenRouterClient(
             put("parallel_tool_calls", false)
             put("max_tokens", 1024)
             putJsonObject("usage") { put("include", true) }
+            if (reasoningOff) putJsonObject("reasoning") { put("enabled", false) }
         }
         val response = http.post("$baseUrl/chat/completions") {
             header("Authorization", "Bearer $key")
@@ -131,6 +158,9 @@ class OpenRouterClient(
          * Claude Sonnet 5.5, Opus 5.5 and Fable/Mythos 5.1 reject forced tool use
          * (tool_choice any/required → HTTP 400); everything else accepts it.
          */
+        /** Claude models do not reason unless asked; everyone else is asked not to. */
+        fun reasoningOffAllowed(model: String): Boolean = !model.startsWith("anthropic/")
+
         fun forcedToolChoiceAllowed(model: String): Boolean =
             listOf("claude-sonnet-5.5", "claude-opus-5.5", "claude-fable-5.1", "claude-mythos-5.1").none { it in model }
 

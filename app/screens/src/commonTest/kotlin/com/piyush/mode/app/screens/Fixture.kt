@@ -80,7 +80,11 @@ internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel()
     val db = testDatabase()
     val clock = ScreenClock(now = { now }, zone = { zone })
     val files = InMemoryFileStore()
-    val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also { it.apiKey = "sk-or-test" }
+    // No strong model, so no brain: each test scripts the hands' replies only.
+    val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also {
+        it.apiKey = "sk-or-test"
+        it.update { s -> s.copy(strongModel = null) }
+    }
     val tasks = TaskRepository(db, now = { now })
     val conversations = ConversationRepository(db, now = { now })
     val memory = MemoryRepository(db, now = { now })

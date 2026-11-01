@@ -293,14 +293,15 @@ impl Session {
         })
     }
 
-    /// Brings an app to the front by bundle id.
-    pub fn launch(&self, bundle_id: &str) -> Result<()> {
+    /// Brings an app to the front by bundle id. `fresh` closes a running copy first, so the
+    /// app starts on its home page instead of wherever it was left.
+    pub fn launch(&self, bundle_id: &str, fresh: bool) -> Result<()> {
         let bundle_id = bundle_id.to_string();
         self.run(async |live| {
             let mut apps = AppServiceClient::connect_rsd(&mut live.adapter, &mut live.handshake)
                 .await
                 .map_err(|e| err("app service", e))?;
-            apps.launch_application(bundle_id, &[], false, false, None, None, None).await?;
+            apps.launch_application(bundle_id, &[], fresh, false, None, None, None).await?;
             Ok(())
         })
     }

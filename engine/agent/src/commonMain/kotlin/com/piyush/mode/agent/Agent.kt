@@ -47,6 +47,8 @@ data class AgentConfig(
     val maxCostUsd: Double? = null,
     /** Stop before a step once the task has run this long; null: no limit. */
     val maxMillis: Long? = 15 * 60_000L,
+    /** The planning mind: briefs the hands before the first tap. Null: no brief. */
+    val brainModel: String? = null,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -150,20 +152,33 @@ class Agent(
         val tools = AgentTools.available(ops, recall = memory != null)
         val schema = AgentTools.schema(tools)
         trace.runStarted(task, config, tools.map { it.name })
+        // The brain reads the request first (Brain); a failure just means no brief.
+        val brief = config.brainModel?.let { brainModel ->
+            onStatus(WORKING)
+            val r = Brain(llm, brainModel).brief(task, startContext)
+            trace.briefed(brainModel, r.brief?.text(), r.costUsd, r.error)
+            r
+        }
         val history = mutableListOf<String>()
-        var cost = 0.0
+        var cost = brief?.costUsd ?: 0.0
         var lastScreen: String? = null
         var lastWasPhoneAction = false
         val stuck = StuckDetector(canStepUp = config.strongModel != null)
         /** The app the agent last opened, to return to after the user answers a question. */
         var lastApp: String? = null
-        /** The model's own plan for multi-part tasks, shown back to it every step. */
-        var plan: String? = null
+        /** The model's own plan for multi-part tasks, shown back to it every step; the brain's steps first. */
+        var plan: String? = brief?.brief?.steps?.mapIndexed { i, s -> "${i + 1}. $s" }?.joinToString("\n")
+        brief?.brief?.let { b -> onPlan(b.steps.map { PlanItem(it, false) }) }
+        /** The brief says start fresh: the first time its app opens, it opens on its home page. */
+        var freshPending = brief?.brief?.fresh == true
         var inMode = startsInMode
         /** The user's answers, shown on their own every step so they are not lost in the history. */
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
+        /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
+        var lastOp: String? = null
+        var lastPage: List<String> = emptyList()
         /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
         val ledger = ChangeLedger()
         /** Memory lookups made, by query, and the step they were made at. */
@@ -227,9 +242,16 @@ class Agent(
             )
 
             // Tell the model what its last action did, and notice when nothing changes.
-            val changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
+            var changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
             if (changed != null && history.isNotEmpty()) {
-                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
+                // A rotating banner or an ad makes any page "change"; most of its text the same is the same page.
+                val samePage = ChangeLedger.similarity(ChangeLedger.page(lastPage), ChangeLedger.page(screen.pageTexts())) >= SAME_PAGE
+                history[history.lastIndex] += when {
+                    lastOp == "back" && samePage -> { changed = false; BACK_DID_NOTHING }
+                    !changed -> UNCHANGED
+                    samePage && lastOp == "tap" -> " → same page (only small parts changed)"
+                    else -> " → screen changed"
+                }
             }
             lastScreen = screen.signature
             // Proof on screen confirms the last change; a different page means the agent went to check.
@@ -253,6 +275,7 @@ class Agent(
                 ContextBuilder.Input(
                     systemPrompt = SYSTEM_PROMPT,
                     task = task,
+                    brief = brief?.brief?.text(),
                     context = context,
                     step = step,
                     maxSteps = config.maxSteps,
@@ -401,7 +424,10 @@ class Agent(
                 }
                 else -> {
                     val op = try {
-                        AgentTools.toOp(call, screen.geometry)
+                        AgentTools.toOp(call, screen.geometry).let { o ->
+                            // The brief said start fresh: the first opening of an app lands on its home page.
+                            if (o is Op.LaunchApp && freshPending) { freshPending = false; o.copy(fresh = true) } else o
+                        }
                     } catch (e: IllegalArgumentException) {
                         stuck.badReply()
                         record(call.name, reason, "not done: ${e.message}")
@@ -455,6 +481,8 @@ class Agent(
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
+                        lastOp = call.name
+                        lastPage = screen.pageTexts()
                         stuck.acted()
                         stuck.scrolled(if (op is Op.Scroll) call.arguments.string("direction") else null)
                         if (op is Op.LaunchApp) {
@@ -694,6 +722,10 @@ class Agent(
     companion object {
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        private const val BACK_DID_NOTHING =
+            " → same page: the back swipe did nothing here. Tap the page's own ← (top left), X, Cancel or Done instead"
+        /** Pages sharing this much of their text are the same page. */
+        private const val SAME_PAGE = 0.85
         /** The status bar and Dynamic Island, in screen points from the top. */
         private const val STATUS_BAR_PT = 60.0
         /** What ticks up there: the clock, a timer, the battery percentage, Mode's own "Step 4" on the island. */
@@ -729,6 +761,16 @@ class Agent(
             You are run by an app called Mode. If Mode's own screen (its task log, "Step N: thinking",
             the Agent/Compare/Logs tabs) is showing, that is you: never wait on it, leave it and work in
             the app the task needs.
+
+            THE BRIEF, when there is one, is from your planning mind: it has read the request. Gather what it
+            says before acting, decide and ask as it says, finish when its "done when" is on screen, and report
+            as it says. If the screen shows the brief is wrong, say so in a note and adapt.
+
+            Getting oriented: each time an app opens, check where you are (the page, the date shown, any search
+            already typed). If it is not where the task starts, get there first: the page's own ← (top left),
+            X, Cancel or Done, or the app's main tab. The iOS back swipe does nothing in many apps. A search box
+            that already holds text: clear it (its ×) and type yours. To start a new task in an app, open it with
+            fresh true.
 
             How to act:
             - Coordinates are screenshot pixels. To tap a piece of text, use its listed centre. For icons

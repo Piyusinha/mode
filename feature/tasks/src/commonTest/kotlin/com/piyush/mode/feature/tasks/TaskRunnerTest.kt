@@ -83,7 +83,11 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
     val runs = RunRepository(files, db)
     val conversations = ConversationRepository(db)
     val tasks = TaskRepository(db)
-    val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also { it.apiKey = key }
+    // No strong model, so no brain: each test scripts the hands' replies only.
+    val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also {
+        it.apiKey = key
+        it.update { s -> s.copy(strongModel = null) }
+    }
     val memory = MemoryRepository(db)
     private val taskMemory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(model, memory), tasks, startOfToday = { 0L })
     val runner = TaskRunner(

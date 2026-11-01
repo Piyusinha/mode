@@ -36,6 +36,8 @@ char *mc_set_clipboard(McSession *s, const char *utf8);
 /* PNG, full resolution; free with mc_bytes_free */
 char *mc_screenshot(McSession *s, uint8_t **out, size_t *out_len);
 char *mc_launch(McSession *s, const char *bundle_id);
+/* closes a running copy first, so the app starts on its home page */
+char *mc_launch_fresh(McSession *s, const char *bundle_id);
 char *mc_list_apps(McSession *s, char **out_json);
 
 void mc_string_free(char *s);

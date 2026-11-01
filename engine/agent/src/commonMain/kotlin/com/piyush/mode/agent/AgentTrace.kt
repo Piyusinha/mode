@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonObject
 interface AgentTrace {
     fun runStarted(task: String, config: AgentConfig, tools: List<String>) {}
 
+    /** The brain's brief (null when it failed), what it cost, and why it failed. */
+    fun briefed(model: String, brief: String?, costUsd: Double, error: String?) {}
+
     /** The screen as the model will see it, and how long looking took. */
     fun looked(step: Int, jpeg: ByteArray, imageWidth: Int, imageHeight: Int, texts: List<Triple<String, Int, Int>>, millis: Long) {}
 

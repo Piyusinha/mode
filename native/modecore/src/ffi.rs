@@ -193,7 +193,13 @@ pub unsafe extern "C" fn mc_screenshot(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mc_launch(s: *mut McSession, bundle_id: *const c_char) -> *mut c_char {
-    guard(|| unsafe { session(s) }?.launch(unsafe { text(bundle_id, "bundle id") }?))
+    guard(|| unsafe { session(s) }?.launch(unsafe { text(bundle_id, "bundle id") }?, false))
+}
+
+/// Like `mc_launch`, but closes a running copy first: the app starts on its home page.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mc_launch_fresh(s: *mut McSession, bundle_id: *const c_char) -> *mut c_char {
+    guard(|| unsafe { session(s) }?.launch(unsafe { text(bundle_id, "bundle id") }?, true))
 }
 
 /// `[{"name", "bundle_id"}]` JSON. Free with `mc_string_free`.
