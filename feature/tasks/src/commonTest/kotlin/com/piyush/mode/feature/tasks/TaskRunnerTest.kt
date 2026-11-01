@@ -89,7 +89,7 @@ private val quick = AgentConfig(settleMs = 0, maxSteps = 10)
 class TaskRunnerTest {
     @Test
     fun runsATaskRecordsItNotifiesAndLetsGoOfThePhone() = runTest {
-        val f = Fixture(this, ScriptedModel(call("done", "summary" to "Light mode on")))
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "Light mode on")))
         val result = f.runner.runTask("Turn off dark mode", quick)
 
         assertIs<AgentOutcome.Done>(result!!.outcome)
@@ -120,7 +120,7 @@ class TaskRunnerTest {
 
     @Test
     fun aQuestionWaitsForTheUsersAnswer() = runTest {
-        val f = Fixture(this, ScriptedModel(call("ask_user", "question" to "Which Wi-Fi?"), call("done", "summary" to "joined")))
+        val f = Fixture(this, ScriptedModel(call("ask_user", "question" to "Which Wi-Fi?"), call("done", "evidence" to "on screen", "summary" to "joined")))
         f.runner.start("Join Wi-Fi", quick)
         testScheduler.runCurrent()
         val question = f.runner.state.value.question!!
@@ -147,7 +147,7 @@ class TaskRunnerTest {
 
     @Test
     fun aTaskIsSavedWithItsConversation() = runTest {
-        val f = Fixture(this, ScriptedModel(call("done", "summary" to "Light mode is on.")))
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "Light mode is on.")))
         f.runner.runTask("Turn off dark mode", quick)
         val state = f.runner.state.value
 
@@ -164,7 +164,7 @@ class TaskRunnerTest {
 
     @Test
     fun aFollowUpContinuesTheSameConversation() = runTest {
-        val f = Fixture(this, ScriptedModel(call("done", "summary" to "Sent."), call("done", "summary" to "Sent to Rahul too.")))
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "Sent."), call("done", "evidence" to "on screen", "summary" to "Sent to Rahul too.")))
         f.runner.runTask("Text Sonali I'm leaving", quick)
         val conversation = f.runner.state.value.conversationId!!
         f.runner.runTask("Also tell Rahul", quick, conversationId = conversation)
@@ -193,7 +193,7 @@ class TaskRunnerTest {
 
     @Test
     fun comparisonRunsStartNoConversation() = runTest {
-        val f = Fixture(this, ScriptedModel(call("done", "summary" to "x")))
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "x")))
         f.runner.runTask("t", quick, tag = "compare-1")
         assertNull(f.runner.state.value.conversationId)
         assertTrue(f.conversations.recent().first().isEmpty())

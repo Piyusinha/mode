@@ -135,6 +135,8 @@ class Agent(
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
         val notes = mutableListOf<String>()
+        /** A successful done was sent back once to be checked; the next one is accepted. */
+        var verifyAsked = false
 
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
@@ -164,7 +166,7 @@ class Agent(
                 val changed = screen.signature != lastScreen
                 noProgress = if (changed) 0 else noProgress + 1
                 if (history.isNotEmpty()) {
-                    history[history.lastIndex] += if (changed) " → screen changed" else " → screen did NOT change"
+                    history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
                 }
             }
             lastScreen = screen.signature
@@ -212,11 +214,29 @@ class Agent(
                 continue
             }
             val reason = AgentTools.reasonOf(call)
+            AgentTools.noteOf(call)?.let {
+                notes += it
+                trace.noted(step, it)
+            }
             when (call.name) {
                 "done" -> {
                     val summary = call.arguments.string("summary").orEmpty()
                     val success = call.arguments["success"]?.jsonPrimitive?.booleanOrNull ?: true
-                    record("done", summary, if (success) "finished" else "gave up")
+                    val evidence = call.arguments.string("evidence")?.trim().orEmpty()
+                    val lastUnchanged = history.lastOrNull()?.endsWith(UNCHANGED) == true
+                    // Catch "I tapped Send" when nothing was sent: once per task, ask for a check.
+                    if (success && !verifyAsked && (evidence.isEmpty() || lastUnchanged)) {
+                        verifyAsked = true
+                        val why = if (lastUnchanged) "your last action did not change the screen" else "you did not say what on the screen shows it"
+                        trace.verifyRejected(step, why)
+                        record(
+                            "done (not accepted yet)", summary,
+                            "not accepted yet: $why. Look at the screen and check the task really happened; if it did, " +
+                                "call done again and say what on the screen shows it",
+                        )
+                        continue
+                    }
+                    record("done", summary, (if (success) "finished" else "gave up") + evidence.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
                     return result(AgentOutcome.Done(summary, success), step)
                 }
                 "ask_user" -> {
@@ -431,6 +451,7 @@ class Agent(
 
     companion object {
         private const val NEAR_PX = 60.0
+        private const val UNCHANGED = " → screen did NOT change"
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.
@@ -485,9 +506,16 @@ class Agent(
             - Most apps put Search, Back and tabs in the same places: tabs at the bottom, Back at top left.
             - You can start from any screen: you do not need to go home first.
 
+            Keep what you find: when a screen shows something you will need later or the user asked to know
+            (calendar events, times, prices, names, a tracking number), put it in the note field of your next
+            action. Notes stay with you for the whole task; older steps are only summarised. Never note
+            passwords, passcodes or card numbers.
+
             Finishing:
-            - When the task is done, call done with a short summary of what you did and what the screen
-              shows. If it cannot be done, call done with success false and say why.
+            - Before calling done, look at the screen: does it really show the task happened (the switch is
+              off, the message shows as sent)? If your last action did nothing, fix that first.
+            - Call done with a short summary (include what the user asked to know, from your notes) and the
+              evidence on screen. If it cannot be done, call done with success false and say why.
             - Keep each reason to a few words.
         """.trimIndent()
     }

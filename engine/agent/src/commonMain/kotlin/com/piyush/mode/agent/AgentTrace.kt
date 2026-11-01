@@ -23,6 +23,12 @@ interface AgentTrace {
     /** What was done on the phone and how it went. */
     fun acted(step: Int, action: String, op: String?, outcome: String, millis: Long) {}
 
+    /** A fact the model kept for the rest of the task. */
+    fun noted(step: Int, text: String) {}
+
+    /** A `done` that was sent back once to be checked against the screen. */
+    fun verifyRejected(step: Int, why: String) {}
+
     fun runEnded(result: AgentResult) {}
 
     object None : AgentTrace

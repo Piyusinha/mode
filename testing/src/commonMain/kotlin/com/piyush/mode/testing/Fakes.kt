@@ -70,7 +70,7 @@ public class ScriptedModel(vararg replies: ToolCall?) : LlmClient {
         models += model
         lastTools = tools
         lastUserText = messages.last().text
-        val reply = if (next < script.size) script[next] else call("done", "summary" to "out of script")
+        val reply = if (next < script.size) script[next] else call("done", "evidence" to "on screen", "summary" to "out of script")
         next++
         return ChatResult(reply, "", Usage(100, 10, 0.001))
     }

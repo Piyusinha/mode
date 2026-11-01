@@ -45,6 +45,14 @@ object AgentTools {
     class Param(val name: String, val type: String, val description: String, val required: Boolean = true, val enum: List<String>? = null)
 
     private val reason = Param("reason", "string", "A few words on why, shown to the user as progress.")
+
+    /** Offered on every action, so keeping a fact never costs a step of its own. */
+    private val note = Param(
+        "note", "string",
+        "Optional. A fact from this screen to keep for the rest of the task: an event, a time, a name, a price, " +
+            "anything the user asked to know. Never a password, code or card number.",
+        required = false,
+    )
     private fun point(axis: String) = Param(axis, "number", "Screenshot pixel $axis of the target's centre.")
 
     val ALL: List<Tool> = listOf(
@@ -108,10 +116,18 @@ object AgentTools {
             listOf(Param("question", "string", "One clear question.")),
         ),
         Tool(
-            "done", "The task is complete, or cannot be done. Say what you did and what the screen shows now.", null,
-            listOf(Param("summary", "string", "Short summary for the user."), Param("success", "boolean", "Whether the task was achieved.")),
+            "done", "The task is complete, or cannot be done. Check the screen first.", null,
+            listOf(
+                Param("summary", "string", "Short summary for the user, including anything they asked to know (use your notes)."),
+                Param("success", "boolean", "Whether the task was achieved."),
+                Param(
+                    "evidence", "string",
+                    "What on the current screen shows it is done (\"Dark Mode switch is off\", \"message shows Delivered\"), " +
+                        "or why it cannot be done.",
+                ),
+            ),
         ),
-    )
+    ).map { tool -> if (tool.name == "done") tool else Tool(tool.name, tool.description, tool.needs, tool.params + note) }
 
     /** The tools this phone can honour. */
     fun available(phoneOps: Set<String>): List<Tool> = ALL.filter { it.needs == null || it.needs in phoneOps }
@@ -180,6 +196,9 @@ object AgentTools {
     }
 
     fun reasonOf(call: ToolCall): String = call.arguments["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+    /** The fact the model asked to keep with this action, if any. */
+    fun noteOf(call: ToolCall): String? = call.arguments["note"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 internal fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull
