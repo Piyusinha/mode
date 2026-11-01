@@ -349,3 +349,41 @@ the graph grows past what one file reads comfortably.
   changing after 4 tries. Last: tap "Send".") beats spending the rest of the
   step and cost budget going round in circles.
 
+## D29. Memory: facts, skills and tips, learned by an outside critic
+
+- **Three kinds of memory:**
+  - **facts** about the user, all of them shown up to 25;
+  - **skills**, routes that worked, with placeholders;
+  - **app tips**.
+
+  These follow the 2026 mobile-agent research (EvoSkill-GUI, MAGNET) and
+  ChatGPT's saved memories. Matching uses words, not embeddings: it's fast,
+  on-device and enough for a few hundred items.
+- **Writing:** after each task, one call to the reflection model acting as an
+  outside critic. It sees the steps and the final screen, not the agent's
+  reasoning. The harness has the last word:
+  - evidence on every change;
+  - new skills only from successes;
+  - a failure may only add to a skill;
+  - at most 5 changes;
+  - no secrets (`SecretFilter`);
+  - near-duplicates merged.
+- **Saving:** memory saves without asking; new facts show "Remembered · Undo".
+  Private tasks and comparison runs neither use nor add to memory.
+- **Not yet:** memory lives only on the iPhone. Expiry by confidence comes in
+  H5.
+
+## D30. One inbox, one queue, and the iOS limit on schedules
+
+- **Every source calls `TaskInbox.submit`:** the app now; Siri, Shortcuts, the
+  Watch and schedules next. One drain loop runs tasks in order under a phone
+  lock, so a comparison run and a queued task never collide.
+- **At launch:**
+  - tasks interrupted by Mode closing are marked failed;
+  - queued tasks more than an hour old are not run, since a stale "send it
+    now" is worse than none.
+- **Schedules:** iOS won't let Mode start itself in the background. So a
+  schedule runs while Mode is open, and otherwise sets a notification that
+  opens Mode, which then runs it. A run missed by more than 2 hours is
+  skipped. Waking in the background is tested last (status, "Last").
+

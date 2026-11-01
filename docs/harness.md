@@ -216,6 +216,60 @@ typed settings with the $0.05 cost limit enforced, and the live model catalogue.
 - `TaskContext` carries the user's name and, for a follow-up, the earlier
   turns. H3 fills in "about you" and the app notes.
 
+**Steps 3 and 4 (memory, queue and sources) are done** (2026-11-01), after a
+second round of research (table below).
+
+**Memory (`feature:memory`, schema v2):**
+- **Facts about you:** all of them, up to 25, as ChatGPT does with saved
+  memories.
+- **Skills:** routes that worked, with placeholders such as "Message [Person] on
+  WhatsApp". They are matched on keywords, title and app. The best one, at a
+  score of 0.5 or more, is given in full; others are given by name.
+- **App tips:** given for the apps a task names, for apps a matched fact points
+  to, and when an app opens.
+- **Recent tasks:** one line each.
+- **`recall`:** a tool for looking things up mid-task.
+- **Ranking:** by retention, exp(−days/successes).
+- **Reflector:** an outside critic that runs after each task. It sees the steps
+  and the final screen, not the agent's reasons, and returns add / update /
+  forget changes. The harness enforces evidence, no new skills from failures,
+  failures only adding to skills, at most 5 changes, `SecretFilter`, and
+  merging.
+- **Undo, privacy, learning:** "Remembered · Undo" for new facts. Private tasks
+  neither use nor add to memory. A Learn switch.
+
+**Agent changes from the research:**
+- The plan is recited last, so it never breaks the cache.
+- An optional `expect` field on every action is checked on the next screen.
+
+**Queue (`TaskInbox`, `TaskQueue`):**
+- One way in for the app, Siri, Shortcuts, the Watch and schedules.
+- Tasks run in order, under one phone lock.
+- Waiting tasks can be cancelled.
+- Recovery at launch: interrupted tasks are failed; queued tasks over an hour
+  old are dropped.
+
+**Schedules (`feature:schedules`, schema v3):**
+- A time of day on chosen days, or once. Handles the clocks changing.
+- Checked at launch, when Mode comes to the front, and every 30 s.
+- A run missed by over 2 h is skipped.
+- A notification at each next run opens Mode, because iOS can't start it in
+  the background.
+
+### What the research changed (2026-11-01)
+
+| Finding | Source | What Mode does |
+|---|---|---|
+| Skills per intent; metadata retrieval beats full text (12/12 vs 1/12) | EvoSkill-GUI | Skills with keywords and an app, a threshold, only from successes |
+| Placeholder workflows; retention ranking; keep variants | MAGNET | Placeholders, exp(−gap/uses), a different route is kept beside |
+| An isolated critic reflects better (−8.5 points without it) | EvoSkill-GUI | The Reflector sees steps and the final screen, not the agent's reasons |
+| All saved facts in every prompt, plus recent chat summaries | ChatGPT memory | Every fact up to 25; recent tasks section |
+| Editable memory by category; incognito | Claude memory | Memory screen; private tasks |
+| Let the model choose what to keep; stable prefix; progressive disclosure | Anthropic harness guide | Reflector writes; the best skill in full, others by name |
+| Recite the plan at the end; keep the prefix stable | Manus | The plan moved to the end of each step |
+| Pre/post-condition checks per step (+15–17 points) | Q-Reflector | `expect`, checked on the next screen, with no extra call |
+| ADD / UPDATE / DELETE / NOOP over existing items | Mem0 | Reflector ops on items it is shown by id |
+
 
 1. **Data layer:** `core:database`; persistent tasks, conversations and runs;
    typed settings and the model catalogue.
@@ -231,6 +285,19 @@ typed settings with the $0.05 cost limit enforced, and the live model catalogue.
 Each step is tested on the JVM with fakes, and run on the phone before the next.
 
 ## Sources
+
+Second round (2026-11-01):
+- Anthropic, harness patterns: https://claude.com/resources/articles/harnessing-claudes-intelligence
+- Anthropic memory tool: https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool
+- ChatGPT memory, reverse engineered: https://llmrefs.com/blog/reverse-engineering-chatgpt-memory
+- Manus context engineering (summary): https://tianpan.co/blog/2026-03-02-context-engineering-lessons-from-manus
+- EvoSkill-GUI: https://www.alphaxiv.org/abs/2609.17653
+- Q-Reflector / StepReflect: https://arxiv.org/abs/2608.05587
+- MemGUI-Agent: https://arxiv.org/abs/2606.19926
+- Mem0: https://docs.mem0.ai/core-concepts/how-it-works.md
+- DeepSeek Harness v0.1 (no mechanisms published yet): https://gigazine.net/gsc_news/en/20260814-deepseek-harness-v0-1/
+
+First round:
 
 - MobiMem: experience memory raises AndroidWorld success by up to 50%:
   https://arxiv.org/pdf/2512.15784

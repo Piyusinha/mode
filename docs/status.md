@@ -41,9 +41,10 @@ In this order; everything else below waits until these are done.
 1. ~~**H2, the context builder:**~~ done 2026-11-01: sectioned prompt with budgets, notes,
    verify before done, stuck check, time limit, daily cap, prompt caching
    (`docs/harness.md` §9).
-2. **H3, memory:** about you, per-app notes, reflection, secret filter,
-   "Remembered · Undo", `recall`.
-3. **H4, queue and sources:** one task inbox for the app, Siri, Watch, Shortcuts and schedules.
+2. ~~**H3, memory:**~~ done 2026-11-01: facts, skills, app tips, reflection,
+   secret filter, "Remembered · Undo", `recall`, private tasks.
+3. ~~**H4, queue and sources:**~~ done 2026-11-01: one task inbox and queue,
+   recovery at launch, schedules with notifications.
 4. **SwiftUI app:** the screens from the design canvas, Liquid Glass, light and dark.
 5. **Siri and the Live Activity:** "Hey Siri, start Mode", steps on the Dynamic Island,
    the answer on the Lock Screen.

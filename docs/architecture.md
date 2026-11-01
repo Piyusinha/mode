@@ -52,11 +52,11 @@ outside the layers and is used only by test source sets.
 
 | Layer | Module | Role |
 |---|---|---|
-| core | `core:common` | `AppLog` (event timeline), time ids, `ActivityTracker` (is anything using the phone?), `systemLog` on iOS |
+| core | `core:common` | `AppLog` (event timeline), time ids, `ActivityTracker` (is anything using the phone?), `SecretFilter`, `systemLog` on iOS |
 | core | `core:storage` | `SecretStore`, `KeyValueStore`, `FileStore`; iOS: Keychain, UserDefaults, Documents |
 | core | `core:platform` | `AppInfo`, `AppLifecycle`, `BackgroundWork`, `Notifier`; iOS: KeepAwake, background task, notifications |
 | core | `core:network` | The HTTP client (Darwin on iOS) |
-| core | `core:database` | The on-device SQLite database (SQLDelight): conversations, turns, tasks, the run index; `mode.db` on iOS |
+| core | `core:database` | The on-device SQLite database (SQLDelight, schema v3, upgrades checked): conversations, turns, tasks, the run index, memory, schedules; `mode.db` on iOS |
 | engine | `engine:ops` | What can be asked of a phone: `Op`, `PhoneBackend`, `ResilientBackend`, `FakeBackend` |
 | engine | `engine:llm` | `LlmClient`, `OpenRouterClient`, and `OpenRouterModels` (the live model catalogue) |
 | engine | `engine:agent` | The agent loop, its tools, `ContextBuilder` (what the model sees), `StuckDetector` and `AgentTrace` |
@@ -65,7 +65,9 @@ outside the layers and is used only by test source sets.
 | feature | `feature:settings` | `SettingsRepository` (typed `ModeSettings`, including the per-task cost limit) and `ModelCatalog` (usable models with cost per task, cached a day) |
 | feature | `feature:runs` | `RunRecorder`, `RunRepository` (listed from the database; events and screenshots stay files) |
 | feature | `feature:conversations` | `ConversationRepository`: conversations and their turns |
-| feature | `feature:tasks` | `TaskRunner` (`TaskState`, `PendingQuestion`), `TaskRepository` (saved tasks with source and status) |
+| feature | `feature:memory` | `MemoryRepository` (facts, skills, app tips; merge, undo), `MemoryRetrieval` (what a task gets, `recall`), `Reflector` (learns after each task) |
+| feature | `feature:tasks` | `TaskRunner` (one task at a time under a phone lock), `TaskQueue` / `TaskInbox` (the one way in for every source), `TaskMemory`, `TaskRepository` |
+| feature | `feature:schedules` | `ScheduleRule` (next run, local time), `ScheduleRepository`, `Scheduler` (due tasks to the inbox, notifications) |
 | feature | `feature:diagnostics` | `HandsCheck` |
 | feature | `feature:compare` | `CompareRunner` |
 | app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |
