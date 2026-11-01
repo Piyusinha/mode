@@ -34,7 +34,10 @@ public data class LiveStep(
     val seconds: Double,
 )
 
-public data class FinishedRun(val badge: TaskBadge, val summary: String, val steps: Int, val seconds: Long, val costUsd: Double)
+public data class FinishedRun(val badge: TaskBadge, val summary: String, val steps: Int, val seconds: Long, val costUsd: Double) {
+    /** The reply as blocks, drawn like the chat's. */
+    val parts: List<com.piyush.mode.app.screens.conversation.ReplyPart> get() = com.piyush.mode.app.screens.conversation.replyParts(summary)
+}
 
 /** The task running now, step by step, with Stop and the agent's questions. */
 public class LiveRunPresenter(

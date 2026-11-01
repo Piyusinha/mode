@@ -19,10 +19,10 @@ final class LiveViewModel {
 
     struct Finished: Equatable {
         let badge: Format.BadgeStyle
-        let summary: String
+        let reply: [ModeReplyBlock]
         let line: String
 
-        static func == (a: Finished, b: Finished) -> Bool { a.summary == b.summary && a.line == b.line }
+        static func == (a: Finished, b: Finished) -> Bool { a.reply == b.reply && a.line == b.line }
     }
 
     struct State: Equatable {
@@ -77,7 +77,7 @@ final class LiveViewModel {
             )
         }
         state.finished = s.finished.map {
-            Finished(badge: Format.badge($0.badge), summary: $0.summary,
+            Finished(badge: Format.badge($0.badge), reply: $0.parts.map(ModeReplyBlock.init),
                      line: L10n.Live.summary(steps: Int($0.steps), seconds: Format.seconds(Double($0.seconds)), cost: Format.money($0.costUsd)))
         }
     }

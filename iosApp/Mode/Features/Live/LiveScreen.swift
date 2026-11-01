@@ -19,12 +19,14 @@ struct LiveScreen: View {
                     .padding(.horizontal, ModeSpacing.xl)
             } else if state.running == nil {
                 if let finished = state.finished {
-                    VStack(spacing: ModeSpacing.m) {
-                        ModeBadge(finished.badge.text, icon: finished.badge.icon, tone: finished.badge.tone)
-                        Text(finished.summary).modeText(.body).multilineTextAlignment(.center)
-                        Text(finished.line).modeText(.footnote, color: ModeColor.textSecondary)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                            ModeBadge(finished.badge.text, icon: finished.badge.icon, tone: finished.badge.tone)
+                            ModeReply(finished.reply)
+                            Text(finished.line).modeText(.footnote, color: ModeColor.textSecondary)
+                        }
+                        .padding(ModeSpacing.screenEdge)
                     }
-                    .padding(ModeSpacing.xl)
                     .frame(maxHeight: .infinity)
                 } else {
                     ModeEmptyState(icon: .running, title: L10n.Live.idleTitle, message: L10n.Live.idleMessage).frame(maxHeight: .infinity)

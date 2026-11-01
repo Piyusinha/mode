@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.tasks.presentation
 
+import com.piyush.mode.core.common.PlainText
 import com.piyush.mode.agent.Agent
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
@@ -238,7 +239,8 @@ public class TaskRunner(
             reply = replyFor(finished.outcome)
             val line = describeResult(finished)
             mutableState.update { it.copy(lastResult = finished, status = line) }
-            notifier.post("Mode", line)
+            // The notification reads like the chat reply, as plain text (it can't draw Markdown).
+            notifier.post("Mode", PlainText.fromMarkdown(reply))
             // Come back so the user sees how it went.
             runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
             return finished

@@ -3,6 +3,7 @@ package com.piyush.mode.app.screens.onboarding
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.app.screens.settings.ModelChoice
+import com.piyush.mode.core.common.PlainText
 import com.piyush.mode.core.platform.AppLifecycle
 import com.piyush.mode.core.platform.Permission
 import com.piyush.mode.core.platform.PermissionStatus
@@ -251,7 +252,7 @@ public class OnboardingPresenter(
             set { st ->
                 st.copy(
                     testRunning = false,
-                    testSummary = summary,
+                    testSummary = summary?.let { PlainText.fromMarkdown(it) },
                     testItems = st.testItems.map {
                         when {
                             it.state == TestItemState.Done -> it

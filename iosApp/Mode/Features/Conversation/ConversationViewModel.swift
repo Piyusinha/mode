@@ -112,23 +112,6 @@ final class ConversationViewModel {
         }
     }
 
-    private static func block(_ part: ReplyPart) -> ModeReplyBlock {
-        switch onEnum(of: part) {
-        case let .paragraph(p): .paragraph(p.text)
-        case let .heading(p): .heading(level: Int(p.level), p.text)
-        case let .bullets(p): .bullets(p.items)
-        case let .numbered(p): .numbered(start: Int(p.start), p.items)
-        case let .agenda(p):
-            .agenda(p.rows.map { row in
-                ModeAgendaRow(time: row.start ?? String(localized: L10n.Conversation.allDay), end: row.end, text: row.text, allDay: row.start == nil)
-            })
-        case let .table(p): .table(header: p.header, rows: p.rows)
-        case let .quote(p): .quote(p.text)
-        case let .code(p): .code(p.text)
-        case .divider: .divider
-        }
-    }
-
     private static func map(_ s: ConversationUiState) -> State {
         State(
             title: s.title,
@@ -139,7 +122,7 @@ final class ConversationViewModel {
                     fromUser: t.fromUser,
                     spoken: t.source == .siri || t.source == .watch,
                     text: t.text,
-                    blocks: t.parts.map(block),
+                    blocks: t.parts.map(ModeReplyBlock.init),
                     status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
                     screens: t.screens > 0 ? t.taskId.map { (L10n.Conversation.seeScreens(Int(t.screens)), $0) } : nil
                 )

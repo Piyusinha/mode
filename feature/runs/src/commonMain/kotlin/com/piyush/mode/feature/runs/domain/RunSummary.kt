@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.runs.domain
 
+import com.piyush.mode.core.common.PlainText
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
 import kotlin.math.roundToInt
@@ -28,7 +29,7 @@ public fun describeResult(result: AgentResult): String {
     val cost = "$" + ((result.costUsd * 10000).roundToInt() / 10000.0)
     val time = "${result.millis / 1000}s"
     return when (val o = result.outcome) {
-        is AgentOutcome.Done -> (if (o.success) "Done: " else "Could not finish: ") + o.summary + " ($time, ${result.steps} steps, $cost)"
+        is AgentOutcome.Done -> (if (o.success) "Done: " else "Could not finish: ") + PlainText.fromMarkdown(o.summary, oneLine = true) + " ($time, ${result.steps} steps, $cost)"
         is AgentOutcome.Stopped -> "Stopped: ${o.why} ($time, ${result.steps} steps, $cost)"
         is AgentOutcome.Failed -> "Failed: ${o.why}"
     }
