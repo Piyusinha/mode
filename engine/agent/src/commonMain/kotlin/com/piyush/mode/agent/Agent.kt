@@ -150,16 +150,17 @@ class Agent(
         var context = startContext
         val started = clock.markNow()
         val ops = phone.ops()
-        val tools = AgentTools.available(ops, recall = memory != null)
-        val schema = AgentTools.schema(tools)
-        trace.runStarted(task, config, tools.map { it.name })
+        val brain = config.brainModel?.let { Brain(llm, it) }
+        trace.runStarted(task, config, AgentTools.available(ops, recall = memory != null, brain = brain != null).map { it.name })
         // The brain reads the request first (Brain); a failure just means no brief.
-        val brief = config.brainModel?.let { brainModel ->
+        val brief = brain?.let { b ->
             onStatus(WORKING)
-            val r = Brain(llm, brainModel).brief(task, startContext)
-            trace.briefed(brainModel, r.brief?.text(), r.costUsd, r.error)
+            val r = b.brief(task, startContext)
+            trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null)
+        val schema = AgentTools.schema(tools)
         val history = mutableListOf<String>()
         var cost = brief?.costUsd ?: 0.0
         var lastScreen: String? = null
@@ -183,6 +184,17 @@ class Agent(
          * down again and again (the strong model too). Mode remembers the list for it.
          */
         val scrolled = LinkedHashSet<String>()
+        /** The screen text as of the last look, for the brain's decisions. */
+        var screenNow: List<String> = emptyList()
+        /** Asks the brain to choose; its answer (or why it could not) for the history. Adds its cost. */
+        suspend fun askBrain(question: String): String {
+            val b = brain ?: return "no planning mind is set: choose yourself from what you have seen"
+            onStatus(WORKING)
+            val d = b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow)
+            cost += d.costUsd
+            trace.decided(question, d.answer, d.costUsd, d.error)
+            return d.answer?.let { "your planning mind decided: $it. Do that now" } ?: "your planning mind could not decide (${d.error}): choose yourself"
+        }
         /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
         var lastOp: String? = null
         var lastPage: List<String> = emptyList()
@@ -261,6 +273,7 @@ class Agent(
                 }
             }
             lastScreen = screen.signature
+            screenNow = screen.pageTexts()
             // Scrolling one list: add what is on screen now to what was seen; anything else starts afresh.
             if (lastOp == "scroll") {
                 if (scrolled.isEmpty()) scrolled += lastPage
@@ -407,6 +420,11 @@ class Agent(
                         record("plan", "", "plan saved; it is shown to you every step: now do the next open item")
                     }
                 }
+                "decide" -> {
+                    val question = call.arguments.string("question")?.trim().orEmpty().ifBlank { reason.ifBlank { task } }
+                    val answer = askBrain(question)
+                    record("decide \"$question\"", reason, answer)
+                }
                 "recall" -> {
                     val query = call.arguments.string("query")?.trim().orEmpty()
                     stuck.thought()
@@ -475,12 +493,10 @@ class Agent(
                     if (op is Op.Scroll) {
                         val direction = call.arguments.string("direction")
                         stuck.holdReversal(direction)?.let { kept ->
-                            record(
-                                "$described (not done)", reason,
-                                "not done: you have scrolled back and forth. Keep scrolling $kept until you find it or the " +
-                                    "page ends (the section you want is usually just past the last one you saw); if your " +
-                                    "notes already answer the task, call done",
-                            )
+                            // Going back and forth is a choice not being made: the brain makes it.
+                            val decided = if (brain != null) " " + askBrain("The assistant keeps scrolling back and forth over this list (\"$reason\"). What should it pick or do now?")
+                                else " Keep scrolling $kept until you find it or the page ends; if your notes already answer the task, call done."
+                            record("$described (not done)", reason, "not done: you have scrolled back and forth.$decided")
                             continue
                         }
                     }
@@ -804,7 +820,8 @@ class Agent(
               (ratings, prices, sizes); open an item only to act on it, or when the list does not say.
             - Comparing options (the best, highest rated, cheapest): Mode keeps everything that was on screen
               while you scroll a list, under SEEN WHILE SCROLLING. Scroll through once, then choose from that
-              list and open your choice; never scroll back to re-check. Ignore ads and sponsored entries (AD,
+              list and open your choice; never scroll back to re-check. If the choice is not obvious, call
+              decide: your planning mind chooses from what you saw and tells you what to tap. Ignore ads and sponsored entries (AD,
               Ad, Sponsored, Promoted) and entries that are not what was asked (a salad place for sushi).
             - To see more of a list or page, use scroll (never swipe for scrolling). Keep going one way until
               you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and

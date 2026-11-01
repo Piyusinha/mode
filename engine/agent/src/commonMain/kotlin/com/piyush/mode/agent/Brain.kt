@@ -67,6 +67,36 @@ class Brain(private val llm: LlmClient, private val model: String) {
         }
     }
 
+    class Decision(val answer: String?, val costUsd: Double, val error: String? = null)
+
+    /**
+     * A choice the hands can't make well alone (seen on the phone: the highest-rated restaurant was on
+     * screen and Haiku re-planned nine times instead of picking it). Text only: the brief, what was seen
+     * while scrolling, the screen's text.
+     */
+    suspend fun decide(question: String, task: String, brief: String?, seen: List<String>, screen: List<String>): Decision {
+        val input = buildString {
+            append("REQUEST: ").append(task).append("\n\n")
+            brief?.let { append("THE BRIEF YOU WROTE:\n").append(it).append("\n\n") }
+            if (seen.isNotEmpty()) append("SEEN WHILE SCROLLING (top to bottom):\n").append(seen.joinToString("\n") { "- $it" }).append("\n\n")
+            append("ON SCREEN NOW:\n").append(screen.joinToString("\n") { "- $it" }).append("\n\n")
+            append("THE ASSISTANT ASKS: ").append(question)
+        }
+        val messages = listOf(
+            ChatMessage("system", listOf(ChatMessage.Part.Text(DECIDE, cacheAfter = true))),
+            ChatMessage("user", listOf(ChatMessage.Part.Text(input))),
+        )
+        return try {
+            val reply = llm.chat(model, messages, DECIDE_TOOLS)
+            val answer = reply.toolCall?.takeIf { it.name == "decision" }?.arguments?.let { text(it, "answer") }
+                ?: reply.text.trim().takeIf { it.isNotEmpty() }
+            Decision(answer, reply.usage.costUsd, if (answer == null) "no decision in the reply" else null)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            Decision(null, 0.0, e.message)
+        }
+    }
+
     private fun input(task: String, c: TaskContext): String = buildString {
         c.today?.let { append("NOW: ").append(it).append("\n\n") }
         val about = listOfNotNull(c.userName?.let { "Their name: $it" }) + c.aboutYou
@@ -106,6 +136,40 @@ class Brain(private val llm: LlmClient, private val model: String) {
         }
 
         const val MAX_STEPS = 6
+
+        private val DECIDE_TOOLS: JsonArray = buildJsonArray {
+            add(
+                buildJsonObject {
+                    put("type", "function")
+                    putJsonObject("function") {
+                        put("name", "decision")
+                        put("description", "Your decision for the assistant operating the phone.")
+                        putJsonObject("parameters") {
+                            put("type", "object")
+                            putJsonObject("properties") {
+                                put(
+                                    "answer",
+                                    buildJsonObject {
+                                        put("type", "string")
+                                        put("description", "The choice and why in a few words, then exactly what to tap: quote its text as it appears.")
+                                    },
+                                )
+                            }
+                            putJsonArray("required") { add(JsonPrimitive("answer")) }
+                        }
+                    }
+                },
+            )
+        }
+
+        val DECIDE = """
+            You are the planning mind of Mode, a personal assistant operating the user's iPhone. The assistant
+            doing the tapping asks you to make a choice. Decide from what it saw (the text below; you do not see
+            images), following your brief: ignore ads and sponsored entries (AD, Ad, Sponsored, Promoted) and
+            entries that are not what was asked; break ties as the brief says (more ratings, then faster or
+            nearer). If what you need is not in the text, say exactly what to look at next instead. Answer with
+            the decision tool: the choice, why in a few words, and the exact on-screen text to tap.
+        """.trimIndent()
 
         private fun arr(name: String, about: String) = name to buildJsonObject {
             put("type", "array"); putJsonObject("items") { put("type", "string") }; put("description", about)

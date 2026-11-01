@@ -108,6 +108,15 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
         AppLog.log("agent", if (brief != null) "brief by $model:\n$brief" else "no brief ($model): ${error ?: "unknown"}")
     }
 
+    override fun decided(question: String, answer: String?, costUsd: Double, error: String?) {
+        event("decide", buildJsonObject {
+            put("question", question)
+            answer?.let { put("answer", it) }
+            put("cost_usd", costUsd)
+            error?.let { put("error", it) }
+        })
+    }
+
     override fun noted(step: Int, text: String) {
         event("note", buildJsonObject { put("step", step); put("text", text) })
     }

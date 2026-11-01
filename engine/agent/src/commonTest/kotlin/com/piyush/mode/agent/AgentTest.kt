@@ -374,6 +374,38 @@ class AgentTest {
     }
 
     @Test
+    fun theHandsAskTheBrainToChooseAndThereIsNoPlanToolWithABrief() = runTest {
+        val list = listOf("WeFit - Protein Bowls 4.7 (186) AD" to (200.0 to 300.0), "Matsuri - The Chancery 4.7 (106)" to (200.0 to 500.0))
+        val phone = FakePhone(List(5) { list })
+        val model = ScriptedModel(
+            call("brief", "intent" to "Add sushi from the highest-rated restaurant", "app" to "Swiggy", "start" to "continue",
+                "done_when" to "cart shows sushi", "steps" to listOf("Search sushi", "Pick the highest rated"), "report" to "what was added"),
+            call("decide", "question" to "Which restaurant is highest rated, ignoring ads?"),
+            call("decision", "answer" to "Matsuri - The Chancery: 4.7, the top non-ad sushi place. Tap \"Matsuri - The Chancery\""),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", brainModel = "brain")).run("sushi from the highest rated")
+        assertEquals(listOf("brain", "cheap", "brain"), model.models.take(3), "brief, then the hands ask, then the brain decides")
+        assertTrue("your planning mind decided: Matsuri" in model.lastUserText, model.lastUserText)
+        assertTrue(AgentTools.available(setOf("input.tap"), brain = true, briefed = true).none { it.name == "plan" })
+        assertTrue(AgentTools.available(setOf("input.tap")).none { it.name == "decide" }, "no brain, no decide")
+    }
+
+    @Test
+    fun goingBackAndForthHandsTheChoiceToTheBrain() = runTest {
+        val phone = FakePhone(List(12) { i -> listOf("List" to (100.0 to 200.0), "row $i" to (100.0 to 300.0 + i)) })
+        fun scroll(d: String) = call("scroll", "direction" to d, "reason" to "Checking the top")
+        val model = ScriptedModel(
+            call("brief", "intent" to "x", "start" to "continue", "done_when" to "x", "steps" to listOf("a"), "report" to "x"),
+            scroll("down"), scroll("up"), scroll("down"), scroll("up"),
+            call("decision", "answer" to "Pick row 2: tap \"row 2\""),
+            call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle.copy(model = "cheap", brainModel = "brain")).run("t")
+        assertTrue("your planning mind decided: Pick row 2" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun scrollingOneWayAgainAndAgainSuggestsSortOrFilter() = runTest {
         val phone = FakePhone(List(12) { i -> listOf("Results" to (100.0 to 200.0), "row $i" to (100.0 to 300.0)) })
         fun down() = call("scroll", "direction" to "down", "reason" to "Looking for the highest rated")

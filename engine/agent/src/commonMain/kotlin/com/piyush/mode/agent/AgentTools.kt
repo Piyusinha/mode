@@ -142,6 +142,13 @@ object AgentTools {
             listOf(Param("steps", "string", "The plan, one item per line, e.g. \"1. Turn off dark mode\\n2. Set brightness to half\"")),
         ),
         Tool(
+            "decide", "Ask your planning mind to make a choice for you: which option is best, which item matches, " +
+                "what to do next when you are unsure. It sees the brief, everything you saw while scrolling and " +
+                "this screen, and tells you what to pick and tap. Use it instead of scrolling back to re-check or " +
+                "planning again.", null,
+            listOf(Param("question", "string", "The choice to make, e.g. \"Which sushi restaurant is highest rated, ignoring ads?\"")),
+        ),
+        Tool(
             "recall", "Look up what Mode remembers: a person's details, a place, a preference, or the steps of a " +
                 "skill listed under WHAT WORKED BEFORE. Use it when the task needs something you don't have.", null,
             listOf(Param("query", "string", "What to look up, e.g. \"Sonali\" or \"Message [Person] on WhatsApp\".")),
@@ -191,8 +198,16 @@ object AgentTools {
     }
 
     /** The tools this phone can honour; recall only when there is a memory to look in. */
-    fun available(phoneOps: Set<String>, recall: Boolean = false): List<Tool> =
-        ALL.filter { (it.needs == null || it.needs in phoneOps) && (recall || it.name != "recall") }
+    /**
+     * The tools this phone can honour; recall only with a memory to look in; decide only with a brain.
+     * With a brief, plan is left out: the brief's steps are the plan (seen on the phone: nine re-plans
+     * instead of one choice).
+     */
+    fun available(phoneOps: Set<String>, recall: Boolean = false, brain: Boolean = false, briefed: Boolean = false): List<Tool> =
+        ALL.filter {
+            (it.needs == null || it.needs in phoneOps) && (recall || it.name != "recall") &&
+                (brain || it.name != "decide") && !(briefed && it.name == "plan")
+        }
 
     /** OpenAI-style function-calling schema for [tools]. */
     fun schema(tools: List<Tool>): JsonArray = buildJsonArray {

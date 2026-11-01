@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonObject
 interface AgentTrace {
     fun runStarted(task: String, config: AgentConfig, tools: List<String>) {}
 
+    /** A choice the brain made for the hands (null when it could not), what it cost. */
+    fun decided(question: String, answer: String?, costUsd: Double, error: String?) {}
+
     /** The brain's brief (null when it failed), what it cost, and why it failed. */
     fun briefed(model: String, brief: String?, costUsd: Double, error: String?) {}
 
