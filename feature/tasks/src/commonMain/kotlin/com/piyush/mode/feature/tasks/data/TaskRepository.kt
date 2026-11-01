@@ -22,9 +22,9 @@ public class TaskRepository(
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val newId: () -> String = { Uuid.random().toString() },
 ) {
-    public fun create(text: String, source: TaskSource, conversationId: String?): Task {
+    public fun create(text: String, source: TaskSource, conversationId: String?, private: Boolean = false): Task {
         val id = newId()
-        db.taskQueries.insert(id, conversationId, text, source.stored, TaskStatus.Queued.stored, now())
+        db.taskQueries.insert(id, conversationId, text, source.stored, TaskStatus.Queued.stored, now(), if (private) 1 else 0)
         return get(id)!!
     }
 
@@ -43,6 +43,22 @@ public class TaskRepository(
     /** Adds a cost that came after the task finished (its reflection). */
     public fun addCost(id: String, usd: Double) {
         db.taskQueries.addCost(usd, id)
+    }
+
+    /** Tasks waiting to run, oldest first. */
+    public fun queued(): List<Task> = db.taskQueries.queued().executeAsList().map { it.toDomain() }
+
+    /**
+     * After a relaunch: a task that was running when Mode closed is marked
+     * failed, and a queued one older than [maxWaitMs] is not run any more
+     * (a request from an hour ago is likely stale).
+     */
+    public fun tidyAfterRelaunch(maxWaitMs: Long) {
+        val time = now()
+        db.transaction {
+            db.taskQueries.interruptRunning(time)
+            db.taskQueries.expireQueued(time, time - maxWaitMs)
+        }
     }
 
     /** The newest tasks first, as they are now. */
@@ -69,6 +85,7 @@ public class TaskRepository(
         runId = run_id,
         summary = summary,
         steps = steps?.toInt(),
+        private = private_ != 0L,
         costUsd = cost_usd,
     )
 }

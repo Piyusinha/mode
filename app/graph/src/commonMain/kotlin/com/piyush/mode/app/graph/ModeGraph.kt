@@ -26,6 +26,7 @@ import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.data.TaskRepository
+import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
 import com.piyush.mode.llm.OpenRouterModels
@@ -89,12 +90,17 @@ class ModeGraph(platform: PlatformServices) {
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
     )
 
+    /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope)
+
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
 
     init {
         IdleDisconnectPolicy(session, activity, scope).install(platform.lifecycle)
         scope.launch { models.refresh() }
+        // Tasks left from the last session: interrupted ones are marked, fresh ones run.
+        inbox.recover()
         scope.launch {
             runCatching { runs.backfill() }
                 .onSuccess { if (it > 0) AppLog.log("runs", "listed $it earlier runs") }

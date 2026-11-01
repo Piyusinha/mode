@@ -29,7 +29,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.piyush.mode.feature.tasks.domain.TaskStatus
 import com.piyush.mode.feature.settings.data.SettingsRepository
+import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
+import com.piyush.mode.feature.tasks.domain.TaskSource
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.ops.PhoneUnavailable
 import com.piyush.mode.testing.FakePhone
@@ -362,5 +364,92 @@ class TaskRunnerTest {
         testScheduler.advanceUntilIdle()
         f.runner.runTask("turn it back on", quick)
         assertTrue("today: turn off dark mode → Dark mode is off." in model.agentPrompts.last(), model.agentPrompts.last())
+    }
+
+    private fun Fixture.queue(scope: CoroutineScope) = TaskQueue(runner, tasks, conversations, scope)
+
+    private suspend fun Fixture.saved(text: String) = tasks.recent().first().single { it.text == text }
+
+    @Test
+    fun queuedTasksRunOneAfterAnotherInOrder() = runTest {
+        val model = ScriptedModel(
+            call("done", "evidence" to "x", "summary" to "A done"),
+            call("done", "evidence" to "x", "summary" to "B done"),
+        )
+        val f = Fixture(this, model)
+        val q = f.queue(this)
+        q.submit("A", TaskSource.Siri)
+        q.submit("B", TaskSource.Watch)
+        testScheduler.advanceUntilIdle()
+        assertEquals("A done", f.saved("A").summary)
+        assertEquals("B done", f.saved("B").summary)
+        assertEquals(TaskSource.Watch, f.saved("B").source)
+        assertTrue(q.queue.value.isEmpty())
+    }
+
+    @Test
+    fun aSecondTaskWaitsWhileTheFirstRunsAndCanBeCancelled() = runTest {
+        val model = ScriptedModel(
+            call("ask_user", "question" to "Which Sonali?"),
+            call("done", "evidence" to "x", "summary" to "A done"),
+            call("done", "evidence" to "x", "summary" to "C done"),
+        )
+        val f = Fixture(this, model)
+        val q = f.queue(this)
+        q.submit("A", TaskSource.App)
+        testScheduler.advanceUntilIdle()
+        val b = q.submit("B", TaskSource.App)!!
+        q.submit("C", TaskSource.App)
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf("B", "C"), q.queue.value.map { it.text }, "A is running, B and C wait")
+
+        q.cancel(b.id)
+        assertEquals(listOf("C"), q.queue.value.map { it.text })
+        f.runner.answer("the first one")
+        testScheduler.advanceUntilIdle()
+        assertEquals(TaskStatus.Stopped, f.saved("B").status)
+        assertEquals("C done", f.saved("C").summary, "B never ran")
+    }
+
+    @Test
+    fun stopEndsTheRunningTaskButTheQueueGoesOn() = runTest {
+        val model = ScriptedModel(
+            call("ask_user", "question" to "Which one?"),
+            call("done", "evidence" to "x", "summary" to "B done"),
+        )
+        val f = Fixture(this, model)
+        val q = f.queue(this)
+        val a = q.submit("A", TaskSource.App)!!
+        testScheduler.advanceUntilIdle()
+        q.submit("B", TaskSource.App)
+        q.cancel(a.id)
+        testScheduler.advanceUntilIdle()
+        assertEquals(TaskStatus.Stopped, f.saved("A").status)
+        assertEquals("B done", f.saved("B").summary)
+    }
+
+    @Test
+    fun afterARelaunchInterruptedTasksFailStaleOnesAreDroppedAndFreshOnesRun() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "x", "summary" to "fresh done")))
+        TaskRepository(f.db, now = { 0L }).create("stale", TaskSource.Siri, null)
+        val running = f.tasks.create("was running", TaskSource.App, null)
+        f.tasks.markRunning(running.id, "run-x")
+        f.tasks.create("fresh", TaskSource.Watch, null)
+
+        f.queue(this).recover()
+        testScheduler.advanceUntilIdle()
+        assertEquals(TaskStatus.Failed, f.saved("was running").status)
+        assertEquals(TaskStatus.NotStarted, f.saved("stale").status)
+        assertEquals("fresh done", f.saved("fresh").summary)
+    }
+
+    @Test
+    fun aPrivateTaskStaysPrivateWhileItWaits() = runTest {
+        val model = AgentAndCritic(call("done", "evidence" to "x", "summary" to "ok"))
+        val f = Fixture(this, model, withMemory = true)
+        val task = f.queue(this).submit("Message Sonali", TaskSource.App, private = true)!!
+        assertTrue(f.tasks.get(task.id)!!.private)
+        testScheduler.advanceUntilIdle()
+        assertEquals(0, model.reflections)
     }
 }

@@ -1,4 +1,4 @@
--- Version 2 → 3: tasks that repeat (docs/harness.md §3, queue and sources).
+-- Version 2 → 3: tasks that repeat, and private tasks (docs/harness.md §3, queue and sources).
 CREATE TABLE schedule (
     id TEXT NOT NULL PRIMARY KEY,
     text TEXT NOT NULL,
@@ -12,3 +12,6 @@ CREATE TABLE schedule (
 );
 
 CREATE INDEX schedule_next ON schedule(enabled, next_run_at);
+
+-- 1 for a private task: it neither uses nor adds to memory, also while it waits in the queue.
+ALTER TABLE task ADD COLUMN private INTEGER NOT NULL DEFAULT 0;

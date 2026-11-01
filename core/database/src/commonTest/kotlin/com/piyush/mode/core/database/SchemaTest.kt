@@ -23,7 +23,7 @@ class SchemaTest {
     fun aTaskMovesThroughItsStatusesAndOutlivesItsConversation() {
         val db = testDatabase()
         db.conversationQueries.insert("c1", "t", 1, 1)
-        db.taskQueries.insert("k1", "c1", "Turn off dark mode", "app", "queued", 1)
+        db.taskQueries.insert("k1", "c1", "Turn off dark mode", "app", "queued", 1, 0)
         db.taskQueries.start("running", 2, "run-1", "k1")
         db.taskQueries.finish("done", 3, "Light mode on", 7, 0.004, "k1")
         val task = db.taskQueries.byId("k1").executeAsOne()
@@ -63,10 +63,10 @@ class SchemaTest {
     @Test
     fun queuedTasksComeOutOldestFirstAndARelaunchTidiesUp() {
         val db = testDatabase()
-        db.taskQueries.insert("old", null, "old queued", "siri", "queued", 10)
-        db.taskQueries.insert("a", null, "first", "app", "queued", 100)
-        db.taskQueries.insert("b", null, "second", "watch", "queued", 200)
-        db.taskQueries.insert("r", null, "was running", "app", "running", 50)
+        db.taskQueries.insert("old", null, "old queued", "siri", "queued", 10, 0)
+        db.taskQueries.insert("a", null, "first", "app", "queued", 100, 0)
+        db.taskQueries.insert("b", null, "second", "watch", "queued", 200, 0)
+        db.taskQueries.insert("r", null, "was running", "app", "running", 50, 0)
         assertEquals(listOf("old", "a", "b"), db.taskQueries.queued().executeAsList().map { it.id })
 
         db.taskQueries.interruptRunning(300)

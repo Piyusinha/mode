@@ -50,6 +50,8 @@ import com.piyush.mode.feature.settings.domain.ModelOption
 import com.piyush.mode.feature.memory.data.MemoryRepository
 import com.piyush.mode.feature.memory.domain.MemoryKind
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
+import com.piyush.mode.feature.tasks.domain.TaskSource
+import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -89,7 +91,7 @@ fun App(graph: ModeGraph, decodeImage: (ByteArray) -> ImageBitmap) {
                     }
                 }
                 when (tab) {
-                    0 -> AgentScreen(graph.tasks, connection.label)
+                    0 -> AgentScreen(graph.tasks, graph.inbox, connection.label)
                     1 -> CompareScreen(graph.compare, graph.tasks, graph.models)
                     2 -> LogsScreen(graph.files, graph.runs, decodeImage)
                     3 -> SettingsScreen(graph.settings, graph.models, graph.memory)
@@ -110,8 +112,9 @@ private fun Page(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun AgentScreen(runner: TaskRunner, connection: String) {
+private fun AgentScreen(runner: TaskRunner, inbox: TaskQueue, connection: String) {
     val state by runner.state.collectAsState()
+    val waiting by inbox.queue.collectAsState()
     val focus = LocalFocusManager.current
     var task by remember { mutableStateOf("") }
     var private by remember { mutableStateOf(false) }
@@ -124,9 +127,9 @@ private fun AgentScreen(runner: TaskRunner, connection: String) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { focus.clearFocus(); runner.start(task.trim(), private = private) },
-                enabled = !state.running && task.isNotBlank(),
-            ) { Text("Run") }
+                onClick = { focus.clearFocus(); inbox.submit(task.trim(), TaskSource.App, private = private); task = "" },
+                enabled = task.isNotBlank(),
+            ) { Text(if (state.running) "Add to queue" else "Run") }
             OutlinedButton(onClick = { runner.stop() }, enabled = state.running) { Text("Stop") }
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(private, { private = it })
@@ -134,6 +137,13 @@ private fun AgentScreen(runner: TaskRunner, connection: String) {
             }
         }
         if (state.status.isNotBlank()) Text(state.status, style = MaterialTheme.typography.titleSmall)
+        if (waiting.isNotEmpty()) Text("Up next", style = MaterialTheme.typography.titleSmall)
+        for (w in waiting) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("${w.text} · ${w.source.name.lowercase()}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { inbox.cancel(w.id) }) { Text("Cancel") }
+            }
+        }
         for (item in state.remembered) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("Remembered: ${item.text}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)

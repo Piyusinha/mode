@@ -45,4 +45,6 @@ public data class Task(
     val summary: String?,
     val steps: Int?,
     val costUsd: Double?,
+    /** Neither uses nor adds to memory. */
+    val private: Boolean = false,
 )

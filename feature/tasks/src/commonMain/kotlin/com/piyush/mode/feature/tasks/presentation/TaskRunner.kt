@@ -23,6 +23,7 @@ import com.piyush.mode.feature.conversations.domain.TurnRole
 import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.tasks.data.TaskRepository
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
+import com.piyush.mode.feature.tasks.domain.Task
 import com.piyush.mode.feature.tasks.domain.TaskSource
 import com.piyush.mode.feature.tasks.domain.TaskState
 import com.piyush.mode.feature.tasks.domain.TaskStatus
@@ -37,14 +38,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
  * Runs agent tasks: saves the task and its conversation, connects, records
  * the run, relays the agent's questions to the user, notifies when done, and
- * always lets go of the phone after.
+ * always lets go of the phone after. One task at a time, whoever asks: there
+ * is one phone. Tasks from every source arrive through [TaskQueue].
  */
 public class TaskRunner(
     private val session: PhoneSession,
@@ -68,6 +73,10 @@ public class TaskRunner(
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
 
     private var job: Job? = null
+    /** The task running now, to stop it without stopping the queue. */
+    private var current: Job? = null
+    /** One phone: a queued task and a comparison run never drive it at once. */
+    private val phoneLock = Mutex()
 
     /** Starts [task] unless one is running; a [conversationId] makes it a follow-up there. */
     public fun start(
@@ -91,6 +100,7 @@ public class TaskRunner(
     /** Stops the running task; a pending question counts as stopped. */
     public fun stop() {
         job?.cancel()
+        current?.cancel()
         state.value.question?.answer?.complete(null)
     }
 
@@ -115,22 +125,47 @@ public class TaskRunner(
         conversationId: String? = null,
         source: TaskSource = TaskSource.App,
         private: Boolean = false,
-    ): AgentResult? = activity.track { run(task, config, tag, stayConnected, conversationId, source, private) }
-
-    private suspend fun run(
-        task: String,
-        config: AgentConfig,
-        tag: String?,
-        stayConnected: Boolean,
-        conversationId: String?,
-        source: TaskSource,
-        private: Boolean,
     ): AgentResult? {
-        // A follow-up sees how the earlier tasks in its conversation went (read before this task's own turn).
-        val earlier = conversationId?.let(::earlierTurns).orEmpty()
-        val conversation = conversationId ?: if (tag == null) conversations.create(task).id else null
-        val saved = tasks.create(task, source, conversation)
-        conversation?.let { conversations.addTurn(it, TurnRole.User, task, saved.id) }
+        val saved = admit(task, source, conversationId, tag, private)
+        return runSaved(saved, config, tag, stayConnected)
+    }
+
+    /** Runs a task that was saved earlier (it waited in the queue). */
+    public suspend fun runQueued(task: Task, config: AgentConfig = settings.agentConfig(), stayConnected: Boolean = false): AgentResult? =
+        runSaved(task, config, tag = null, stayConnected)
+
+    /**
+     * Saves a new task, with its conversation (a new one unless
+     * [conversationId] is given; none for comparison runs, which have a
+     * [tag]) and the user's turn, ready to run.
+     */
+    public fun admit(text: String, source: TaskSource, conversationId: String?, tag: String? = null, private: Boolean = false): Task {
+        val conversation = conversationId ?: if (tag == null) conversations.create(text).id else null
+        val saved = tasks.create(text, source, conversation, private)
+        conversation?.let { conversations.addTurn(it, TurnRole.User, text, saved.id) }
+        return saved
+    }
+
+    private suspend fun runSaved(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? =
+        phoneLock.withLock {
+            activity.track {
+                coroutineScope {
+                    current = coroutineContext[Job]
+                    try {
+                        run(saved, config, tag, stayConnected)
+                    } finally {
+                        current = null
+                    }
+                }
+            }
+        }
+
+    private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
+        val task = saved.text
+        val private = saved.private
+        val conversation = saved.conversationId
+        // A follow-up sees how the earlier tasks in its conversation went (not this task's own turn).
+        val earlier = conversation?.let { earlierTurns(it, excluding = saved.id) }.orEmpty()
         mutableState.update { TaskState(running = true, taskId = saved.id, conversationId = conversation) }
         notifier.requestPermission()
         runs.prune()
@@ -252,8 +287,8 @@ public class TaskRunner(
     }
 
     /** Each earlier task in the conversation with Mode's reply to it. */
-    private fun earlierTurns(conversationId: String): List<TaskContext.EarlierTurn> {
-        val turns = conversations.turnsNow(conversationId)
+    private fun earlierTurns(conversationId: String, excluding: String): List<TaskContext.EarlierTurn> {
+        val turns = conversations.turnsNow(conversationId).filter { it.taskId != excluding }
         return turns.mapIndexedNotNull { i, turn ->
             if (turn.role != TurnRole.User) return@mapIndexedNotNull null
             val reply = turns.getOrNull(i + 1)?.takeIf { it.role == TurnRole.Mode }?.text ?: "(no result)"
