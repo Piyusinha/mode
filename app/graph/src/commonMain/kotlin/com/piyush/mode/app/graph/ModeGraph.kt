@@ -100,7 +100,7 @@ class ModeGraph(platform: PlatformServices) {
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
 
     /** Each screen's presenter, for the native UI. */
-    val screens: Screens = Screens(scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory)
+    val screens: Screens = Screens(scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs)
 
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
