@@ -107,6 +107,11 @@ public class Reflector(
             ?: return Applied.Refused("unknown kind '${change.str("kind")}': $title")
         val succeeded = input.outcome == Outcome.Done
 
+        // What a list shows today (ratings, prices, delivery times) goes out of date: seen on the phone, a
+        // restaurant's rating and price were kept as a fact about the user, against the prompt's rule.
+        if (kind == MemoryKind.Fact && op != "forget" && LIST_DATA.containsMatchIn(change.str("text"))) {
+            return Applied.Refused("today's list data, not a lasting fact: $title")
+        }
         when (op) {
             "add" -> {
                 if (kind == MemoryKind.Skill && !succeeded) return Applied.Refused("a skill only comes from a task that worked: $title")
@@ -184,6 +189,12 @@ public class Reflector(
 
     public companion object {
         public const val MAX_CHANGES: Int = 5
+
+        /** Ratings, prices and delivery times: what a list shows today. */
+        private val LIST_DATA = Regex(
+            """\b(rated|ratings?)\s*\d|\d(\.\d)?\s*(stars?|★)|(₹|\brs\.?|\binr)\s*\d|\$\s*\d|\d+\s*-\s*\d+\s*mins?\b|\bdelivery (time|in)\b""",
+            RegexOption.IGNORE_CASE,
+        )
         private const val MAX_KNOWN = 40
         private const val TOOL = "save_memory"
 
@@ -212,6 +223,10 @@ public class Reflector(
             - Every change needs evidence: the step or answer it comes from.
             - Prefer updating an item already remembered (by its id) over adding a near-duplicate; forget one
               the task proved wrong.
+            - If the task found a shorter way than a remembered skill's steps (a recent entry instead of typing,
+              a sort instead of scrolling), update that skill's steps to the shorter way.
+            - Quote on-screen labels in a skill's steps exactly as shown ("Tap 'Log' beside the meal"): Mode
+              finds them on screen next time and points at them.
             - If the task failed, say why in failure_type and root_cause; add tips about what to avoid, or add
               "If it goes wrong:" lines to an existing skill. Never make a new skill from a failure.
             - Never store passwords, passcodes, one-time codes, card or bank numbers, or ID numbers.

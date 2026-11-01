@@ -27,6 +27,7 @@ object ContextBuilder {
     const val MAX_NOTES = 30
     const val MAX_NOTE_CHARS = 200
     const val MAX_TEXTS = 80
+    const val MAX_TIP_CHARS = 400
 
     /** The screen as the model will see it. */
     class Screen(
@@ -59,6 +60,10 @@ object ContextBuilder {
         val expectation: String? = null,
         /** Mode's record of what was changed for the user, with proof; never summarised away. */
         val done: List<String> = emptyList(),
+        /** Tips from earlier tasks about what is on screen now (JustInTime). */
+        val tipsNow: List<String> = emptyList(),
+        /** A routine that worked before, where its next step's label is on screen now (JustInTime). */
+        val routeHint: String? = null,
         /** Every line of text seen while scrolling the current list, in order, so options can be compared. */
         val seenWhileScrolling: List<String> = emptyList(),
         val screen: Screen,
@@ -90,11 +95,6 @@ object ContextBuilder {
         if (c.skills.isNotEmpty()) {
             append("WHAT WORKED BEFORE (follow it when it fits; the screen has the last word):\n")
             append(c.skills.joinToString("\n").clip(MAX_SKILL_CHARS)).append("\n\n")
-        }
-        if (c.appNotes.isNotEmpty()) {
-            append("TIPS FOR THESE APPS (from earlier tasks):\n")
-            c.appNotes.take(MAX_APP_NOTES).forEach { append("- ").append(it).append('\n') }
-            append('\n')
         }
         if (c.recentTasks.isNotEmpty()) {
             append("RECENT TASKS (newest first; for \"do that again\" or \"turn it back on\"):\n")
@@ -149,6 +149,12 @@ object ContextBuilder {
             input.seenWhileScrolling.forEach { append("- ").append(it).append('\n') }
             append('\n')
         }
+        if (input.tipsNow.isNotEmpty()) {
+            append("TIPS FOR THIS SCREEN (learned in earlier tasks):\n")
+            input.tipsNow.forEach { append("- ").append(it.clip(MAX_TIP_CHARS)).append('\n') }
+            append('\n')
+        }
+        input.routeHint?.let { append("FROM A ROUTINE THAT WORKED BEFORE: ").append(it).append("\n\n") }
         input.expectation?.let {
             append("YOU EXPECTED your last action to: ").append(it.clip(MAX_NOTE_CHARS))
             append(". Does the screen below show that? If not, deal with it before moving on.\n\n")

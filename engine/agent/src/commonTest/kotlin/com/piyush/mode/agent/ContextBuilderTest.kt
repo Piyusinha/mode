@@ -63,7 +63,7 @@ class ContextBuilderTest {
         )
         val stable = ContextBuilder.stable(input(context = context, answers = List(8) { "q$it" to "a$it" }))
         assertEquals(ContextBuilder.MAX_ABOUT_YOU, Regex("- fact \\d+").findAll(stable).count())
-        assertEquals(ContextBuilder.MAX_APP_NOTES, Regex("- app note \\d+").findAll(stable).count())
+        assertEquals(0, Regex("- app note \\d+").findAll(stable).count(), "tips come with the screen they are about, not up front")
         assertFalse("task 1 " in stable, "only the last 3 turns")
         assertTrue("task 4 " in stable)
         assertFalse("x".repeat(300) in stable, "each turn clipped")
@@ -130,7 +130,7 @@ class ContextBuilderTest {
             recentTasks = List(8) { "task $it" },
         )
         val stable = ContextBuilder.stable(input(context = context))
-        val order = listOf("ABOUT THE USER", "WHAT WORKED BEFORE", "TIPS FOR THESE APPS", "RECENT TASKS", "TASK:").map { stable.indexOf(it) }
+        val order = listOf("ABOUT THE USER", "WHAT WORKED BEFORE", "RECENT TASKS", "TASK:").map { stable.indexOf(it) }
         assertEquals(order.sorted(), order, stable)
         assertTrue(order.all { it >= 0 })
         assertTrue("- task 4" in stable)

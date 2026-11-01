@@ -199,6 +199,10 @@ class Agent(
             trace.decided(question, d.answer, d.costUsd, d.error)
             return d.answer?.let { "your planning mind decided: $it. Do that now" } ?: "your planning mind could not decide (${d.error}): choose yourself"
         }
+        /** The routine that worked before for this kind of task, step by step, and the next step to look for. */
+        val routine = JustInTime.steps(startContext.knownRoute ?: startContext.skills.firstOrNull { it.startsWith("SKILL:") })
+        var routineAt = 1
+        var routineHinted: JustInTime.Hint? = null
         /** Where the last tap landed (screen points), and whether a tap on the focused field was refused already. */
         var lastTapAt: Pair<Double, Double>? = null
         var focusTapRefused = false
@@ -346,6 +350,8 @@ class Agent(
                     expectation = expectation,
                     done = ledger.lines(),
                     seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
+                    tipsNow = if (inMode) emptyList() else JustInTime.tips(context.appNotes, screen.pageTexts(), lastApp),
+                    routeHint = (if (inMode) null else JustInTime.hint(routine, routineAt, screen.layout)).also { routineHinted = it }?.text(),
                     screen = ContextBuilder.Screen(
                         screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.layout, keyboardUp = screen.keyboardUp,
                     ),
@@ -582,6 +588,8 @@ class Agent(
                             if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
                         }
                         if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
+                        // The routine's step was followed: look for the next one.
+                        routineHinted?.takeIf { h -> op is Op.Tap && label == h.element.text }?.let { h -> routineAt = h.step.number + 1 }
                         if (!screen.keyboardUp) focusTapRefused = false
                         lastOp = call.name
                         lastPage = screen.pageTexts()

@@ -91,6 +91,19 @@ class ReflectorTest {
     }
 
     @Test
+    fun todaysListDataIsNotKeptAsAFact() = runTest {
+        val critic = Critic(
+            reply(
+                change("add", "fact", "Matsuri on Swiggy", "Sushi restaurant on Lavelle Road, rated 4.7 with 106 ratings, 65-75 mins delivery, Avocado Maki at Rs 570", subject = "matsuri"),
+                change("add", "fact", "Home", "Home is in Indiranagar, Bengaluru", subject = "home"),
+            ),
+        )
+        val r = Reflector(critic, repo).reflect(input(), "m")
+        assertEquals(listOf("Home is in Indiranagar, Bengaluru"), repo.all().map { it.text })
+        assertTrue(r.refused.single().startsWith("today's list data"), r.refused.toString())
+    }
+
+    @Test
     fun aSecretIsNeverSavedWhateverTheModelSays() = runTest {
         val critic = Critic(reply(change("add", "fact", "Bank", "Bank OTP 482913", subject = "bank")))
         val r = Reflector(critic, repo).reflect(input(), "m")

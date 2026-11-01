@@ -130,6 +130,18 @@ class AgentTest {
     }
 
     @Test
+    fun aRoutineThatWorkedPointsAtItsNextStepOnScreen() = runTest {
+        val home = listOf("Where do you want to go?" to (200.0 to 220.0), "Bellandur" to (100.0 to 280.0))
+        val rides = listOf("Bike 99" to (100.0 to 500.0), "Book now" to (300.0 to 800.0), "Cab 250" to (100.0 to 560.0))
+        val phone = FakePhone(listOf(home, rides, rides))
+        val model = ScriptedModel(call("tap", "id" to 1, "reason" to "Choosing the drop"), call("done", "evidence" to "x", "summary" to "x"))
+        val routine = "SKILL: Book a Rapido ride\n1. Open Rapido.\n2. Tap 'Where do you want to go?' and pick the place.\n3. Tap \"Book now\"."
+        Agent(phone, model, Gate(), noSettle).run("ride to Bellandur", context = TaskContext(skills = listOf(routine)))
+        // After step 2's label was tapped, the next step's label is pointed at.
+        assertTrue("FROM A ROUTINE THAT WORKED BEFORE: step 3" in model.lastUserText && "\"Book now\" is on screen as [" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun riskyTapsNeedTheUsersYes() = runTest {
         val phone = FakePhone(listOf(listOf("Request Uber Go" to (201.0 to 800.0))))
         val gate = Gate(allow = false)
@@ -1037,16 +1049,16 @@ class AgentTest {
 
     @Test
     fun openingAnAppBringsItsTipsOnce() = runTest {
-        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
-        val memory = Remembers(emptyMap(), tips = mapOf("Calendar" to listOf("Calendar: the list button is top right")))
+        val phone = FakePhone(List(5) { listOf("Today" to (60.0 to 800.0), "Inbox" to (340.0 to 800.0), "Calendars" to (200.0 to 800.0)) })
+        val memory = Remembers(emptyMap(), tips = mapOf("Calendar" to listOf("Calendar: the Inbox and Calendars buttons sit at the bottom right")))
         val model = ScriptedModel(
             call("open_app", "name" to "Calendar", "reason" to "x"),
             call("open_app", "name" to "Calendar", "reason" to "x"),
             call("done", "evidence" to "x", "summary" to "x"),
         )
         Agent(phone, model, Gate(), noSettle, memory = memory).run("read my calendar")
-        assertEquals(1, Regex("Calendar: the list button is top right").findAll(model.lastUserText).count())
-        assertTrue("TIPS FOR THESE APPS" in model.lastUserText)
+        assertEquals(1, Regex("Calendar: the Inbox and Calendars buttons").findAll(model.lastUserText).count())
+        assertTrue("TIPS FOR THIS SCREEN" in model.lastUserText, model.lastUserText)
     }
 
     @Test
