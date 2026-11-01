@@ -36,7 +36,26 @@ As of 2026-11-01.
 
 ## Roadmap
 
-In order. Items 1–7 are engineering; 8–10 are for launch; the free build stays last.
+### Focus now (set 2026-11-01)
+In this order; everything else below waits until these are done.
+1. **H2, the context builder:** sectioned prompt with budgets, `note`, verify before
+   done, stuck check, prompt caching (`docs/harness.md` §9).
+2. **H3, memory:** about you, per-app notes, reflection, secret filter,
+   "Remembered · Undo", `recall`.
+3. **H4, queue and sources:** one task inbox for the app, Siri, Watch, Shortcuts and schedules.
+4. **SwiftUI app:** the screens from the design canvas, Liquid Glass, light and dark.
+5. **Siri and the Live Activity:** "Hey Siri, start Mode", steps on the Dynamic Island,
+   the answer on the Lock Screen.
+6. **Voice transcription:** speak a task instead of typing it. On-device speech to
+   text (Apple's `SpeechAnalyzer`, so it's free, private and works offline), a live
+   transcript while you talk, then send. Per D17, the mic must stop before the agent
+   drives. The Watch app reuses it through the watch's own dictation.
+7. **Mac setup app:** one-click install and pairing (Launch item 8 below).
+
+After that: Apple Watch app, landing page and demo video, then "Last".
+
+### Earlier list
+Items 1–7 are engineering; 8–10 are for launch; the free build stays last.
 
 ### Make the agent better
 1. **Speed.** About a third of a run is waiting. Typing waits ~6 s, probably because a
