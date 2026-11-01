@@ -23,9 +23,12 @@ class MemorySettingsOnboardingTest {
         f.memory.save(MemoryDraft(MemoryKind.Skill, "turn off dark mode", "Turn off Dark Mode", "1. Settings", "e", app = "Settings"))
         f.memory.save(MemoryDraft(MemoryKind.Tip, "calendar", "Calendar", "list button top right", "e", app = "Calendar"))
         val p = MemoryPresenter(backgroundScope, f.memory, f.settings, f.clock)
-        val s = p.state.awaitState { it.tips.isNotEmpty() }
+        val s = p.state.awaitState { it.apps.isNotEmpty() }
         assertEquals(listOf("Sonali"), s.aboutYou.map { it.title })
-        assertEquals("Settings", s.skills.single().app)
+        assertEquals("Settings", s.routines.single().name)
+        assertEquals(listOf("Settings"), s.routines.single().routines.single().steps)
+        assertEquals(1, s.routineCount)
+        assertEquals(1, s.tipCount)
 
         p.delete(s.aboutYou.single().id)
         assertTrue(p.state.awaitState { it.aboutYou.isEmpty() }.aboutYou.isEmpty())
@@ -33,6 +36,35 @@ class MemorySettingsOnboardingTest {
         assertFalse(p.state.awaitState { !it.learn }.learn)
         p.forgetEverything()
         assertTrue(p.state.awaitState { it.isEmpty }.isEmpty)
+    }
+
+    @Test
+    fun tipsAreGroupedByAppHoweverTheAppWasStored() = runTest {
+        val f = Fixture(this)
+        f.memory.save(MemoryDraft(MemoryKind.Tip, "myfitnesspal", "MyFitnessPal: check the diary first", "Use the day arrows at the top.", "e", app = "MyFitnessPal"))
+        f.memory.save(MemoryDraft(MemoryKind.Tip, "myfitnesspal", "MyFitnessPal: don't scroll back and forth", "Read the diary once, top to bottom.", "e"))
+        f.memory.save(MemoryDraft(MemoryKind.Tip, "rapido", "Rapido: pickup is your location", "Rapido fills the pickup with where you are.", "e"))
+        f.memory.save(MemoryDraft(MemoryKind.Skill, "log a food", "Log a food", "1. Open MyFitnessPal\n2. Tap Log beside the meal\nIf it goes wrong: search again", "e", app = "MyFitnessPal"))
+        val p = MemoryPresenter(backgroundScope, f.memory, f.settings, f.clock)
+        val s = p.state.awaitState { it.apps.size == 2 }
+        assertEquals(listOf("MyFitnessPal", "Rapido"), s.apps.map { it.name }, "one group per app, the most tips first")
+        val mfp = s.app("MyFitnessPal")!!
+        assertEquals(setOf("Check the diary first", "Don't scroll back and forth"), mfp.tips.map { it.title }.toSet(), "no app name in front")
+        val routine = mfp.routines.single()
+        assertEquals(listOf("Open MyFitnessPal", "Tap Log beside the meal"), routine.steps)
+        assertEquals("If it goes wrong: search again", routine.body)
+        assertEquals("Rapido", s.apps.last().name, "named from the title when the app was not stored")
+    }
+
+    @Test
+    fun anItemsTitleAndTextCanBothBeEdited() = runTest {
+        val f = Fixture(this)
+        f.memory.save(MemoryDraft(MemoryKind.Tip, "rapido", "Rapido: pickup", "Pickup is your location.", "e"))
+        val p = MemoryPresenter(backgroundScope, f.memory, f.settings, f.clock)
+        val tip = p.state.awaitState { it.apps.isNotEmpty() }.apps.single().tips.single()
+        p.edit(tip.id, "Recent destinations are on the home screen.", title = "Recent destinations")
+        val edited = p.state.awaitState { st -> st.apps.single().tips.single().title == "Recent destinations" }.apps.single().tips.single()
+        assertEquals("Recent destinations are on the home screen.", edited.text)
     }
 
     @Test

@@ -26,7 +26,7 @@ struct MainTabs: View {
         TabView(selection: $tab) {
             Tab(value: AppTab.home) { stack(.home) { navigate in HomeRoute(app: app, navigate: navigate) } }
             Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, navigate: navigate, newTask: { showingAsk = true }) } }
-            Tab(value: AppTab.memory) { stack(.memory) { _ in MemoryRoute(app: app) } }
+            Tab(value: AppTab.memory) { stack(.memory) { navigate in MemoryRoute(app: app, navigate: navigate) } }
         }
         .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) {
             if paths[tab, default: []].isEmpty {
@@ -96,7 +96,15 @@ struct MainTabs: View {
         let parts = target.split(separator: ":", maxSplits: 1).map(String.init)
         switch parts.first {
         case "tasks": tab = .tasks
-        case "memory": tab = .memory
+        case "memory":
+            tab = .memory
+            switch parts.count > 1 ? parts.last : nil {
+            case "aboutyou": paths[.memory] = [.memoryAboutYou]
+            case "routines": paths[.memory] = [.memoryRoutines(app: nil)]
+            case "apps": paths[.memory] = [.memoryApps]
+            case let name?: paths[.memory] = name.hasPrefix("edit=") ? [.memoryEdit(id: String(name.dropFirst(5)))] : [.memoryApps, .memoryApp(name: name)]
+            default: break
+            }
         case "live": showingLive = true
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
@@ -130,6 +138,11 @@ private struct TabRoot<Content: View>: View {
                     case .liveRun: LiveRoute(app: app)
                     case let .runScreens(taskId): RunScreensRoute(app: app, taskId: taskId)
                     case .settings: SettingsRoute(app: app, navigate: navigate)
+                    case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
+                    case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)
+                    case .memoryApps: MemoryAppsRoute(app: app, navigate: navigate)
+                    case let .memoryApp(name): MemoryAppRoute(app: app, name: name, navigate: navigate)
+                    case let .memoryEdit(id): MemoryEditRoute(app: app, id: id)
                     }
                 }
         }

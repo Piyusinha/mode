@@ -69,10 +69,13 @@ public class MemoryRepository(
     }
 
     /** Replaces an item's text, keeping the old text for undo. Null if it no longer exists or the text is a secret. */
-    public fun update(id: String, text: String, evidence: String, sourceTaskId: String? = null): MemoryItem? {
+    /** Changes an item's text (and, when the user edits it, its [title]); null if it is gone or looks like a secret. */
+    public fun update(id: String, text: String, evidence: String, sourceTaskId: String? = null, title: String? = null): MemoryItem? {
         val item = get(id) ?: return null
-        if (SecretFilter.isSecret("$text $evidence")) return null
-        return change(id, MemoryDraft(item.kind, item.subject, item.title, text, evidence, item.keywords, item.app).cleaned()!!, sourceTaskId)
+        val newTitle = title?.trim()?.takeIf { it.isNotEmpty() } ?: item.title
+        if (SecretFilter.isSecret("$newTitle $text $evidence")) return null
+        val draft = MemoryDraft(item.kind, item.subject, newTitle, text, evidence, item.keywords, item.app).cleaned() ?: return null
+        return change(id, draft, sourceTaskId)
     }
 
     public fun forget(id: String) {
@@ -138,6 +141,7 @@ public class MemoryRepository(
     )
 
     public companion object {
-        public const val MAX_TEXT: Int = 300
+        /** Long enough for a routine of several steps (300 cut routines and tips mid-word). */
+        public const val MAX_TEXT: Int = 800
     }
 }

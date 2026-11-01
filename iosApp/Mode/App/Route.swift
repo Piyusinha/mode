@@ -8,6 +8,12 @@ enum Route: Hashable {
     case runScreens(taskId: String)
     case settings
     case developer
+    case memoryAboutYou
+    /// Routines, all of them or one app's.
+    case memoryRoutines(app: String?)
+    case memoryApps
+    case memoryApp(name: String)
+    case memoryEdit(id: String)
 }
 
 /// A mode:// link from the Live Activity (or anywhere): open a conversation, Ask, or just Mode.

@@ -234,6 +234,50 @@ enum L10n {
         static func learned(_ day: String) -> String {
             String(localized: "memory.learned", defaultValue: "learned \(day)")
         }
+
+        // One screen per kind of memory.
+        static let hubHint = LocalizedStringResource("memory.hubHint", defaultValue: "Mode reads these before every task, so it gets things right the first time and takes fewer steps.")
+        static let aboutYouHint = LocalizedStringResource("memory.aboutYouHint", defaultValue: "People, places and preferences Mode keeps in mind.")
+        static let routinesHint = LocalizedStringResource("memory.routinesHint", defaultValue: "Routines from tasks that worked. Mode follows them next time.")
+        static let appsHint = LocalizedStringResource("memory.appsHint", defaultValue: "What Mode learned in each app. It uses these on every task there.")
+        static let routinesInApp = LocalizedStringResource("memory.routinesInApp", defaultValue: "Routines in this app")
+        static let titleLabel = LocalizedStringResource("memory.titleLabel", defaultValue: "Title")
+        static let stepsLabel = LocalizedStringResource("memory.stepsLabel", defaultValue: "Steps, one per line")
+        static let editFact = LocalizedStringResource("memory.editFact", defaultValue: "About You")
+        static let editRoutine = LocalizedStringResource("memory.editRoutine", defaultValue: "Routine")
+        static let editTip = LocalizedStringResource("memory.editTip", defaultValue: "Tip")
+        static let nothingHere = LocalizedStringResource("memory.nothingHere", defaultValue: "Nothing here yet")
+        static let nothingHereMessage = LocalizedStringResource("memory.nothingHereMessage", defaultValue: "Mode adds to this as it does tasks for you.")
+
+        static func things(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.things.one", defaultValue: "1 thing · people, places, preferences")
+                : String(localized: "memory.things", defaultValue: "\(n) things · people, places, preferences")
+        }
+
+        static func routinesLearned(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.routinesLearned.one", defaultValue: "1 routine learned from a task that worked")
+                : String(localized: "memory.routinesLearned", defaultValue: "\(n) routines learned from tasks that worked")
+        }
+
+        static func tipsCount(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.tipsCount.one", defaultValue: "1 tip") : String(localized: "memory.tipsCount", defaultValue: "\(n) tips")
+        }
+
+        static func routinesCount(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.routinesCount.one", defaultValue: "1 routine") : String(localized: "memory.routinesCount", defaultValue: "\(n) routines")
+        }
+
+        static func appsCount(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.appsCount.one", defaultValue: "1 app") : String(localized: "memory.appsCount", defaultValue: "\(n) apps")
+        }
+
+        static func appTipsHint(_ tips: String) -> String {
+            String(localized: "memory.appTipsHint", defaultValue: "\(tips) Mode uses on every task here.")
+        }
+
+        static func learnedOn(_ day: String) -> String {
+            String(localized: "memory.learnedOn", defaultValue: "Learned \(day)")
+        }
     }
 
     enum Settings {
