@@ -23,6 +23,8 @@ internal class ChangeLedger {
         var checked: Boolean = false,
         /** The strong model has been asked about it once. */
         var escalated: Boolean = false,
+        /** The page right after it was the same page, nothing new on it: the tap most likely missed. */
+        var noEffect: Boolean = false,
     ) {
         val confirmed: Boolean get() = proof != null
     }
@@ -32,8 +34,11 @@ internal class ChangeLedger {
     fun add(step: Int, target: String, what: String, page: Set<String>, proof: String?): Entry =
         Entry(step, target, what, page, proof).also { entries += it }
 
-    /** The latest change still waiting for a check, if any. */
-    fun pending(): Entry? = entries.lastOrNull { !it.confirmed && !it.checked }
+    /**
+     * The latest change still waiting for a check, if any. One that had no effect still waits, as far as
+     * other changes go: a silent add looks the same as a missed tap, so only the same item may be retried.
+     */
+    fun pending(): Entry? = entries.lastOrNull { !it.confirmed && (!it.checked || it.noEffect) }
 
     /** A confirmed change of this same target. */
     fun confirmedFor(target: String): Entry? = entries.lastOrNull { it.confirmed && same(it.target, target) }
@@ -44,17 +49,31 @@ internal class ChangeLedger {
      * not a scroll: seen on the phone, a scroll down a long menu "left the page" and a second,
      * different item was added before the first was checked.
      */
-    fun looked(page: Set<String>, texts: List<String>, navigated: Boolean) {
+    fun looked(page: Set<String>, texts: List<String>, navigated: Boolean, rightAfter: Boolean = false) {
         val entry = pending() ?: return
         // Only what was not already on the page it was made on ("Recently added" headers don't count).
         Changes.proof(texts.filter { norm(it) !in entry.page })?.let { entry.proof = it; return }
-        if (navigated && similarity(entry.page, page) < SAME_PAGE) entry.checked = true
+        // Seen on the phone: a tap that missed (off by a coordinate convention) held every retry back, nine
+        // times. Right after the change, the very same page with nothing new means it most likely did nothing.
+        if (rightAfter && !entry.noEffect && similarity(entry.page, page) >= NO_EFFECT) {
+            entry.noEffect = true
+            entry.checked = true
+            return
+        }
+        if (navigated && similarity(entry.page, page) < SAME_PAGE) {
+            entry.checked = true
+            entry.noEffect = false
+        }
     }
+
+    /** Tries at this target that showed no proof; a third is held, whatever the page shows. */
+    fun unprovenTries(target: String): Int = entries.count { !it.confirmed && same(it.target, target) }
 
     /** One line each, for the model. */
     fun lines(): List<String> = entries.map { e ->
         val status = when {
             e.confirmed -> "confirmed: \"${e.proof}\""
+            e.noEffect -> "it had no effect (the page stayed the same): you may try it once more"
             e.checked -> "not confirmed; you left that page, so check the list you are on"
             else -> "NOT confirmed yet: check it before any other change"
         }
@@ -64,6 +83,8 @@ internal class ChangeLedger {
     companion object {
         /** Pages sharing at least this much of their text count as the same page. */
         const val SAME_PAGE = 0.5
+        /** Right after a change, a page at least this similar (and nothing new on it) means the tap did nothing. */
+        const val NO_EFFECT = 0.95
 
         fun page(texts: List<String>): Set<String> = texts.map(::norm).filter { it.length > 1 }.toSet()
 

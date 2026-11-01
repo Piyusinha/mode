@@ -290,7 +290,11 @@ class Agent(
             }
             // Proof on screen confirms the last change; a different page means the agent went to check.
             val confirmedBefore = ledger.entries.count { it.confirmed }
-            ledger.looked(ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first }, navigated = lastOp != "scroll" && lastOp != "wait")
+            ledger.looked(
+                ChangeLedger.page(screen.pageTexts()), screen.texts.map { it.first },
+                navigated = lastOp != "scroll" && lastOp != "wait",
+                rightAfter = lastWasPhoneAction && ledger.entries.lastOrNull()?.step == step - 1,
+            )
             if (ledger.entries.count { it.confirmed } > confirmedBefore) stuck.progressed()
             val verdict = stuck.looked(screen.signature, changed)
             if (verdict is StuckDetector.Verdict.Stop) {
@@ -496,7 +500,17 @@ class Agent(
                             record("$described (not done)", reason, alreadyDone(done))
                             continue
                         }
-                        ledger.pending()?.let { last ->
+                        if (ledger.unprovenTries(target) >= MAX_UNPROVEN_TRIES) {
+                            stuck.badReply()
+                            record(
+                                "$described (held back)", reason,
+                                "not done: this was tried twice without any sign it worked. Check where it would show (the " +
+                                    "list, the cart, the diary) before trying again, or ask the user",
+                            )
+                            continue
+                        }
+                        // A change that visibly did nothing may be tried again on the same item, not on another.
+                        ledger.pending()?.takeUnless { it.noEffect && ChangeLedger.same(it.target, target) }?.let { last ->
                             stuck.badReply()
                             record("$described (held back)", reason, checkFirst(last))
                             continue
@@ -830,6 +844,8 @@ class Agent(
         private const val STEP_UP_BUDGET_SHARE = 3.0
         private const val STRONG_STEP_GUESS_USD = 0.02
         private const val SCROLLS_BEFORE_HINT = 3
+        /** Tries at one change with no sign it worked before it is held for a check. */
+        private const val MAX_UNPROVEN_TRIES = 2
         /** Taps this close vertically (points) are on the same row: the focused field. */
         private const val SAME_ROW_PT = 30.0
         /** The longest wait for the screen to stop moving after an action, and how often it is checked. */

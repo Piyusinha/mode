@@ -563,8 +563,9 @@ class AgentTest {
         fun menu(i: Int) = List(10) { k -> "dish ${i * 10 + k}" to (100.0 to 200.0 + k * 60) }
         val phone = FakePhone(listOf(menu(0), menu(0), menu(1), menu(1)) + List(5) { menu(1) })
         val add = call("tap", "x" to 411, "y" to 340, "reason" to "Adding it to the cart")
+        val another = call("tap", "x" to 411, "y" to 600, "reason" to "Adding another dish")
         val model = ScriptedModel(
-            add, call("scroll", "direction" to "down", "reason" to "Checking the cart"), add,
+            add, call("scroll", "direction" to "down", "reason" to "Checking the cart"), another,
             call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"),
         )
         Agent(phone, model, Gate(), noSettle).run("add a sushi")
@@ -643,6 +644,19 @@ class AgentTest {
         Agent(phone, model, Gate(), noSettle.copy(model = "cheap", strongModel = "strong", brainModel = "brain")).run("t")
         assertTrue("your planning mind decided: Open the first result" in model.lastUserText, model.lastUserText)
         assertTrue("strong" !in model.models, "a decision, not a strong step: ${model.models}")
+    }
+
+    @Test
+    fun anAddThatVisiblyDidNothingMayBeTriedOnceMore() = runTest {
+        // On the phone: a missed tap held every retry back, nine times. The page stayed exactly the same.
+        val menu = List(12) { "dish $it" to (100.0 to 200.0 + it * 50) }
+        val phone = FakePhone(List(10) { menu })
+        val add = call("tap", "x" to 411, "y" to 340, "reason" to "Adding it to the cart")
+        val model = ScriptedModel(add, add, add, call("done", "evidence" to "x", "summary" to "x"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("add a dish")
+        // First try; it changed nothing, so a second; a third is held for a check.
+        assertEquals(2, phone.actions.count { it is Op.Tap })
+        assertTrue("tried twice without any sign" in model.lastUserText, model.lastUserText)
     }
 
     @Test
