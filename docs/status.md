@@ -54,6 +54,21 @@ In order. Items 1–7 are engineering; 8–10 are for launch; the free build sta
    and Logs; onboarding (API key, pairing check).
 7. **Docs.** Bring architecture, decisions, flows and setup up to date.
 
+### Production iOS app (designed 2026-11-01)
+Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the owner).
+
+- **Hands-free flow.** "Hey Siri, start Mode" → Mode listens on a Live Activity →
+  the Dynamic Island shows each step while Mode works in other apps → the answer
+  lands on the Lock Screen. To prove first on the phone: whether an App Intent can
+  start listening and the Live Activity from the background (reports say a cold start
+  is blocked; the fallback is Siri taking the task as dictated text).
+- **App screens.** Chat (voice or typed tasks, plan cards, results, "Remembered"
+  chips), Live run, Tasks (running, waiting for you, up next, every day), Memory
+  (people, preferences, places; on the phone only; forget anytime).
+- **Look.** Native Liquid Glass: SwiftUI for the iOS screens, Live Activity, Siri and
+  speech; the agent, memory, tasks, model client and logs stay shared Kotlin so the
+  Android app reuses them.
+
 ### Launch
 8. **Mac setup app: one click.** A small Mac app that does the whole first-time setup
    in one click: installs Mode on the phone, makes and pushes the pairing file over
