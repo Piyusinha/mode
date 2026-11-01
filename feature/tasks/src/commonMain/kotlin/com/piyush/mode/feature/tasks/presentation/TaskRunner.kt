@@ -4,6 +4,7 @@ import com.piyush.mode.agent.Agent
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
+import com.piyush.mode.agent.TaskContext
 import com.piyush.mode.agent.UserGate
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
@@ -112,6 +113,8 @@ public class TaskRunner(
         conversationId: String?,
         source: TaskSource,
     ): AgentResult? {
+        // A follow-up sees how the earlier tasks in its conversation went (read before this task's own turn).
+        val earlier = conversationId?.let(::earlierTurns).orEmpty()
         val conversation = conversationId ?: if (tag == null) conversations.create(task).id else null
         val saved = tasks.create(task, source, conversation)
         conversation?.let { conversations.addTurn(it, TurnRole.User, task, saved.id) }
@@ -158,7 +161,8 @@ public class TaskRunner(
                 trace = recorder,
             )
             // Started from Mode's own screen; the agent goes straight to the app it needs.
-            val finished = background.run { agent.run(task, startsInMode = true) }
+            val context = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier)
+            val finished = background.run { agent.run(task, startsInMode = true, context = context) }
             result = finished
             outcome = statusOf(finished.outcome)
             reply = replyFor(finished.outcome)
@@ -199,6 +203,16 @@ public class TaskRunner(
         val left = cap - tasks.spentSince(startOfToday())
         if (left <= 0.0) return null
         return config.copy(maxCostUsd = minOf(config.maxCostUsd ?: left, left))
+    }
+
+    /** Each earlier task in the conversation with Mode's reply to it. */
+    private fun earlierTurns(conversationId: String): List<TaskContext.EarlierTurn> {
+        val turns = conversations.turnsNow(conversationId)
+        return turns.mapIndexedNotNull { i, turn ->
+            if (turn.role != TurnRole.User) return@mapIndexedNotNull null
+            val reply = turns.getOrNull(i + 1)?.takeIf { it.role == TurnRole.Mode }?.text ?: "(no result)"
+            TaskContext.EarlierTurn(turn.text, reply)
+        }
     }
 
     private fun money(usd: Double): String = "$" + ((usd * 100).roundToInt() / 100.0).toString()

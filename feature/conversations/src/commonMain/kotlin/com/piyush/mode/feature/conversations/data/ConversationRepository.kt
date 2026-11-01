@@ -54,7 +54,11 @@ public class ConversationRepository(
     public fun recent(limit: Long = 100): Flow<List<Conversation>> =
         db.conversationQueries.recent(limit).asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toDomain() } }
 
-    /** The turns of one conversation, oldest first. */
+    /** The turns of one conversation as they are now, oldest first. */
+    public fun turnsNow(conversationId: String): List<Turn> =
+        db.turnQueries.forConversation(conversationId).executeAsList().map { it.toDomain() }
+
+    /** The turns of one conversation, oldest first, updated as they change. */
     public fun turns(conversationId: String): Flow<List<Turn>> =
         db.turnQueries.forConversation(conversationId).asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toDomain() } }
 

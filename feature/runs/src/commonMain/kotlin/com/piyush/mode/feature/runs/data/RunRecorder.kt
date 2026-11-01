@@ -79,6 +79,8 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
                 put("prompt_tokens", it.promptTokens)
                 put("completion_tokens", it.completionTokens)
                 put("cost_usd", it.costUsd)
+                if (it.cachedTokens > 0) put("cached_tokens", it.cachedTokens)
+                if (it.cacheWriteTokens > 0) put("cache_write_tokens", it.cacheWriteTokens)
             }
             error?.let { put("error", it) }
         })
@@ -94,6 +96,19 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
             put("outcome", outcome)
         })
         if (outcome.startsWith("failed")) AppLog.error("agent", "step $step $action: $outcome")
+    }
+
+    override fun noted(step: Int, text: String) {
+        event("note", buildJsonObject { put("step", step); put("text", text) })
+    }
+
+    override fun verifyRejected(step: Int, why: String) {
+        event("verify", buildJsonObject { put("step", step); put("why", why) })
+    }
+
+    override fun stuck(step: Int, why: String) {
+        event("stuck", buildJsonObject { put("step", step); put("why", why) })
+        AppLog.log("agent", "run $id stopped as stuck at step $step: $why")
     }
 
     override fun runEnded(result: AgentResult) {

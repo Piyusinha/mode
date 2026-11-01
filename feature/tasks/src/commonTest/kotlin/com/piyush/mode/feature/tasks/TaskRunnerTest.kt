@@ -238,4 +238,23 @@ class TaskRunnerTest {
         f.alreadySpentToday(99.0)
         assertIs<AgentOutcome.Done>(f.runner.runTask("Turn off dark mode", quick)!!.outcome)
     }
+
+    @Test
+    fun aFollowUpShowsTheModelHowTheEarlierTaskWentAndTheUsersName() = runTest {
+        val model = ScriptedModel(
+            call("done", "evidence" to "on screen", "summary" to "Sent Sonali: I'm leaving."),
+            call("done", "evidence" to "on screen", "summary" to "Told Rahul."),
+        )
+        val f = Fixture(this, model)
+        f.settings.update { it.copy(userName = "Piyush") }
+        f.runner.runTask("Text Sonali I'm leaving", quick)
+        assertFalse("EARLIER IN THIS CONVERSATION" in model.lastUserText, "a new conversation has no history")
+
+        f.runner.runTask("Also tell Rahul", quick, conversationId = f.runner.state.value.conversationId)
+        val prompt = model.lastUserText
+        assertTrue("They asked: Text Sonali I'm leaving" in prompt, prompt)
+        assertTrue("Result: Sent Sonali: I'm leaving." in prompt, prompt)
+        assertFalse("They asked: Also tell Rahul" in prompt, "the current task is not an earlier turn")
+        assertTrue("Their name: Piyush" in prompt)
+    }
 }

@@ -132,12 +132,17 @@ private fun RunDetail(runs: RunRepository, id: String, decodeImage: (ByteArray) 
                         Text(
                             (e.str("error").takeIf { it.isNotEmpty() }?.let { "MODEL ERROR: $it" }
                                 ?: "${e.str("tool")} ${e["arguments"] ?: ""}") +
-                                "\n${e.long("ms")} ms · ${e.int("prompt_tokens") ?: "?"} in / ${e.int("completion_tokens") ?: "?"} out · $${money(e.double("cost_usd") ?: 0.0)}" +
+                                "\n${e.long("ms")} ms · ${e.int("prompt_tokens") ?: "?"} in" +
+                                (e.int("cached_tokens")?.let { " ($it cached)" } ?: "") +
+                                " / ${e.int("completion_tokens") ?: "?"} out · $${money(e.double("cost_usd") ?: 0.0)}" +
                                 (e.str("text").takeIf { it.isNotEmpty() }?.let { "\ntext: $it" } ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
                         )
                     }
+                    "note" -> Text("noted: ${e.str("text")}", style = MaterialTheme.typography.bodySmall)
+                    "verify" -> Text("done sent back to check: ${e.str("why")}", style = MaterialTheme.typography.bodySmall)
+                    "stuck" -> Text("stopped as stuck: ${e.str("why")}", style = MaterialTheme.typography.bodySmall)
                     "act" -> Text(
                         "→ ${e.str("action")}: ${e.str("outcome")} (${e.long("ms")} ms)",
                         style = MaterialTheme.typography.bodySmall,
