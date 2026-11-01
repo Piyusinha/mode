@@ -2,6 +2,7 @@ import ActivityKit
 import Foundation
 import ModeDesignSystem
 import ModeKit
+import UIKit
 
 /// Keeps the Live Activity in step with the running task: starts it when a task
 /// starts, updates it when something changes, and ends it with the answer.
@@ -18,6 +19,8 @@ final class LiveActivityController {
 
     /// How long the answer stays on the Lock Screen.
     private let answerStays: TimeInterval = 30 * 60
+    /// If Mode stops updating for this long (it was closed mid-task), iOS shows the activity as stale.
+    private let staleAfter: TimeInterval = 3 * 60
 
     init(screens: Screens) {
         presenter = screens.liveActivity()
@@ -27,12 +30,28 @@ final class LiveActivityController {
             Updates { await old.end(nil, dismissalPolicy: .immediate) }
         }
         updates = observe(presenter.state) { [weak self] state in self?.apply(state) }
+        // Closed from the app switcher mid-task: take the activity away with it.
+        NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            Self.endAllNow()
+        }
+    }
+
+    /// Ends every Mode activity before the app goes, waiting up to a second (termination won't wait longer).
+    nonisolated private static func endAllNow() {
+        let done = DispatchSemaphore(value: 0)
+        Updates.detached {
+            for activity in Activity<ModeActivityAttributes>.activities { await activity.end(nil, dismissalPolicy: .immediate) }
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + 1)
     }
 
     private func apply(_ state: ActivityUiState) {
         switch onEnum(of: state) {
         case .hidden:
-            break
+            end()
+        case let .ended(e):
+            if e.taskId == taskId { end() }
         case let .working(w):
             show(taskId: w.taskId, task: w.task, conversationId: w.conversationId, content: Content(
                 phase: .working,
@@ -59,14 +78,15 @@ final class LiveActivityController {
         if let activity, taskId == id {
             guard content != shown else { return }
             shown = content
-            Updates { await activity.update(ActivityContent(state: content, staleDate: nil)) }
+            let stale = Date().addingTimeInterval(staleAfter)
+            Updates { await activity.update(ActivityContent(state: content, staleDate: stale)) }
             return
         }
         if let previous = activity { Updates { await previous.end(nil, dismissalPolicy: .immediate) } }
         do {
             activity = try Activity.request(
                 attributes: ModeActivityAttributes(task: task, conversationId: conversationId),
-                content: ActivityContent(state: content, staleDate: nil)
+                content: ActivityContent(state: content, staleDate: Date().addingTimeInterval(staleAfter))
             )
             taskId = id
             shown = content
@@ -74,6 +94,18 @@ final class LiveActivityController {
         } catch {
             // Live Activities are off for Mode: the notification tells the answer instead.
             activity = nil
+            presenter.showing(on: false)
+        }
+    }
+
+    /// Takes the activity away now: the task was stopped, or nothing runs.
+    private func end() {
+        guard let activity else { return }
+        self.activity = nil
+        taskId = nil
+        shown = nil
+        Updates { [presenter] in
+            await activity.end(nil, dismissalPolicy: .immediate)
             presenter.showing(on: false)
         }
     }

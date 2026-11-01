@@ -83,12 +83,18 @@ public enum ModeSize {
     public static let replyAction: CGFloat = 34
     public static let shimmerTravel: CGFloat = 160
     /// The Live Activity: its small mark, the Stop button, and the island's compact mark.
-    public static let activityMark: CGFloat = 26
-    public static let activityStop: CGFloat = 40
-    public static let islandMark: CGFloat = 20
-    public static let activityButton: CGFloat = 36
+    public static let activityMark: CGFloat = 22
+    public static let activityStop: CGFloat = 30
+    public static let islandMark: CGFloat = 22
+    /// At or below this size the mark uses its small image (Live Activities can't draw large ones).
+    public static let smallMarkLimit: CGFloat = 32
+    public static let activityButton: CGFloat = 28
     /// The ticking time on the compact Dynamic Island.
-    public static let islandTimer: CGFloat = 44
+    public static let islandTimer: CGFloat = 52
+    /// iOS's height limit for a Live Activity (Lock Screen, expanded island), and the compact island's size, for previews.
+    public static let activityLimit: CGFloat = 160
+    public static let previewIsland: CGFloat = 250
+    public static let previewIslandHeight: CGFloat = 37
 
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520

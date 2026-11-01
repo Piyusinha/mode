@@ -88,6 +88,19 @@ class LiveActivityTest {
     }
 
     @Test
+    fun stoppingEndsTheActivityAtOnce() = runTest {
+        val f = Fixture(this, ScriptedModel(
+            call("wait", "seconds" to 5, "reason" to "loading"),
+            call("done", "evidence" to "x", "summary" to "ok"),
+        ))
+        val p = LiveActivityPresenter(backgroundScope, f.runner, f.tasks)
+        f.queue.submit("Call 123", TaskSource.App)
+        val working = assertIs<ActivityUiState.Working>(until(p) { it is ActivityUiState.Working })
+        p.stop()
+        assertEquals(ActivityUiState.Ended(working.taskId), until(p) { it is ActivityUiState.Ended })
+    }
+
+    @Test
     fun theAnswerIsNotNotifiedWhileTheLockScreenShowsIt() {
         val posted = mutableListOf<String>()
         val notifier = object : Notifier {

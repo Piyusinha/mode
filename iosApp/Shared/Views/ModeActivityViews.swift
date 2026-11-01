@@ -2,28 +2,46 @@ import AppIntents
 import ModeDesignSystem
 import SwiftUI
 
-/// The Live Activity on the Lock Screen (and the Smart Stack): working, waiting for you, or the answer.
-/// Draws the state it is given; its buttons are intents and links.
+// iOS gives a Live Activity about 160 pt of height on the Lock Screen and in the
+// expanded Dynamic Island; anything taller is cut. Every state below is laid out to
+// fit: one header row, at most two lines of text, one row of progress or buttons.
+
+/// The Live Activity on the Lock Screen (and in the notification list and Smart Stack).
 struct ModeActivityLockScreen: View {
     let conversationId: String?
     let state: ModeActivityAttributes.ContentState
+    /// Mode stopped updating it (closed mid-task).
+    let stale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.m) {
-            switch state.phase {
-            case .working:
-                ModeActivityWorkingHeader(state: state)
-                ModeActivityWorkingBody(state: state)
-            case .waiting:
-                ModeActivityHeader { ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning) }
-                ModeActivityWaitingBody(state: state, conversationId: conversationId)
-            case .finished:
-                ModeActivityHeader { ModeActivityOutcome(state: state) }
-                ModeActivityFinishedBody(state: state, conversationId: conversationId)
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+            if stale && state.phase != .finished {
+                ModeActivityHeader { ModeBadge(ActivityL10n.stopped, icon: .stopped, tone: .neutral) }
+                Text(ActivityL10n.closed).modeText(.callout, color: ModeColor.textSecondary).lineLimit(2)
+            } else {
+                switch state.phase {
+                case .working:
+                    ModeActivityWorkingHeader(state: state)
+                    ModeActivityWorkingBody(state: state)
+                case .waiting:
+                    ModeActivityHeader { ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning) }
+                    ModeActivityWaitingBody(state: state)
+                case .finished:
+                    ModeActivityHeader { ModeActivityOutcome(state: state) }
+                    ModeActivityFinishedBody(state: state, conversationId: conversationId)
+                }
             }
         }
-        .padding(ModeSpacing.l)
-        .environment(\.colorScheme, .dark)
+        .padding(.horizontal, ModeSpacing.l)
+        .padding(.vertical, ModeSpacing.m)
+        .modeActivityTheme()
+    }
+}
+
+extension View {
+    /// Live Activities sit on dark glass or the black island: always the dark palette.
+    func modeActivityTheme() -> some View {
+        environment(\.colorScheme, .dark)
     }
 }
 
@@ -34,10 +52,11 @@ struct ModeActivityHeader<Trailing: View>: View {
     var body: some View {
         HStack(spacing: ModeSpacing.s) {
             ModeMark(size: ModeSize.activityMark, alwaysLight: true)
-            Text(ActivityL10n.mode).modeText(.headline)
+            Text(ActivityL10n.mode).modeText(.subheadline).fontWeight(.semibold)
             Spacer(minLength: ModeSpacing.s)
             trailing()
         }
+        .lineLimit(1)
     }
 }
 
@@ -64,8 +83,9 @@ struct ModeActivityStepClock: View {
             if state.paused {
                 Text(ActivityL10n.paused)
             } else if let start = state.startedAt {
-                Text(ActivityL10n.step(state.step))
+                Text(ActivityL10n.step(state.step)).fixedSize()
                 Text(timerInterval: start...Date.distantFuture, countsDown: false)
+                    .frame(width: ModeSize.islandTimer, alignment: .leading)
             } else {
                 Text(ActivityL10n.stepShort(state.step))
             }
@@ -76,48 +96,48 @@ struct ModeActivityStepClock: View {
     }
 }
 
-/// What Mode is doing now, and the plan's progress.
+/// What Mode is doing now (two lines at most), and the plan's progress.
 struct ModeActivityWorkingBody: View {
     let state: ModeActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.m) {
-            Text(state.now).modeText(.title2).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+            Text(state.now).modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
             if !state.plan.isEmpty { ModeSegments(state.plan) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// The question, and Open (it's answered in Mode).
+/// The question (two lines at most), and Open: it's answered in Mode.
 struct ModeActivityWaitingBody: View {
     let state: ModeActivityAttributes.ContentState
-    let conversationId: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.m) {
-            Text(state.question ?? "").modeText(.headline).lineLimit(3)
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+            Text(state.question ?? "").modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
             Link(destination: ModeLinks.open) { ModeActivityButtonLabel(ActivityL10n.open, icon: nil, prominent: true) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// The start of the answer, "+1 more in the chat", Open chat and Another task.
+/// The start of the answer (a line and two rows), Open chat and Another task.
 struct ModeActivityFinishedBody: View {
     let state: ModeActivityAttributes.ContentState
     let conversationId: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            ModeReply(state.reply, density: .compact).lineLimit(2)
-            if state.more > 0 { Text(ActivityL10n.more(state.more)).modeText(.caption, color: ModeColor.textSecondary) }
+            ModeReply(state.reply, density: .compact)
             HStack(spacing: ModeSpacing.s) {
-                Link(destination: ModeLinks.conversation(conversationId)) { ModeActivityButtonLabel(ActivityL10n.openChat, icon: nil, prominent: false) }
+                Link(destination: ModeLinks.conversation(conversationId)) {
+                    ModeActivityButtonLabel(state.more > 0 ? ActivityL10n.openChatMore(state.more) : ActivityL10n.openChat, icon: nil, prominent: false)
+                }
                 Link(destination: ModeLinks.ask) { ModeActivityButtonLabel(ActivityL10n.anotherTask, icon: .ask, prominent: true) }
             }
-            .padding(.top, ModeSpacing.xs)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -137,7 +157,7 @@ struct ModeActivityStopButton: View {
     var body: some View {
         Button(intent: StopTaskIntent()) {
             ModeIcon.stop.image
-                .font(ModeTextStyle.subheadline.font)
+                .font(ModeTextStyle.caption.font)
                 .foregroundStyle(ModeColor.stopRed)
                 .frame(width: ModeSize.activityStop, height: ModeSize.activityStop)
                 .background(ModeColor.stopDisc, in: .circle)
@@ -147,7 +167,7 @@ struct ModeActivityStopButton: View {
     }
 }
 
-/// A capsule button's look: grey, or the accent for the main one.
+/// A small capsule button's look: grey, or the accent for the main one.
 struct ModeActivityButtonLabel: View {
     let title: LocalizedStringResource
     let icon: ModeIcon?
@@ -164,14 +184,15 @@ struct ModeActivityButtonLabel: View {
             if let icon { icon.image }
             Text(title)
         }
-        .modeText(.subheadline, color: prominent ? ModeColor.onAccent : ModeColor.textPrimary)
+        .modeText(.footnote, color: prominent ? ModeColor.onAccent : ModeColor.textPrimary)
         .fontWeight(.semibold)
+        .lineLimit(1)
         .frame(maxWidth: .infinity, minHeight: ModeSize.activityButton)
         .background(prominent ? ModeColor.accent : ModeColor.fill, in: .capsule)
     }
 }
 
-/// How far long lines may shrink before they wrap.
+/// How far long lines may shrink before they're cut.
 enum ModeActivityScale {
-    static let text: CGFloat = 0.8
+    static let text: CGFloat = 0.85
 }

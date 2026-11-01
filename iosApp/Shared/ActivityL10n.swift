@@ -13,6 +13,7 @@ enum ActivityL10n {
     static let stopped = LocalizedStringResource("activity.stopped", defaultValue: "Stopped")
     static let failed = LocalizedStringResource("activity.failed", defaultValue: "Failed")
     static let notStarted = LocalizedStringResource("activity.notStarted", defaultValue: "Didn't start")
+    static let closed = LocalizedStringResource("activity.closed", defaultValue: "Mode was closed before it finished. Open it to try again.")
 
     static func step(_ n: Int) -> LocalizedStringResource {
         LocalizedStringResource("activity.step", defaultValue: "Step \(n) ·")
@@ -26,7 +27,7 @@ enum ActivityL10n {
         LocalizedStringResource("activity.doneIn", defaultValue: "Done in \(seconds) s")
     }
 
-    static func more(_ n: Int) -> LocalizedStringResource {
-        LocalizedStringResource("activity.more", defaultValue: "+\(n) more in the chat")
+    static func openChatMore(_ n: Int) -> LocalizedStringResource {
+        LocalizedStringResource("activity.openChatMore", defaultValue: "Open chat · \(n) more")
     }
 }

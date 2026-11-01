@@ -46,7 +46,8 @@ public struct ModeMark: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var mark: some View {
-        Image("ModeMark", bundle: .module)
+        // Live Activities can't draw large images: small marks use a 96 px copy.
+        Image(size <= ModeSize.smallMarkLimit ? "ModeMarkSmall" : "ModeMark", bundle: .module)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)

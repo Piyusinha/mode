@@ -25,12 +25,28 @@ struct ActivityPreview: View {
     }
 
     var body: some View {
-        VStack(spacing: ModeSpacing.xxxl) {
-            ModeActivityLockScreen(conversationId: nil, state: state)
-                .padding(ModeSpacing.xs)
+        VStack(spacing: ModeSpacing.xl) {
+            // The compact island: mark, then the clock or how it ended.
+            HStack {
+                ModeMark(size: ModeSize.islandMark, alwaysLight: true)
+                Spacer()
+                ModeActivityStepClock(state: state).modeActivityTheme()
+            }
+            .padding(.horizontal, ModeSpacing.m)
+            .frame(width: ModeSize.previewIsland, height: ModeSize.previewIslandHeight)
+            .background(.black, in: .capsule)
+            // The expanded island and the Lock Screen card, each in iOS's 160 pt limit (red line).
+            ModeActivityLockScreen(conversationId: nil, state: state, stale: false)
+                .frame(height: ModeSize.activityLimit, alignment: .top)
                 .background(.black, in: .rect(cornerRadius: ModeRadius.sheet + ModeSpacing.l))
+                .overlay(alignment: .bottom) { Rectangle().fill(.red).frame(height: ModeSize.separator) }
                 .padding(.horizontal, ModeSpacing.s)
-            ModeActivityLockScreen(conversationId: nil, state: state)
+            ModeActivityLockScreen(conversationId: nil, state: state, stale: false)
+                .frame(height: ModeSize.activityLimit, alignment: .top)
+                .background(ModeColor.lockScreen, in: .rect(cornerRadius: ModeRadius.card))
+                .overlay(alignment: .bottom) { Rectangle().fill(.red).frame(height: ModeSize.separator) }
+                .padding(.horizontal, ModeSpacing.l)
+            ModeActivityLockScreen(conversationId: nil, state: state, stale: true)
                 .background(ModeColor.lockScreen, in: .rect(cornerRadius: ModeRadius.card))
                 .padding(.horizontal, ModeSpacing.l)
         }

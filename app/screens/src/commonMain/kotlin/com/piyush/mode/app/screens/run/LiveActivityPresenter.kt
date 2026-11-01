@@ -32,6 +32,9 @@ public sealed interface ActivityUiState {
         val conversationId: String?,
     ) : ActivityUiState
 
+    /** The user stopped it (or it ended without an answer): the activity goes away at once. */
+    public data class Ended(val taskId: String) : ActivityUiState
+
     /** The agent asked something only the user can answer. */
     public data class Waiting(val taskId: String, val task: String, val question: String, val conversationId: String?) : ActivityUiState
 
@@ -88,23 +91,24 @@ public class LiveActivityPresenter(
                 plan = planSteps(s),
                 conversationId = s.conversationId,
             )
-            result != null -> {
+            // Stopped by the user: from Mode, the island, or by answering a question with Stop.
+            result == null || result.outcome is AgentOutcome.Stopped -> ActivityUiState.Ended(id)
+            else -> {
                 val (badge, reply) = when (val o = result.outcome) {
                     is AgentOutcome.Done -> (if (o.success) TaskBadge.Done else TaskBadge.GaveUp) to o.summary
-                    is AgentOutcome.Stopped -> TaskBadge.Stopped to o.why
                     is AgentOutcome.Failed -> TaskBadge.Failed to o.why
+                    is AgentOutcome.Stopped -> TaskBadge.Stopped to o.why
                 }
                 val (parts, more) = lockScreenParts(replyParts(reply))
                 ActivityUiState.Finished(id, badge, result.millis / 1000, parts, more, s.conversationId)
             }
-            else -> ActivityUiState.Hidden
         }
     }
 
     private companion object {
         const val PLAN_SHOWN = 3
         const val ROWS_SHOWN = 2
-        const val HEADLINE = 140
+        const val HEADLINE = 90
 
         /** The previous, current and next plan items; current is what the latest action said it works on. */
         fun planSteps(s: TaskState): List<PlanStep> {

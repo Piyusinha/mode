@@ -35,8 +35,10 @@ public enum ModeReplyDensity: Sendable {
     case regular, compact
 
     var text: ModeTextStyle { self == .regular ? .body : .callout }
-    var lead: ModeTextStyle { self == .regular ? .body : .headline }
+    var lead: ModeTextStyle { self == .regular ? .body : .subheadline }
     var spacing: CGFloat { self == .regular ? ModeSpacing.m : ModeSpacing.xs }
+    /// A compact reply's first line: one line, so the rows below still fit.
+    static let compactLines = 1
 }
 
 /// A reply drawn the way a good chat app does: comfortable body text, real lists,
@@ -76,6 +78,7 @@ private struct ModeReplyBlockView: View {
         switch block {
         case let .paragraph(text):
             ModeInlineText(text, style: first ? density.lead : density.text)
+                .lineLimit(density == .compact ? ModeReplyDensity.compactLines : nil)
         case let .heading(level, text):
             ModeInlineText(text, style: level <= 2 && density == .regular ? .title2 : .headline)
                 .padding(.top, first ? ModeSpacing.none : ModeSpacing.xs)
@@ -176,10 +179,11 @@ public struct ModeAgenda: View {
     }
 
     private var plain: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.m, verticalSpacing: ModeSpacing.xs) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.m, verticalSpacing: ModeSpacing.xxs) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    Text(row.time).modeText(row.allDay ? .captionEmphasis : .bodyEmphasis, color: row.allDay ? ModeColor.textSecondary : ModeColor.textPrimary)
+                    Text(row.time).modeText(row.allDay ? .captionEmphasis : .callout, color: row.allDay ? ModeColor.textSecondary : ModeColor.textPrimary)
+                        .fontWeight(.semibold)
                         .monospacedDigit()
                     ModeInlineText(row.text, style: .callout).lineLimit(1)
                 }

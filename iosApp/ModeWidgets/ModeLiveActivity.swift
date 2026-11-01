@@ -7,7 +7,7 @@ import WidgetKit
 struct ModeLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ModeActivityAttributes.self) { context in
-            ModeActivityLockScreen(conversationId: context.attributes.conversationId, state: context.state)
+            ModeActivityLockScreen(conversationId: context.attributes.conversationId, state: context.state, stale: context.isStale)
                 .activityBackgroundTint(ModeColor.lockScreen)
                 .activitySystemActionForegroundColor(ModeColor.onAccent)
                 .widgetURL(ModeLinks.conversation(context.attributes.conversationId))
@@ -15,37 +15,44 @@ struct ModeLiveActivity: Widget {
             let state = context.state
             let conversation = context.attributes.conversationId
             return DynamicIsland {
+                // The sides beside the camera are narrow: just the mark and Stop (or how it ended).
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: ModeSpacing.s) {
-                        ModeMark(size: ModeSize.activityMark, alwaysLight: true)
-                        if state.phase == .working { ModeActivityStepClock(state: state) }
-                    }
-                    .padding(.leading, ModeSpacing.xs)
+                    ModeMark(size: ModeSize.activityMark, alwaysLight: true)
+                        .padding(.leading, ModeSpacing.xs)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    switch state.phase {
-                    case .working: ModeActivityStopButton()
-                    case .waiting: ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning)
-                    case .finished: ModeActivityOutcome(state: state)
-                    }
-                }
-                DynamicIslandExpandedRegion(.bottom) {
                     Group {
                         switch state.phase {
-                        case .working: ModeActivityWorkingBody(state: state)
-                        case .waiting: ModeActivityWaitingBody(state: state, conversationId: conversation)
-                        case .finished: ModeActivityFinishedBody(state: state, conversationId: conversation)
+                        case .working: ModeActivityStopButton()
+                        case .waiting: ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning)
+                        case .finished: ModeActivityOutcome(state: state)
+                        }
+                    }
+                    .padding(.trailing, ModeSpacing.xs)
+                    .modeActivityTheme()
+                }
+                // Everything else gets the full width below.
+                DynamicIslandExpandedRegion(.bottom) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                        switch state.phase {
+                        case .working:
+                            ModeActivityStepClock(state: state)
+                            ModeActivityWorkingBody(state: state)
+                        case .waiting:
+                            ModeActivityWaitingBody(state: state)
+                        case .finished:
+                            ModeActivityFinishedBody(state: state, conversationId: conversation)
                         }
                     }
                     .padding(.horizontal, ModeSpacing.xs)
-                    .padding(.top, ModeSpacing.xs)
+                    .modeActivityTheme()
                 }
             } compactLeading: {
                 ModeMark(size: ModeSize.islandMark, alwaysLight: true)
             } compactTrailing: {
-                ModeIslandTrailing(state: state)
+                ModeIslandTrailing(state: state).modeActivityTheme()
             } minimal: {
-                ModeIslandMinimal(state: state)
+                ModeIslandMinimal(state: state).modeActivityTheme()
             }
             .widgetURL(ModeLinks.conversation(conversation))
             .keylineTint(ModeColor.accent)
@@ -62,9 +69,11 @@ private struct ModeIslandTrailing: View {
         case .working:
             if let start = state.startedAt, !state.paused {
                 Text(timerInterval: start...Date.distantFuture, countsDown: false)
-                    .modeText(.captionEmphasis, color: ModeColor.tint)
+                    .modeText(.subheadline, color: ModeColor.textPrimary)
+                    .fontWeight(.semibold)
                     .monospacedDigit()
-                    .frame(width: ModeSize.islandTimer)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: ModeSize.islandTimer, alignment: .trailing)
             } else {
                 ModeIcon.pause.image.foregroundStyle(ModeColor.textSecondary)
             }
