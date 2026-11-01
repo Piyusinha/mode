@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
+    id("mode.kmp.library")
 }
 
 // Builds native/modecore for the iPhone and the simulator (cargo is incremental,
@@ -16,9 +16,6 @@ val buildModecore by tasks.registering(Exec::class) {
 }
 
 kotlin {
-    // jvm runs the backend's tests against a fake phone; the iOS targets ship.
-    jvm()
-
     mapOf(
         iosArm64() to "ios-arm64",
         iosSimulatorArm64() to "ios-simulator-arm64",
@@ -38,10 +35,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(projects.shared.coreOps)
-        }
-        commonTest.dependencies {
-            implementation(kotlin("test"))
-            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
