@@ -73,17 +73,13 @@ final class LiveViewModel {
                 paused: r.paused,
                 task: r.text,
                 now: r.paused ? String(localized: L10n.Run.paused) : (s.now ?? r.status),
-                steps: s.steps.map { Self.short($0.action) }
+                steps: s.steps.map(\.reason).filter { !$0.isEmpty }
             )
         }
         state.finished = s.finished.map {
             Finished(badge: Format.badge($0.badge), reply: $0.parts.map(ModeReplyBlock.init),
-                     line: L10n.Live.summary(steps: Int($0.steps), seconds: Format.seconds(Double($0.seconds)), cost: Format.money($0.costUsd)))
+                     line: L10n.Live.summary(steps: Int($0.steps), seconds: Format.seconds(Double($0.seconds))))
         }
     }
 
-    /// "open WhatsApp" → "Open WhatsApp", for the step labels.
-    private static func short(_ action: String) -> String {
-        action.prefix(1).uppercased() + action.dropFirst()
-    }
 }

@@ -186,8 +186,8 @@ enum L10n {
         static let idleTitle = LocalizedStringResource("live.idle.title", defaultValue: "Nothing running")
         static let idleMessage = LocalizedStringResource("live.idle.message", defaultValue: "When Mode works on a task, each step shows here.")
 
-        static func summary(steps: Int, seconds: String, cost: String) -> String {
-            String(localized: "live.summary", defaultValue: "\(steps) steps · \(seconds) · \(cost)")
+        static func summary(steps: Int, seconds: String) -> String {
+            String(localized: "live.summary", defaultValue: "\(seconds) · \(steps) steps")
         }
     }
 

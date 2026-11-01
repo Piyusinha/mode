@@ -18,7 +18,6 @@ import com.piyush.mode.core.storage.FileStore
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.runs.data.RunRecorder
 import com.piyush.mode.feature.runs.data.RunRepository
-import com.piyush.mode.feature.runs.domain.describeResult
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.conversations.domain.TurnRole
@@ -209,7 +208,7 @@ public class TaskRunner(
                 recorder.failedToStart(task, "daily limit reached")
                 return null
             }
-            status("Connecting to the phone…")
+            status("Getting started…")
             val phone = try {
                 session.phone()
             } catch (e: Exception) {
@@ -238,8 +237,8 @@ public class TaskRunner(
             if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget.model)
             outcome = statusOf(finished.outcome)
             reply = replyFor(finished.outcome)
-            val line = describeResult(finished)
-            mutableState.update { it.copy(lastResult = finished, status = line) }
+            // Time, steps and cost stay in the run log; what the user sees is the answer.
+            mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
             // Come back so the user sees how it went.

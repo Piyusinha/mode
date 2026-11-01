@@ -40,7 +40,7 @@ final class RunScreensViewModel {
             title: String(localized: L10n.Screens.title),
             subtitle: [s.task, L10n.Tasks.steps(s.shots.count)].joined(separator: " · "),
             shots: s.shots.map { shot in
-                Shot(id: Int(shot.step), number: String(shot.step), label: shot.action.map { $0.prefix(1).uppercased() + $0.dropFirst() } ?? "",
+                Shot(id: Int(shot.step), number: String(shot.step), label: shot.label ?? "",
                      image: presenter.image(shot: shot).flatMap { UIImage(data: $0.toData()) })
             }
         )

@@ -157,6 +157,11 @@ class Agent(
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
+        /** The last tap and the screen it was made on: a second tap on the same spot of the same screen is held back once. */
+        var lastTap: Pair<Double, Double>? = null
+        var lastTapScreen: String? = null
+        var lastWasTap = false
+        val heldBack = mutableSetOf<Pair<Int, Int>>()
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -202,7 +207,7 @@ class Agent(
                 }
             }
             val stepStarted = clock.markNow()
-            onStatus("Step $step: looking")
+            onStatus(WORKING)
             val lookStarted = clock.markNow()
             val screen = look()
             finalScreen = screen.jpeg
@@ -215,7 +220,7 @@ class Agent(
             // Tell the model what its last action did, and notice when nothing changes.
             val changed = if (lastWasPhoneAction) screen.signature != lastScreen else null
             if (changed != null && history.isNotEmpty()) {
-                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED
+                history[history.lastIndex] += if (changed) " → screen changed" else UNCHANGED + if (lastWasTap) TAP_MAY_HAVE_WORKED else ""
             }
             lastScreen = screen.signature
             val verdict = stuck.looked(screen.signature, changed)
@@ -281,7 +286,7 @@ class Agent(
                     val summary = call.arguments.string("summary").orEmpty()
                     val success = call.arguments["success"]?.jsonPrimitive?.booleanOrNull ?: true
                     val evidence = call.arguments.string("evidence")?.trim().orEmpty()
-                    val lastUnchanged = history.lastOrNull()?.endsWith(UNCHANGED) == true
+                    val lastUnchanged = history.lastOrNull()?.contains(UNCHANGED) == true
                     // Catch "I tapped Send" when nothing was sent: once per task, ask for a check.
                     if (success && !verifyAsked && (evidence.isEmpty() || lastUnchanged)) {
                         verifyAsked = true
@@ -370,6 +375,19 @@ class Agent(
                         continue
                     }
                     val described = describe(call, op, screen)
+                    // Seen on the phone: an app showed "added" for a moment, the screen then looked
+                    // the same, and the same + was tapped three times (three entries). Hold a repeat
+                    // tap on an unchanged screen back once and have the model check first.
+                    if (op is Op.Tap) {
+                        val spot = (op.x / SAME_SPOT_PT).roundToInt() to (op.y / SAME_SPOT_PT).roundToInt()
+                        val again = lastTap?.let { hypot(it.first - op.x, it.second - op.y) < SAME_SPOT_PT } == true &&
+                            lastTapScreen == screen.signature
+                        if (again && heldBack.add(spot)) {
+                            stuck.badReply()
+                            record("$described (held back)", reason, REPEAT_HELD_BACK)
+                            continue
+                        }
+                    }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
                     if (risky != null && !gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
@@ -382,6 +400,9 @@ class Agent(
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
+                        lastWasTap = op is Op.Tap
+                        lastTap = (op as? Op.Tap)?.let { it.x to it.y }
+                        lastTapScreen = screen.signature
                         stuck.acted()
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
@@ -420,7 +441,6 @@ class Agent(
         }
         var last: Exception? = null
         for ((attempt, candidate) in tries.withIndex()) {
-            onStatus("Step $step: thinking ($candidate)")
             trace.asking(step, candidate, steppedUp && candidate != config.model, messages.last().text)
             val started = clock.markNow()
             try {
@@ -534,6 +554,17 @@ class Agent(
     companion object {
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        private const val TAP_MAY_HAVE_WORKED =
+            " (a tap that adds, sends or saves may still have worked: many apps confirm only for a moment)"
+        private const val REPEAT_HELD_BACK =
+            "not done: you just tapped this same spot and the screen looks the same. If it adds, sends, buys, books or " +
+                "saves something, it may already have worked (apps often confirm only for a moment): check first, where " +
+                "it would show (the diary or meal, the list, the cart, the chat). If it really did not work, or this " +
+                "tap is meant to repeat (a + raising a quantity), tap it again and it will go through."
+        /** What the user sees while the agent looks and thinks; never a model or a step number. */
+        const val WORKING = "Working on it"
+        /** Taps closer than this (screen points) count as the same spot. */
+        private const val SAME_SPOT_PT = 24.0
         private const val MAX_RECALL_CHARS = 1200
 
         val SYSTEM_PROMPT = """
@@ -556,6 +587,10 @@ class Agent(
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - Tap a text field before typing into it.
             - If an action did not change the screen, do not repeat it: try another way.
+            - A tap that adds, sends, buys, books, posts or saves is not safe to repeat: doing it twice adds twice.
+              After it, look for proof it worked (a check, a count going up, the item in the list). Many apps
+              confirm for only a moment, so a screen that looks the same does not mean it failed: before tapping
+              again, check where it would show (the diary or meal, the cart, the chat, the list).
             - Say in expect what the screen should show after an action ("Appearance page opens"); on the
               next screen, check it happened before going on.
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).

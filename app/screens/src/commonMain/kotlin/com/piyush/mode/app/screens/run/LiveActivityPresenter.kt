@@ -3,6 +3,7 @@ package com.piyush.mode.app.screens.run
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.app.screens.common.TaskBadge
+import com.piyush.mode.app.screens.common.now
 import com.piyush.mode.app.screens.conversation.ReplyPart
 import com.piyush.mode.app.screens.conversation.replyParts
 import com.piyush.mode.core.platform.ResultSurfaces
@@ -86,7 +87,7 @@ public class LiveActivityPresenter(
                 task = task,
                 step = s.steps.size,
                 startedAtMs = s.startedAtMs,
-                now = s.steps.lastOrNull()?.let { it.reason.ifBlank { it.action } } ?: s.status,
+                now = s.now(),
                 paused = s.paused,
                 plan = planSteps(s),
                 conversationId = s.conversationId,

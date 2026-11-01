@@ -114,7 +114,7 @@ class TaskRunnerTest {
         assertIs<AgentOutcome.Done>(result!!.outcome)
         val state = f.runner.state.value
         assertFalse(state.running)
-        assertTrue(state.status.startsWith("Done: Light mode on"), state.status)
+        assertEquals("Light mode on", state.status, "the answer, never time, steps or cost")
         assertEquals(1, f.link.releases, "disconnected after the task")
         assertEquals("done", f.runs.run(state.lastRunId!!)!!.outcome)
         assertTrue(f.notes.posted.single().contains("Light mode on"))

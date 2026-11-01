@@ -68,13 +68,13 @@ class ConversationAndRunTest {
 
     @Test
     fun runScreensListsEveryScreenWithWhatWasDone() = runTest {
-        val f = Fixture(this, ScriptedModel(call("open_app", "name" to "Settings", "reason" to "x"), call("done", "evidence" to "x", "summary" to "ok")))
+        val f = Fixture(this, ScriptedModel(call("open_app", "name" to "Settings", "reason" to "Opening Settings"), call("done", "evidence" to "x", "summary" to "ok")))
         val task = f.queue.submit("Open settings", TaskSource.App)!!
         testScheduler.advanceUntilIdle()
         val p = RunScreensPresenter(backgroundScope, task.id, f.runs, f.tasks)
         val shots = p.state.value.shots
         assertEquals(listOf(1, 2, 3), shots.map { it.step }, "the fake screen never changes, so done is checked once")
-        assertEquals("open Settings", shots.first().action)
+        assertEquals("Opening Settings", shots.first().label, "the agent's own words, not the raw action")
         assertNotNull(p.image(shots.first()))
     }
 

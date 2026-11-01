@@ -45,7 +45,11 @@ object AgentTools {
 
     class Param(val name: String, val type: String, val description: String, val required: Boolean = true, val enum: List<String>? = null)
 
-    private val reason = Param("reason", "string", "A few words on why, shown to the user as progress.")
+    private val reason = Param(
+        "reason", "string",
+        "Shown to the user as live progress: a few plain words on what you are doing for them (\"Searching for " +
+            "Pintola oats\", \"Adding it to Dinner\"). No coordinates, button names or app internals.",
+    )
 
     /** Offered on every action, so keeping a fact never costs a step of its own. */
     private val note = Param(

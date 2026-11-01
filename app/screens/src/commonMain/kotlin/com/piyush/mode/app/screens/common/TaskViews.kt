@@ -11,7 +11,7 @@ public data class RunningTask(
     val conversationId: String?,
     /** Steps taken so far. */
     val steps: Int,
-    /** What the agent is doing, from the runner: "Step 4: thinking". */
+    /** What the agent is doing, in its own plain words ("Adding it to Dinner"); "Working on it" before the first step. */
     val status: String,
     /** The agent is waiting for the user's answer. */
     val question: Question?,
@@ -42,9 +42,12 @@ internal fun TaskState.running(tasks: TaskRepository): RunningTask? {
         text = tasks.get(id)?.text.orEmpty(),
         conversationId = conversationId,
         steps = steps.size,
-        status = status,
+        status = now(),
         question = question?.let { Question(it.text, it.yesNo) },
         paused = paused,
         startedAtMs = startedAtMs,
     )
 }
+
+/** What the user sees the agent doing: its latest reason, or the runner's own line before the first step. */
+internal fun TaskState.now(): String = steps.lastOrNull { it.reason.isNotBlank() && !it.action.startsWith("done") }?.reason ?: status

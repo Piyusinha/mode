@@ -5,6 +5,7 @@ import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.app.screens.common.RunShot
 import com.piyush.mode.app.screens.common.RunningTask
 import com.piyush.mode.app.screens.common.TaskBadge
+import com.piyush.mode.app.screens.common.now
 import com.piyush.mode.app.screens.common.running
 import com.piyush.mode.app.screens.common.shots
 import com.piyush.mode.feature.runs.data.RunRepository
@@ -52,7 +53,7 @@ public class LiveRunPresenter(
                 mutableState.value = LiveRunUiState(
                     running = s.running(tasks),
                     screen = s.latestScreen.takeIf { s.running },
-                    now = s.steps.lastOrNull()?.let { it.reason.ifBlank { it.action } },
+                    now = s.now(),
                     steps = s.steps.map { LiveStep(it.index, it.reason, it.action, !it.outcome.startsWith("failed") && !it.outcome.startsWith("not "), it.millis / 1000.0) },
                     finished = s.lastResult?.takeIf { !s.running }?.let { r ->
                         val (badge, summary) = when (val o = r.outcome) {

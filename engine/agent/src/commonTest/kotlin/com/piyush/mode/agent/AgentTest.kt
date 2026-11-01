@@ -79,8 +79,8 @@ class AgentTest {
         // The screen never changes, whatever is tapped.
         val phone = FakePhone(listOf(listOf("Same" to (10.0 to 10.0))))
         phone.screens = List(10) { listOf("Same" to (10.0 to 10.0)) }
-        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "try")
-        val model = ScriptedModel(tap, tap, tap, call("done", "evidence" to "on screen", "summary" to "x", "success" to false))
+        fun tap(x: Int) = call("tap", "x" to x, "y" to 1, "reason" to "try")
+        val model = ScriptedModel(tap(1), tap(200), tap(400), call("done", "evidence" to "on screen", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         // Two taps change nothing, so the third decision goes to the strong model, then back to cheap.
         assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
@@ -291,6 +291,26 @@ class AgentTest {
         assertEquals(1.0, op.x1)
         assertTrue(op.x2 > 250, "swipes well across the screen")
         assertEquals(op.y1, op.y2)
+    }
+
+    @Test
+    fun aRepeatTapOnAnUnchangedScreenIsHeldBackOnceSoTheModelChecksFirst() = runTest {
+        val phone = FakePhone(List(10) { listOf("Chocolate oats" to (200.0 to 136.0)) })
+        val plus = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
+        val model = ScriptedModel(plus, plus, plus, call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
+        // First tap goes through; the immediate repeat is held back; insisting goes through.
+        assertEquals(2, phone.actions.count { it is Op.Tap })
+        assertTrue("may already have worked" in model.lastUserText || "held back" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun progressShownToTheUserNeverNamesTheModel() = runTest {
+        val phone = FakePhone(List(10) { listOf("Same" to (10.0 to 10.0)) })
+        val statuses = mutableListOf<String>()
+        val model = ScriptedModel(call("done", "evidence" to "on screen", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle.copy(model = "anthropic/claude-haiku-5.5"), onStatus = { statuses += it }).run("t")
+        assertTrue(statuses.none { "/" in it || "Step" in it }, statuses.toString())
     }
 
     @Test
