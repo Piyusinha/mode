@@ -1,5 +1,6 @@
 package com.piyush.mode.agent
 
+import com.piyush.mode.core.common.SecretFilter
 import com.piyush.mode.llm.ToolCall
 import com.piyush.mode.ops.Op
 import kotlinx.serialization.json.JsonArray
@@ -206,6 +207,8 @@ object AgentTools {
 
     /** The fact the model asked to keep with this action, if any. */
     fun noteOf(call: ToolCall): String? = call.arguments["note"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+        // Notes reach the prompt and the run log on disk: a secret is never kept, whatever the model wrote.
+        ?.let(SecretFilter::hide)
 }
 
 internal fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull

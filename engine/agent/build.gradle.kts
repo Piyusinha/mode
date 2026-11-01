@@ -8,6 +8,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.engine.ops)
             api(projects.engine.llm)
+            implementation(projects.core.common)
         }
         commonTest.dependencies {
             implementation(projects.testing)

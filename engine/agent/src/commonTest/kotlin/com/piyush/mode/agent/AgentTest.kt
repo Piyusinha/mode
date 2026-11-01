@@ -409,4 +409,16 @@ class AgentTest {
         val e = runCatching { AgentTools.toOp(call("swipe", "x1" to 437, "y1" to 470, "x2" to 437, "y2" to 470), g) }.exceptionOrNull()
         assertTrue(e is IllegalArgumentException && "to tap use tap" in e.message!!)
     }
+
+    @Test
+    fun aNoteThatLooksLikeASecretIsHidden() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val model = ScriptedModel(
+            call("scroll", "direction" to "down", "reason" to "read", "note" to "Your OTP is 482913"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertTrue("482913" !in model.lastUserText)
+        assertTrue("[hidden: looked like a secret]" in model.lastUserText)
+    }
 }
