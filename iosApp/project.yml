@@ -2,7 +2,7 @@ name: Mode
 options:
   bundleIdPrefix: com.piyush.mode
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
   createIntermediateGroups: true
 packages:
   # Mode's design system: every colour, font, size, icon and component screens use.
