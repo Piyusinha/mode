@@ -24,6 +24,7 @@ kotlin {
             export(projects.feature.tasks)
             export(projects.feature.diagnostics)
             export(projects.feature.compare)
+            export(projects.feature.conversations)
             export(projects.engine.agent)
             export(projects.engine.ops)
         }
@@ -38,6 +39,7 @@ kotlin {
             api(projects.feature.tasks)
             api(projects.feature.diagnostics)
             api(projects.feature.compare)
+            api(projects.feature.conversations)
             api(projects.engine.agent)
             api(projects.engine.ops)
             implementation(projects.app.devUi)

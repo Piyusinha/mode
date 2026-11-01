@@ -17,6 +17,10 @@ public data class RunSummary(
     val costUsd: Double?,
     /** Set for runs that belong to a model comparison. */
     val tag: String?,
+    /** The task this run carried out, when it was saved as one. */
+    val taskId: String? = null,
+    /** Epoch milliseconds. */
+    val startedAt: Long = 0,
 )
 
 /** A one-line description of how a run went, with time, steps and cost. */

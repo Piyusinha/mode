@@ -12,6 +12,8 @@ kotlin {
             api(projects.feature.tasks)
             api(projects.feature.diagnostics)
             api(projects.feature.compare)
+            api(projects.feature.conversations)
+            api(projects.core.database)
             api(projects.engine.llm)
             api(projects.core.storage)
             api(projects.core.platform)
@@ -19,6 +21,7 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(projects.core.network)
+            implementation(projects.core.database)
             implementation(projects.engine.phoneIos)
         }
     }

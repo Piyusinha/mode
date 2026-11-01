@@ -9,6 +9,7 @@ kotlin {
             api(projects.feature.connection)
             api(projects.feature.settings)
             api(projects.feature.runs)
+            api(projects.feature.conversations)
             api(projects.core.platform)
             api(projects.core.common)
         }

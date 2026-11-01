@@ -33,3 +33,6 @@ DELETE FROM run WHERE id = ?;
 
 count:
 SELECT count(*) FROM run;
+
+deleteAll:
+DELETE FROM run;

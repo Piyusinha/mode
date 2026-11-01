@@ -1,6 +1,9 @@
 package com.piyush.mode.app.graph
 
 import com.piyush.mode.core.common.ActivityTracker
+import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.database.DatabaseFactory
+import com.piyush.mode.core.database.ModeDatabase
 import com.piyush.mode.core.platform.AppInfo
 import com.piyush.mode.core.platform.AppLifecycle
 import com.piyush.mode.core.platform.BackgroundWork
@@ -10,12 +13,14 @@ import com.piyush.mode.core.storage.KeyValueStore
 import com.piyush.mode.core.storage.SecretStore
 import com.piyush.mode.feature.compare.presentation.CompareRunner
 import com.piyush.mode.feature.connection.domain.PhoneLink
+import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.connection.presentation.IdleDisconnectPolicy
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.runs.data.RunRepository
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
+import com.piyush.mode.feature.tasks.data.TaskRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
 import com.piyush.mode.llm.OpenRouterModels
@@ -37,6 +42,8 @@ class PlatformServices(
     val appInfo: AppInfo,
     val http: HttpClient,
     val phoneLink: PhoneLink,
+    /** Opens the app's database. */
+    val database: DatabaseFactory,
 )
 
 /**
@@ -48,18 +55,24 @@ class ModeGraph(platform: PlatformServices) {
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val activity: ActivityTracker = ActivityTracker()
     val files: FileStore = platform.files
+    val database: ModeDatabase = platform.database.create()
 
     val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
     /** The models to pick from: OpenRouter's live list, cached for a day. */
     val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
     val session: PhoneSession = PhoneSession(platform.phoneLink)
-    val runs: RunRepository = RunRepository(platform.files)
+    val runs: RunRepository = RunRepository(platform.files, database)
+    val conversations: ConversationRepository = ConversationRepository(database)
+    val taskHistory: TaskRepository = TaskRepository(database)
 
     val tasks: TaskRunner = TaskRunner(
         session = session,
         settings = settings,
         llm = OpenRouterClient(platform.http, apiKey = { settings.apiKey }),
         files = platform.files,
+        runs = runs,
+        conversations = conversations,
+        tasks = taskHistory,
         notifier = platform.notifier,
         background = platform.background,
         appInfo = platform.appInfo,
@@ -73,5 +86,10 @@ class ModeGraph(platform: PlatformServices) {
     init {
         IdleDisconnectPolicy(session, activity, scope).install(platform.lifecycle)
         scope.launch { models.refresh() }
+        scope.launch {
+            runCatching { runs.backfill() }
+                .onSuccess { if (it > 0) AppLog.log("runs", "listed $it earlier runs") }
+                .onFailure { AppLog.error("runs", "could not list earlier runs", it) }
+        }
     }
 }

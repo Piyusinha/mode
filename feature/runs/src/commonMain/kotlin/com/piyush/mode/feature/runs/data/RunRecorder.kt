@@ -16,16 +16,22 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Writes one agent run to logs/runs/<id>/: run.json (task, settings,
  * outcome, totals), steps.jsonl (one line per event: look, ask, answer, act)
  * and step-N.jpg (what the model saw).
  */
-public class RunRecorder(
+public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
     private val store: FileStore,
     public val id: String = nowId(),
     private val tag: String? = null,
+    /** Where the run is listed; null records files only. */
+    private val index: RunRepository? = null,
+    private val taskId: String? = null,
+    private val startedAt: Long = Clock.System.now().toEpochMilliseconds(),
 ) : AgentTrace {
     private val dir = "runs/$id"
     private var task = ""
@@ -136,5 +142,6 @@ public class RunRecorder(
             }
         }
         store.write("$dir/run.json", run.toString().encodeToByteArray())
+        index?.record(run, taskId, startedAt)
     }
 }

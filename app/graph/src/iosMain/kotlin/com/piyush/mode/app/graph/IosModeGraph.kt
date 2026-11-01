@@ -2,6 +2,7 @@ package com.piyush.mode.app.graph
 
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.common.systemLog
+import com.piyush.mode.core.database.IosDatabaseFactory
 import com.piyush.mode.core.network.darwinHttpClient
 import com.piyush.mode.core.platform.IosAppInfo
 import com.piyush.mode.core.platform.IosAppLifecycle
@@ -32,6 +33,7 @@ val iosModeGraph: ModeGraph by lazy {
             appInfo = IosAppInfo(),
             http = darwinHttpClient(),
             phoneLink = CoreDevicePhoneLink(),
+            database = IosDatabaseFactory(),
         ),
     )
 }

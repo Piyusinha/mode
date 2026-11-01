@@ -7,6 +7,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.engine.agent)
             api(projects.core.storage)
+            api(projects.core.database)
             implementation(projects.core.common)
         }
         commonTest.dependencies {

@@ -23,4 +23,8 @@ public data class TaskState(
     val lastResult: AgentResult? = null,
     /** The recorded run, under runs/ in the logs. */
     val lastRunId: String? = null,
+    /** The saved task (see TaskRepository). */
+    val taskId: String? = null,
+    /** The conversation it belongs to; null for comparison runs. */
+    val conversationId: String? = null,
 )

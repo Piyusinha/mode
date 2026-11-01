@@ -67,7 +67,7 @@ fun LogsScreen(store: FileStore, runs: RunRepository, decodeImage: (ByteArray) -
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { refresh++ }) { Text("Refresh") }
                     OutlinedButton(onClick = { showEvents = true }) { Text("App events") }
-                    OutlinedButton(onClick = { store.delete(""); refresh++ }) { Text("Delete all") }
+                    OutlinedButton(onClick = { runs.deleteAll(); store.delete(""); refresh++ }) { Text("Delete all") }
                 }
                 val list = remember(refresh) { runs.runs() }
                 if (list.isEmpty()) Text("No runs yet.")
