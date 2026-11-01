@@ -344,7 +344,8 @@ enum L10n {
         static let openSettings = LocalizedStringResource("setup.test.openSettings", defaultValue: "Open Settings")
         static let tapWifi = LocalizedStringResource("setup.test.tapWifi", defaultValue: "Tap Wi-Fi")
         static let comeBack = LocalizedStringResource("setup.test.comeBack", defaultValue: "Come back here")
-        static let testNote = LocalizedStringResource("setup.test.note", defaultValue: "You'll see the Dynamic Island show each step while Mode works. On mobile data only, turn it off for a moment so Mode can connect.")
+        // The board also promises the Dynamic Island showing each step; that line returns with the Live Activity (next step).
+        static let testNote = LocalizedStringResource("setup.test.note", defaultValue: "Mode switches to Settings while it works, then comes back here. On mobile data only, turn it off for a moment so Mode can connect.")
         static let runTest = LocalizedStringResource("setup.test.run", defaultValue: "Run the test")
 
         // Result
