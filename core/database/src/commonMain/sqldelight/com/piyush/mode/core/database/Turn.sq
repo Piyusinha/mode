@@ -1,0 +1,17 @@
+-- One message in a conversation: the user's, or Mode's.
+CREATE TABLE turn (
+    id TEXT NOT NULL PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    text TEXT NOT NULL,
+    task_id TEXT,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX turn_conversation ON turn(conversation_id, created_at);
+
+insert:
+INSERT INTO turn(id, conversation_id, role, text, task_id, created_at) VALUES (?, ?, ?, ?, ?, ?);
+
+forConversation:
+SELECT * FROM turn WHERE conversation_id = ? ORDER BY created_at, rowid;

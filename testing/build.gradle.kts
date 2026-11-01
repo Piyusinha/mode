@@ -9,6 +9,13 @@ kotlin {
             api(projects.engine.ops)
             api(projects.engine.llm)
             api(projects.core.storage)
+            api(projects.core.database)
+        }
+        jvmMain.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
+        }
+        iosMain.dependencies {
+            implementation(libs.sqldelight.native.driver)
         }
     }
 }

@@ -1,0 +1,27 @@
+-- A thread of turns between the user and Mode.
+CREATE TABLE conversation (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX conversation_updated ON conversation(updated_at);
+
+insert:
+INSERT INTO conversation(id, title, created_at, updated_at) VALUES (?, ?, ?, ?);
+
+touch:
+UPDATE conversation SET updated_at = ? WHERE id = ?;
+
+rename:
+UPDATE conversation SET title = ?, updated_at = ? WHERE id = ?;
+
+delete:
+DELETE FROM conversation WHERE id = ?;
+
+byId:
+SELECT * FROM conversation WHERE id = ?;
+
+recent:
+SELECT * FROM conversation ORDER BY updated_at DESC LIMIT ?;

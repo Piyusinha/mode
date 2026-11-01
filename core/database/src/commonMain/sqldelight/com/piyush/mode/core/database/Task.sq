@@ -1,0 +1,38 @@
+-- Something the user asked Mode to do, from any source.
+CREATE TABLE task (
+    id TEXT NOT NULL PRIMARY KEY,
+    conversation_id TEXT REFERENCES conversation(id) ON DELETE SET NULL,
+    text TEXT NOT NULL,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    started_at INTEGER,
+    ended_at INTEGER,
+    run_id TEXT,
+    summary TEXT,
+    steps INTEGER,
+    cost_usd REAL
+);
+
+CREATE INDEX task_status ON task(status, created_at);
+
+insert:
+INSERT INTO task(id, conversation_id, text, source, status, created_at) VALUES (?, ?, ?, ?, ?, ?);
+
+setStatus:
+UPDATE task SET status = ? WHERE id = ?;
+
+start:
+UPDATE task SET status = ?, started_at = ?, run_id = ? WHERE id = ?;
+
+finish:
+UPDATE task SET status = ?, ended_at = ?, summary = ?, steps = ?, cost_usd = ? WHERE id = ?;
+
+byId:
+SELECT * FROM task WHERE id = ?;
+
+recent:
+SELECT * FROM task ORDER BY created_at DESC LIMIT ?;
+
+withStatus:
+SELECT * FROM task WHERE status = ? ORDER BY created_at;

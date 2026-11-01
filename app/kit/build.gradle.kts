@@ -14,6 +14,8 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ModeKit"
             isStatic = true
+            // The database's native driver uses the system SQLite.
+            linkerOpts("-lsqlite3")
             // What Swift sees by name.
             export(projects.app.graph)
             export(projects.feature.connection)

@@ -57,6 +57,10 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode
       PRODUCT_NAME: Mode
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      # ModeKit's database uses the system SQLite.
+      OTHER_LDFLAGS:
+        - "$(inherited)"
+        - "-lsqlite3"
       GENERATE_INFOPLIST_FILE: YES
       INFOPLIST_KEY_CFBundleDisplayName: Mode
       INFOPLIST_KEY_UILaunchScreen_Generation: YES

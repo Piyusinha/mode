@@ -1,0 +1,35 @@
+-- The index of recorded runs; each run's steps and screenshots stay as files.
+CREATE TABLE run (
+    id TEXT NOT NULL PRIMARY KEY,
+    task_id TEXT,
+    task TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    model TEXT,
+    steps INTEGER,
+    ms INTEGER,
+    cost_usd REAL,
+    tag TEXT,
+    started_at INTEGER NOT NULL
+);
+
+CREATE INDEX run_started ON run(started_at);
+
+upsert:
+INSERT OR REPLACE INTO run(id, task_id, task, outcome, summary, model, steps, ms, cost_usd, tag, started_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+recent:
+SELECT * FROM run ORDER BY id DESC LIMIT ?;
+
+byId:
+SELECT * FROM run WHERE id = ?;
+
+idsBeyond:
+SELECT id FROM run ORDER BY id DESC LIMIT -1 OFFSET ?;
+
+deleteById:
+DELETE FROM run WHERE id = ?;
+
+count:
+SELECT count(*) FROM run;
