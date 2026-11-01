@@ -15,6 +15,7 @@ kotlin {
             api(projects.feature.conversations)
             api(projects.feature.memory)
             api(projects.feature.schedules)
+            api(projects.app.screens)
             api(projects.core.database)
             api(projects.engine.llm)
             api(projects.core.storage)

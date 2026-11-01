@@ -50,6 +50,7 @@ include(":feature:diagnostics")
 include(":feature:compare")
 // Test fakes shared by every module (test source sets only).
 include(":testing")
+include(":app:screens")
 include(":app:graph")
 include(":app:dev-ui")
 include(":app:kit")

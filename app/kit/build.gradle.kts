@@ -27,6 +27,7 @@ kotlin {
             export(projects.feature.conversations)
             export(projects.feature.memory)
             export(projects.feature.schedules)
+            export(projects.app.screens)
             export(projects.engine.agent)
             export(projects.engine.ops)
         }
@@ -44,6 +45,7 @@ kotlin {
             api(projects.feature.conversations)
             api(projects.feature.memory)
             api(projects.feature.schedules)
+            api(projects.app.screens)
             api(projects.engine.agent)
             api(projects.engine.ops)
             implementation(projects.app.devUi)
