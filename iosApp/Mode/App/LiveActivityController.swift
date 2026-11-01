@@ -16,6 +16,8 @@ final class LiveActivityController {
     private var activity: Activity<ModeActivityAttributes>?
     private var taskId: String?
     private var shown: Content?
+    /// The last ActivityKit call, so the next waits for it.
+    private var queue: Updates?
 
     /// How long the answer stays on the Lock Screen.
     private let answerStays: TimeInterval = 30 * 60
@@ -75,14 +77,21 @@ final class LiveActivityController {
     }
 
     private func show(taskId id: String, task: String, conversationId: String?, content: Content) {
-        if let activity, taskId == id {
+        if let activity, taskId == id, activity.activityState == .active {
             guard content != shown else { return }
             shown = content
             let stale = Date().addingTimeInterval(staleAfter)
-            Updates { await activity.update(ActivityContent(state: content, staleDate: stale)) }
+            let line = "update \(content.phase.rawValue) step \(content.step)"
+            send { [presenter] in
+                await activity.update(ActivityContent(state: content, staleDate: stale))
+                presenter.log(line + " (\(activity.activityState))")
+            }
             return
         }
-        if let previous = activity { Updates { await previous.end(nil, dismissalPolicy: .immediate) } }
+        if let previous = activity {
+            presenter.log("replacing the activity (\(previous.activityState))")
+            send { await previous.end(nil, dismissalPolicy: .immediate) }
+        }
         do {
             activity = try Activity.request(
                 attributes: ModeActivityAttributes(task: task, conversationId: conversationId),
@@ -91,10 +100,12 @@ final class LiveActivityController {
             taskId = id
             shown = content
             presenter.showing(on: true)
+            presenter.log("started \(content.phase.rawValue) step \(content.step)")
         } catch {
             // Live Activities are off for Mode: the notification tells the answer instead.
             activity = nil
             presenter.showing(on: false)
+            presenter.log("could not start: \(error.localizedDescription)")
         }
     }
 
@@ -104,9 +115,10 @@ final class LiveActivityController {
         self.activity = nil
         taskId = nil
         shown = nil
-        Updates { [presenter] in
+        send { [presenter] in
             await activity.end(nil, dismissalPolicy: .immediate)
             presenter.showing(on: false)
+            presenter.log("ended")
         }
     }
 
@@ -116,9 +128,19 @@ final class LiveActivityController {
         taskId = nil
         shown = nil
         let until = Date().addingTimeInterval(answerStays)
-        Updates { [presenter] in
+        send { [presenter] in
             await activity.end(ActivityContent(state: content, staleDate: nil), dismissalPolicy: .after(until))
             presenter.showing(on: false)
+            presenter.log("finished (\(content.outcome?.rawValue ?? ""))")
+        }
+    }
+
+    /// ActivityKit calls, one at a time and in order: an older update never lands after a newer one.
+    private func send(_ work: @escaping @MainActor () async -> Void) {
+        let previous = queue
+        queue = Updates { @MainActor in
+            await previous?.value
+            await work()
         }
     }
 

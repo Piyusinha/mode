@@ -6,6 +6,7 @@ import com.piyush.mode.app.screens.common.TaskBadge
 import com.piyush.mode.app.screens.common.now
 import com.piyush.mode.app.screens.conversation.ReplyPart
 import com.piyush.mode.app.screens.conversation.replyParts
+import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.platform.ResultSurfaces
 import com.piyush.mode.feature.tasks.data.TaskRepository
 import com.piyush.mode.feature.tasks.domain.TaskState
@@ -63,12 +64,30 @@ public class LiveActivityPresenter(
 ) : Presenter<ActivityUiState>(parent, ActivityUiState.Hidden) {
 
     init {
-        scope.launch { runner.state.collect { mutableState.value = map(it) } }
+        scope.launch {
+            var said = ""
+            runner.state.collect { s ->
+                val state = map(s)
+                // One line per change of phase or step, to see in the logs what the activity was given.
+                val line = when (state) {
+                    is ActivityUiState.Working -> "working, step ${state.step}"
+                    else -> state::class.simpleName.orEmpty().lowercase()
+                }
+                if (line != said && state != ActivityUiState.Hidden) AppLog.log("activity", "state: $line")
+                said = line
+                mutableState.value = state
+            }
+        }
     }
 
     /** Stop, from the Dynamic Island. */
     public fun stop() {
         runner.stop()
+    }
+
+    /** What happened to the Live Activity (started, updated, ended, refused), for the logs. */
+    public fun log(message: String) {
+        AppLog.log("activity", message)
     }
 
     /** The Live Activity is (or no longer is) on screen: then the answer lands there, not in a notification too. */

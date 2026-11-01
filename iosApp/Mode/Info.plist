@@ -41,6 +41,8 @@
 	<string>Mode listens when you speak a task, and stops before it starts working in your apps.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

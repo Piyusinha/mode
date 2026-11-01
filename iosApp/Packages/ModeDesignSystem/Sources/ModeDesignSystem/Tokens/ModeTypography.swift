@@ -68,3 +68,9 @@ public extension View {
         font(style.font).foregroundStyle(color)
     }
 }
+
+/// How far a long line may shrink before it wraps or is cut.
+public enum ModeTextScale {
+    /// Titles (a conversation named after a long spoken task).
+    public static let title: CGFloat = 0.75
+}

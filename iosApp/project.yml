@@ -40,6 +40,8 @@ targets:
         NSMicrophoneUsageDescription: Mode listens when you speak a task, and stops before it starts working in your apps.
         # The running task on the Dynamic Island and the Lock Screen.
         NSSupportsLiveActivities: true
+        # Mode updates the activity at every step while it works.
+        NSSupportsLiveActivitiesFrequentUpdates: true
         # mode:// links: the Live Activity's Open chat and Another task.
         CFBundleURLTypes:
           - CFBundleURLName: com.piyush.mode

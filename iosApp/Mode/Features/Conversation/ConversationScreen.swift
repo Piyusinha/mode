@@ -14,7 +14,8 @@ struct ConversationScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: ModeSpacing.l) {
                     VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                        Text(state.title).modeText(.title)
+                        // A spoken task can be long: two lines at most, a little smaller rather than cut.
+                        Text(state.title).modeText(.title).lineLimit(2).minimumScaleFactor(ModeTextScale.title)
                         Text(state.when).modeText(.subheadline, color: ModeColor.textSecondary)
                     }
                     ForEach(state.messages) { message in
