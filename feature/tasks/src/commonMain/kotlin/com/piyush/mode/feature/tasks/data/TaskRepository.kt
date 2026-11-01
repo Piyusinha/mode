@@ -40,6 +40,14 @@ public class TaskRepository(
         db.taskQueries.finish(status.stored, now(), summary, steps?.toLong(), costUsd, id)
     }
 
+    /** Adds a cost that came after the task finished (its reflection). */
+    public fun addCost(id: String, usd: Double) {
+        db.taskQueries.addCost(usd, id)
+    }
+
+    /** The newest tasks first, as they are now. */
+    public fun latest(limit: Long): List<Task> = db.taskQueries.recent(limit).executeAsList().map { it.toDomain() }
+
     /** What tasks created since [epochMs] have cost, in US dollars. */
     public fun spentSince(epochMs: Long): Double = db.taskQueries.costSince(epochMs).executeAsOne()
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -46,6 +47,8 @@ import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.domain.ModelOption
+import com.piyush.mode.feature.memory.data.MemoryRepository
+import com.piyush.mode.feature.memory.domain.MemoryKind
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import kotlinx.coroutines.launch
@@ -89,7 +92,7 @@ fun App(graph: ModeGraph, decodeImage: (ByteArray) -> ImageBitmap) {
                     0 -> AgentScreen(graph.tasks, connection.label)
                     1 -> CompareScreen(graph.compare, graph.tasks, graph.models)
                     2 -> LogsScreen(graph.files, graph.runs, decodeImage)
-                    3 -> SettingsScreen(graph.settings, graph.models)
+                    3 -> SettingsScreen(graph.settings, graph.models, graph.memory)
                     else -> HandsCheckScreen(graph.handsCheck, decodeImage)
                 }
             }
@@ -111,6 +114,7 @@ private fun AgentScreen(runner: TaskRunner, connection: String) {
     val state by runner.state.collectAsState()
     val focus = LocalFocusManager.current
     var task by remember { mutableStateOf("") }
+    var private by remember { mutableStateOf(false) }
     Page {
         Text(connection, style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(
@@ -120,12 +124,22 @@ private fun AgentScreen(runner: TaskRunner, connection: String) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { focus.clearFocus(); runner.start(task.trim()) },
+                onClick = { focus.clearFocus(); runner.start(task.trim(), private = private) },
                 enabled = !state.running && task.isNotBlank(),
             ) { Text("Run") }
             OutlinedButton(onClick = { runner.stop() }, enabled = state.running) { Text("Stop") }
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(private, { private = it })
+                Text("Private", style = MaterialTheme.typography.bodySmall)
+            }
         }
         if (state.status.isNotBlank()) Text(state.status, style = MaterialTheme.typography.titleSmall)
+        for (item in state.remembered) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text("Remembered: ${item.text}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { runner.undoRemembered(item.id) }) { Text("Undo") }
+            }
+        }
 
         for (s in state.steps.reversed()) {
             Card(Modifier.fillMaxWidth()) {
@@ -190,7 +204,7 @@ private fun CompareScreen(compare: CompareRunner, runner: TaskRunner, catalog: M
 }
 
 @Composable
-private fun SettingsScreen(settings: SettingsRepository, catalog: ModelCatalog) {
+private fun SettingsScreen(settings: SettingsRepository, catalog: ModelCatalog, memory: MemoryRepository) {
     val current by settings.settings.collectAsState()
     var key by remember { mutableStateOf(settings.apiKey.orEmpty()) }
     var model by remember { mutableStateOf(current.model) }
@@ -231,7 +245,37 @@ private fun SettingsScreen(settings: SettingsRepository, catalog: ModelCatalog) 
             saved = "Saved."
         }) { Text("Save") }
         if (saved.isNotEmpty()) Text(saved)
+        MemorySection(settings, memory)
     }
+}
+
+/** Everything Mode remembers, by kind: delete one, forget everything, or stop learning. */
+@Composable
+private fun MemorySection(settings: SettingsRepository, memory: MemoryRepository) {
+    val current by settings.settings.collectAsState()
+    val items by memory.observe().collectAsState(emptyList())
+    Text("Memory (on this iPhone only)", style = MaterialTheme.typography.titleMedium)
+    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Checkbox(current.learnFromTasks, { on -> settings.update { it.copy(learnFromTasks = on) } })
+        Text("Learn from tasks", style = MaterialTheme.typography.bodyMedium)
+    }
+    for ((kind, heading) in listOf(MemoryKind.Fact to "About you", MemoryKind.Skill to "Skills", MemoryKind.Tip to "App tips")) {
+        val ofKind = items.filter { it.kind == kind }
+        Text("$heading (${ofKind.size})", style = MaterialTheme.typography.titleSmall)
+        for (item in ofKind) {
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(item.title, style = MaterialTheme.typography.bodyMedium)
+                        Text(item.text, style = MaterialTheme.typography.bodySmall)
+                        if (item.uses > 0) Text("worked ${item.successes} of ${item.uses} times", style = MaterialTheme.typography.labelSmall)
+                    }
+                    TextButton(onClick = { memory.forget(item.id) }) { Text("Delete") }
+                }
+            }
+        }
+    }
+    if (items.isNotEmpty()) OutlinedButton(onClick = { memory.forgetEverything() }) { Text("Forget everything") }
 }
 
 @Composable

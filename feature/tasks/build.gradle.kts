@@ -10,6 +10,7 @@ kotlin {
             api(projects.feature.settings)
             api(projects.feature.runs)
             api(projects.feature.conversations)
+            api(projects.feature.memory)
             api(projects.core.platform)
             api(projects.core.common)
         }

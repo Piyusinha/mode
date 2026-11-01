@@ -39,3 +39,6 @@ SELECT * FROM task WHERE status = ? ORDER BY created_at;
 
 costSince:
 SELECT COALESCE(SUM(cost_usd), 0.0) AS total FROM task WHERE created_at >= ?;
+
+addCost:
+UPDATE task SET cost_usd = COALESCE(cost_usd, 0) + ? WHERE id = ?;

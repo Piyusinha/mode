@@ -17,7 +17,12 @@ import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.connection.presentation.IdleDisconnectPolicy
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
+import com.piyush.mode.core.common.startOfTodayMillis
+import com.piyush.mode.feature.memory.data.MemoryRepository
+import com.piyush.mode.feature.memory.data.MemoryRetrieval
+import com.piyush.mode.feature.memory.data.Reflector
 import com.piyush.mode.feature.runs.data.RunRepository
+import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.data.TaskRepository
@@ -64,11 +69,14 @@ class ModeGraph(platform: PlatformServices) {
     val runs: RunRepository = RunRepository(platform.files, database)
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)
+    private val llm = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
+    /** What Mode remembers about the user, skills and app tips; on this iPhone only. */
+    val memory: MemoryRepository = MemoryRepository(database)
 
     val tasks: TaskRunner = TaskRunner(
         session = session,
         settings = settings,
-        llm = OpenRouterClient(platform.http, apiKey = { settings.apiKey }),
+        llm = llm,
         files = platform.files,
         runs = runs,
         conversations = conversations,
@@ -78,6 +86,7 @@ class ModeGraph(platform: PlatformServices) {
         appInfo = platform.appInfo,
         activity = activity,
         scope = scope,
+        memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
     )
 
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)

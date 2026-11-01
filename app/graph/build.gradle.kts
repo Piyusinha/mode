@@ -13,6 +13,7 @@ kotlin {
             api(projects.feature.diagnostics)
             api(projects.feature.compare)
             api(projects.feature.conversations)
+            api(projects.feature.memory)
             api(projects.core.database)
             api(projects.engine.llm)
             api(projects.core.storage)

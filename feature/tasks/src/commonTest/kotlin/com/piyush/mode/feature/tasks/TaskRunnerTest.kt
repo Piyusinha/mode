@@ -12,7 +12,21 @@ import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.conversations.domain.TurnRole
 import com.piyush.mode.feature.runs.data.RunRepository
+import com.piyush.mode.feature.memory.data.MemoryRepository
+import com.piyush.mode.feature.memory.data.MemoryRetrieval
+import com.piyush.mode.feature.memory.data.Reflector
+import com.piyush.mode.feature.memory.domain.MemoryDraft
+import com.piyush.mode.feature.memory.domain.MemoryKind
+import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.tasks.data.TaskRepository
+import com.piyush.mode.llm.ChatMessage
+import com.piyush.mode.llm.ChatResult
+import com.piyush.mode.llm.ToolCall
+import com.piyush.mode.llm.Usage
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.piyush.mode.feature.tasks.domain.TaskStatus
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
@@ -58,7 +72,7 @@ private object Inline : BackgroundWork {
     override suspend fun <T> run(work: suspend () -> T): T = work()
 }
 
-private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "sk-or-test", fail: String? = null) {
+private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "sk-or-test", fail: String? = null, withMemory: Boolean = false) {
     val link = Link(fail)
     val files = InMemoryFileStore()
     val notes = Notes()
@@ -68,6 +82,8 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
     val conversations = ConversationRepository(db)
     val tasks = TaskRepository(db)
     val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).also { it.apiKey = key }
+    val memory = MemoryRepository(db)
+    private val taskMemory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(model, memory), tasks, startOfToday = { 0L })
     val runner = TaskRunner(
         session = PhoneSession(link, Duration.ZERO),
         settings = settings,
@@ -81,6 +97,7 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
         appInfo = object : AppInfo { override val bundleId = "com.piyush.mode" },
         activity = activity,
         scope = scope,
+        memory = if (withMemory) taskMemory else null,
     )
 }
 
@@ -256,5 +273,94 @@ class TaskRunnerTest {
         assertTrue("Result: Sent Sonali: I'm leaving." in prompt, prompt)
         assertFalse("They asked: Also tell Rahul" in prompt, "the current task is not an earlier turn")
         assertTrue("Their name: Piyush" in prompt)
+    }
+
+    /** Answers the agent from a script and the reflection with one saved fact; remembers what each was shown. */
+    private class AgentAndCritic(vararg agentReplies: ToolCall) : LlmClient {
+        private val agent = ScriptedModel(*agentReplies)
+        val agentPrompts = mutableListOf<String>()
+        var reflections = 0
+        override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
+            if ("save_memory" in tools.toString()) {
+                reflections++
+                val args = buildJsonObject {
+                    put("failure_type", "none")
+                    put("changes", buildJsonArray {
+                        add(buildJsonObject {
+                            put("op", "add"); put("kind", "fact"); put("subject", "sonali"); put("title", "Sonali")
+                            put("text", "Sonali: message her on WhatsApp"); put("evidence", "step 1")
+                        })
+                    })
+                }
+                return ChatResult(ToolCall("save_memory", args), "", Usage(800, 100, 0.0003))
+            }
+            agentPrompts += messages.last().text
+            return agent.chat(model, messages, tools)
+        }
+    }
+
+    @Test
+    fun aTaskGetsWhatIsRememberedAndTeachesSomethingNew() = runTest {
+        val model = AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent."))
+        val f = Fixture(this, model, withMemory = true)
+        f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
+
+        f.runner.runTask("Message Sonali saying I'm late", quick)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue("ABOUT THE USER:\n- Home is in Indiranagar" in model.agentPrompts.first(), model.agentPrompts.first())
+        assertEquals(1, model.reflections)
+        assertEquals(listOf("Sonali: message her on WhatsApp"), f.runner.state.value.remembered.map { it.text })
+        val saved = f.tasks.recent().first().single()
+        assertEquals(0.001 + 0.0003, saved.costUsd!!, 1e-9, "the reflection's cost counts toward the task")
+        assertEquals(1, f.memory.all().first { it.subject == "home" }.uses, "what it was shown is recorded")
+    }
+
+    @Test
+    fun undoTakesBackWhatATaskTaught() = runTest {
+        val f = Fixture(this, AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent.")), withMemory = true)
+        f.runner.runTask("Message Sonali", quick)
+        testScheduler.advanceUntilIdle()
+        val item = f.runner.state.value.remembered.single()
+        f.runner.undoRemembered(item.id)
+        assertTrue(f.runner.state.value.remembered.isEmpty())
+        assertTrue(f.memory.all().isEmpty())
+    }
+
+    @Test
+    fun aPrivateTaskNeitherUsesNorAddsToMemory() = runTest {
+        val model = AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent."))
+        val f = Fixture(this, model, withMemory = true)
+        f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
+        f.runner.runTask("Message Sonali", quick, private = true)
+        testScheduler.advanceUntilIdle()
+        assertFalse("Indiranagar" in model.agentPrompts.single())
+        assertEquals(0, model.reflections)
+        assertEquals(1, f.memory.all().size)
+    }
+
+    @Test
+    fun withLearningOffNothingNewIsSavedButMemoryIsStillUsed() = runTest {
+        val model = AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent."))
+        val f = Fixture(this, model, withMemory = true)
+        f.settings.update { it.copy(learnFromTasks = false) }
+        f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
+        f.runner.runTask("Message Sonali", quick)
+        testScheduler.advanceUntilIdle()
+        assertTrue("Indiranagar" in model.agentPrompts.single())
+        assertEquals(0, model.reflections)
+    }
+
+    @Test
+    fun recentTasksAreShownToTheNextOne() = runTest {
+        val model = AgentAndCritic(
+            call("done", "evidence" to "x", "summary" to "Dark mode is off."),
+            call("done", "evidence" to "x", "summary" to "Dark mode is on."),
+        )
+        val f = Fixture(this, model, withMemory = true)
+        f.runner.runTask("turn off dark mode", quick)
+        testScheduler.advanceUntilIdle()
+        f.runner.runTask("turn it back on", quick)
+        assertTrue("today: turn off dark mode → Dark mode is off." in model.agentPrompts.last(), model.agentPrompts.last())
     }
 }

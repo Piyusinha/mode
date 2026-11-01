@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.tasks.domain
 
+import com.piyush.mode.feature.memory.domain.MemoryItem
 import com.piyush.mode.agent.AgentResult
 import com.piyush.mode.agent.StepRecord
 import kotlinx.coroutines.CompletableDeferred
@@ -27,4 +28,6 @@ public data class TaskState(
     val taskId: String? = null,
     /** The conversation it belongs to; null for comparison runs. */
     val conversationId: String? = null,
+    /** Facts about the user this task taught Mode, for "Remembered · Undo". Arrives a moment after the task ends. */
+    val remembered: List<MemoryItem> = emptyList(),
 )

@@ -20,6 +20,7 @@ import com.piyush.mode.feature.runs.domain.describeResult
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.conversations.domain.TurnRole
+import com.piyush.mode.feature.tasks.data.TaskMemory
 import com.piyush.mode.feature.tasks.data.TaskRepository
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
 import com.piyush.mode.feature.tasks.domain.TaskSource
@@ -58,6 +59,8 @@ public class TaskRunner(
     private val appInfo: AppInfo,
     private val activity: ActivityTracker,
     private val scope: CoroutineScope,
+    /** What Mode remembers; null runs every task without memory. */
+    private val memory: TaskMemory? = null,
     /** Midnight today, for the daily spend cap. */
     private val startOfToday: () -> Long = ::startOfTodayMillis,
 ) {
@@ -72,10 +75,17 @@ public class TaskRunner(
         config: AgentConfig = settings.agentConfig(),
         conversationId: String? = null,
         source: TaskSource = TaskSource.App,
+        private: Boolean = false,
         onFinished: (AgentResult?) -> Unit = {},
     ) {
         if (state.value.running || task.isBlank()) return
-        job = scope.launch { onFinished(runTask(task, config, conversationId = conversationId, source = source)) }
+        job = scope.launch { onFinished(runTask(task, config, conversationId = conversationId, source = source, private = private)) }
+    }
+
+    /** Takes back something a task taught Mode, from the "Remembered · Undo" chip. */
+    public fun undoRemembered(itemId: String) {
+        memory?.undo(itemId)
+        mutableState.update { s -> s.copy(remembered = s.remembered.filter { it.id != itemId }) }
     }
 
     /** Stops the running task; a pending question counts as stopped. */
@@ -94,7 +104,8 @@ public class TaskRunner(
      * Runs one task to the end; null if it could not start or failed.
      * Disconnects after, unless [stayConnected] (more tasks follow at once).
      * A new conversation is started unless [conversationId] is given; runs
-     * with a [tag] (model comparisons) get none.
+     * with a [tag] (model comparisons) get none. A [private] task neither
+     * uses nor adds to memory; neither do comparison runs.
      */
     public suspend fun runTask(
         task: String,
@@ -103,7 +114,8 @@ public class TaskRunner(
         stayConnected: Boolean = false,
         conversationId: String? = null,
         source: TaskSource = TaskSource.App,
-    ): AgentResult? = activity.track { run(task, config, tag, stayConnected, conversationId, source) }
+        private: Boolean = false,
+    ): AgentResult? = activity.track { run(task, config, tag, stayConnected, conversationId, source, private) }
 
     private suspend fun run(
         task: String,
@@ -112,6 +124,7 @@ public class TaskRunner(
         stayConnected: Boolean,
         conversationId: String?,
         source: TaskSource,
+        private: Boolean,
     ): AgentResult? {
         // A follow-up sees how the earlier tasks in its conversation went (read before this task's own turn).
         val earlier = conversationId?.let(::earlierTurns).orEmpty()
@@ -151,6 +164,9 @@ public class TaskRunner(
                 recorder.failedToStart(task, "could not connect: ${e.message}")
                 throw e
             }
+            val useMemory = !private && tag == null
+            val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier)
+            val prepared = memory?.prepare(task, base, useMemory, saved.id)
             val agent = Agent(
                 phone = phone,
                 llm = llm,
@@ -159,11 +175,12 @@ public class TaskRunner(
                 onStep = { step -> mutableState.update { it.copy(steps = it.steps + step) } },
                 onStatus = ::status,
                 trace = recorder,
+                memory = prepared?.agentMemory,
             )
             // Started from Mode's own screen; the agent goes straight to the app it needs.
-            val context = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier)
-            val finished = background.run { agent.run(task, startsInMode = true, context = context) }
+            val finished = background.run { agent.run(task, startsInMode = true, context = prepared?.context ?: base) }
             result = finished
+            if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget.model)
             outcome = statusOf(finished.outcome)
             reply = replyFor(finished.outcome)
             val line = describeResult(finished)
@@ -203,6 +220,35 @@ public class TaskRunner(
         val left = cap - tasks.spentSince(startOfToday())
         if (left <= 0.0) return null
         return config.copy(maxCostUsd = minOf(config.maxCostUsd ?: left, left))
+    }
+
+    /**
+     * After a task: record how it went with what it was shown, and, when
+     * learning is on, reflect on it in the background (the user already has
+     * the answer, so this never slows a task down).
+     */
+    private fun learnFrom(taskId: String, task: String, result: AgentResult, usedIds: List<String>, model: String) {
+        val memory = memory ?: return
+        memory.recordUse(result, usedIds)
+        val settings = settings.settings.value
+        if (!settings.learnFromTasks) return
+        scope.launch {
+            try {
+                val reflection = memory.learn(taskId, task, result, settings.reflectionModel ?: model)
+                AppLog.log(
+                    "memory",
+                    "task $taskId: saved ${reflection.saved.size}, refused ${reflection.refused.size}" +
+                        (reflection.failureType?.let { ", failure $it: ${reflection.rootCause}" } ?: ""),
+                )
+                if (reflection.remembered.isNotEmpty()) {
+                    mutableState.update { s -> if (s.taskId == taskId) s.copy(remembered = reflection.remembered) else s }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLog.error("memory", "could not learn from task $taskId", e)
+            }
+        }
     }
 
     /** Each earlier task in the conversation with Mode's reply to it. */
