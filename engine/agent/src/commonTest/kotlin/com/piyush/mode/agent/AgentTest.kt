@@ -63,8 +63,27 @@ class AgentTest {
         val model = ScriptedModel(call("done", "evidence" to "on screen", "summary" to "x"))
         Agent(phone, model, Gate(), noSettle).run("task")
         // 99 pt × 500/402 ≈ 123 px, 783 pt × 1000/874 ≈ 896 px
-        assertTrue("\"General\" at (123, 896)" in model.lastUserText, model.lastUserText)
+        assertTrue("[1] \"General\" (123, 896)" in model.lastUserText, model.lastUserText)
         assertTrue("TASK: task" in model.lastUserText)
+    }
+
+    @Test
+    fun aTapByIdLandsOnThatTextsCentre() = runTest {
+        val phone = FakePhone(listOf(listOf("Recent" to (60.0 to 250.0), "Bellandur" to (100.0 to 300.0)), listOf("Ride options" to (100.0 to 300.0))))
+        val model = ScriptedModel(call("tap", "id" to 2, "reason" to "Picking the recent destination"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("ride to Bellandur")
+        val tap = phone.actions.single() as Op.Tap
+        assertEquals(100.0, tap.x, 0.5)
+        assertEquals(300.0, tap.y, 0.5)
+    }
+
+    @Test
+    fun anIdThatIsNotOnTheScreenIsRefused() = runTest {
+        val phone = FakePhone(List(3) { listOf("Bellandur" to (100.0 to 300.0)) })
+        val model = ScriptedModel(call("tap", "id" to 9, "reason" to "Picking it"), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("ride to Bellandur")
+        assertTrue(phone.actions.isEmpty())
+        assertTrue("there is no [9] on this screen" in model.lastUserText, model.lastUserText)
     }
 
     @Test
@@ -153,7 +172,9 @@ class AgentTest {
     fun schemaListsRequiredArguments() {
         val tap = AgentTools.schema(AgentTools.ALL.filter { it.name == "tap" }).single().jsonObject
             .getValue("function").jsonObject.getValue("parameters").jsonObject
-        assertEquals(listOf("x", "y", "reason"), tap.getValue("required").jsonArray.map { it.jsonPrimitive.content })
+        // A tap takes an id or x and y, so only the reason is required.
+        assertEquals(listOf("reason"), tap.getValue("required").jsonArray.map { it.jsonPrimitive.content })
+        assertEquals(setOf("id", "x", "y", "reason"), tap.getValue("properties").jsonObject.keys.intersect(setOf("id", "x", "y", "reason")))
     }
 
     @Test
@@ -632,7 +653,7 @@ class AgentTest {
         val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
         Agent(phone, model, Gate(), noSettle).run("search sushi")
         assertTrue("KEYBOARD IS UP" in model.lastUserText, model.lastUserText)
-        assertTrue("\"Q\" at" !in model.lastUserText, "keys are not listed as text")
+        assertTrue("\"Q\" (" !in model.lastUserText, "keys are not listed as text")
         assertTrue("Try 'Pizza'" in model.lastUserText)
     }
 

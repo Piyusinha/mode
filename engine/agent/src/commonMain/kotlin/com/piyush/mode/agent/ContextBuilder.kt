@@ -33,8 +33,8 @@ object ContextBuilder {
         val jpeg: ByteArray,
         val imageWidth: Int,
         val imageHeight: Int,
-        /** Text with its centre in screenshot pixels. */
-        val texts: List<Triple<String, Int, Int>>,
+        /** The screen's text, numbered and grouped into rows and cards (centres in screenshot pixels). */
+        val layout: ScreenLayout,
         /** The keyboard is up: a field is focused (its keys are left out of [texts]). */
         val keyboardUp: Boolean = false,
     )
@@ -168,9 +168,9 @@ object ContextBuilder {
             append("(Its keys are left out of the text below.)\n")
         }
         append("THE SCREEN NOW: the screenshot is ${s.imageWidth}×${s.imageHeight} pixels. ")
-        append("Text on it, with each piece's centre in screenshot pixels:\n")
-        if (s.texts.isEmpty()) append("(no text found)\n")
-        s.texts.take(MAX_TEXTS).forEach { (text, x, y) -> append("\"").append(text).append("\" at (").append(x).append(", ").append(y).append(")\n") }
+        append("Its text, top to bottom: one line per row, a blank line between groups (an item with its details), ")
+        append("\"(ad)\" before an ad; each piece as [id] \"text\" (centre x, y in pixels). Tap text by its id.\n")
+        if (s.layout.elements.isEmpty()) append("(no text found)\n") else append(s.layout.render(MAX_TEXTS))
         append("\nChoose the next single action.")
     }
 

@@ -335,7 +335,7 @@ class Agent(
                     done = ledger.lines(),
                     seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
                     screen = ContextBuilder.Screen(
-                        screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.visibleTexts, keyboardUp = screen.keyboardUp,
+                        screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.layout, keyboardUp = screen.keyboardUp,
                     ),
                     hideScreen = inMode,
                 ),
@@ -348,7 +348,8 @@ class Agent(
             val model = answer.model
             cost += reply.usage.costUsd
             if (stepUp && model == config.strongModel) lastStrongCost = reply.usage.costUsd
-            val call = reply.toolCall
+            // An element's id becomes its centre here, so everything after sees a point.
+            val call = reply.toolCall?.let { AgentTools.withElement(it, screen.layout) }
             var actionStarted = clock.markNow()
             lastWasPhoneAction = false
 
@@ -682,9 +683,12 @@ class Agent(
     private class Screen(
         val jpeg: ByteArray,
         val geometry: AgentTools.Geometry,
-        /** Text with its centre in screenshot pixels. */
-        val texts: List<Triple<String, Int, Int>>,
+        /** Text with its centre and size in screenshot pixels. */
+        val boxes: List<ScreenLayout.Box>,
     ) {
+        /** Text with its centre in screenshot pixels. */
+        val texts: List<Triple<String, Int, Int>> = boxes.map { Triple(it.text, it.x, it.y) }
+
         /**
          * Text and rough position: a scroll changes it even when the words do not. The status
          * bar is left out: its clock, and the Live Activity's timer on the Dynamic Island, change
@@ -700,6 +704,12 @@ class Agent(
         /** What the model is shown: the page's text, without the keyboard's keys. */
         val visibleTexts: List<Triple<String, Int, Int>> = keyboardTop?.let { top -> texts.filter { it.third < top } } ?: texts
 
+        /** What the model reads: the page's text without the status bar or the keyboard, numbered and grouped. */
+        val layout: ScreenLayout = ScreenLayout.of(
+            boxes.filter { b -> b.y > geometry.toPixelsY(STATUS_BAR_PT) && keyboardTop.let { it == null || b.y < it } },
+            lineHeight = geometry.toPixelsY(LINE_PT).roundToInt(),
+        )
+
         /** The page's words, without the status bar or the keyboard: to tell one page from another. */
         fun pageTexts(): List<String> = visibleTexts.filter { it.third > geometry.toPixelsY(STATUS_BAR_PT) }.map { it.first }
     }
@@ -713,8 +723,7 @@ class Agent(
             px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int,
             bounds.getValue("w").jsonPrimitive.double, bounds.getValue("h").jsonPrimitive.double,
         )
-        val texts = screenTexts(g)
-        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
+        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, screenBoxes(g))
     }
 
     /**
@@ -751,12 +760,18 @@ class Agent(
 
     /** The text on screen now, with centres in screenshot pixels. */
     private suspend fun screenTexts(g: AgentTools.Geometry): List<Triple<String, Int, Int>> =
+        screenBoxes(g).map { Triple(it.text, it.x, it.y) }
+
+    /** The text on screen now, with centres and sizes in screenshot pixels (size 0 when the phone does not say). */
+    private suspend fun screenBoxes(g: AgentTools.Geometry): List<ScreenLayout.Box> =
         (phone.send(Op.ScreenText()) as JsonArray).map {
             val box = it.jsonObject
-            Triple(
+            ScreenLayout.Box(
                 box.getValue("text").jsonPrimitive.contentOrNull.orEmpty(),
                 g.toPixelsX(box.getValue("x").jsonPrimitive.double).roundToInt(),
                 g.toPixelsY(box.getValue("y").jsonPrimitive.double).roundToInt(),
+                box["w"]?.jsonPrimitive?.doubleOrNull?.let { w -> g.toPixelsX(w).roundToInt() } ?: 0,
+                box["h"]?.jsonPrimitive?.doubleOrNull?.let { h -> g.toPixelsY(h).roundToInt() } ?: 0,
             )
         }
 
@@ -835,6 +850,8 @@ class Agent(
             " → same page: the back swipe did nothing here. Tap the page's own ← (top left), X, Cancel or Done instead"
         /** Pages sharing this much of their text are the same page. */
         private const val SAME_PAGE = 0.85
+        /** A line of text, in screen points, when the phone does not give text sizes. */
+        private const val LINE_PT = 20.0
         /** The status bar and Dynamic Island, in screen points from the top. */
         private const val STATUS_BAR_PT = 60.0
         /** What ticks up there: the clock, a timer, the battery percentage, Mode's own "Step 4" on the island. */
@@ -899,8 +916,8 @@ class Agent(
             fresh true.
 
             How to act:
-            - Coordinates are screenshot pixels. To tap a piece of text, use its listed centre. For icons
-              without text, read the position off the screenshot.
+            - Each piece of text on the screen has a number: tap it with its id (exact). For icons without
+              text, give x and y in screenshot pixels, read off the screenshot.
             - Use what is already on screen before searching or typing: a recent, suggested, saved or favourite
               entry that matches (a recent destination or search, a suggested contact or item) is one tap. Type
               only when what you want is not listed.
@@ -918,8 +935,8 @@ class Agent(
             - To see more of a list or page, use scroll (never swipe for scrolling). Keep going one way until
               you find it or the page ends: what you look for is usually just past the last thing you saw. Search fields and
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
-            - To type into a field, use type_text with the field's x and y: Mode taps it only if the keyboard is
-              not already up. Set submit true to press return (to search). When the screen says KEYBOARD IS UP,
+            - To type into a field, use type_text with the field's id (or x and y): Mode taps it only if the
+              keyboard is not already up. Set submit true to press return (to search). When the screen says KEYBOARD IS UP,
               the field is focused: just type_text, never tap the field again.
             - If an action did not change the screen, do not repeat it: try another way.
             - Changing things for the user (adding, logging, saving, sending, booking, buying, deleting) is

@@ -81,11 +81,18 @@ object AgentTools {
         required = false,
     )
 
-    private fun point(axis: String) = Param(axis, "number", "Screenshot pixel $axis of the target's centre.")
+    private fun point(axis: String) = Param(
+        axis, "number", "Screenshot pixel $axis of the target's centre; only for what has no id (an icon without text).", required = false,
+    )
+
+    private val id = Param("id", "integer", "The number [id] of the text to act on, from the screen's text. Exact: prefer it.", required = false)
+
+    /** Tools that act on an element: they take its [id] in place of x and y. */
+    private val BY_ID = setOf("tap", "long_press", "type_text")
 
     val ALL: List<Tool> = listOf(
-        Tool("tap", "Tap a point on the screen.", "input.tap", listOf(point("x"), point("y"), reason)),
-        Tool("long_press", "Press and hold a point (context menus, rearranging).", "input.press", listOf(point("x"), point("y"), reason)),
+        Tool("tap", "Tap a piece of text by its id, or a point (x and y) for an icon without text.", "input.tap", listOf(id, point("x"), point("y"), reason)),
+        Tool("long_press", "Press and hold (context menus, rearranging): an id, or x and y.", "input.press", listOf(id, point("x"), point("y"), reason)),
         Tool(
             "swipe", "Drag a finger from one point to another: sliders, swiping cards, pull to refresh. " +
                 "Not for scrolling lists (use scroll).", "input.drag",
@@ -105,10 +112,11 @@ object AgentTools {
             ),
         ),
         Tool(
-            "type_text", "Type into a text field. Give the field's x and y: Mode taps it first if the keyboard is not up. " +
+            "type_text", "Type into a text field. Give the field's id (or x and y): Mode taps it first if the keyboard is not up. " +
                 "Any language works.", "input.text",
             listOf(
                 Param("text", "string", "The text to type."),
+                Param("id", "integer", "Optional. The field's [id] (its placeholder or label), to focus it.", required = false),
                 Param("x", "number", "Optional. The field's centre, in screenshot pixels, to focus it.", required = false),
                 Param("y", "number", "Optional. The field's centre, in screenshot pixels.", required = false),
                 Param("submit", "boolean", "Optional. true presses return after typing (to search or send).", required = false),
@@ -246,7 +254,21 @@ object AgentTools {
      * The op for a phone tool call, in screen points. Throws [IllegalArgumentException]
      * with a message for the model when an argument is missing or wrong.
      */
+    /** The call with an element's [id] turned into its centre (x and y), as the rest of Mode expects. */
+    fun withElement(call: ToolCall, layout: ScreenLayout): ToolCall {
+        if (call.name !in BY_ID) return call
+        val wanted = call.arguments["id"]?.jsonPrimitive?.contentOrNull?.trim()?.toDoubleOrNull()?.toInt() ?: return call
+        val e = layout.byId(wanted) ?: return call
+        return ToolCall(call.name, JsonObject(call.arguments + mapOf("x" to JsonPrimitive(e.x), "y" to JsonPrimitive(e.y))))
+    }
+
     fun toOp(call: ToolCall, g: Geometry): Op {
+        // An id that was not turned into a point (withElement) is not on this screen.
+        if (call.name in BY_ID && call.arguments["id"] != null && call.arguments["x"] == null) {
+            throw IllegalArgumentException(
+                "there is no [${call.arguments["id"]?.jsonPrimitive?.contentOrNull}] on this screen: use an id from the list, or x and y",
+            )
+        }
         val a = call.arguments
         // Seen on the phone: one model sent "x": [228, 269] (a point) for a tap; read the pair.
         fun pair(name: String): List<Double>? =

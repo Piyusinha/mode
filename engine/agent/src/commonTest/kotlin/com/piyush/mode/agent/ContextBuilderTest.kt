@@ -8,7 +8,9 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ContextBuilderTest {
-    private val screen = ContextBuilder.Screen(byteArrayOf(1), 500, 1000, listOf(Triple("General", 99, 783)))
+    private fun layout(texts: List<Triple<String, Int, Int>>) = ScreenLayout.of(texts.map { ScreenLayout.Box(it.first, it.second, it.third) }, 22)
+    private val generalOnly = listOf(Triple("General", 99, 783))
+    private val screen = ContextBuilder.Screen(byteArrayOf(1), 500, 1000, layout(generalOnly))
 
     private fun input(
         step: Int = 1,
@@ -18,11 +20,11 @@ class ContextBuilderTest {
         plan: String? = null,
         answers: List<Pair<String, String>> = emptyList(),
         hideScreen: Boolean = false,
-        texts: List<Triple<String, Int, Int>> = screen.texts,
+        texts: List<Triple<String, Int, Int>> = generalOnly,
     ) = ContextBuilder.Input(
         systemPrompt = "RULES", task = "turn off dark mode", context = context, step = step, maxSteps = 30,
         answers = answers, plan = plan, notes = notes, history = history, recentSteps = 12, lastApp = null,
-        screen = ContextBuilder.Screen(screen.jpeg, 500, 1000, texts), hideScreen = hideScreen,
+        screen = ContextBuilder.Screen(screen.jpeg, 500, 1000, layout(texts)), hideScreen = hideScreen,
     )
 
     @Test
@@ -37,7 +39,7 @@ class ContextBuilderTest {
         assertIs<Part.Image>(parts[2])
         assertTrue((parts[0] as Part.Text).text.contains("TASK: turn off dark mode"))
         assertTrue((parts[1] as Part.Text).text.startsWith("STEP 1 of at most 30"))
-        assertTrue((parts[1] as Part.Text).text.contains("\"General\" at (99, 783)"))
+        assertTrue((parts[1] as Part.Text).text.contains("[1] \"General\" (99, 783)"))
     }
 
     @Test
