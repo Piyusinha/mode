@@ -9,5 +9,8 @@ kotlin {
             api(projects.engine.ops)
             api(projects.engine.llm)
         }
+        commonTest.dependencies {
+            implementation(projects.testing)
+        }
     }
 }

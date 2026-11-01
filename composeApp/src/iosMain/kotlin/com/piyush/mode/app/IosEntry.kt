@@ -1,5 +1,7 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.storage.FileStore
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.window.ComposeUIViewController
@@ -10,42 +12,47 @@ import com.piyush.mode.ops.PhoneUnavailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
-import platform.Foundation.NSBundle
-import platform.Foundation.NSUserDefaults
-import platform.Foundation.NSNotificationCenter
-import platform.Foundation.NSOperationQueue
-import platform.UIKit.UIApplicationDidEnterBackgroundNotification
-import platform.UIKit.UIApplicationWillTerminateNotification
 import com.piyush.mode.coredevice.LoopbackVpn
+import com.piyush.mode.core.common.systemLog
 import com.piyush.mode.core.network.darwinHttpClient
-import platform.UIKit.UIApplication
-import platform.UIKit.UIBackgroundTaskInvalid
+import com.piyush.mode.core.platform.IosAppInfo
+import com.piyush.mode.core.platform.IosAppLifecycle
+import com.piyush.mode.core.platform.IosBackgroundWork
+import com.piyush.mode.core.platform.IosNotifier
+import com.piyush.mode.core.storage.DocumentsFileStore
+import com.piyush.mode.core.storage.KeychainSecretStore
+import com.piyush.mode.core.storage.UserDefaultsStore
 import platform.UIKit.UIViewController
 
 /** The root view controller Swift hosts in its window. */
 fun MainViewController(): UIViewController {
-    AppLog.install(IosLogStore::event)
+    AppLog.install { line ->
+        IosServices.logs.append("events.log", line + "\n")
+        systemLog(line)
+    }
     AppLog.log("app", "Mode started (${if (LoopbackVpn.builtIn) "paid build, own VPN" else "free build, LocalDevVPN"})")
     return ComposeUIViewController { App(IosPhoneLink, IosServices) }
 }
 
 private object IosServices : AppServices {
-    private val defaults = NSUserDefaults.standardUserDefaults
+    private val secrets = KeychainSecretStore()
+    private val prefs = UserDefaultsStore()
+    private val notifier = IosNotifier()
 
-    override fun secret(name: String): String? = Keychain.get(name)
-    override fun setSecret(name: String, value: String?) = Keychain.set(name, value)
-    override fun pref(name: String): String? = defaults.stringForKey(name)
-    override fun setPref(name: String, value: String) = defaults.setObject(value, forKey = name)
-    override fun notify(title: String, body: String) = Notifier.post(title, body)
-    override fun requestNotifications() = Notifier.requestPermission()
+    override fun secret(name: String): String? = secrets.get(name)
+    override fun setSecret(name: String, value: String?) = secrets.set(name, value)
+    override fun pref(name: String): String? = prefs.getString(name)
+    override fun setPref(name: String, value: String) = prefs.putString(name, value)
+    override fun notify(title: String, body: String) = notifier.post(title, body)
+    override fun requestNotifications() = notifier.requestPermission()
     override val http by lazy { darwinHttpClient() }
-    override val logs: LogStore = IosLogStore
+    override val logs: FileStore = DocumentsFileStore("logs")
 }
 
 private object IosPhoneLink : PhoneLink {
     private val connector = PhoneConnector()
 
-    override val ownBundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode"
+    override val ownBundleId: String = IosAppInfo().bundleId
 
     override suspend fun connect(): PhoneConnection {
         val pairing = PairingFile.load() ?: throw PhoneUnavailable(
@@ -63,23 +70,10 @@ private object IosPhoneLink : PhoneLink {
         )
     }
 
-    override suspend fun <T> inBackground(work: suspend () -> T): T {
-        // Silent mixable audio keeps Mode running for as long as the work
-        // takes; the background task is a second, shorter safety net.
-        withContext(Dispatchers.Main) { KeepAwake.start() }
-        val app = UIApplication.sharedApplication
-        var task = UIBackgroundTaskInvalid
-        task = app.beginBackgroundTaskWithName("mode.drive") {
-            app.endBackgroundTask(task)
-            task = UIBackgroundTaskInvalid
-        }
-        try {
-            return work()
-        } finally {
-            if (task != UIBackgroundTaskInvalid) app.endBackgroundTask(task)
-            withContext(Dispatchers.Main) { KeepAwake.stop() }
-        }
-    }
+    private val background = IosBackgroundWork()
+    private val lifecycle = IosAppLifecycle()
+
+    override suspend fun <T> inBackground(work: suspend () -> T): T = background.run(work)
 
     override fun decodeImage(bytes: ByteArray): ImageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
 
@@ -88,15 +82,7 @@ private object IosPhoneLink : PhoneLink {
         AppLog.log("vpn", "Mode's VPN stopped")
     }
 
-    override fun onAppTerminate(action: () -> Unit) {
-        NSNotificationCenter.defaultCenter.addObserverForName(
-            UIApplicationWillTerminateNotification, null, NSOperationQueue.mainQueue,
-        ) { _ -> action() }
-    }
+    override fun onAppTerminate(action: () -> Unit) = lifecycle.onTerminate(action)
 
-    override fun onAppBackground(action: () -> Unit) {
-        NSNotificationCenter.defaultCenter.addObserverForName(
-            UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue,
-        ) { _ -> action() }
-    }
+    override fun onAppBackground(action: () -> Unit) = lifecycle.onBackground(action)
 }

@@ -1,5 +1,8 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.common.nowId
+import com.piyush.mode.core.storage.FileStore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -170,7 +173,7 @@ class CompareRow(val model: String, val task: String, val outcome: String, val s
  * Runs each task the user wrote with each model, from the Home Screen, and
  * tabulates success, steps, time and cost. The tasks come from the user.
  */
-class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHolder, private val logs: LogStore) {
+class CompareRunner(private val runner: AgentRunner, private val holder: PhoneHolder, private val logs: FileStore) {
     val rows = mutableStateListOf<CompareRow>()
     var running by mutableStateOf(false)
         private set

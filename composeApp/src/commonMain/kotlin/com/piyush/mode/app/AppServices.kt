@@ -1,5 +1,7 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.storage.FileStore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -27,7 +29,7 @@ interface AppServices {
     val http: HttpClient
 
     /** Debug logs: runs, steps, screenshots, app events. */
-    val logs: LogStore
+    val logs: FileStore
 }
 
 /** The user's agent settings. */

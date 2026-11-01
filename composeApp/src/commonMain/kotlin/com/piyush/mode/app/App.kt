@@ -1,5 +1,6 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.common.AppLog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

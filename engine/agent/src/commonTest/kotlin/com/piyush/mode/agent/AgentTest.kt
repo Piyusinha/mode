@@ -9,7 +9,9 @@ import com.piyush.mode.llm.LlmFailed
 import com.piyush.mode.llm.OpenRouterClient
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
-import com.piyush.mode.ops.wireName
+import com.piyush.mode.testing.FakePhone
+import com.piyush.mode.testing.ScriptedModel
+import com.piyush.mode.testing.call
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -26,65 +28,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-
-/** A 402×874-point phone whose screen is 500×1000 in screenshots, with scripted text per screen. */
-private class FakePhone(
-    var screens: List<List<Pair<String, Pair<Double, Double>>>>,
-    private val supported: Set<String> = setOf(
-        "screen.capture", "screen.text", "input.tap", "input.scroll", "input.text", "input.keys", "nav.home", "apps.launch",
-        "input.drag",
-    ),
-) : PhoneBackend {
-    val actions = mutableListOf<Op>()
-    /** Base64 frames handed out by successive captures; the last one repeats. */
-    var frames: MutableList<String> = mutableListOf("AAAA")
-    var captures = 0
-    private var screen = 0
-    override val name = "fake"
-    override suspend fun ops() = supported
-
-    override suspend fun send(op: Op): JsonElement = when (op) {
-        is Op.ScreenCapture -> buildJsonObject {
-            captures++
-            put("jpeg_b64", if (frames.size > 1) frames.removeAt(0) else frames.first())
-            put("bounds", buildJsonObject { put("x", 0); put("y", 0); put("w", 402.0); put("h", 874.0); put("id", 0) })
-            put("img_px", buildJsonObject { put("w", 500); put("h", 1000) })
-        }
-        is Op.ScreenText -> buildJsonArray {
-            for ((text, at) in screens[screen.coerceAtMost(screens.lastIndex)]) add(
-                buildJsonObject { put("text", text); put("x", at.first); put("y", at.second); put("confidence", 1.0) },
-            )
-        }
-        else -> {
-            require(op.wireName in supported)
-            actions += op
-            screen++
-            if (op is Op.LaunchApp) JsonPrimitive("bundle.${op.name}") else JsonNull
-        }
-    }
-}
-
-private fun call(name: String, vararg args: Pair<String, Any>) = ToolCall(
-    name,
-    JsonObject(args.associate { (k, v) -> k to (if (v is Number) JsonPrimitive(v) else if (v is Boolean) JsonPrimitive(v) else JsonPrimitive(v.toString())) }),
-)
-
-/** Answers each step with the next scripted call and records which model was asked. */
-private class ScriptedModel(vararg replies: ToolCall?) : LlmClient {
-    private val script = replies.toList()
-    private var next = 0
-    val models = mutableListOf<String>()
-    var lastTools: JsonArray? = null
-    var lastUserText = ""
-    override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
-        models += model
-        lastTools = tools
-        lastUserText = messages.last().text
-        val reply = if (next < script.size) script[next] else call("done", "summary" to "out of script")
-        next++
-        return ChatResult(reply, "", Usage(100, 10, 0.001))
-    }
-}
 
 private class Gate(val allow: Boolean = true, val answer: String? = "yes") : UserGate {
     val asked = mutableListOf<String>()

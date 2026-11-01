@@ -1,5 +1,9 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.common.AppLog
+import com.piyush.mode.core.common.nowId
+import com.piyush.mode.core.common.nowIso
+import com.piyush.mode.core.storage.FileStore
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
@@ -14,55 +18,13 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-
-/**
- * Files under Mode's Documents/logs (visible in the Files app and Finder, and
- * pulled to a Mac with `devicectl device copy from`). Paths are relative.
- */
-interface LogStore {
-    fun append(path: String, text: String)
-    fun write(path: String, bytes: ByteArray)
-    fun read(path: String): ByteArray?
-    /** Names directly inside [dir], or empty. */
-    fun list(dir: String): List<String>
-    fun delete(path: String)
-}
-
-@OptIn(ExperimentalTime::class)
-internal fun nowIso(): String = Clock.System.now().toString()
-
-/** A sortable, file-name-safe timestamp, like 2026-10-31T23-40-12. */
-@OptIn(ExperimentalTime::class)
-internal fun nowId(): String = Clock.System.now().toString().substring(0, 19).replace(':', '-')
-
-/**
- * The app-wide event timeline: connecting, the VPN, disk-image mounts,
- * reconnects, keep-awake, questions, errors. Goes to logs/events.log and to
- * the system log (so a Mac can watch it live).
- */
-object AppLog {
-    private var sink: ((String) -> Unit)? = null
-
-    fun install(sink: (String) -> Unit) {
-        this.sink = sink
-    }
-
-    fun log(tag: String, message: String) {
-        sink?.invoke("${nowIso()} [$tag] $message")
-    }
-
-    fun error(tag: String, message: String, e: Throwable? = null) =
-        log(tag, "ERROR $message" + (e?.let { ": ${it.message ?: it}" } ?: ""))
-}
 
 /**
  * Writes one agent run to logs/runs/<id>/: run.json (task, settings,
  * outcome, totals), steps.jsonl (one line per event: look, ask, answer, act)
  * and step-N.jpg (what the model saw).
  */
-class RunRecorder(private val store: LogStore, val id: String = nowId(), private val tag: String? = null) : AgentTrace {
+class RunRecorder(private val store: FileStore, val id: String = nowId(), private val tag: String? = null) : AgentTrace {
     val dir = "runs/$id"
     private var task = ""
     private var config: AgentConfig? = null
@@ -178,17 +140,17 @@ class RunRecorder(private val store: LogStore, val id: String = nowId(), private
         private val json = Json { ignoreUnknownKeys = true }
 
         /** Run summaries, newest first. */
-        fun runs(store: LogStore): List<JsonObject> = store.list("runs").sortedDescending().mapNotNull { id ->
+        fun runs(store: FileStore): List<JsonObject> = store.list("runs").sortedDescending().mapNotNull { id ->
             store.read("runs/$id/run.json")?.decodeToString()?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
         }
 
         /** The events of one run, in order. */
-        fun events(store: LogStore, id: String): List<JsonObject> =
+        fun events(store: FileStore, id: String): List<JsonObject> =
             store.read("runs/$id/steps.jsonl")?.decodeToString()?.lines()?.filter { it.isNotBlank() }
                 ?.mapNotNull { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }.orEmpty()
 
         /** Keeps the newest [keep] runs. */
-        fun prune(store: LogStore, keep: Int = 60) {
+        fun prune(store: FileStore, keep: Int = 60) {
             store.list("runs").sortedDescending().drop(keep).forEach { store.delete("runs/$it") }
         }
     }

@@ -1,5 +1,6 @@
 package com.piyush.mode.app
 
+import com.piyush.mode.core.storage.FileStore
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +37,7 @@ import kotlin.math.roundToInt
 
 /** Past runs step by step (screenshots, model answers, timings) and the app event log. */
 @Composable
-fun LogsScreen(store: LogStore, link: PhoneLink) {
+fun LogsScreen(store: FileStore, link: PhoneLink) {
     var refresh by remember { mutableIntStateOf(0) }
     var openRun by remember { mutableStateOf<String?>(null) }
     var showEvents by remember { mutableStateOf(false) }
@@ -92,7 +93,7 @@ fun LogsScreen(store: LogStore, link: PhoneLink) {
 }
 
 @Composable
-private fun RunDetail(store: LogStore, link: PhoneLink, id: String, back: () -> Unit) {
+private fun RunDetail(store: FileStore, link: PhoneLink, id: String, back: () -> Unit) {
     TextButton(onClick = back) { Text("← Runs") }
     val events = remember(id) { RunRecorder.events(store, id) }
     val run = remember(id) { RunRecorder.runs(store).firstOrNull { it.str("id") == id } }

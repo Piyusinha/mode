@@ -1,4 +1,4 @@
-package com.piyush.mode.app
+package com.piyush.mode.core.platform
 
 import platform.Foundation.NSUUID
 import platform.UIKit.UIApplication
@@ -10,15 +10,14 @@ import platform.UserNotifications.UNNotificationRequest
 import platform.UserNotifications.UNNotificationSound
 import platform.UserNotifications.UNUserNotificationCenter
 
-/** Local notifications: a task finished, or the agent needs the user. Main thread. */
-object Notifier {
-    fun requestPermission() {
+/** Local notifications through UNUserNotificationCenter. Main thread. */
+public class IosNotifier : Notifier {
+    override fun requestPermission() {
         UNUserNotificationCenter.currentNotificationCenter()
             .requestAuthorizationWithOptions(UNAuthorizationOptionAlert or UNAuthorizationOptionSound) { _, _ -> }
     }
 
-    /** Shown only when Mode is not on screen; in front, the app itself shows it. */
-    fun post(title: String, body: String) {
+    override fun post(title: String, body: String) {
         if (UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) return
         val content = UNMutableNotificationContent().apply {
             setTitle(title)

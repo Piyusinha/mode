@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 
-package com.piyush.mode.app
+package com.piyush.mode.core.storage
 
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -21,13 +21,12 @@ import platform.Foundation.seekToEndOfFile
 import platform.Foundation.writeData
 import platform.Foundation.writeToFile
 import platform.posix.memcpy
-import platform.Foundation.NSLog
 
-/** [LogStore] in Mode's Documents/logs: shared with the Files app and Finder. */
-object IosLogStore : LogStore {
-    val root: String by lazy {
+/** A [FileStore] under Documents/[folder]: shared with the Files app and Finder. */
+public class DocumentsFileStore(folder: String) : FileStore {
+    public val root: String by lazy {
         val docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true).first() as String
-        "$docs/logs"
+        "$docs/$folder"
     }
     private val files = NSFileManager.defaultManager
 
@@ -63,13 +62,6 @@ object IosLogStore : LogStore {
         files.removeItemAtPath(full(path), null)
     }
 
-    /** The app-event sink: logs/events.log plus the system log, so a Mac can watch it live. */
-    fun event(line: String) {
-        append("events.log", line + "\n")
-        // One preformatted string: Kotlin strings cannot go through NSLog's
-        // varargs (%@ crashed at launch), and a literal % must not be read as a format.
-        NSLog(("Mode " + line).replace("%", "%%"))
-    }
 
     private fun full(path: String) = if (path.isEmpty()) root else "$root/$path"
 

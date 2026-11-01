@@ -30,9 +30,14 @@ dependencyResolutionManagement {
 }
 
 // Layers, lowest first: core → engine → feature → app (see docs/architecture.md).
+include(":core:common")
+include(":core:storage")
+include(":core:platform")
 include(":core:network")
 include(":engine:ops")
 include(":engine:llm")
 include(":engine:agent")
 include(":engine:phone-ios")
+// Test fakes shared by every module (test source sets only).
+include(":testing")
 include(":composeApp")

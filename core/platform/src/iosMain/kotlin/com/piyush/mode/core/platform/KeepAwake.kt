@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 
-package com.piyush.mode.app
+package com.piyush.mode.core.platform
+
+import com.piyush.mode.core.common.AppLog
 
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -32,7 +34,7 @@ import platform.darwin.NSObjectProtocol
  * a call or another app's exclusive audio interrupts it, and it restarts
  * when the interruption ends. Main thread only.
  */
-object KeepAwake {
+internal object KeepAwake {
     private var holders = 0
     private var player: AVAudioPlayer? = null
     private var interruptions: NSObjectProtocol? = null

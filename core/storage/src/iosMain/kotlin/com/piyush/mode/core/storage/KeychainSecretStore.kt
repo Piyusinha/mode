@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
-package com.piyush.mode.app
+package com.piyush.mode.core.storage
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -43,10 +43,10 @@ import platform.Security.kSecValueData
  * Secrets (the model API key) in the iOS Keychain: encrypted, this device
  * only, readable after the first unlock so background runs can use them.
  */
-object Keychain {
-    private const val SERVICE = "com.piyush.mode"
+public class KeychainSecretStore(private val service: String = "com.piyush.mode") : SecretStore {
 
-    fun get(account: String): String? = memScoped {
+    override fun get(name: String): String? = memScoped {
+        val account = name
         val query = base(account)
         CFDictionaryAddValue(query, kSecReturnData, kCFBooleanTrue)
         CFDictionaryAddValue(query, kSecMatchLimit, kSecMatchLimitOne)
@@ -58,8 +58,8 @@ object Keychain {
         NSString.create(data = data, encoding = NSUTF8StringEncoding)?.toString()
     }
 
-    /** Stores [value], or removes the entry when it is null or blank. */
-    fun set(account: String, value: String?) {
+    override fun set(name: String, value: String?) {
+        val account = name
         val delete = base(account)
         SecItemDelete(delete)
         CFRelease(delete)
@@ -75,7 +75,7 @@ object Keychain {
     private fun base(account: String): CFMutableDictionaryRef? {
         val dict = CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
         CFDictionaryAddValue(dict, kSecClass, kSecClassGenericPassword)
-        CFDictionaryAddValue(dict, kSecAttrService, CFStringCreateWithCString(null, SERVICE, kCFStringEncodingUTF8))
+        CFDictionaryAddValue(dict, kSecAttrService, CFStringCreateWithCString(null, service, kCFStringEncodingUTF8))
         CFDictionaryAddValue(dict, kSecAttrAccount, CFStringCreateWithCString(null, account, kCFStringEncodingUTF8))
         return dict
     }
