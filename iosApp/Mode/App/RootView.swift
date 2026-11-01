@@ -7,8 +7,7 @@ struct RootView: View {
 
     var body: some View {
         if app.needsOnboarding {
-            // Replaced by the setup flow in a later step; until then, go straight in.
-            MainTabs(app: app).task { app.onboardingFinished() }
+            OnboardingRoute(app: app)
         } else {
             MainTabs(app: app)
         }

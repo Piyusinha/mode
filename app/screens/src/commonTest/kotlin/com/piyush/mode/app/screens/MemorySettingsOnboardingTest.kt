@@ -104,4 +104,17 @@ class MemorySettingsOnboardingTest {
         assertTrue(f.settings.settings.value.onboardingDone)
         assertEquals(OnboardingStep.Finished, p.state.value.step)
     }
+
+    @Test
+    fun aKeyAlreadySavedNeedNotBeTypedAgain() = runTest {
+        val f = Fixture(this)
+        val p = onboarding(f)
+        p.next()
+        p.setName("Piyush")
+        p.next()
+        assertEquals(OnboardingStep.Key, p.state.value.step)
+        assertTrue(p.state.value.canContinue, "the saved key is kept")
+        p.next()
+        assertEquals("sk-or-test", f.settings.apiKey)
+    }
 }

@@ -225,6 +225,35 @@ enum L10n {
         }
     }
 
+    enum Setup {
+        static let welcomeTitle = LocalizedStringResource("setup.welcome.title", defaultValue: "Your iPhone, done for you")
+        static let welcomeMessage = LocalizedStringResource("setup.welcome.message", defaultValue: "Tell Mode what you want and it uses your apps to do it, right here on your iPhone. Setup takes about two minutes.")
+        static let getStarted = LocalizedStringResource("setup.getStarted", defaultValue: "Get Started")
+        static let nameTitle = LocalizedStringResource("setup.name.title", defaultValue: "What should Mode call you?")
+        static let nameMessage = LocalizedStringResource("setup.name.message", defaultValue: "Used in greetings and when Mode signs a message for you.")
+        static let keyTitle = LocalizedStringResource("setup.key.title", defaultValue: "Your AI key")
+        static let keyMessage = LocalizedStringResource("setup.key.message", defaultValue: "Mode thinks with a model you choose on OpenRouter, and you pay it directly: usually under a cent a task. The key stays in this iPhone's Keychain.")
+        static let getKey = LocalizedStringResource("setup.key.get", defaultValue: "Get a key at openrouter.ai")
+        static let keyLooksWrong = LocalizedStringResource("setup.key.looksWrong", defaultValue: "OpenRouter keys start with sk-or-")
+        static let modelTitle = LocalizedStringResource("setup.model.title", defaultValue: "Pick a model")
+        static let modelMessage = LocalizedStringResource("setup.model.message", defaultValue: "You can change it any time in Settings.")
+        static let permissionsTitle = LocalizedStringResource("setup.permissions.title", defaultValue: "Let Mode see and tap")
+        static let permissionsMessage = LocalizedStringResource("setup.permissions.message", defaultValue: "iOS will ask to add a VPN. It never leaves your iPhone: Mode uses it to reach the phone's own developer services, so it can see the screen and tap for you.")
+        static let allow = LocalizedStringResource("setup.permissions.allow", defaultValue: "Allow and Connect")
+        static let testTitle = LocalizedStringResource("setup.test.title", defaultValue: "A quick test")
+        static let testMessage = LocalizedStringResource("setup.test.message", defaultValue: "Mode will open Settings, tap Wi-Fi and come back here. Watch it happen.")
+        static let runTest = LocalizedStringResource("setup.test.run", defaultValue: "Run the Test")
+        static let resultTitle = LocalizedStringResource("setup.result.title", defaultValue: "Did it work?")
+        static let resultMessage = LocalizedStringResource("setup.result.message", defaultValue: "Did you see Settings open and Wi-Fi get tapped?")
+        static let itWorked = LocalizedStringResource("setup.result.worked", defaultValue: "Yes, It Worked")
+        static let itDidnt = LocalizedStringResource("setup.result.didnt", defaultValue: "No")
+        static let diagnoseTitle = LocalizedStringResource("setup.diagnose.title", defaultValue: "Let's find the problem")
+        static let diagnoseMessage = LocalizedStringResource("setup.diagnose.message", defaultValue: "Mode checks each part on its own: the VPN, the phone's services, seeing the screen.")
+        static let checkAgain = LocalizedStringResource("setup.diagnose.check", defaultValue: "Check Again")
+        static let continueAnyway = LocalizedStringResource("setup.continueAnyway", defaultValue: "Continue Anyway")
+        static let skip = LocalizedStringResource("setup.skip", defaultValue: "Skip for Now")
+    }
+
     enum Developer {
         static let title = LocalizedStringResource("developer.title", defaultValue: "Developer")
     }

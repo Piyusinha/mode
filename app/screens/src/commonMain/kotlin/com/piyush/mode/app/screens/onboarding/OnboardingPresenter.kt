@@ -21,6 +21,8 @@ public data class OnboardingUiState(
     val key: String = "",
     /** The key looks like an OpenRouter key ("sk-or-…"). */
     val keyLooksRight: Boolean = false,
+    /** A key is already saved; leaving the field empty keeps it. */
+    val hasSavedKey: Boolean = false,
     val models: List<ModelChoice> = emptyList(),
     val selectedModel: String? = null,
     /** Asking iOS for the VPN and reaching the phone's own services. */
@@ -54,7 +56,7 @@ public class OnboardingPresenter(
 
     init {
         val s = settings.settings.value
-        set { it.copy(name = s.userName.orEmpty(), selectedModel = s.model) }
+        set { it.copy(name = s.userName.orEmpty(), selectedModel = s.model, hasSavedKey = s.hasApiKey) }
         scope.launch { catalog.refresh() }
         scope.launch {
             catalog.state.collect { models ->
@@ -80,7 +82,7 @@ public class OnboardingPresenter(
         if (!st.canContinue) return
         when (st.step) {
             OnboardingStep.Name -> settings.update { it.copy(userName = st.name) }
-            OnboardingStep.Key -> settings.apiKey = st.key
+            OnboardingStep.Key -> if (st.key.isNotBlank()) settings.apiKey = st.key
             OnboardingStep.Model -> st.selectedModel?.let { id -> settings.update { it.copy(model = id) } }
             else -> Unit
         }
@@ -175,7 +177,7 @@ public class OnboardingPresenter(
             next.copy(
                 canContinue = when (next.step) {
                     OnboardingStep.Name -> next.name.isNotBlank()
-                    OnboardingStep.Key -> next.keyLooksRight
+                    OnboardingStep.Key -> next.keyLooksRight || (next.key.isBlank() && next.hasSavedKey)
                     OnboardingStep.Model -> next.selectedModel != null
                     OnboardingStep.Permissions -> !next.connecting
                     OnboardingStep.TestRun -> !next.testRunning
