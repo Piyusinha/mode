@@ -64,8 +64,11 @@ internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel()
     val memory = MemoryRepository(db, now = { now })
     val runs = RunRepository(files, db)
     val notes = Notes()
+    val session = PhoneSession(Link(), Duration.ZERO)
+    val catalog = com.piyush.mode.feature.settings.data.ModelCatalog(fetch = { error("offline") }, files = files)
+    val handsCheck = com.piyush.mode.feature.diagnostics.presentation.HandsCheck(session, Inline, object : AppInfo { override val bundleId = "com.piyush.mode" }, ActivityTracker())
     val runner = TaskRunner(
-        session = PhoneSession(Link(), Duration.ZERO),
+        session = session,
         settings = settings,
         llm = model,
         files = files,

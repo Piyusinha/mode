@@ -25,6 +25,8 @@ public data class ModeSettings(
     val askBeforeRisky: RiskConfirmation = RiskConfirmation.OnlyVeryRisky,
     /** What Mode calls the user; null until setup asks. */
     val userName: String? = null,
+    /** First-run setup finished (or skipped); the app opens on Home after that. */
+    val onboardingDone: Boolean = false,
     val hasApiKey: Boolean = false,
 ) {
     /** The same settings with every value brought into range. */

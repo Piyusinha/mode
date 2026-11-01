@@ -99,10 +99,10 @@ class ModeGraph(platform: PlatformServices) {
     /** Tasks that repeat; due ones go to the inbox, with a notification for when Mode is closed. */
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
 
-    /** Each screen's presenter, for the native UI. */
-    val screens: Screens = Screens(scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs)
-
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
+    /** Each screen's presenter, for the native UI. */
+    val screens: Screens = Screens(scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session, handsCheck)
+
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
 
     init {

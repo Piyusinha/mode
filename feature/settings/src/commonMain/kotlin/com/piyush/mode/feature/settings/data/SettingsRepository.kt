@@ -43,6 +43,7 @@ public class SettingsRepository(
         prefs.putString(LEARN, next.learnFromTasks.toString())
         prefs.putString(ASK_BEFORE_RISKY, next.askBeforeRisky.name)
         prefs.putString(USER_NAME, next.userName.orEmpty())
+        prefs.putString(ONBOARDING_DONE, next.onboardingDone.toString())
         state.value = read()
     }
 
@@ -63,6 +64,7 @@ public class SettingsRepository(
             askBeforeRisky = prefs.getString(ASK_BEFORE_RISKY)
                 ?.let { name -> RiskConfirmation.entries.firstOrNull { it.name == name } } ?: defaults.askBeforeRisky,
             userName = prefs.getString(USER_NAME)?.ifBlank { null },
+            onboardingDone = prefs.getString(ONBOARDING_DONE)?.toBooleanStrictOrNull() ?: defaults.onboardingDone,
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
         ).validated()
     }
@@ -79,5 +81,6 @@ public class SettingsRepository(
         const val LEARN = "learn_from_tasks"
         const val ASK_BEFORE_RISKY = "ask_before_risky"
         const val USER_NAME = "user_name"
+        const val ONBOARDING_DONE = "onboarding_done"
     }
 }

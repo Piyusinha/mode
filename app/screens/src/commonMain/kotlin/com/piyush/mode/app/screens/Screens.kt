@@ -6,7 +6,13 @@ import com.piyush.mode.app.screens.home.HomePresenter
 import com.piyush.mode.app.screens.repeat.RepeatPresenter
 import com.piyush.mode.app.screens.run.LiveRunPresenter
 import com.piyush.mode.app.screens.run.RunScreensPresenter
+import com.piyush.mode.app.screens.memory.MemoryPresenter
+import com.piyush.mode.app.screens.onboarding.OnboardingPresenter
+import com.piyush.mode.app.screens.settings.SettingsPresenter
+import com.piyush.mode.feature.connection.presentation.PhoneSession
+import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.runs.data.RunRepository
+import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.app.screens.tasks.TasksPresenter
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.memory.data.MemoryRepository
@@ -31,6 +37,9 @@ public class Screens(
     private val conversations: ConversationRepository,
     private val memory: MemoryRepository,
     private val runs: RunRepository,
+    private val catalog: ModelCatalog,
+    private val session: PhoneSession,
+    private val handsCheck: HandsCheck,
     private val clock: ScreenClock = ScreenClock(),
 ) {
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
@@ -43,6 +52,15 @@ public class Screens(
     public fun liveRun(): LiveRunPresenter = LiveRunPresenter(scope, runner, tasks)
 
     public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks)
+
+    public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
+
+    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog)
+
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, handsCheck)
+
+    /** Whether first-run setup still has to be shown. */
+    public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone
 
     /** The Repeat sheet, filled with [text] (the task to repeat) or empty. */
     public fun repeat(text: String = ""): RepeatPresenter = RepeatPresenter(scope, text, scheduler, clock)
