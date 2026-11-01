@@ -54,6 +54,13 @@ object AgentTools {
             "anything the user asked to know. Never a password, code or card number.",
         required = false,
     )
+    /** Offered on phone actions: the model states what should happen, and checks it on the next screen. */
+    private val expect = Param(
+        "expect", "string",
+        "Optional. What the screen should show after this action, in a few words (\"Appearance page opens\").",
+        required = false,
+    )
+
     private fun point(axis: String) = Param(axis, "number", "Screenshot pixel $axis of the target's centre.")
 
     val ALL: List<Tool> = listOf(
@@ -128,7 +135,13 @@ object AgentTools {
                 ),
             ),
         ),
-    ).map { tool -> if (tool.name == "done") tool else Tool(tool.name, tool.description, tool.needs, tool.params + note) }
+    ).map { tool ->
+        when {
+            tool.name == "done" -> tool
+            tool.needs != null -> Tool(tool.name, tool.description, tool.needs, tool.params + note + expect)
+            else -> Tool(tool.name, tool.description, tool.needs, tool.params + note)
+        }
+    }
 
     /** The tools this phone can honour. */
     fun available(phoneOps: Set<String>): List<Tool> = ALL.filter { it.needs == null || it.needs in phoneOps }
@@ -204,6 +217,9 @@ object AgentTools {
     }
 
     fun reasonOf(call: ToolCall): String = call.arguments["reason"]?.jsonPrimitive?.contentOrNull.orEmpty()
+
+    /** What the model expects this action to do, if it said. */
+    fun expectOf(call: ToolCall): String? = call.arguments["expect"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
 
     /** The fact the model asked to keep with this action, if any. */
     fun noteOf(call: ToolCall): String? = call.arguments["note"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }

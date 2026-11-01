@@ -421,4 +421,21 @@ class AgentTest {
         assertTrue("482913" !in model.lastUserText)
         assertTrue("[hidden: looked like a secret]" in model.lastUserText)
     }
+
+    @Test
+    fun anExpectationIsShownOnceOnTheNextStep() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val seen = mutableListOf<String>()
+        val scripted = ScriptedModel(
+            call("open_app", "name" to "Settings", "reason" to "x", "expect" to "Settings opens"),
+            call("scroll", "direction" to "down", "reason" to "x"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        val model = LlmClient { m, messages, tools -> seen += messages.last().text; scripted.chat(m, messages, tools) }
+        val result = Agent(phone, model, Gate(), noSettle).run("t")
+        assertEquals(listOf(false, true, false), seen.map { "YOU EXPECTED your last action to: Settings opens" in it })
+        assertEquals(listOf("Settings"), result.appsOpened)
+        assertEquals(3, result.transcript.size)
+        assertTrue(result.finalScreen != null)
+    }
 }

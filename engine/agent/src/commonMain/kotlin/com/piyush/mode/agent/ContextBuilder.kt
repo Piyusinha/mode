@@ -9,8 +9,10 @@ import com.piyush.mode.llm.ChatMessage.Part
  * end with a cache point, so a provider can reuse them:
  *
  * 1. system: the rules (never trimmed) · cache point
- * 2. stable: about you, app notes, the conversation so far, the task, answers, plan · cache point
- * 3. per step: step number, notes, recent steps, the screen's text, then the screenshot
+ * 2. stable: about you, app notes, the conversation so far, the task, answers · cache point
+ * 3. per step: step number, notes, recent steps, what the last action was expected to do,
+ *    the plan (recited last, where attention is highest, and so it never breaks the cache),
+ *    the screen's text, then the screenshot
  */
 object ContextBuilder {
     const val MAX_ABOUT_YOU = 25
@@ -46,6 +48,8 @@ object ContextBuilder {
         /** How many recent steps are shown word for word. */
         val recentSteps: Int,
         val lastApp: String?,
+        /** What the model said its last action would do, shown once so it can check. */
+        val expectation: String? = null,
         val screen: Screen,
         /** Mode's own screen is in front: describe it instead of showing it. */
         val hideScreen: Boolean,
@@ -63,7 +67,7 @@ object ContextBuilder {
         ),
     )
 
-    /** Changes only when the plan or an answer does. */
+    /** Changes only when an answer arrives. */
     fun stable(input: Input): String = buildString {
         val c = input.context
         val about = listOfNotNull(c.userName?.let { "Their name: $it" }) + c.aboutYou
@@ -92,9 +96,6 @@ object ContextBuilder {
                 append("- You asked: ").append(q).append("\n  They said: ").append(a).append('\n')
             }
         }
-        input.plan?.let {
-            append("\nYOUR PLAN (keep it up to date with the plan tool):\n").append(it.clip(MAX_PLAN_CHARS)).append('\n')
-        }
     }
 
     /** Changes every step. */
@@ -117,6 +118,13 @@ object ContextBuilder {
             append('\n')
         }
         input.lastApp?.let { append("App you last opened: ").append(it).append("\n\n") }
+        input.expectation?.let {
+            append("YOU EXPECTED your last action to: ").append(it.clip(MAX_NOTE_CHARS))
+            append(". Does the screen below show that? If not, deal with it before moving on.\n\n")
+        }
+        input.plan?.let {
+            append("YOUR PLAN (keep it up to date with the plan tool):\n").append(it.clip(MAX_PLAN_CHARS)).append("\n\n")
+        }
         if (input.hideScreen) {
             append("THE SCREEN NOW: Mode, the app that runs you, is in front (not shown: it is not part of the task). ")
             append("Start by opening the app or place the task needs (usually open_app), or plan first if the task has several parts.")

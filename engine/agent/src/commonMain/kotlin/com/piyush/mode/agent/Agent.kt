@@ -79,7 +79,21 @@ sealed interface AgentOutcome {
     class Failed(val why: String) : AgentOutcome
 }
 
-class AgentResult(val outcome: AgentOutcome, val steps: Int, val costUsd: Double, val millis: Long)
+class AgentResult(
+    val outcome: AgentOutcome,
+    val steps: Int,
+    val costUsd: Double,
+    val millis: Long,
+    /** One line per step, as the model saw them ("3. tap \"Light\" — ok → screen changed"). */
+    val transcript: List<String> = emptyList(),
+    val notes: List<String> = emptyList(),
+    /** The user's answers to the agent's questions. */
+    val answers: List<Pair<String, String>> = emptyList(),
+    /** Apps opened during the task, in order, without repeats. */
+    val appsOpened: List<String> = emptyList(),
+    /** The last screenshot the model saw. */
+    val finalScreen: ByteArray? = null,
+)
 
 /**
  * The look → decide → act loop. It knows nothing about any app or task: each
@@ -135,11 +149,18 @@ class Agent(
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
         val notes = mutableListOf<String>()
+        val appsOpened = mutableListOf<String>()
+        var finalScreen: ByteArray? = null
+        /** What the last phone action was expected to do; shown on the next step only. */
+        var expectation: String? = null
         /** A successful done was sent back once to be checked; the next one is accepted. */
         var verifyAsked = false
 
-        fun result(outcome: AgentOutcome, step: Int) =
-            AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
+        fun result(outcome: AgentOutcome, step: Int) = AgentResult(
+            outcome, step, cost, started.elapsedNow().inWholeMilliseconds,
+            transcript = history.toList(), notes = notes.toList(), answers = answers.toList(),
+            appsOpened = appsOpened.toList(), finalScreen = finalScreen,
+        )
 
         /** " Last: tap "Send"." for a stop message, from the latest step. */
         fun lastAction() = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
@@ -166,6 +187,7 @@ class Agent(
             onStatus("Step $step: looking")
             val lookStarted = clock.markNow()
             val screen = look()
+            finalScreen = screen.jpeg
             trace.looked(
                 step, screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts,
                 lookStarted.elapsedNow().inWholeMilliseconds,
@@ -200,11 +222,13 @@ class Agent(
                     history = history,
                     recentSteps = config.historySteps,
                     lastApp = lastApp,
+                    expectation = expectation,
                     screen = ContextBuilder.Screen(screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts),
                     hideScreen = inMode,
                 ),
             )
             inMode = false
+            expectation = null
             val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, messages, schema)
             val reply = answer.reply
             val model = answer.model
@@ -327,7 +351,11 @@ class Agent(
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
                         stuck.acted()
-                        if (op is Op.LaunchApp) lastApp = result.jsonPrimitiveOrNull() ?: op.name
+                        if (op is Op.LaunchApp) {
+                            lastApp = result.jsonPrimitiveOrNull() ?: op.name
+                            if (op.name !in appsOpened) appsOpened += op.name
+                        }
+                        expectation = AgentTools.expectOf(call)
                         "ok"
                     } catch (e: Exception) {
                         "failed: ${e.message}"
@@ -490,6 +518,8 @@ class Agent(
               search pages: tap the field, type, then press return or pick a result; Cancel closes them.
             - Tap a text field before typing into it.
             - If an action did not change the screen, do not repeat it: try another way.
+            - Say in expect what the screen should show after an action ("Appearance page opens"); on the
+              next screen, check it happened before going on.
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).
             - Work on your own. Do not ask the user how to navigate or whether to go back.
 

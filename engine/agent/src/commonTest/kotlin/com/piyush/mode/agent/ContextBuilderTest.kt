@@ -43,8 +43,10 @@ class ContextBuilderTest {
     @Test
     fun theStablePartIsTheSameFromStepToStep() {
         val context = TaskContext(userName = "Piyush", earlierTurns = listOf(TaskContext.EarlierTurn("message Sonali", "Sent.")))
-        val one = ContextBuilder.stable(input(step = 2, history = listOf("1. open Settings — ok"), context = context))
-        val two = ContextBuilder.stable(input(step = 7, history = List(6) { "${it + 1}. tap \"x\" — ok" }, notes = listOf("a"), context = context))
+        val one = ContextBuilder.stable(input(step = 2, history = listOf("1. open Settings — ok"), context = context, plan = "1. a"))
+        val two = ContextBuilder.stable(
+            input(step = 7, history = List(6) { "${it + 1}. tap \"x\" — ok" }, notes = listOf("a"), context = context, plan = "1. [done] a\n2. b"),
+        )
         assertEquals(one, two)
         assertTrue(one.indexOf("Their name: Piyush") < one.indexOf("EARLIER IN THIS CONVERSATION"))
         assertTrue(one.indexOf("EARLIER IN THIS CONVERSATION") < one.indexOf("TASK:"))
@@ -57,9 +59,7 @@ class ContextBuilderTest {
             appNotes = List(20) { "app note $it" },
             earlierTurns = List(5) { TaskContext.EarlierTurn("task $it " + "x".repeat(400), "done $it") },
         )
-        val stable = ContextBuilder.stable(
-            input(context = context, plan = "p".repeat(3000), answers = List(8) { "q$it" to "a$it" }),
-        )
+        val stable = ContextBuilder.stable(input(context = context, answers = List(8) { "q$it" to "a$it" }))
         assertEquals(ContextBuilder.MAX_ABOUT_YOU, Regex("- fact \\d+").findAll(stable).count())
         assertEquals(ContextBuilder.MAX_APP_NOTES, Regex("- app note \\d+").findAll(stable).count())
         assertFalse("task 1 " in stable, "only the last 3 turns")
@@ -67,11 +67,11 @@ class ContextBuilderTest {
         assertFalse("x".repeat(300) in stable, "each turn clipped")
         assertFalse("q2" in stable, "only the last 5 answers")
         assertTrue("q7" in stable)
-        assertFalse("p".repeat(1500) in stable, "plan clipped")
 
         val step = ContextBuilder.perStep(
-            input(notes = List(35) { "note $it " + "n".repeat(300) }, texts = List(100) { Triple("t$it", 1, it) }),
+            input(notes = List(35) { "note $it " + "n".repeat(300) }, texts = List(100) { Triple("t$it", 1, it) }, plan = "p".repeat(3000)),
         )
+        assertFalse("p".repeat(1500) in step, "plan clipped")
         assertTrue("(5 earlier notes not shown)" in step)
         assertFalse("note 4 " in step)
         assertTrue("note 34 " in step)
@@ -101,5 +101,20 @@ class ContextBuilderTest {
         assertTrue(user.parts.none { it is Part.Image })
         assertTrue("Mode, the app that runs you, is in front" in user.text)
         assertFalse("\"General\"" in user.text)
+    }
+
+    @Test
+    fun thePlanAndTheExpectationComeLastJustBeforeTheScreen() {
+        val step = ContextBuilder.perStep(
+            ContextBuilder.Input(
+                systemPrompt = "RULES", task = "t", context = TaskContext.Empty, step = 3, maxSteps = 30,
+                answers = emptyList(), plan = "1. open Settings", notes = listOf("a fact"),
+                history = listOf("1. open Settings — ok"), recentSteps = 12, lastApp = null,
+                expectation = "Settings opens", screen = screen, hideScreen = false,
+            ),
+        )
+        assertTrue(step.indexOf("WHAT HAPPENED SO FAR") < step.indexOf("YOU EXPECTED"))
+        assertTrue(step.indexOf("YOU EXPECTED your last action to: Settings opens") < step.indexOf("YOUR PLAN"))
+        assertTrue(step.indexOf("YOUR PLAN") < step.indexOf("THE SCREEN NOW"))
     }
 }
