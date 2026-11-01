@@ -109,6 +109,8 @@ class Agent(
     private val onStep: (StepRecord) -> Unit = {},
     private val onStatus: (String) -> Unit = {},
     private val trace: AgentTrace = AgentTrace.None,
+    /** What Mode remembers; null runs without recall or app tips. */
+    private val memory: AgentMemory? = null,
 ) {
     private val clock = TimeSource.Monotonic
 
@@ -125,10 +127,12 @@ class Agent(
         return result
     }
 
-    private suspend fun runSteps(task: String, startsInMode: Boolean, context: TaskContext): AgentResult {
+    private suspend fun runSteps(task: String, startsInMode: Boolean, startContext: TaskContext): AgentResult {
+        /** Grows when an opened app brings tips with it. */
+        var context = startContext
         val started = clock.markNow()
         val ops = phone.ops()
-        val tools = AgentTools.available(ops)
+        val tools = AgentTools.available(ops, recall = memory != null)
         val schema = AgentTools.schema(tools)
         trace.runStarted(task, config, tools.map { it.name })
         val history = mutableListOf<String>()
@@ -312,11 +316,22 @@ class Agent(
                 "plan" -> {
                     plan = call.arguments.string("steps")?.trim()?.take(1500)
                     // Seen on the phone: eight plan rewrites in one run, each a wasted step.
-                    if (stuck.planned() >= 2) {
+                    if (stuck.thought() >= 2) {
                         record("plan", "", "plan saved, but you planned again without acting: no more planning now, do the next item")
                     } else {
                         record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
                     }
+                }
+                "recall" -> {
+                    val query = call.arguments.string("query")?.trim().orEmpty()
+                    val found = memory?.recall(query).orEmpty()
+                    stuck.thought()
+                    trace.recalled(step, query, found)
+                    record(
+                        "recall \"$query\"", "",
+                        if (found.isEmpty()) "nothing remembered about that"
+                        else "remembered:\n" + found.joinToString("\n").take(MAX_RECALL_CHARS),
+                    )
                 }
                 "wait" -> {
                     val waits = stuck.waited()
@@ -353,7 +368,12 @@ class Agent(
                         stuck.acted()
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
-                            if (op.name !in appsOpened) appsOpened += op.name
+                            if (op.name !in appsOpened) {
+                                appsOpened += op.name
+                                // The first time an app opens, what was learned about it comes along.
+                                val tips = memory?.tipsFor(op.name).orEmpty().filter { it !in context.appNotes }
+                                if (tips.isNotEmpty()) context = context.copy(appNotes = context.appNotes + tips)
+                            }
                         }
                         expectation = AgentTools.expectOf(call)
                         "ok"
@@ -497,6 +517,7 @@ class Agent(
     companion object {
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        private const val MAX_RECALL_CHARS = 1200
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.

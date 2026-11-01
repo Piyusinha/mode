@@ -114,6 +114,11 @@ object AgentTools {
             listOf(Param("steps", "string", "The plan, one item per line, e.g. \"1. [done] turn off dark mode\\n2. set brightness\"")),
         ),
         Tool(
+            "recall", "Look up what Mode remembers: a person's details, a place, a preference, or the steps of a " +
+                "skill listed under WHAT WORKED BEFORE. Use it when the task needs something you don't have.", null,
+            listOf(Param("query", "string", "What to look up, e.g. \"Sonali\" or \"Message [Person] on WhatsApp\".")),
+        ),
+        Tool(
             "wait", "Wait for something to load or arrive before looking again.", null,
             listOf(Param("seconds", "number", "1 to 10."), reason),
         ),
@@ -143,8 +148,9 @@ object AgentTools {
         }
     }
 
-    /** The tools this phone can honour. */
-    fun available(phoneOps: Set<String>): List<Tool> = ALL.filter { it.needs == null || it.needs in phoneOps }
+    /** The tools this phone can honour; recall only when there is a memory to look in. */
+    fun available(phoneOps: Set<String>, recall: Boolean = false): List<Tool> =
+        ALL.filter { (it.needs == null || it.needs in phoneOps) && (recall || it.name != "recall") }
 
     /** OpenAI-style function-calling schema for [tools]. */
     fun schema(tools: List<Tool>): JsonArray = buildJsonArray {

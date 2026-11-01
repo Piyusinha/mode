@@ -9,7 +9,8 @@ import com.piyush.mode.llm.ChatMessage.Part
  * end with a cache point, so a provider can reuse them:
  *
  * 1. system: the rules (never trimmed) · cache point
- * 2. stable: about you, app notes, the conversation so far, the task, answers · cache point
+ * 2. stable: about you, skills, app tips, recent tasks, the conversation so far, the task,
+ *    answers · cache point
  * 3. per step: step number, notes, recent steps, what the last action was expected to do,
  *    the plan (recited last, where attention is highest, and so it never breaks the cache),
  *    the screen's text, then the screenshot
@@ -17,6 +18,8 @@ import com.piyush.mode.llm.ChatMessage.Part
 object ContextBuilder {
     const val MAX_ABOUT_YOU = 25
     const val MAX_APP_NOTES = 10
+    const val MAX_SKILL_CHARS = 1500
+    const val MAX_RECENT_TASKS = 5
     const val MAX_EARLIER_TURNS = 3
     const val MAX_TURN_CHARS = 300
     const val MAX_ANSWERS = 5
@@ -76,9 +79,18 @@ object ContextBuilder {
             about.take(MAX_ABOUT_YOU).forEach { append("- ").append(it).append('\n') }
             append('\n')
         }
+        if (c.skills.isNotEmpty()) {
+            append("WHAT WORKED BEFORE (follow it when it fits; the screen has the last word):\n")
+            append(c.skills.joinToString("\n").clip(MAX_SKILL_CHARS)).append("\n\n")
+        }
         if (c.appNotes.isNotEmpty()) {
-            append("NOTES FROM EARLIER TASKS IN THESE APPS (what worked or failed):\n")
+            append("TIPS FOR THESE APPS (from earlier tasks):\n")
             c.appNotes.take(MAX_APP_NOTES).forEach { append("- ").append(it).append('\n') }
+            append('\n')
+        }
+        if (c.recentTasks.isNotEmpty()) {
+            append("RECENT TASKS (newest first; for \"do that again\" or \"turn it back on\"):\n")
+            c.recentTasks.take(MAX_RECENT_TASKS).forEach { append("- ").append(it.clip(MAX_TURN_CHARS)).append('\n') }
             append('\n')
         }
         if (c.earlierTurns.isNotEmpty()) {

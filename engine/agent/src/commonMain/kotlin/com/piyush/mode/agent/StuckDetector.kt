@@ -20,7 +20,7 @@ class StuckDetector(private val canStepUp: Boolean) {
     private var sinceStepUp = 0
     private var badReplies = 0
     private var waits = 0
-    /** plan calls in a row with no phone action between them. */
+    /** plan and recall calls in a row with no phone action between them. */
     private var plans = 0
     private var steppedUp = false
     /** Screens seen right after phone actions, newest last. */
@@ -50,7 +50,7 @@ class StuckDetector(private val canStepUp: Boolean) {
                 "you have been on this screen $visits times in the last $WINDOW steps: this route is not working, try a different one",
             )
             plans >= 3 -> stepUp(
-                "you have re-planned $plans times in a row without acting: stop planning and do the next item with a phone action",
+                "you have planned or looked things up $plans times in a row without acting: act now with a phone action",
             )
             sinceStepUp >= STEP_UP_UNCHANGED || badReplies >= 2 || waits >= 3 -> stepUp(null)
             else -> Verdict.Fine
@@ -63,8 +63,8 @@ class StuckDetector(private val canStepUp: Boolean) {
     /** A phone action went through. */
     fun acted() { badReplies = 0; waits = 0; plans = 0 }
 
-    /** The model rewrote its plan; returns how many times in a row. */
-    fun planned(): Int = ++plans
+    /** The model planned or looked something up instead of acting; returns how many times in a row. */
+    fun thought(): Int = ++plans
 
     /** The model chose to wait; returns how many waits in a row. */
     fun waited(): Int = ++waits

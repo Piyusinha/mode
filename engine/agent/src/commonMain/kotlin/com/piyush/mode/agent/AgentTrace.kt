@@ -23,6 +23,9 @@ interface AgentTrace {
     /** What was done on the phone and how it went. */
     fun acted(step: Int, action: String, op: String?, outcome: String, millis: Long) {}
 
+    /** A lookup in memory and what it found. */
+    fun recalled(step: Int, query: String, found: List<String>) {}
+
     /** A fact the model kept for the rest of the task. */
     fun noted(step: Int, text: String) {}
 

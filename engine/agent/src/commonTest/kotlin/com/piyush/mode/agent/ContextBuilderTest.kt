@@ -117,4 +117,21 @@ class ContextBuilderTest {
         assertTrue(step.indexOf("YOU EXPECTED your last action to: Settings opens") < step.indexOf("YOUR PLAN"))
         assertTrue(step.indexOf("YOUR PLAN") < step.indexOf("THE SCREEN NOW"))
     }
+
+    @Test
+    fun memorySectionsComeInOrderBeforeTheTask() {
+        val context = TaskContext(
+            userName = "Piyush",
+            aboutYou = listOf("Sonali: WhatsApp"),
+            skills = listOf("SKILL: Turn off Dark Mode\n1. open Settings"),
+            appNotes = listOf("Settings: search is at the top"),
+            recentTasks = List(8) { "task $it" },
+        )
+        val stable = ContextBuilder.stable(input(context = context))
+        val order = listOf("ABOUT THE USER", "WHAT WORKED BEFORE", "TIPS FOR THESE APPS", "RECENT TASKS", "TASK:").map { stable.indexOf(it) }
+        assertEquals(order.sorted(), order, stable)
+        assertTrue(order.all { it >= 0 })
+        assertTrue("- task 4" in stable)
+        assertFalse("- task 5" in stable, "only the last 5 tasks")
+    }
 }

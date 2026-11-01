@@ -400,7 +400,7 @@ class AgentTest {
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
         assertTrue("planned again without acting" in model.lastUserText)
-        assertTrue("re-planned 3 times in a row" in model.lastUserText, model.lastUserText)
+        assertTrue("planned or looked things up 3 times in a row" in model.lastUserText, model.lastUserText)
     }
 
     @Test
@@ -437,5 +437,51 @@ class AgentTest {
         assertEquals(listOf("Settings"), result.appsOpened)
         assertEquals(3, result.transcript.size)
         assertTrue(result.finalScreen != null)
+    }
+
+    private class Remembers(private val lines: Map<String, List<String>>, private val tips: Map<String, List<String>> = emptyMap()) : AgentMemory {
+        val asked = mutableListOf<String>()
+        override fun recall(query: String) = lines[query].orEmpty().also { asked += query }
+        override fun tipsFor(app: String) = tips[app].orEmpty()
+    }
+
+    @Test
+    fun recallIsOfferedOnlyWithAMemory() = runTest {
+        val phone = FakePhone(listOf(listOf("x" to (1.0 to 1.0))))
+        val without = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, without, Gate(), noSettle).run("t")
+        assertTrue("\"recall\"" !in without.lastTools.toString())
+        val with = ScriptedModel(call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, with, Gate(), noSettle, memory = Remembers(emptyMap())).run("t")
+        assertTrue("\"recall\"" in with.lastTools.toString())
+    }
+
+    @Test
+    fun whatRecallFindsIsInTheNextStep() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val memory = Remembers(mapOf("Sonali" to listOf("Sonali: message her on WhatsApp")))
+        val model = ScriptedModel(
+            call("recall", "query" to "Sonali"),
+            call("recall", "query" to "Rahul"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle, memory = memory).run("message Sonali")
+        assertEquals(listOf("Sonali", "Rahul"), memory.asked)
+        assertTrue("remembered:\nSonali: message her on WhatsApp" in model.lastUserText, model.lastUserText)
+        assertTrue("recall \"Rahul\" — nothing remembered about that" in model.lastUserText)
+    }
+
+    @Test
+    fun openingAnAppBringsItsTipsOnce() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val memory = Remembers(emptyMap(), tips = mapOf("Calendar" to listOf("Calendar: the list button is top right")))
+        val model = ScriptedModel(
+            call("open_app", "name" to "Calendar", "reason" to "x"),
+            call("open_app", "name" to "Calendar", "reason" to "x"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle, memory = memory).run("read my calendar")
+        assertEquals(1, Regex("Calendar: the list button is top right").findAll(model.lastUserText).count())
+        assertTrue("TIPS FOR THESE APPS" in model.lastUserText)
     }
 }
