@@ -41,6 +41,11 @@ targets:
         NSSiriUsageDescription: So you can say "Hey Siri, start Mode" and tell it what to do.
         # The running task on the Dynamic Island and the Lock Screen.
         NSSupportsLiveActivities: true
+        # mode:// links: the Live Activity's Open chat and Another task.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.piyush.mode
+            CFBundleURLSchemes:
+              - mode
     dependencies:
       - package: ModeDesignSystem
       - target: ModeWidgets

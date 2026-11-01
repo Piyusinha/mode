@@ -62,10 +62,23 @@ struct MainTabs: View {
         .sheet(item: Binding(get: { run.state.question }, set: { _ in })) { question in
             QuestionSheet(question: question, onAnswer: run.answer, onStop: run.stopFromQuestion)
         }
+        .onOpenURL { url in DeepLink(url).map(open) }
         #if DEBUG && targetEnvironment(simulator)
         .task { openForScreenshots() }
         .fullScreenCover(item: $previewActivity) { ActivityPreview(phase: $0) }
         #endif
+    }
+
+    /// Follows a link from the Live Activity.
+    private func open(_ link: DeepLink) {
+        switch link {
+        case let .conversation(id):
+            showingLive = false
+            tab = .home
+            paths[.home] = [.conversation(id: id)]
+        case .ask: showingAsk = true
+        case .open: break
+        }
     }
 
     #if DEBUG && targetEnvironment(simulator)
