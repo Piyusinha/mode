@@ -258,16 +258,8 @@ public struct ModeLivePanel: View {
             Text(task).modeText(.subheadline, color: ModeColor.textSecondary).lineLimit(1)
             Text(now).modeText(.title).lineLimit(2)
             if !steps.isEmpty {
-                HStack(spacing: ModeSpacing.xs) {
-                    ForEach(Array(steps.suffix(3).enumerated()), id: \.offset) { index, step in
-                        let current = index == min(steps.count, 3) - 1
-                        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                            Capsule().fill(current ? ModeColor.tintSoft : ModeColor.accent).frame(height: ModeSize.segmentHeight)
-                            Text(step).modeText(current ? .captionEmphasis : .caption, color: current ? ModeColor.textPrimary : ModeColor.textSecondary).lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                let shown = steps.suffix(3)
+                ModeSegments(shown.enumerated().map { index, step in .init(step, state: index == shown.count - 1 ? .now : .done) })
             }
             HStack(spacing: ModeSpacing.m) {
                 Button(action: onPauseToggle) {

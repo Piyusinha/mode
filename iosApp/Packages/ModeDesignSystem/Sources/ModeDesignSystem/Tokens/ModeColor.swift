@@ -42,6 +42,10 @@ public enum ModeColor {
 
     /// Behind sheets and dialogs.
     public static let scrim = named("Scrim")
+    /// Behind the Live Activity on the Lock Screen: dark glass whatever the phone's appearance.
+    public static let lockScreen = Color.black.opacity(0.55)
+    /// The Stop button's dark red disc on the Dynamic Island.
+    public static let stopDisc = stopRed.opacity(0.22)
 
     private static func named(_ name: String) -> Color { Color(name, bundle: .module) }
 }

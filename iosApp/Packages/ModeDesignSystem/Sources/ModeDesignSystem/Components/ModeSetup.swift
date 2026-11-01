@@ -29,15 +29,29 @@ public struct ModeStepDots: View {
 
 /// The Orbit app mark, as on the Welcome board.
 public struct ModeMark: View {
-    public init() {}
+    private let size: CGFloat
+    private let alwaysLight: Bool
+
+    /// The app mark; large (Welcome) by default, small for headers like the Live Activity's.
+    /// [alwaysLight]: the violet mark even on dark surfaces (the Lock Screen, the Dynamic Island).
+    public init(size: CGFloat = ModeSize.mark, alwaysLight: Bool = false) {
+        self.size = size
+        self.alwaysLight = alwaysLight
+    }
 
     public var body: some View {
+        mark.environment(\.colorScheme, alwaysLight ? .light : colorScheme)
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var mark: some View {
         Image("ModeMark", bundle: .module)
             .resizable()
             .scaledToFit()
-            .frame(width: ModeSize.mark, height: ModeSize.mark)
-            .clipShape(.rect(cornerRadius: ModeSize.markRadius))
-            .shadow(color: ModeColor.accent.opacity(0.35), radius: ModeSpacing.xl, y: ModeSpacing.s)
+            .frame(width: size, height: size)
+            .clipShape(.rect(cornerRadius: size * ModeSize.markRadius / ModeSize.mark))
+            .shadow(color: ModeColor.accent.opacity(size >= ModeSize.mark ? 0.35 : 0), radius: ModeSpacing.xl, y: ModeSpacing.s)
             .accessibilityHidden(true)
     }
 }

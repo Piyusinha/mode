@@ -20,6 +20,8 @@ targets:
     platform: iOS
     sources:
       - path: Mode
+      # The Live Activity's model, Stop intent, strings and views, shared with ModeWidgets.
+      - path: Shared
     info:
       # Keys Xcode's generated plist has no build setting for; merged with it.
       path: Mode/Info.plist
@@ -37,8 +39,11 @@ targets:
         NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
         NSMicrophoneUsageDescription: Mode listens when you speak a task, and stops before it starts working in your apps.
         NSSiriUsageDescription: So you can say "Hey Siri, start Mode" and tell it what to do.
+        # The running task on the Dynamic Island and the Lock Screen.
+        NSSupportsLiveActivities: true
     dependencies:
       - package: ModeDesignSystem
+      - target: ModeWidgets
     preBuildScripts:
       # Screens use the design system and the string catalog, never literals.
       - name: Check UI literals
@@ -84,6 +89,30 @@ targets:
       FRAMEWORK_SEARCH_PATHS:
         - "$(inherited)"
         - "$(SRCROOT)/../app/kit/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+  # The Live Activity (Dynamic Island, Lock Screen, Watch Smart Stack). Needs no
+  # special entitlement, so free and paid accounts both get it.
+  ModeWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ModeWidgets
+      - path: Shared
+    info:
+      path: ModeWidgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - package: ModeDesignSystem
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.widgets
+      PRODUCT_NAME: ModeWidgets
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_CFBundleDisplayName: Mode
+      TARGETED_DEVICE_FAMILY: "1"
+      SKIP_INSTALL: YES
+      LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+      SWIFT_EMIT_LOC_STRINGS: YES
 schemes:
   Mode:
     build:

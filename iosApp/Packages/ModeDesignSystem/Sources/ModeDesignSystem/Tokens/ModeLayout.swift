@@ -82,6 +82,13 @@ public enum ModeSize {
     public static let quoteBar: CGFloat = 3
     public static let replyAction: CGFloat = 34
     public static let shimmerTravel: CGFloat = 160
+    /// The Live Activity: its small mark, the Stop button, and the island's compact mark.
+    public static let activityMark: CGFloat = 26
+    public static let activityStop: CGFloat = 40
+    public static let islandMark: CGFloat = 20
+    public static let activityButton: CGFloat = 36
+    /// The ticking time on the compact Dynamic Island.
+    public static let islandTimer: CGFloat = 44
 
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520

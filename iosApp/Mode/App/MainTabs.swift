@@ -12,6 +12,9 @@ struct MainTabs: View {
     @State private var run: RunStatusViewModel
     @State private var showingLive = false
     @State private var showingAsk = false
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var previewActivity: ModeActivityAttributes.ContentState.Phase?
+    #endif
 
     init(app: AppModel) {
         self.app = app
@@ -61,6 +64,7 @@ struct MainTabs: View {
         }
         #if DEBUG && targetEnvironment(simulator)
         .task { openForScreenshots() }
+        .fullScreenCover(item: $previewActivity) { ActivityPreview(phase: $0) }
         #endif
     }
 
@@ -76,6 +80,7 @@ struct MainTabs: View {
         case "live": showingLive = true
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
+        case "activity": previewActivity = ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
         default: break
         }
     }

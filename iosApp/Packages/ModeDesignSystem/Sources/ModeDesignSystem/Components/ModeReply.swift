@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One block of a reply, as the app draws it. Text may carry inline Markdown
 /// (**bold**, *italic*, `code`, links).
-public enum ModeReplyBlock: Equatable, Sendable {
+public enum ModeReplyBlock: Hashable, Codable, Sendable {
     case paragraph(String)
     case heading(level: Int, String)
     case bullets([String])
@@ -15,7 +15,7 @@ public enum ModeReplyBlock: Equatable, Sendable {
 }
 
 /// One line of an agenda: "14:00" over "15:00", then what.
-public struct ModeAgendaRow: Equatable, Sendable {
+public struct ModeAgendaRow: Hashable, Codable, Sendable {
     public let time: String
     public let end: String?
     public let text: String
@@ -30,19 +30,30 @@ public struct ModeAgendaRow: Equatable, Sendable {
     }
 }
 
+/// How roomy a reply is: the chat, or a compact card (the Lock Screen, the Dynamic Island).
+public enum ModeReplyDensity: Sendable {
+    case regular, compact
+
+    var text: ModeTextStyle { self == .regular ? .body : .callout }
+    var lead: ModeTextStyle { self == .regular ? .body : .headline }
+    var spacing: CGFloat { self == .regular ? ModeSpacing.m : ModeSpacing.xs }
+}
+
 /// A reply drawn the way a good chat app does: comfortable body text, real lists,
 /// an agenda card for timed items, tables, quotes and code. Text can be selected.
 public struct ModeReply: View {
     private let blocks: [ModeReplyBlock]
+    private let density: ModeReplyDensity
 
-    public init(_ blocks: [ModeReplyBlock]) {
+    public init(_ blocks: [ModeReplyBlock], density: ModeReplyDensity = .regular) {
         self.blocks = blocks
+        self.density = density
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+        VStack(alignment: .leading, spacing: density.spacing) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                ModeReplyBlockView(block, first: index == 0)
+                ModeReplyBlockView(block, first: index == 0, density: density)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,27 +64,29 @@ public struct ModeReply: View {
 private struct ModeReplyBlockView: View {
     private let block: ModeReplyBlock
     private let first: Bool
+    private let density: ModeReplyDensity
 
-    init(_ block: ModeReplyBlock, first: Bool) {
+    init(_ block: ModeReplyBlock, first: Bool, density: ModeReplyDensity) {
         self.block = block
         self.first = first
+        self.density = density
     }
 
     var body: some View {
         switch block {
         case let .paragraph(text):
-            ModeInlineText(text, style: .body)
+            ModeInlineText(text, style: first ? density.lead : density.text)
         case let .heading(level, text):
-            ModeInlineText(text, style: level <= 2 ? .title2 : .headline)
+            ModeInlineText(text, style: level <= 2 && density == .regular ? .title2 : .headline)
                 .padding(.top, first ? ModeSpacing.none : ModeSpacing.xs)
         case let .bullets(items):
-            ModeListView(items: items) { _ in ModeReplyGlyph.bullet.text.modeText(.bodyEmphasis, color: ModeColor.tint) }
+            ModeListView(items: items, style: density.text) { _ in ModeReplyGlyph.bullet.text.modeText(.bodyEmphasis, color: ModeColor.tint) }
         case let .numbered(start, items):
-            ModeListView(items: items) { index in
+            ModeListView(items: items, style: density.text) { index in
                 Text((start + index).formatted() + ModeReplyGlyph.numberSuffix.rawValue).modeText(.bodyEmphasis, color: ModeColor.textSecondary).monospacedDigit()
             }
         case let .agenda(rows):
-            ModeAgenda(rows: rows)
+            ModeAgenda(rows: rows, style: density == .regular ? .card : .plain)
         case let .table(header, rows):
             ModeReplyTable(header: header, rows: rows)
         case let .quote(text):
@@ -130,6 +143,7 @@ public struct ModeInlineText: View {
 /// A list with hanging indents: the mark, then the item's text wrapping under itself.
 private struct ModeListView<Mark: View>: View {
     let items: [String]
+    let style: ModeTextStyle
     @ViewBuilder let mark: (Int) -> Mark
 
     var body: some View {
@@ -137,22 +151,43 @@ private struct ModeListView<Mark: View>: View {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.s) {
                     mark(index).frame(minWidth: ModeSize.listMark, alignment: .leading)
-                    ModeInlineText(item, style: .body)
+                    ModeInlineText(item, style: style)
                 }
             }
         }
     }
 }
 
-/// Timed items as an agenda card: times in a column, an accent bar, then what.
+/// Timed items as an agenda: times in a column, then what. As a card (the chat:
+/// an accent bar and separators) or plain rows (the Lock Screen).
 public struct ModeAgenda: View {
-    private let rows: [ModeAgendaRow]
+    public enum Style: Sendable { case card, plain }
 
-    public init(rows: [ModeAgendaRow]) {
+    private let rows: [ModeAgendaRow]
+    private let style: Style
+
+    public init(rows: [ModeAgendaRow], style: Style = .card) {
         self.rows = rows
+        self.style = style
     }
 
     public var body: some View {
+        if style == .plain { plain } else { card }
+    }
+
+    private var plain: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.m, verticalSpacing: ModeSpacing.xs) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    Text(row.time).modeText(row.allDay ? .captionEmphasis : .bodyEmphasis, color: row.allDay ? ModeColor.textSecondary : ModeColor.textPrimary)
+                        .monospacedDigit()
+                    ModeInlineText(row.text, style: .callout).lineLimit(1)
+                }
+            }
+        }
+    }
+
+    private var card: some View {
         VStack(spacing: ModeSpacing.none) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 HStack(alignment: .center, spacing: ModeSpacing.m) {
