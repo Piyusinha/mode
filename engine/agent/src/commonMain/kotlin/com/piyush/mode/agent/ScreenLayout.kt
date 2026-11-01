@@ -25,6 +25,13 @@ class ScreenLayout private constructor(val cards: List<Card>) {
 
     fun byId(id: Int): Element? = elements.firstOrNull { it.id == id }
 
+    /** What sits right of [text] on its row (a form's value beside its label), left to right. */
+    fun rightOf(text: String): List<Element> {
+        val row = cards.flatMap { it.rows }.firstOrNull { r -> r.any { it.text == text } } ?: return emptyList()
+        val x = row.first { it.text == text }.x
+        return row.filter { it.x > x }
+    }
+
     /** One line per row, a blank line between cards, "(ad)" before an ad's first row; at most [max] elements. */
     fun render(max: Int): String = buildString {
         var shown = 0

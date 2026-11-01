@@ -258,7 +258,8 @@ object AgentTools {
     /** The call with an element's [id] turned into its centre (x and y), as the rest of Mode expects. */
     fun withElement(call: ToolCall, layout: ScreenLayout): ToolCall {
         if (call.name !in BY_ID) return call
-        val wanted = call.arguments["id"]?.jsonPrimitive?.contentOrNull?.trim()?.toDoubleOrNull()?.toInt() ?: return call
+        // Seen on the phone: "id": "[8]", copied with its brackets.
+        val wanted = call.arguments["id"]?.jsonPrimitive?.contentOrNull?.trim()?.trim('[', ']', ' ')?.toDoubleOrNull()?.toInt() ?: return call
         val e = layout.byId(wanted) ?: return call
         return ToolCall(call.name, JsonObject(call.arguments + mapOf("x" to JsonPrimitive(e.x), "y" to JsonPrimitive(e.y))))
     }

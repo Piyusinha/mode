@@ -142,6 +142,23 @@ class AgentTest {
     }
 
     @Test
+    fun tappingAFormsLabelPointsAtItsValue() = runTest {
+        // MyFitnessPal's Add Food form: labels left, values right; a tap on the label changes nothing.
+        val form = listOf(
+            "Serving Size" to (60.0 to 215.0), "1 pieces" to (360.0 to 215.0),
+            "Number of Servings" to (80.0 to 263.0), "1" to (370.0 to 263.0),
+            "Meal" to (40.0 to 356.0), "Dinner" to (360.0 to 356.0),
+        )
+        val phone = FakePhone(List(4) { form })
+        val model = ScriptedModel(
+            call("tap", "id" to "[3]", "reason" to "Setting the number of servings"),
+            call("done", "evidence" to "x", "summary" to "x"),
+        )
+        Agent(phone, model, Gate(), noSettle).run("log 8 pieces")
+        assertTrue("\"Number of Servings\" is a label; its value is [4] \"1\"" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun riskyTapsNeedTheUsersYes() = runTest {
         val phone = FakePhone(listOf(listOf("Request Uber Go" to (201.0 to 800.0))))
         val gate = Gate(allow = false)

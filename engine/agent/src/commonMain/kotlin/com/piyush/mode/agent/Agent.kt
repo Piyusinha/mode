@@ -205,6 +205,8 @@ class Agent(
         var routineHinted: JustInTime.Hint? = null
         /** Where the last tap landed (screen points), and whether a tap on the focused field was refused already. */
         var lastTapAt: Pair<Double, Double>? = null
+        /** The text the last tap landed on, to tell a form's label from its value. */
+        var lastTapLabel: String? = null
         var focusTapRefused = false
         /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
         var lastOp: String? = null
@@ -290,8 +292,8 @@ class Agent(
                 history[history.lastIndex] += when {
                     endOfList -> END_OF_LIST
                     lastOp == "back" && samePage -> { changed = false; BACK_DID_NOTHING }
-                    !changed -> UNCHANGED
-                    samePage && lastOp == "tap" -> " → same page (only small parts changed)"
+                    !changed -> UNCHANGED + (if (lastOp == "tap") labelHint(lastTapLabel, screen.layout) else "")
+                    samePage && lastOp == "tap" -> " → same page (only small parts changed)" + labelHint(lastTapLabel, screen.layout)
                     else -> " → screen changed"
                 }
             }
@@ -588,6 +590,7 @@ class Agent(
                             if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
                         }
                         if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
+                        lastTapLabel = if (op is Op.Tap) label else null
                         // The routine's step was followed: look for the next one.
                         routineHinted?.takeIf { h -> op is Op.Tap && label == h.element.text }?.let { h -> routineAt = h.step.number + 1 }
                         if (!screen.keyboardUp) focusTapRefused = false
@@ -775,6 +778,16 @@ class Agent(
     private fun routeSteps(route: String): List<String> =
         route.lines().mapNotNull { ROUTE_STEP.matchEntire(it.trim())?.groupValues?.get(1)?.trim()?.takeIf(String::isNotEmpty) }
             .take(MAX_ROUTE_STEPS)
+
+    /**
+     * A tap on a form's label does nothing; its value is the box to its right. Seen on the phone: "Number of
+     * Servings" and "Serving Size" tapped again and again while "1" and "6 pieces" sat beside them.
+     */
+    private fun labelHint(tapped: String?, layout: ScreenLayout): String {
+        val value = tapped?.let(layout::rightOf)?.firstOrNull() ?: return ""
+        return ": \"$tapped\" is a label; its value is [${value.id}] \"${value.text}\" on the right of the same row. " +
+            "Tap that (or type_text with id ${value.id})"
+    }
 
     /** The held-back reply: which change to check, and where. */
     private fun checkFirst(last: ChangeLedger.Entry): String =
@@ -986,8 +999,11 @@ class Agent(
                  search results, prefer an entry whose serving is in that unit ("4 piece") when the names fit
                  equally. Open the item (tap its name, not the + or Add beside it): its serving size or unit is
                  usually a menu, so open it and pick the user's unit (piece, gram, cup), then set the number
-                 (type_text with clear true replaces the old number). Never turn "8 pieces" into 8 of a bigger
-                 unit (8 rolls). Only when no such unit exists, convert sensibly and say so in your summary.
+                 (type_text with clear true replaces the old number). The amount is serving size × number of
+                 servings: 8 pieces is "1 piece" × 8, or "6 pieces" × 1.33. Never turn "8 pieces" into 8 of a
+                 bigger unit (8 rolls). Only when no such unit exists, convert sensibly and say so in your summary.
+            - Forms: a row has its label on the left and its value on the right (a box, a menu, a number). Tap
+              or type into the value; tapping the label does nothing.
                  + adds the default.
               3. Do it once. A + or Add button adds; it never checks anything.
               4. Check: Mode reads the screen right after and tells you what appeared ("Food logged!"); that is
