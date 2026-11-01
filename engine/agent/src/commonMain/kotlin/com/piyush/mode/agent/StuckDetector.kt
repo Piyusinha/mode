@@ -20,6 +20,8 @@ class StuckDetector(private val canStepUp: Boolean) {
     private var sinceStepUp = 0
     private var badReplies = 0
     private var waits = 0
+    /** plan calls in a row with no phone action between them. */
+    private var plans = 0
     private var steppedUp = false
     /** Screens seen right after phone actions, newest last. */
     private val recent = ArrayDeque<String>()
@@ -47,6 +49,9 @@ class StuckDetector(private val canStepUp: Boolean) {
             visits >= WARN_VISITS -> stepUp(
                 "you have been on this screen $visits times in the last $WINDOW steps: this route is not working, try a different one",
             )
+            plans >= 3 -> stepUp(
+                "you have re-planned $plans times in a row without acting: stop planning and do the next item with a phone action",
+            )
             sinceStepUp >= STEP_UP_UNCHANGED || badReplies >= 2 || waits >= 3 -> stepUp(null)
             else -> Verdict.Fine
         }
@@ -56,7 +61,10 @@ class StuckDetector(private val canStepUp: Boolean) {
     fun badReply() { badReplies++ }
 
     /** A phone action went through. */
-    fun acted() { badReplies = 0; waits = 0 }
+    fun acted() { badReplies = 0; waits = 0; plans = 0 }
+
+    /** The model rewrote its plan; returns how many times in a row. */
+    fun planned(): Int = ++plans
 
     /** The model chose to wait; returns how many waits in a row. */
     fun waited(): Int = ++waits
@@ -65,6 +73,7 @@ class StuckDetector(private val canStepUp: Boolean) {
         sinceStepUp = 0
         badReplies = 0
         waits = 0
+        plans = 0
         if (!canStepUp) return if (note != null) Verdict.StepUp(note) else Verdict.Fine
         steppedUp = true
         return Verdict.StepUp(note)

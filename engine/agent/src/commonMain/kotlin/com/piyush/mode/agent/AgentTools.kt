@@ -169,7 +169,14 @@ object AgentTools {
         return when (call.name) {
             "tap" -> Op.Tap(g.x(num("x")), g.y(num("y")))
             "long_press" -> Op.LongPress(g.x(num("x")), g.y(num("y")))
-            "swipe" -> Op.Drag(g.x(num("x1")), g.y(num("y1")), g.x(num("x2")), g.y(num("y2")), duration = 0.3)
+            "swipe" -> {
+                val (x1, y1, x2, y2) = listOf(num("x1"), num("y1"), num("x2"), num("y2"))
+                // Seen on the phone: a "placeholder" swipe from a point to itself.
+                require(kotlin.math.hypot(x2 - x1, y2 - y1) >= 20) {
+                    "a swipe needs start and end points apart: to tap use tap, to scroll use scroll"
+                }
+                Op.Drag(g.x(x1), g.y(y1), g.x(x2), g.y(y2), duration = 0.3)
+            }
             "scroll" -> {
                 val x = optNum("x")?.let(g::x) ?: (g.screenWidth / 2)
                 val y = optNum("y")?.let(g::y) ?: (g.screenHeight / 2)

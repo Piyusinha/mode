@@ -382,4 +382,31 @@ class AgentTest {
         assertTrue(stopped.why.startsWith("Took longer than"), stopped.why)
         assertEquals(0, result.steps)
     }
+
+    @Test
+    fun theSameNoteIsKeptOnce() = runTest {
+        val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
+        val scroll = { call("scroll", "direction" to "down", "reason" to "more", "note" to "14:00 Biozyme") }
+        val model = ScriptedModel(scroll(), scroll(), call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("t")
+        assertEquals(1, Regex("- 14:00 Biozyme").findAll(model.lastUserText).count())
+    }
+
+    @Test
+    fun replanningAgainAndAgainIsCalledOutAndStepsUp() = runTest {
+        val phone = FakePhone(List(10) { listOf("Same" to (1.0 to 1.0)) })
+        val plan = call("plan", "steps" to "1. find it")
+        val model = ScriptedModel(plan, plan, plan, call("done", "evidence" to "x", "summary" to "x", "success" to false))
+        Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
+        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
+        assertTrue("planned again without acting" in model.lastUserText)
+        assertTrue("re-planned 3 times in a row" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
+    fun aSwipeToTheSamePointIsRefused() {
+        val g = AgentTools.Geometry(500, 1000, 402.0, 874.0)
+        val e = runCatching { AgentTools.toOp(call("swipe", "x1" to 437, "y1" to 470, "x2" to 437, "y2" to 470), g) }.exceptionOrNull()
+        assertTrue(e is IllegalArgumentException && "to tap use tap" in e.message!!)
+    }
 }

@@ -225,9 +225,12 @@ class Agent(
                 continue
             }
             val reason = AgentTools.reasonOf(call)
-            AgentTools.noteOf(call)?.let {
-                notes += it
-                trace.noted(step, it)
+            AgentTools.noteOf(call)?.let { note ->
+                // Seen on the phone: the same note kept again a few steps later.
+                if (notes.none { it.equals(note, ignoreCase = true) }) {
+                    notes += note
+                    trace.noted(step, note)
+                }
             }
             when (call.name) {
                 "done" -> {
@@ -284,7 +287,12 @@ class Agent(
                 }
                 "plan" -> {
                     plan = call.arguments.string("steps")?.trim()?.take(1500)
-                    record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
+                    // Seen on the phone: eight plan rewrites in one run, each a wasted step.
+                    if (stuck.planned() >= 2) {
+                        record("plan", "", "plan saved, but you planned again without acting: no more planning now, do the next item")
+                    } else {
+                        record("plan", "", "plan saved; it is shown to you every step: now do the first open item")
+                    }
                 }
                 "wait" -> {
                     val waits = stuck.waited()
@@ -517,14 +525,17 @@ class Agent(
 
             Keep what you find: when a screen shows something you will need later or the user asked to know
             (calendar events, times, prices, names, a tracking number), put it in the note field of your next
-            action. Notes stay with you for the whole task; older steps are only summarised. Never note
-            passwords, passcodes or card numbers.
+            action. Notes are facts for the user's answer, not your progress (that is tracked already), and
+            each fact is noted once. Notes stay with you for the whole task; older steps are only summarised.
+            Never note passwords, passcodes or card numbers.
 
             Finishing:
             - Before calling done, look at the screen: does it really show the task happened (the switch is
               off, the message shows as sent)? If your last action did nothing, fix that first.
             - Call done with a short summary (include what the user asked to know, from your notes) and the
-              evidence on screen. If it cannot be done, call done with success false and say why.
+              evidence on screen. Give the facts as they finally are; do not talk about your notes or steps.
+              If it cannot be done, call done with success false and say why.
+            - Plan once, then act. Update the plan only after finishing an item or changing course.
             - Keep each reason to a few words.
         """.trimIndent()
     }
