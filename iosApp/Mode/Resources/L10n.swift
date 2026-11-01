@@ -52,6 +52,62 @@ enum L10n {
         static let message = LocalizedStringResource("placeholder.message", defaultValue: "This screen arrives in the next update.")
     }
 
+    enum Home {
+        static let subtitle = LocalizedStringResource("home.subtitle", defaultValue: "What can I do for you?")
+        static let suggested = LocalizedStringResource("home.suggested", defaultValue: "Suggested")
+        static let recent = LocalizedStringResource("home.recent", defaultValue: "Recent")
+        static let needsKeyTitle = LocalizedStringResource("home.needsKey.title", defaultValue: "Add your AI key")
+        static let needsKeyMessage = LocalizedStringResource("home.needsKey.message", defaultValue: "Mode needs an OpenRouter key before it can do anything.")
+        static let emptyTitle = LocalizedStringResource("home.empty.title", defaultValue: "Ask Mode anything")
+        static let emptyMessage = LocalizedStringResource("home.empty.message", defaultValue: "Tap the microphone and say what to do: \u{201C}Turn off dark mode\u{201D}, \u{201C}Text Sonali I'm on my way\u{201D}.")
+
+        static func greeting(_ part: PartOfDayName, name: String?) -> String {
+            switch (part, name) {
+            case let (.morning, name?): String(localized: "home.greeting.morning.named", defaultValue: "Good morning, \(name)")
+            case let (.afternoon, name?): String(localized: "home.greeting.afternoon.named", defaultValue: "Good afternoon, \(name)")
+            case let (.evening, name?): String(localized: "home.greeting.evening.named", defaultValue: "Good evening, \(name)")
+            case let (.night, name?): String(localized: "home.greeting.night.named", defaultValue: "Hello, \(name)")
+            case (.morning, nil): String(localized: "home.greeting.morning", defaultValue: "Good morning")
+            case (.afternoon, nil): String(localized: "home.greeting.afternoon", defaultValue: "Good afternoon")
+            case (.evening, nil): String(localized: "home.greeting.evening", defaultValue: "Good evening")
+            case (.night, nil): String(localized: "home.greeting.night", defaultValue: "Hello")
+            }
+        }
+
+        static func askedOften(_ times: Int) -> String {
+            String(localized: "home.suggestion.often", defaultValue: "You've asked \(times) times lately")
+        }
+
+        static func learned(app: String?) -> String {
+            if let app { String(localized: "home.suggestion.learnedIn", defaultValue: "Mode knows how, in \(app)") }
+            else { String(localized: "home.suggestion.learned", defaultValue: "Mode knows how") }
+        }
+    }
+
+    enum PartOfDayName { case morning, afternoon, evening, night }
+
+    enum Ask {
+        static let title = LocalizedStringResource("ask.title", defaultValue: "Ask Mode")
+        static let prompt = LocalizedStringResource("ask.prompt", defaultValue: "What should Mode do?")
+        static let followUpPrompt = LocalizedStringResource("ask.followUpPrompt", defaultValue: "Ask for more")
+        static let send = LocalizedStringResource("ask.send", defaultValue: "Send")
+        static let privateOn = LocalizedStringResource("ask.privateOn", defaultValue: "Private: nothing is remembered")
+        static let privateOff = LocalizedStringResource("ask.privateOff", defaultValue: "Make this private")
+        static let voiceSoon = LocalizedStringResource("ask.voiceSoon", defaultValue: "Speaking a task is coming soon. Type it for now.")
+    }
+
+    enum Conversation {
+        static let working = LocalizedStringResource("conversation.working", defaultValue: "Working on it")
+
+        static func seeScreens(_ count: Int) -> String {
+            String(localized: "conversation.seeScreens", defaultValue: "See all \(count) screens")
+        }
+
+        static func remembered(_ text: String) -> String {
+            String(localized: "conversation.remembered", defaultValue: "Remembered: \(text)")
+        }
+    }
+
     enum Developer {
         static let title = LocalizedStringResource("developer.title", defaultValue: "Developer")
     }

@@ -16,16 +16,16 @@ struct MainTabs: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab(value: AppTab.home) {
-                TabRoot(app: app) { PlaceholderScreen() }
+                TabRoot(app: app) { navigate in HomeRoute(app: app, navigate: navigate) }
             } label: { Label { Text(L10n.Tab.home) } icon: { ModeIcon.home.image } }
             Tab(value: AppTab.tasks) {
-                TabRoot(app: app) { PlaceholderScreen() }
+                TabRoot(app: app) { _ in PlaceholderScreen() }
             } label: { Label { Text(L10n.Tab.tasks) } icon: { ModeIcon.tasks.image } }
             Tab(value: AppTab.memory) {
-                TabRoot(app: app) { PlaceholderScreen() }
+                TabRoot(app: app) { _ in PlaceholderScreen() }
             } label: { Label { Text(L10n.Tab.memory) } icon: { ModeIcon.memory.image } }
             Tab(value: AppTab.ask, role: .search) {
-                TabRoot(app: app) { PlaceholderScreen() }
+                TabRoot(app: app) { navigate in AskRoute(app: app, navigate: navigate) }
             } label: { Label { Text(L10n.Tab.ask) } icon: { ModeIcon.ask.image } }
         }
         .tint(ModeColor.tint)
@@ -44,18 +44,24 @@ struct MainTabs: View {
 /// One tab's navigation stack, with every route it can open.
 private struct TabRoot<Content: View>: View {
     let app: AppModel
-    @ViewBuilder let content: () -> Content
+    @ViewBuilder let content: (@escaping (Route) -> Void) -> Content
+    @State private var path: [Route] = []
 
     var body: some View {
-        NavigationStack {
-            content()
+        NavigationStack(path: $path) {
+            content(navigate)
                 .navigationDestination(for: Route.self) { route in
                     switch route {
+                    case let .conversation(id): ConversationRoute(app: app, conversationId: id, navigate: navigate)
                     case .developer: DeveloperView()
-                    default: PlaceholderScreen()
+                    case .liveRun, .runScreens, .settings: PlaceholderScreen()
                     }
                 }
         }
+    }
+
+    private func navigate(_ route: Route) {
+        path.append(route)
     }
 }
 
