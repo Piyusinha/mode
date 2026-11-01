@@ -487,8 +487,13 @@ class Agent(
         /** Text with its centre in screenshot pixels. */
         val texts: List<Triple<String, Int, Int>>,
     ) {
-        /** Text and rough position: a scroll changes it even when the words do not. */
-        val signature: String = texts.joinToString("|") { "${it.first}@${it.third / 12}" }
+        /**
+         * Text and rough position: a scroll changes it even when the words do not. The status
+         * bar is left out: its clock, and the Live Activity's timer on the Dynamic Island, change
+         * every second and once made every screen look "changed" (an add was tapped four times).
+         */
+        val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(it.first.trim()) }
+            .joinToString("|") { "${it.first}@${it.third / 12}" }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -551,6 +556,10 @@ class Agent(
     companion object {
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        /** The status bar and Dynamic Island, in screen points from the top. */
+        private const val STATUS_BAR_PT = 60.0
+        /** What ticks up there: the clock, a timer, the battery percentage. */
+        private val TICKING = Regex("""^\d{1,3}(?:[:.]\d{2}){0,2}%?$""")
         private const val TAP_MAY_HAVE_WORKED =
             " (a tap that adds, sends or saves may still have worked: many apps confirm only for a moment)"
         private const val REPEAT_HELD_BACK =

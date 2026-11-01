@@ -304,6 +304,16 @@ class AgentTest {
     }
 
     @Test
+    fun aTickingClockInTheStatusBarIsNotAChange() = runTest {
+        // The Dynamic Island's timer changes every second; the page below does not.
+        val phone = FakePhone(List(10) { i -> listOf("0:${10 + i}" to (330.0 to 20.0), "Chocolate oats" to (200.0 to 136.0)) })
+        val plus = call("tap", "x" to 411, "y" to 273, "reason" to "Adding it to Dinner")
+        val model = ScriptedModel(plus, plus, call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
+        assertEquals(1, phone.actions.count { it is Op.Tap }, "the repeat is held back: only the clock moved")
+    }
+
+    @Test
     fun afterATapThatChangedNothingTheNextTapOnThatScreenIsHeldBackEvenElsewhere() = runTest {
         val phone = FakePhone(List(10) { listOf("Results" to (200.0 to 100.0)) })
         fun plus(y: Int) = call("tap", "x" to 411, "y" to y, "reason" to "Adding it")
