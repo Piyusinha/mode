@@ -14,13 +14,16 @@ import com.piyush.mode.feature.connection.presentation.IdleDisconnectPolicy
 import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.runs.data.RunRepository
+import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
+import com.piyush.mode.llm.OpenRouterModels
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** What each platform provides; everything else is built from these. */
 class PlatformServices(
@@ -47,6 +50,8 @@ class ModeGraph(platform: PlatformServices) {
     val files: FileStore = platform.files
 
     val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
+    /** The models to pick from: OpenRouter's live list, cached for a day. */
+    val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
     val session: PhoneSession = PhoneSession(platform.phoneLink)
     val runs: RunRepository = RunRepository(platform.files)
 
@@ -67,5 +72,6 @@ class ModeGraph(platform: PlatformServices) {
 
     init {
         IdleDisconnectPolicy(session, activity, scope).install(platform.lifecycle)
+        scope.launch { models.refresh() }
     }
 }

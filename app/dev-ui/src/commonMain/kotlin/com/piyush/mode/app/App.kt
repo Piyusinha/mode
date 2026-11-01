@@ -44,7 +44,8 @@ import com.piyush.mode.feature.compare.presentation.CompareRunner
 import com.piyush.mode.feature.connection.domain.label
 import com.piyush.mode.feature.diagnostics.presentation.HandsCheck
 import com.piyush.mode.feature.settings.data.SettingsRepository
-import com.piyush.mode.feature.settings.domain.ModelCatalog
+import com.piyush.mode.feature.settings.data.ModelCatalog
+import com.piyush.mode.feature.settings.domain.ModelOption
 import com.piyush.mode.feature.tasks.domain.PendingQuestion
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import kotlinx.coroutines.launch
@@ -86,9 +87,9 @@ fun App(graph: ModeGraph, decodeImage: (ByteArray) -> ImageBitmap) {
                 }
                 when (tab) {
                     0 -> AgentScreen(graph.tasks, connection.label)
-                    1 -> CompareScreen(graph.compare, graph.tasks)
+                    1 -> CompareScreen(graph.compare, graph.tasks, graph.models)
                     2 -> LogsScreen(graph.files, graph.runs, decodeImage)
-                    3 -> SettingsScreen(graph.settings)
+                    3 -> SettingsScreen(graph.settings, graph.models)
                     else -> HandsCheckScreen(graph.handsCheck, decodeImage)
                 }
             }
@@ -142,13 +143,13 @@ private fun AgentScreen(runner: TaskRunner, connection: String) {
 }
 
 @Composable
-private fun CompareScreen(compare: CompareRunner, runner: TaskRunner) {
+private fun CompareScreen(compare: CompareRunner, runner: TaskRunner, catalog: ModelCatalog) {
     val scope = rememberCoroutineScope()
     val state by compare.state.collectAsState()
     val task by runner.state.collectAsState()
     val focus = LocalFocusManager.current
     var tasks by remember { mutableStateOf("") }
-    var models by remember { mutableStateOf(ModelCatalog.recommended.take(4).joinToString("\n") { it.id }) }
+    var models by remember { mutableStateOf(catalog.state.value.recommended.take(4).joinToString("\n") { it.id }) }
     Page {
         Text(
             "Runs every task with every model, each from the Home Screen, and compares success, steps, time and cost. " +
@@ -189,7 +190,7 @@ private fun CompareScreen(compare: CompareRunner, runner: TaskRunner) {
 }
 
 @Composable
-private fun SettingsScreen(settings: SettingsRepository) {
+private fun SettingsScreen(settings: SettingsRepository, catalog: ModelCatalog) {
     val current by settings.settings.collectAsState()
     var key by remember { mutableStateOf(settings.apiKey.orEmpty()) }
     var model by remember { mutableStateOf(current.model) }
@@ -203,14 +204,17 @@ private fun SettingsScreen(settings: SettingsRepository) {
             label = { Text("OpenRouter API key") }, visualTransformation = PasswordVisualTransformation(),
         )
         Text("Kept in the iPhone Keychain on this device only.", style = MaterialTheme.typography.bodySmall)
-        OutlinedTextField(model, { model = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Model") })
-        OutlinedTextField(strong, { strong = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Stronger model when stuck (empty: never)") })
+        val models by catalog.state.collectAsState()
+        var query by remember { mutableStateOf("") }
+        Text("Model: $model", style = MaterialTheme.typography.titleSmall)
+        Text("When stuck: ${strong.ifBlank { "never step up" }}", style = MaterialTheme.typography.bodySmall)
+        Text("Picked models (${models.source.name.lowercase()} list, cost for a typical task):", style = MaterialTheme.typography.titleSmall)
+        for (option in models.recommended) ModelRow(option, onMain = { model = option.id }, onStuck = { strong = option.id })
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search all ${models.all.size} models") })
+        if (query.isNotBlank()) for (option in catalog.search(query).take(15)) ModelRow(option, onMain = { model = option.id }, onStuck = { strong = option.id })
+        TextButton(onClick = { strong = "" }) { Text("Never step up to a stronger model") }
         OutlinedTextField(steps, { steps = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Max steps per task") })
         OutlinedTextField(cost, { cost = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Max cost per task (US dollars)") })
-        Text("Models to try ($ per million tokens, in · out):", style = MaterialTheme.typography.titleSmall)
-        for (option in ModelCatalog.recommended) {
-            TextButton(onClick = { model = option.id }) { Text("${option.id}  (${option.note})") }
-        }
         Button(onClick = {
             settings.apiKey = key
             settings.update {
@@ -227,6 +231,26 @@ private fun SettingsScreen(settings: SettingsRepository) {
             saved = "Saved."
         }) { Text("Save") }
         if (saved.isNotEmpty()) Text(saved)
+    }
+}
+
+@Composable
+private fun ModelRow(option: ModelOption, onMain: () -> Unit, onStuck: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(10.dp)) {
+            Text(
+                option.name + (option.tag?.let { "  · ${it.name}" } ?: ""),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "about $${money(option.costPerTaskUsd)} a task" + (if (option.note.isNotBlank()) " · ${option.note}" else "") + "\n${option.id}",
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onMain) { Text("Use") }
+                TextButton(onClick = onStuck) { Text("Use when stuck") }
+            }
+        }
     }
 }
 
