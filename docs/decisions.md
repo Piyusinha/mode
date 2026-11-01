@@ -333,3 +333,19 @@ the graph grows past what one file reads comfortably.
   Display, which can't ship. Body text stays SF Pro so it follows the iPhone's
   text size. SwiftUI uses `Font.mode(.largeTitle)` from `ModeFont.swift`.
 
+## D28. Notes as a field, and a check before done that runs once
+
+- **Notes.** The harness design had `note(text)` as its own tool. It became an
+  optional `note` field on every action instead: a model reading a calendar
+  can scroll and keep what it just read in the same step. A separate tool
+  would cost one more model call per fact, about $0.0005 and 2 s each.
+- **Verify.** `done` must give evidence: what on the current screen shows the
+  task is complete. A successful `done` is sent back for a look when the
+  evidence is missing or the last action changed nothing. This happens only
+  once per task, and the second `done` is always accepted. That catches "I
+  tapped Send" when nothing was sent, without a loop, and without asking the
+  user anything (the user wants as few questions as possible).
+- **Stuck.** Stopping early with an honest reason ("Stuck: the screen stopped
+  changing after 4 tries. Last: tap "Send".") beats spending the rest of the
+  step and cost budget going round in circles.
+

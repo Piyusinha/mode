@@ -68,10 +68,11 @@ flowchart LR
 3. **Plan.** The model writes a short plan for any task with several parts,
    as it does today.
 4. **Act loop.** As now, with two new tools:
-   - `note(text)`: keep a fact found on the way ("14:00 Biozyme with lunch").
+   - `note`: keep a fact found on the way ("14:00 Biozyme with lunch").
      Notes stay in the prompt for the rest of the task, even after the step
-     history is trimmed, and feed the final answer. Today, a long calendar
-     read can lose early items.
+     history is trimmed, and feed the final answer. Built as an optional
+     field on every action rather than its own tool, so keeping a fact never
+     costs a step (D28).
    - `recall(query)`: look up memory mid-task ("Sonali's number"),
      for things the first pull didn't foresee.
 5. **Verify.** Before `done` is accepted, the model must say what on the
@@ -196,6 +197,24 @@ make Mode faster and cheaper, as the papers suggest.
 Progress: **step 1 (the data layer) is done** (2026-11-01): `core:database`, saved
 tasks and conversations, the run index with a one-time import of earlier runs,
 typed settings with the $0.05 cost limit enforced, and the live model catalogue.
+
+**Step 2 (the context builder) is done** (2026-11-01):
+- `ContextBuilder`: the sections and budgets of §5, with cache points after
+  the system prompt and after the stable part. Steps older than the last 12
+  become one summary line, made without a model call.
+- Prompt caching through OpenRouter: `cache_control` markers for Anthropic and
+  Gemini models, the same stable-first layout for the rest. Cached tokens are
+  logged per step.
+- Notes, as a field on every action.
+- Verify: `done` needs evidence from the screen. A successful `done` with none,
+  or right after an action that changed nothing, is sent back once.
+- `StuckDetector`:
+  - steps up after 2 unchanged screens;
+  - stops after 4 unchanged once the stronger model has had a try, or after
+    seeing the same screen 6 times in 12.
+- A 15-minute time limit and the daily spend cap.
+- `TaskContext` carries the user's name and, for a follow-up, the earlier
+  turns. H3 fills in "about you" and the app notes.
 
 
 1. **Data layer:** `core:database`; persistent tasks, conversations and runs;

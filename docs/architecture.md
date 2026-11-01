@@ -59,7 +59,7 @@ outside the layers and is used only by test source sets.
 | core | `core:database` | The on-device SQLite database (SQLDelight): conversations, turns, tasks, the run index; `mode.db` on iOS |
 | engine | `engine:ops` | What can be asked of a phone: `Op`, `PhoneBackend`, `ResilientBackend`, `FakeBackend` |
 | engine | `engine:llm` | `LlmClient`, `OpenRouterClient`, and `OpenRouterModels` (the live model catalogue) |
-| engine | `engine:agent` | The agent loop, its tools and `AgentTrace` |
+| engine | `engine:agent` | The agent loop, its tools, `ContextBuilder` (what the model sees), `StuckDetector` and `AgentTrace` |
 | engine | `engine:phone-ios` | The iPhone backend over CoreDevice, the VPN and the pairing file |
 | feature | `feature:connection` | `PhoneSession` (one shared session, `ConnectionState`), the `PhoneLink` port, `IdleDisconnectPolicy` |
 | feature | `feature:settings` | `SettingsRepository` (typed `ModeSettings`, including the per-task cost limit) and `ModelCatalog` (usable models with cost per task, cached a day) |

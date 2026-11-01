@@ -38,8 +38,9 @@ As of 2026-11-01.
 
 ### Focus now (set 2026-11-01)
 In this order; everything else below waits until these are done.
-1. **H2, the context builder:** sectioned prompt with budgets, `note`, verify before
-   done, stuck check, prompt caching (`docs/harness.md` §9).
+1. ~~**H2, the context builder:**~~ done 2026-11-01: sectioned prompt with budgets, notes,
+   verify before done, stuck check, time limit, daily cap, prompt caching
+   (`docs/harness.md` §9).
 2. **H3, memory:** about you, per-app notes, reflection, secret filter,
    "Remembered · Undo", `recall`.
 3. **H4, queue and sources:** one task inbox for the app, Siri, Watch, Shortcuts and schedules.
