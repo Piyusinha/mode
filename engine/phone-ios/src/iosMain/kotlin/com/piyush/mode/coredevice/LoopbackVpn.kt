@@ -97,6 +97,11 @@ object LoopbackVpn {
         }.forEach { it.connection.stopVPNTunnel() }
     }
 
+    /** Whether the user has allowed Mode's VPN (its configuration exists); free builds use LocalDevVPN instead. */
+    suspend fun isAllowed(): Boolean = builtIn && loadAll().any {
+        (it.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == providerBundleId
+    }
+
     private suspend fun loadOrCreate(): NETunnelProviderManager {
         val existing = loadAll().firstOrNull {
             (it.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == providerBundleId

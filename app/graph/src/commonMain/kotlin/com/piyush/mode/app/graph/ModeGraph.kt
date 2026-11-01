@@ -53,6 +53,9 @@ class PlatformServices(
     val phoneLink: PhoneLink,
     /** Opens the app's database. */
     val database: DatabaseFactory,
+    val permissions: com.piyush.mode.core.platform.Permissions,
+    /** Each stage of reaching this iPhone, for the Diagnose screen. */
+    val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks,
 )
 
 /**
@@ -101,7 +104,10 @@ class ModeGraph(platform: PlatformServices) {
 
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     /** Each screen's presenter, for the native UI. */
-    val screens: Screens = Screens(scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session, handsCheck)
+    val screens: Screens = Screens(
+        scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session,
+        platform.permissions, platform.phoneChecks, com.piyush.mode.llm.OpenRouterAuth(platform.http),
+    )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
 

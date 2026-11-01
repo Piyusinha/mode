@@ -34,6 +34,8 @@ val iosModeGraph: ModeGraph by lazy {
             http = darwinHttpClient(),
             phoneLink = CoreDevicePhoneLink(),
             database = IosDatabaseFactory(),
+            permissions = com.piyush.mode.core.platform.IosPermissions(),
+            phoneChecks = com.piyush.mode.feature.connection.data.CoreDevicePhoneChecks(),
         ),
     )
 }

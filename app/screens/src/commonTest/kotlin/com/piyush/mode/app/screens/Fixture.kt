@@ -53,6 +53,28 @@ internal class Notes : Notifier {
     override fun cancel(id: String) { scheduled.remove(id) }
 }
 
+internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
+    val granted = mutableSetOf<com.piyush.mode.core.platform.Permission>()
+    override suspend fun status(permission: com.piyush.mode.core.platform.Permission) =
+        if (permission in granted) com.piyush.mode.core.platform.PermissionStatus.Allowed else com.piyush.mode.core.platform.PermissionStatus.NotAsked
+    override suspend fun request(permission: com.piyush.mode.core.platform.Permission): com.piyush.mode.core.platform.PermissionStatus {
+        granted += permission
+        return status(permission)
+    }
+}
+
+internal class FakeChecks(var paired: Boolean = true) : com.piyush.mode.feature.connection.domain.PhoneChecks {
+    var vpn = false
+    override fun hasPairingFile() = paired
+    override suspend fun vpnAllowed() = vpn
+    override suspend fun run(update: (List<com.piyush.mode.feature.connection.domain.PhoneCheckResult>) -> Unit) {
+        update(listOf(
+            com.piyush.mode.feature.connection.domain.PhoneCheckResult(com.piyush.mode.feature.connection.domain.PhoneCheckId.PairingFile, com.piyush.mode.feature.connection.domain.CheckState.Passed(null)),
+            com.piyush.mode.feature.connection.domain.PhoneCheckResult(com.piyush.mode.feature.connection.domain.PhoneCheckId.Paired, com.piyush.mode.feature.connection.domain.CheckState.Failed("unpaired", "Pair again from your Mac.")),
+        ))
+    }
+}
+
 /** Every feature a screen may use, on an in-memory database, at a fixed time. */
 internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel(), var now: Long = nov(1, 8)) {
     val db = testDatabase()
@@ -66,7 +88,8 @@ internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel()
     val notes = Notes()
     val session = PhoneSession(Link(), Duration.ZERO)
     val catalog = com.piyush.mode.feature.settings.data.ModelCatalog(fetch = { error("offline") }, files = files)
-    val handsCheck = com.piyush.mode.feature.diagnostics.presentation.HandsCheck(session, Inline, object : AppInfo { override val bundleId = "com.piyush.mode" }, ActivityTracker())
+    val permissions = FakePermissions()
+    val checks = FakeChecks()
     val runner = TaskRunner(
         session = session,
         settings = settings,
