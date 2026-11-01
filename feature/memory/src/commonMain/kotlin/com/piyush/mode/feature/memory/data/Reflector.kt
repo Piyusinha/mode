@@ -202,7 +202,10 @@ public class Reflector(
               in lower case; keywords = 4 to 10 words someone might use to ask for it (synonyms too); app = the
               main app.
             - tip: one short note about an app's layout or behaviour that would have saved steps ("Calendar:
-              the list button is top right; the icon next to it opens search"). subject = the app, lower case.
+              the list button is top right; the icon next to it opens search"). Above all a shortcut the
+              assistant missed or found: a recent or suggested entry to tap instead of typing ("Rapido: recent
+              destinations are listed on the home screen; tap one instead of searching"), a sort or filter
+              option, a direct button. subject = the app, lower case.
 
             Rules:
             - At most 5 changes. Fewer is better: only what will clearly help another task.

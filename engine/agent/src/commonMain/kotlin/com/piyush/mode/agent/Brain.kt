@@ -102,6 +102,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
         val about = listOfNotNull(c.userName?.let { "Their name: $it" }) + c.aboutYou
         if (about.isNotEmpty()) append("ABOUT THE USER:\n").append(about.joinToString("\n") { "- $it" }).append("\n\n")
         if (c.skills.isNotEmpty()) append("WHAT WORKED BEFORE:\n").append(c.skills.joinToString("\n")).append("\n\n")
+        // Learned from earlier tasks ("Rapido: recent destinations are on the home screen"): shape the plan with them.
+        if (c.appNotes.isNotEmpty()) {
+            append("TIPS FOR THESE APPS (from earlier tasks):\n").append(c.appNotes.take(ContextBuilder.MAX_APP_NOTES).joinToString("\n") { "- $it" }).append("\n\n")
+        }
         if (c.recentTasks.isNotEmpty()) append("RECENT TASKS:\n").append(c.recentTasks.joinToString("\n") { "- $it" }).append("\n\n")
         if (c.earlierTurns.isNotEmpty()) {
             append("EARLIER IN THIS CONVERSATION:\n")

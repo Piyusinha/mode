@@ -38,6 +38,13 @@ class BrainTest {
     }
 
     @Test
+    fun theBrainSeesWhatWasLearnedAboutTheApps() = runTest {
+        val model = ScriptedModel(sonali)
+        Brain(model, "strong").brief("ride to Bellandur", TaskContext(appNotes = listOf("Rapido: recent destinations are on the home screen")))
+        assertTrue("TIPS FOR THESE APPS" in model.lastUserText && "recent destinations are on the home screen" in model.lastUserText, model.lastUserText)
+    }
+
+    @Test
     fun aMissingOrFailedBriefIsNoBriefNotAFailedTask() = runTest {
         assertNull(Brain(ScriptedModel(call("brief", "intent" to "x")), "strong").brief("t", TaskContext()).brief, "no steps")
         val failing = LlmClient { _, _, _ -> throw LlmFailed("down") }
