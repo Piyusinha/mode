@@ -31,6 +31,10 @@ targets:
         UIBackgroundModes:
           - audio
         NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
+        # Instrument Sans (SIL Open Font License, Fonts/OFL.txt) for titles and headings.
+        UIAppFonts:
+          - InstrumentSans-Variable.ttf
+          - InstrumentSans-Italic-Variable.ttf
     preBuildScripts:
       # Builds the Kotlin side (ModeKit.framework) for the SDK and configuration Xcode is building.
       - name: Build ModeKit

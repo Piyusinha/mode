@@ -4,6 +4,10 @@ import ModeKit
 
 @main
 struct ModeApp: App {
+    init() {
+        ModeFonts.check()
+    }
+
     var body: some Scene {
         WindowGroup {
             ComposeView()

@@ -321,3 +321,15 @@ the `PlatformServices` a platform provides. It needs no library, the compiler
 checks it, and Swift uses it directly. Koin (or similar) can come later if
 the graph grows past what one file reads comfortably.
 
+## D27. Brand: the Orbit icon and Instrument Sans
+
+- **Icon, "Orbit":** a frosted glass iPhone with an agent circling it; the
+  orbit passes behind the phone and in front of it, and the agent leaves a
+  trail. A first try (an M drawn as one swipe) read too much like Gmail.
+  `tools/make-icon.swift` draws it at 1024 px in light, dark and tinted into
+  `iosApp/Mode/Assets.xcassets`; iOS adds its own glass.
+- **Typeface:** Instrument Sans (SIL Open Font License, `iosApp/Mode/Fonts/OFL.txt`)
+  for titles and headings, chosen as the closest free match to Anthropic Sans
+  Display, which can't ship. Body text stays SF Pro so it follows the iPhone's
+  text size. SwiftUI uses `Font.mode(.largeTitle)` from `ModeFont.swift`.
+
