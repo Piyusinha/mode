@@ -29,8 +29,10 @@ dependencyResolutionManagement {
     }
 }
 
-// Shared modules are added as their phase starts (screen, agent, tools, llm, mcp, devsvc).
-include(":shared:core-ops")
-include(":shared:phone-coredevice")
-include(":shared:agent")
+// Layers, lowest first: core → engine → feature → app (see docs/architecture.md).
+include(":core:network")
+include(":engine:ops")
+include(":engine:llm")
+include(":engine:agent")
+include(":engine:phone-ios")
 include(":composeApp")

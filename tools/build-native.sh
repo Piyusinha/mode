@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds modecore (native/modecore) as static libraries for the iPhone and the
-# Apple-silicon simulator, for the Kotlin cinterop in shared/phone-coredevice.
+# Apple-silicon simulator, for the Kotlin cinterop in engine/phone-ios.
 #
 #   tools/build-native.sh            # release (what the app links)
 #   PROFILE=debug tools/build-native.sh

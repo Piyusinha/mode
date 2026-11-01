@@ -17,7 +17,7 @@ import platform.Foundation.NSOperationQueue
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
 import platform.UIKit.UIApplicationWillTerminateNotification
 import com.piyush.mode.coredevice.LoopbackVpn
-import com.piyush.mode.agent.darwinHttpClient
+import com.piyush.mode.core.network.darwinHttpClient
 import platform.UIKit.UIApplication
 import platform.UIKit.UIBackgroundTaskInvalid
 import platform.UIKit.UIViewController

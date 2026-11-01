@@ -8,7 +8,7 @@ import com.piyush.mode.agent.Agent
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
-import com.piyush.mode.agent.OpenRouterClient
+import com.piyush.mode.llm.OpenRouterClient
 import com.piyush.mode.agent.StepRecord
 import com.piyush.mode.agent.UserGate
 import com.piyush.mode.ops.Op

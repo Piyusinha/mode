@@ -13,17 +13,18 @@ kotlin {
             // The one framework Swift imports: the UI plus every shared module it exports.
             baseName = "ModeKit"
             isStatic = true
-            export(projects.shared.coreOps)
-            export(projects.shared.phoneCoredevice)
-            export(projects.shared.agent)
+            export(projects.engine.ops)
+            export(projects.engine.phoneIos)
+            export(projects.engine.agent)
         }
     }
 
     sourceSets {
         commonMain.dependencies {
-            api(projects.shared.coreOps)
-            api(projects.shared.phoneCoredevice)
-            api(projects.shared.agent)
+            api(projects.engine.ops)
+            api(projects.engine.phoneIos)
+            api(projects.engine.agent)
+            implementation(projects.core.network)
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)

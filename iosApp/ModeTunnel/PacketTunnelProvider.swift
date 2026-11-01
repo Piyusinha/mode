@@ -9,7 +9,7 @@ import NetworkExtension
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     /// This end of the tunnel (the phone's address on it).
     private static let local = "10.7.1.1"
-    /// The reflected "peer"; must match LoopbackVpn.PEER in shared/phone-coredevice.
+    /// The reflected "peer"; must match LoopbackVpn.PEER in engine/phone-ios.
     private static let peer = "10.7.0.1"
 
     override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {

@@ -13,7 +13,7 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 CARGO=${CARGO:-$HOME/.cargo/bin/cargo}
-# Must match PhoneConnector's hostname (shared/phone-coredevice).
+# Must match PhoneConnector's hostname (engine/phone-ios).
 HOSTNAME_FOR_PAIRING=Mode
 BUNDLE_ID=com.piyush.mode
 OUT="$ROOT/build/pairing/mode.rppairing"

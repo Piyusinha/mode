@@ -44,7 +44,7 @@ targets:
           ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
     postCompileScripts:
       # Apple's developer disk image from this Mac's Xcode, so Mode can remount
-      # it after the phone restarts (shared/phone-coredevice: PhoneConnector).
+      # it after the phone restarts (engine/phone-ios: PhoneConnector).
       - name: Bundle developer disk image
         basedOnDependencyAnalysis: false
         script: |

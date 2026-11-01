@@ -4,7 +4,7 @@ import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
 import com.piyush.mode.agent.AgentTrace
-import com.piyush.mode.agent.Usage
+import com.piyush.mode.llm.Usage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
