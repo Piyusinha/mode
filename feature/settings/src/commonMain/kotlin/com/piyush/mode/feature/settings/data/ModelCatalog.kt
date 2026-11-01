@@ -45,11 +45,13 @@ public class ModelCatalog @OptIn(ExperimentalTime::class) constructor(
         }
     }
 
-    /** Usable models whose name or id contains [query], cheapest task first. */
-    public fun search(query: String): List<ModelOption> {
-        val q = query.trim()
-        return if (q.isEmpty()) state.value.all else state.value.all.filter { it.id.contains(q, true) || it.name.contains(q, true) }
-    }
+    /** Usable models matching [query] (see ModelSearch), the closest first. */
+    public fun search(query: String, maker: String? = null): List<ModelOption> = ModelSearch.search(state.value.all, query, maker)
+
+    /** The makers in the list ("anthropic", "openai"…), the one with the most models first. */
+    public fun makers(): List<String> =
+        state.value.all.groupingBy(ModelSearch::maker).eachCount().entries.filter { it.key.isNotEmpty() }
+            .sortedByDescending { it.value }.map { it.key }
 
     private fun load(): CatalogState {
         val cached = files.read(CACHE)?.decodeToString()
