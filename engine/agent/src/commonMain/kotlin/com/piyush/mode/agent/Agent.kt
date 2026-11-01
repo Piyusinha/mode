@@ -157,11 +157,10 @@ class Agent(
         val answers = mutableListOf<Pair<String, String>>()
         /** The user answered and the agent has not acted since: another question would repeat it. */
         var answeredSinceAction = false
-        /** The last tap and the screen it was made on: a second tap on the same spot of the same screen is held back once. */
-        var lastTap: Pair<Double, Double>? = null
+        /** The screen the last tap was made on: the next tap on that same, unchanged screen is held back once. */
         var lastTapScreen: String? = null
         var lastWasTap = false
-        val heldBack = mutableSetOf<Pair<Int, Int>>()
+        val heldBack = mutableSetOf<String>()
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
         /** Facts the model kept on the way; shown every step for the rest of the task. */
@@ -375,14 +374,13 @@ class Agent(
                         continue
                     }
                     val described = describe(call, op, screen)
-                    // Seen on the phone: an app showed "added" for a moment, the screen then looked
-                    // the same, and the same + was tapped three times (three entries). Hold a repeat
-                    // tap on an unchanged screen back once and have the model check first.
+                    // Seen on the phone: an app showed "added" for a moment and the screen then looked
+                    // the same, so the agent tapped the same + three times; another time it tapped +
+                    // on four different wrong results. After a tap that changed nothing visible, the
+                    // next tap on that screen is held back once and the model checks first.
                     if (op is Op.Tap) {
-                        val spot = (op.x / SAME_SPOT_PT).roundToInt() to (op.y / SAME_SPOT_PT).roundToInt()
-                        val again = lastTap?.let { hypot(it.first - op.x, it.second - op.y) < SAME_SPOT_PT } == true &&
-                            lastTapScreen == screen.signature
-                        if (again && heldBack.add(spot)) {
+                        val again = lastWasTap && lastTapScreen == screen.signature
+                        if (again && heldBack.add(screen.signature)) {
                             stuck.badReply()
                             record("$described (held back)", reason, REPEAT_HELD_BACK)
                             continue
@@ -401,7 +399,6 @@ class Agent(
                         answeredSinceAction = false
                         if (op is Op.TypeText) lastTyped = op.text
                         lastWasTap = op is Op.Tap
-                        lastTap = (op as? Op.Tap)?.let { it.x to it.y }
                         lastTapScreen = screen.signature
                         stuck.acted()
                         if (op is Op.LaunchApp) {
@@ -557,14 +554,13 @@ class Agent(
         private const val TAP_MAY_HAVE_WORKED =
             " (a tap that adds, sends or saves may still have worked: many apps confirm only for a moment)"
         private const val REPEAT_HELD_BACK =
-            "not done: you just tapped this same spot and the screen looks the same. If it adds, sends, buys, books or " +
-                "saves something, it may already have worked (apps often confirm only for a moment): check first, where " +
-                "it would show (the diary or meal, the list, the cart, the chat). If it really did not work, or this " +
-                "tap is meant to repeat (a + raising a quantity), tap it again and it will go through."
+            "not done: your last tap on this screen changed nothing visible. If it added, sent, bought, booked or saved " +
+                "something, it may already have worked (apps often confirm only for a moment), so another tap here could " +
+                "add a second or a wrong item. Check first, where it would show (the diary or meal, the list, the cart, " +
+                "the chat). If you are sure this tap is right (it really did not work, or a + raises a quantity), tap " +
+                "again and it will go through."
         /** What the user sees while the agent looks and thinks; never a model or a step number. */
         const val WORKING = "Working on it"
-        /** Taps closer than this (screen points) count as the same spot. */
-        private const val SAME_SPOT_PT = 24.0
         private const val MAX_RECALL_CHARS = 1200
 
         val SYSTEM_PROMPT = """
@@ -591,6 +587,11 @@ class Agent(
               After it, look for proof it worked (a check, a count going up, the item in the list). Many apps
               confirm for only a moment, so a screen that looks the same does not mean it failed: before tapping
               again, check where it would show (the diary or meal, the cart, the chat, the list).
+            - Choosing from search results (food, products, contacts, places): read them from the screenshot and
+              pick only one that matches what the user asked (name, brand, size). A + or Add button adds the
+              item; it does not open or check it. If nothing matches, search again with another spelling or
+              fewer words (spoken tasks are often misheard); if still nothing matches, ask the user which one
+              they mean instead of adding something close.
             - Say in expect what the screen should show after an action ("Appearance page opens"); on the
               next screen, check it happened before going on.
             - Deal with popups, permission prompts and ads yourself (dismiss or allow as the task needs).

@@ -82,8 +82,8 @@ class AgentTest {
         fun tap(x: Int) = call("tap", "x" to x, "y" to 1, "reason" to "try")
         val model = ScriptedModel(tap(1), tap(200), tap(400), call("done", "evidence" to "on screen", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
-        // Two taps change nothing, so the third decision goes to the strong model, then back to cheap.
-        assertEquals(listOf("cheap", "cheap", "strong", "cheap"), model.models)
+        // Taps change nothing (the second is held back for a check), so a later decision goes to the strong model.
+        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
     }
 
     @Test
@@ -301,6 +301,15 @@ class AgentTest {
         Agent(phone, model, Gate(), noSettle).run("add chocolate oats to dinner")
         // First tap goes through; the immediate repeat is held back; insisting goes through.
         assertEquals(2, phone.actions.count { it is Op.Tap })
+    }
+
+    @Test
+    fun afterATapThatChangedNothingTheNextTapOnThatScreenIsHeldBackEvenElsewhere() = runTest {
+        val phone = FakePhone(List(10) { listOf("Results" to (200.0 to 100.0)) })
+        fun plus(y: Int) = call("tap", "x" to 411, "y" to y, "reason" to "Adding it")
+        val model = ScriptedModel(plus(435), plus(355), call("done", "evidence" to "on screen", "summary" to "x"), call("done", "evidence" to "on screen", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("add oats to dinner")
+        assertEquals(1, phone.actions.count { it is Op.Tap }, "the second row's + waits until the first was checked")
         assertTrue("may already have worked" in model.lastUserText || "held back" in model.lastUserText, model.lastUserText)
     }
 
