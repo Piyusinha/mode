@@ -13,6 +13,7 @@ As of 2026-11-01.
 | 4 | App integration: pairing, connecting from the phone, hands check, VPN, speed, restart recovery, keep-awake, clean session end | 🟡 All but mobile data and the long soak |
 | 5 | Docs | 🟡 Needs a pass for everything since the agent |
 | 6 | The agent: task in, AI picks each action, Mode executes | ✅ Working on the phone; tuning continues |
+| H1 | Harness step 1: the data layer (database, saved tasks and conversations, run index, typed settings, cost limit, live model catalogue) | ✅ Done, 91 tests |
 | P1 | Production step 1: modular clean architecture (layers, one module per feature, StateFlow state, ModeGraph, SKIE) | ✅ Done, 74 tests; on-phone check pending (see below) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 

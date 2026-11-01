@@ -193,6 +193,11 @@ make Mode faster and cheaper, as the papers suggest.
 
 ## 9. Order of work
 
+Progress: **step 1 (the data layer) is done** (2026-11-01): `core:database`, saved
+tasks and conversations, the run index with a one-time import of earlier runs,
+typed settings with the $0.05 cost limit enforced, and the live model catalogue.
+
+
 1. **Data layer:** `core:database`; persistent tasks, conversations and runs;
    typed settings and the model catalogue.
 2. **Context builder:** the sections and budgets, `note`, the progress

@@ -56,14 +56,16 @@ outside the layers and is used only by test source sets.
 | core | `core:storage` | `SecretStore`, `KeyValueStore`, `FileStore`; iOS: Keychain, UserDefaults, Documents |
 | core | `core:platform` | `AppInfo`, `AppLifecycle`, `BackgroundWork`, `Notifier`; iOS: KeepAwake, background task, notifications |
 | core | `core:network` | The HTTP client (Darwin on iOS) |
+| core | `core:database` | The on-device SQLite database (SQLDelight): conversations, turns, tasks, the run index; `mode.db` on iOS |
 | engine | `engine:ops` | What can be asked of a phone: `Op`, `PhoneBackend`, `ResilientBackend`, `FakeBackend` |
-| engine | `engine:llm` | `LlmClient` and `OpenRouterClient` |
+| engine | `engine:llm` | `LlmClient`, `OpenRouterClient`, and `OpenRouterModels` (the live model catalogue) |
 | engine | `engine:agent` | The agent loop, its tools and `AgentTrace` |
 | engine | `engine:phone-ios` | The iPhone backend over CoreDevice, the VPN and the pairing file |
 | feature | `feature:connection` | `PhoneSession` (one shared session, `ConnectionState`), the `PhoneLink` port, `IdleDisconnectPolicy` |
-| feature | `feature:settings` | `AgentSettingsRepository`, `ModelCatalog` |
-| feature | `feature:runs` | `RunRecorder`, `RunRepository` (`RunSummary`, events, screenshots) |
-| feature | `feature:tasks` | `TaskRunner` (`TaskState`, `PendingQuestion`) |
+| feature | `feature:settings` | `SettingsRepository` (typed `ModeSettings`, including the per-task cost limit) and `ModelCatalog` (usable models with cost per task, cached a day) |
+| feature | `feature:runs` | `RunRecorder`, `RunRepository` (listed from the database; events and screenshots stay files) |
+| feature | `feature:conversations` | `ConversationRepository`: conversations and their turns |
+| feature | `feature:tasks` | `TaskRunner` (`TaskState`, `PendingQuestion`), `TaskRepository` (saved tasks with source and status) |
 | feature | `feature:diagnostics` | `HandsCheck` |
 | feature | `feature:compare` | `CompareRunner` |
 | app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |
