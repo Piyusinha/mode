@@ -103,13 +103,13 @@ class Agent(
      * goes straight to the app it needs. Started from anywhere else (Siri,
      * Shortcuts), the agent works from whatever is on screen.
      */
-    suspend fun run(task: String, startsInMode: Boolean = false): AgentResult {
-        val result = runSteps(task, startsInMode)
+    suspend fun run(task: String, startsInMode: Boolean = false, context: TaskContext = TaskContext.Empty): AgentResult {
+        val result = runSteps(task, startsInMode, context)
         trace.runEnded(result)
         return result
     }
 
-    private suspend fun runSteps(task: String, startsInMode: Boolean): AgentResult {
+    private suspend fun runSteps(task: String, startsInMode: Boolean, context: TaskContext): AgentResult {
         val started = clock.markNow()
         val ops = phone.ops()
         val tools = AgentTools.available(ops)
@@ -133,6 +133,8 @@ class Agent(
         var answeredSinceAction = false
         /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
         var lastTyped: String? = null
+        /** Facts the model kept on the way; shown every step for the rest of the task. */
+        val notes = mutableListOf<String>()
 
         fun result(outcome: AgentOutcome, step: Int) =
             AgentResult(outcome, step, cost, started.elapsedNow().inWholeMilliseconds)
@@ -172,7 +174,23 @@ class Agent(
                 badReplies = 0
             }
 
-            val messages = prompt(task, history, screen, step, lastApp, plan, answers, hideScreen = inMode)
+            val messages = ContextBuilder.build(
+                ContextBuilder.Input(
+                    systemPrompt = SYSTEM_PROMPT,
+                    task = task,
+                    context = context,
+                    step = step,
+                    maxSteps = config.maxSteps,
+                    answers = answers,
+                    plan = plan,
+                    notes = notes,
+                    history = history,
+                    recentSteps = config.historySteps,
+                    lastApp = lastApp,
+                    screen = ContextBuilder.Screen(screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts),
+                    hideScreen = inMode,
+                ),
+            )
             inMode = false
             val answer = think(step, if (stepUp) config.strongModel!! else config.model, stepUp, messages, schema)
             val reply = answer.reply
@@ -374,48 +392,6 @@ class Agent(
         return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, texts)
     }
 
-    private fun prompt(
-        task: String,
-        history: List<String>,
-        screen: Screen,
-        step: Int,
-        lastApp: String?,
-        plan: String?,
-        answers: List<Pair<String, String>>,
-        hideScreen: Boolean,
-    ): List<ChatMessage> {
-        val g = screen.geometry
-        val user = buildString {
-            append("TASK: ").append(task).append("\n\n")
-            append("STEP ").append(step).append(" of at most ").append(config.maxSteps).append("\n\n")
-            if (answers.isNotEmpty()) {
-                append("THE USER'S ANSWERS (final: act on them, never ask about the same thing again):\n")
-                answers.forEach { (q, a) -> append("- You asked: ").append(q).append("\n  They said: ").append(a).append('\n') }
-                append('\n')
-            }
-            plan?.let { append("YOUR PLAN (keep it up to date with the plan tool):\n").append(it).append("\n\n") }
-            if (history.isEmpty()) {
-                append("No actions yet.\n\n")
-            } else {
-                append("WHAT HAPPENED SO FAR (latest last):\n")
-                history.takeLast(config.historySteps).forEach { append(it).append('\n') }
-                append('\n')
-            }
-            lastApp?.let { append("App you last opened: ").append(it).append("\n\n") }
-            if (hideScreen) {
-                append("THE SCREEN NOW: Mode, the app that runs you, is in front (not shown: it is not part of the task). ")
-                append("Start by opening the app or place the task needs (usually open_app), or plan first if the task has several parts.")
-                return listOf(ChatMessage("system", SYSTEM_PROMPT), ChatMessage("user", toString()))
-            }
-            append("THE SCREEN NOW: the screenshot is ${g.imageWidth}×${g.imageHeight} pixels. ")
-            append("Text on it, with each piece's centre in screenshot pixels:\n")
-            if (screen.texts.isEmpty()) append("(no text found)\n")
-            screen.texts.take(MAX_TEXTS).forEach { (text, x, y) -> append("\"").append(text).append("\" at (").append(x).append(", ").append(y).append(")\n") }
-            append("\nChoose the next single action.")
-        }
-        return listOf(ChatMessage("system", SYSTEM_PROMPT), ChatMessage("user", user, screen.jpeg))
-    }
-
     /** A readable action for the log, naming the text tapped when there is one. */
     private fun describe(call: ToolCall, op: Op, screen: Screen): String = when (op) {
         is Op.Tap -> "tap " + (nearestText(op.x, op.y, screen)?.let { "\"$it\"" } ?: "(${pixel(op.x, op.y, screen)})")
@@ -454,7 +430,6 @@ class Agent(
     private fun money(usd: Double): String = "$" + ((usd * 10000).roundToInt() / 10000.0).toString()
 
     companion object {
-        private const val MAX_TEXTS = 80
         private const val NEAR_PX = 60.0
 
         val SYSTEM_PROMPT = """
