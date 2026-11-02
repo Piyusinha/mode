@@ -1,6 +1,8 @@
 package com.piyush.mode.feature.settings.data
 
 import com.piyush.mode.agent.AgentConfig
+import com.piyush.mode.llm.ModelProvider
+import com.piyush.mode.feature.settings.domain.ProviderModels
 import com.piyush.mode.core.storage.KeyValueStore
 import com.piyush.mode.core.storage.SecretStore
 import com.piyush.mode.feature.settings.domain.ModeSettings
@@ -18,6 +20,7 @@ public class SettingsRepository(
     private val secrets: SecretStore,
     private val prefs: KeyValueStore,
 ) {
+    public val claudeCredentials: ClaudeCredentialStore = ClaudeCredentialStore(secrets) { refreshAccounts() }
     private val state = MutableStateFlow(read())
     public val settings: StateFlow<ModeSettings> = state.asStateFlow()
 
@@ -29,10 +32,43 @@ public class SettingsRepository(
         }
 
     public val hasApiKey: Boolean get() = !apiKey.isNullOrBlank()
+    public val hasModelAccess: Boolean get() = settings.value.hasModelAccess
+
+    /** Account changes refresh readiness; credentials stay in their own store. */
+    private fun refreshAccounts() { state.value = read() }
+
+    public fun hasAccess(provider: ModelProvider): Boolean = when (provider) {
+        ModelProvider.OpenRouter -> hasApiKey
+        ModelProvider.ClaudeOAuth -> claudeCredentials.connected.value
+    }
+
+    /** Each provider retains its own model selections, including an explicitly disabled strong model. */
+    public fun selectProvider(provider: ModelProvider) {
+        val old = state.value
+        if (old.provider == provider) return
+        saveModels(old)
+        val prefix = "provider_${provider.id}_"
+        val strong = prefs.getString(prefix + "strong")
+        update { it.copy(
+            provider = provider,
+            model = prefs.getString(prefix + "main") ?: ProviderModels.main(provider),
+            strongModel = if (strong == null) ProviderModels.strong(provider) else strong.ifBlank { null },
+            reflectionModel = prefs.getString(prefix + "reflection")?.ifBlank { null },
+        ) }
+    }
+
+    private fun saveModels(settings: ModeSettings) {
+        val prefix = "provider_${settings.provider.id}_"
+        prefs.putString(prefix + "main", settings.model)
+        prefs.putString(prefix + "strong", settings.strongModel.orEmpty())
+        prefs.putString(prefix + "reflection", settings.reflectionModel.orEmpty())
+    }
 
     /** Applies [change], brings every value into range, and saves it. */
     public fun update(change: (ModeSettings) -> ModeSettings) {
         val next = change(state.value).validated()
+        prefs.putString(PROVIDER, next.provider.id)
+        saveModels(next)
         prefs.putString(MODEL, next.model)
         // Empty means "never step up", as the first version stored it.
         prefs.putString(STRONG_MODEL, next.strongModel.orEmpty())
@@ -79,12 +115,15 @@ public class SettingsRepository(
             userName = prefs.getString(USER_NAME)?.ifBlank { null },
             onboardingDone = prefs.getString(ONBOARDING_DONE)?.toBooleanStrictOrNull() ?: defaults.onboardingDone,
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
+            provider = ModelProvider.fromId(prefs.getString(PROVIDER)),
+            hasClaudeAccount = claudeCredentials.connected.value,
         ).validated()
     }
 
     private companion object {
         // The first four names are kept from the first version, so existing installs keep their settings.
         const val API_KEY = "openrouter_api_key"
+        const val PROVIDER = "model_provider"
         const val MODEL = "agent_model"
         const val STRONG_MODEL = "agent_strong_model"
         const val MAX_STEPS = "agent_max_steps"

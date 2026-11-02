@@ -1,5 +1,7 @@
 package com.piyush.mode.feature.tasks.data
 
+import com.piyush.mode.llm.ModelProvider
+
 import com.piyush.mode.agent.AgentMemory
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
@@ -49,7 +51,8 @@ public class TaskMemory(
     }
 
     /** Learns from a finished task; its cost is added to the task. */
-    public suspend fun learn(taskId: String, task: String, result: AgentResult, model: String): Reflector.Reflection {
+    public suspend fun learn(taskId: String, task: String, result: AgentResult, model: String,
+        provider: ModelProvider = ModelProvider.OpenRouter): Reflector.Reflection {
         val outcome = outcomeOf(result)
         val summary = when (val o = result.outcome) {
             is AgentOutcome.Done -> o.summary
@@ -63,8 +66,9 @@ public class TaskMemory(
                 appsOpened = result.appsOpened, finalScreen = result.finalScreen,
             ),
             model,
+            provider,
         )
-        tasks.addCost(taskId, reflection.costUsd)
+        if (provider.reportsCurrencyCost) tasks.addCost(taskId, reflection.costUsd)
         return reflection
     }
 

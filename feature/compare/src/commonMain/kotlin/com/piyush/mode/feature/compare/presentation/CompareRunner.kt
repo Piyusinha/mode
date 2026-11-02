@@ -37,6 +37,7 @@ public class CompareRunner(
     public suspend fun run(tasks: List<String>, models: List<String>) {
         if (state.value.running) return
         mutableState.value = CompareState(running = true)
+        val config = settings.agentConfig()
         val id = "compare-" + nowId()
         AppLog.log("compare", "$id: ${tasks.size} tasks × ${models.size} models")
         try {
@@ -45,7 +46,7 @@ public class CompareRunner(
                     runCatching { session.phone().send(Op.Home) }
                     val result = runner.runTask(
                         task,
-                        settings.agentConfig().let { AgentConfig(model = model, strongModel = null, maxSteps = it.maxSteps, maxCostUsd = it.maxCostUsd) },
+                        config.copy(model = model, strongModel = null, brainModel = null),
                         tag = id,
                         stayConnected = true,
                     )
@@ -57,7 +58,7 @@ public class CompareRunner(
                             is AgentOutcome.Stopped -> "⏹ ${o.why}"
                             is AgentOutcome.Failed -> "❌ ${o.why}"
                         }
-                        CompareRow(model, task, outcome, result.steps, result.millis / 1000, result.costUsd)
+                        CompareRow(model, task, outcome, result.steps, result.millis / 1000, result.costUsd, result.costReported)
                     }
                     mutableState.update { it.copy(rows = it.rows + row) }
                     files.write("compare/$id.txt", summary().encodeToByteArray())
@@ -75,8 +76,9 @@ public class CompareRunner(
         for ((model, rows) in state.value.rows.groupBy { it.model }) {
             val wins = rows.count { it.outcome.startsWith("✅") }
             append("$model: $wins/${rows.size} done, ${rows.sumOf { it.steps }} steps, ")
-            append("${rows.sumOf { it.seconds }}s, $${money(rows.sumOf { it.costUsd })}\n")
-            rows.forEach { append("  • ${it.task}: ${it.outcome} (${it.steps} steps, ${it.seconds}s, $${money(it.costUsd)})\n") }
+            val cost = if (rows.all { it.costReported }) "$${money(rows.sumOf { it.costUsd })}" else "cost not reported"
+            append("${rows.sumOf { it.seconds }}s, $cost\n")
+            rows.forEach { append("  • ${it.task}: ${it.outcome} (${it.steps} steps, ${it.seconds}s, ${if (it.costReported) "$${money(it.costUsd)}" else "cost not reported"})\n") }
         }
     }
 

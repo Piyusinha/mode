@@ -298,6 +298,27 @@ enum L10n {
         static let usageNote = LocalizedStringResource("chatgpt.usageNote", defaultValue: "Change how much of your plan Mode may use in ChatGPT → Settings → Usage.")
     }
 
+    enum Claude {
+        static let check = LocalizedStringResource("claude.check", defaultValue: "Test Claude connection")
+        static let checking = LocalizedStringResource("claude.checking", defaultValue: "Checking image and action…")
+        static let title = LocalizedStringResource("claude.title", defaultValue: "Claude account · Experimental")
+        static let use = LocalizedStringResource("claude.use", defaultValue: "Use Claude OAuth")
+        static let connect = LocalizedStringResource("claude.connect", defaultValue: "Sign in with Claude")
+        static let reconnect = LocalizedStringResource("claude.reconnect", defaultValue: "Sign in again")
+        static let disconnect = LocalizedStringResource("claude.disconnect", defaultValue: "Disconnect Claude")
+        static let connected = LocalizedStringResource("claude.connected", defaultValue: "Claude account connected")
+        static let notConnected = LocalizedStringResource("claude.notConnected", defaultValue: "Claude account not connected")
+        static let note = LocalizedStringResource("claude.note", defaultValue: "Connects directly from this iPhone. This unofficial integration may be refused or billed as extra usage by Claude. Mode cannot verify the billing allowance.")
+        static let code = LocalizedStringResource("claude.code", defaultValue: "Authorization code")
+        static let codePrompt = LocalizedStringResource("claude.codePrompt", defaultValue: "Paste the complete code, including #…")
+        static let instructions = LocalizedStringResource("claude.instructions", defaultValue: "Finish signing in in your browser, copy the code Claude shows, then return here and paste it. The code expires after 10 minutes.")
+        static let finish = LocalizedStringResource("claude.finish", defaultValue: "Connect account")
+        static let cancel = LocalizedStringResource("claude.cancel", defaultValue: "Cancel sign-in")
+        static let connecting = LocalizedStringResource("claude.connecting", defaultValue: "Connecting…")
+        static let quota = LocalizedStringResource("claude.quota", defaultValue: "Claude manages your quota. Dollar costs are not reported; Mode's dollar limits apply only to OpenRouter. Step and time limits still apply.")
+        static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
+    }
+
     enum Settings {
         static let you = LocalizedStringResource("settings.you", defaultValue: "You")
         static let name = LocalizedStringResource("settings.name", defaultValue: "Your name")

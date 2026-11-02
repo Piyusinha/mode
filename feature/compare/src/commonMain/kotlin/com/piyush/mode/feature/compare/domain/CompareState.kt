@@ -9,6 +9,7 @@ public data class CompareRow(
     val steps: Int,
     val seconds: Long,
     val costUsd: Double,
+    val costReported: Boolean = true,
 )
 
 public data class CompareState(val running: Boolean = false, val rows: List<CompareRow> = emptyList())

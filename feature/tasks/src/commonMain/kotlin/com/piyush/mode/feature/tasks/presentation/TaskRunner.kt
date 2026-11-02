@@ -1,5 +1,7 @@
 package com.piyush.mode.feature.tasks.presentation
 
+import com.piyush.mode.llm.ModelProvider
+
 import com.piyush.mode.core.platform.QuestionKind
 import kotlinx.datetime.toLocalDateTime
 import com.piyush.mode.core.common.PlainText
@@ -206,9 +208,9 @@ public class TaskRunner(
         var reply = "Failed."
         var result: AgentResult? = null
         try {
-            if (!settings.hasApiKey) {
+            if (!settings.hasAccess(config.provider)) {
                 outcome = TaskStatus.NotStarted
-                reply = "Add your OpenRouter API key in Settings first."
+                reply = if (config.provider == ModelProvider.ClaudeOAuth) "Connect Claude in Settings first." else "Add your OpenRouter API key in Settings first."
                 status(reply)
                 recorder.failedToStart(task, "no API key")
                 return null
@@ -234,7 +236,7 @@ public class TaskRunner(
             val prepared = memory?.prepare(task, base, useMemory, saved.id)
             val agent = Agent(
                 phone = phone,
-                llm = llm,
+                llm = llm.forProvider(budget.provider),
                 gate = gate(phone),
                 config = budget,
                 onStep = { step -> mutableState.update { it.copy(steps = it.steps + step) } },
@@ -248,7 +250,7 @@ public class TaskRunner(
             // Started from Mode's own screen; the agent goes straight to the app it needs.
             val finished = background.run { agent.run(task, startsInMode = true, context = prepared?.context ?: base) }
             result = finished
-            if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget.model)
+            if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget)
             outcome = statusOf(finished.outcome)
             reply = replyFor(finished.outcome)
             // Time, steps and cost stay in the run log; what the user sees is the answer.
@@ -273,7 +275,8 @@ public class TaskRunner(
             notifier.post("Mode", "Task failed: ${e.message}")
             return null
         } finally {
-            tasks.finish(saved.id, outcome, reply, result?.steps, result?.costUsd)
+            tasks.finish(saved.id, outcome, reply, result?.steps,
+                if (config.provider.reportsCurrencyCost) result?.costUsd else null)
             conversation?.let { conversations.addTurn(it, TurnRole.Mode, reply, saved.id) }
             mutableState.update { it.copy(running = false, question = null, paused = false) }
             pauseGate = null
@@ -287,6 +290,8 @@ public class TaskRunner(
      * when the cap is already spent. Unchanged when there is no daily cap.
      */
     private fun withinDailyCap(config: AgentConfig): AgentConfig? {
+        // OAuth reports tokens but no currency cost; only provider quotas and step/time limits apply.
+        if (!config.provider.reportsCurrencyCost) return config.copy(maxCostUsd = null)
         val cap = settings.settings.value.dailyCapUsd ?: return config
         val left = cap - tasks.spentSince(startOfToday())
         if (left <= 0.0) return null
@@ -298,14 +303,15 @@ public class TaskRunner(
      * learning is on, reflect on it in the background (the user already has
      * the answer, so this never slows a task down).
      */
-    private fun learnFrom(taskId: String, task: String, result: AgentResult, usedIds: List<String>, model: String) {
+    private fun learnFrom(taskId: String, task: String, result: AgentResult, usedIds: List<String>, config: AgentConfig) {
         val memory = memory ?: return
         memory.recordUse(result, usedIds)
         val settings = settings.settings.value
+        val reflectionModel = settings.reflectionModel.takeIf { settings.provider == config.provider } ?: config.model
         if (!settings.learnFromTasks) return
         scope.launch {
             try {
-                val reflection = memory.learn(taskId, task, result, settings.reflectionModel ?: model)
+                val reflection = memory.learn(taskId, task, result, reflectionModel, config.provider)
                 AppLog.log(
                     "memory",
                     "task $taskId: saved ${reflection.saved.size}, refused ${reflection.refused.size}" +

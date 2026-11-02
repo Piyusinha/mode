@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -118,6 +119,48 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
 private val quick = AgentConfig(settleMs = 0, maxSteps = 10)
 
 class TaskRunnerTest {
+    @Test
+    fun claudeTaskAndItsReflectionKeepTheirProviderAfterSettingsChange() = runTest {
+        var calls = 0
+        var routerCalls = 0
+        lateinit var f: Fixture
+        val claude = LlmClient { _, _, _ ->
+            calls++
+            if (calls == 1) {
+                f.settings.selectProvider(com.piyush.mode.llm.ModelProvider.OpenRouter)
+                ChatResult(call("done", "evidence" to "on screen", "summary" to "Ready"), "", Usage(10, 2, 0.0, costReported = false))
+            } else {
+                ChatResult(ToolCall("save_memory", buildJsonObject { put("changes", buildJsonArray {}) }), "", Usage(10, 2, 0.0, costReported = false))
+            }
+        }
+        val registry = com.piyush.mode.llm.ProviderClients(mapOf(
+            com.piyush.mode.llm.ModelProvider.OpenRouter to LlmClient { _, _, _ -> routerCalls++; error("unexpected paid request") },
+            com.piyush.mode.llm.ModelProvider.ClaudeOAuth to claude,
+        ))
+        f = Fixture(this, registry, key = null, withMemory = true)
+        f.settings.claudeCredentials.save(com.piyush.mode.llm.ClaudeOAuth.Credentials("test", "test-refresh", Long.MAX_VALUE))
+        f.settings.selectProvider(com.piyush.mode.llm.ModelProvider.ClaudeOAuth)
+        f.settings.update { it.copy(strongModel = null, dailyCapUsd = 0.01) }
+        val config = f.settings.agentConfig().copy(settleMs = 0)
+        val result = f.runner.runTask("Read the screen", config)
+        advanceUntilIdle()
+        assertIs<AgentOutcome.Done>(result!!.outcome)
+        assertFalse(result.costReported)
+        assertEquals(2, calls, "task and reflection both used Claude")
+        assertEquals(0, routerCalls)
+        assertNull(f.tasks.latest(1).first().costUsd)
+        assertNull(f.runs.runs().single().costUsd)
+    }
+
+    @Test
+    fun disconnectedClaudeNeverUsesAnAvailableRouterKey() = runTest {
+        val f = Fixture(this, ScriptedModel(), key = "router-key")
+        f.settings.selectProvider(com.piyush.mode.llm.ModelProvider.ClaudeOAuth)
+        assertNull(f.runner.runTask("t", f.settings.agentConfig()))
+        assertEquals(0, f.link.connects)
+        assertTrue(f.runner.state.value.status.contains("Connect Claude"))
+    }
+
     @Test
     fun runsATaskRecordsItNotifiesAndLetsGoOfThePhone() = runTest {
         val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "Light mode on")))

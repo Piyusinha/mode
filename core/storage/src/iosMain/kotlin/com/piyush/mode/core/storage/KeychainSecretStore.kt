@@ -27,7 +27,9 @@ import platform.Foundation.dataUsingEncoding
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
+import platform.Security.SecItemUpdate
 import platform.Security.errSecSuccess
+import platform.Security.errSecItemNotFound
 import platform.Security.kSecAttrAccessible
 import platform.Security.kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 import platform.Security.kSecAttrAccount
@@ -60,16 +62,30 @@ public class KeychainSecretStore(private val service: String = "com.piyush.mode"
 
     override fun set(name: String, value: String?) {
         val account = name
-        val delete = base(account)
-        SecItemDelete(delete)
-        CFRelease(delete)
-        if (value.isNullOrBlank()) return
-        val add = base(account)
-        val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding) ?: return
-        CFDictionaryAddValue(add, kSecValueData, CFBridgingRetain(data))
-        CFDictionaryAddValue(add, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
-        SecItemAdd(add, null)
-        CFRelease(add)
+        val query = base(account)
+        if (value.isNullOrBlank()) {
+            val status = SecItemDelete(query)
+            CFRelease(query)
+            check(status == errSecSuccess || status == errSecItemNotFound) { "Could not remove a credential from Keychain ($status)." }
+            return
+        }
+        val data = (value as NSString).dataUsingEncoding(NSUTF8StringEncoding)
+            ?: error("Could not encode a credential for Keychain.")
+        val retained = CFBridgingRetain(data)
+        val changes = CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
+        CFDictionaryAddValue(changes, kSecValueData, retained)
+        CFDictionaryAddValue(changes, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+        // Updating preserves the previous value if a rotated-token write fails.
+        var status = SecItemUpdate(query, changes)
+        if (status == errSecItemNotFound) {
+            CFDictionaryAddValue(query, kSecValueData, retained)
+            CFDictionaryAddValue(query, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+            status = SecItemAdd(query, null)
+        }
+        CFRelease(changes)
+        CFRelease(query)
+        CFRelease(retained)
+        check(status == errSecSuccess) { "Could not save a credential in Keychain ($status). Unlock this iPhone and try again." }
     }
 
     private fun base(account: String): CFMutableDictionaryRef? {

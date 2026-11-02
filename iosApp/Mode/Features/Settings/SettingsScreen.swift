@@ -7,6 +7,7 @@ struct SettingsScreen: View {
     @Binding var name: String
     @Binding var key: String
     @Binding var query: String
+    @Binding var claudeCode: String
     let costStep: Double
     let costRange: ClosedRange<Double>
     let dailyCapStep: Double
@@ -16,6 +17,28 @@ struct SettingsScreen: View {
 
     var body: some View {
         List {
+            Section {
+                ModeToggleRow(L10n.Claude.use, isOn: Binding(get: { state.useClaude }, set: { onEvent(.useClaude($0)) }))
+                Text(state.claudeConnected ? L10n.Claude.connected : L10n.Claude.notConnected).modeText(.footnote, color: ModeColor.textSecondary)
+                Text(L10n.Claude.note).modeText(.footnote, color: ModeColor.textSecondary)
+                if state.claudeAwaitingCode {
+                    Text(L10n.Claude.instructions).modeText(.footnote, color: ModeColor.textSecondary)
+                    ModeTextField(L10n.Claude.code, prompt: L10n.Claude.codePrompt, text: $claudeCode, secure: true)
+                    ModeButton(state.claudeSigningIn ? L10n.Claude.connecting : L10n.Claude.finish) { onEvent(.finishClaude) }
+                        .disabled(state.claudeSigningIn || claudeCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    ModeButton(L10n.Claude.cancel) { onEvent(.cancelClaude) }
+                } else {
+                    ModeButton(state.claudeConnected ? L10n.Claude.reconnect : L10n.Claude.connect) { onEvent(.connectClaude) }
+                }
+                if let error = state.claudeError { Text(error).modeText(.footnote, color: ModeColor.warning) }
+                if state.claudeConnected {
+                    ModeButton(state.claudeChecking ? L10n.Claude.checking : L10n.Claude.check) { onEvent(.checkClaude) }
+                        .disabled(state.claudeChecking)
+                }
+                if let check = state.claudeCheck { Text(check).modeText(.footnote, color: ModeColor.textSecondary) }
+                if state.claudeConnected { ModeButton(L10n.Claude.disconnect) { onEvent(.disconnectClaude) } }
+            } header: { ModeSectionHeader(L10n.Claude.title) }
+
             Section {
                 ModeTextField(L10n.Settings.name, prompt: L10n.Settings.namePrompt, text: $name)
                     .onSubmit { onEvent(.saveName) }
@@ -44,11 +67,15 @@ struct SettingsScreen: View {
             } header: { ModeSectionHeader(L10n.Settings.whenStuck) }
 
             Section {
-                Stepper(value: Binding(get: { state.maxCost }, set: { onEvent(.maxCost($0)) }), in: costRange, step: costStep) {
-                    ModeRow(String(localized: L10n.Settings.maxCost), subtitle: state.maxCostLabel)
-                }
-                Stepper(value: Binding(get: { state.dailyCap }, set: { onEvent(.dailyCap($0)) }), in: dailyCapRange, step: dailyCapStep) {
-                    ModeRow(String(localized: L10n.Settings.dailyCap), subtitle: state.dailyCapLabel)
+                if state.useClaude {
+                    Text(L10n.Claude.quota).modeText(.footnote, color: ModeColor.textSecondary)
+                } else {
+                    Stepper(value: Binding(get: { state.maxCost }, set: { onEvent(.maxCost($0)) }), in: costRange, step: costStep) {
+                        ModeRow(String(localized: L10n.Settings.maxCost), subtitle: state.maxCostLabel)
+                    }
+                    Stepper(value: Binding(get: { state.dailyCap }, set: { onEvent(.dailyCap($0)) }), in: dailyCapRange, step: dailyCapStep) {
+                        ModeRow(String(localized: L10n.Settings.dailyCap), subtitle: state.dailyCapLabel)
+                    }
                 }
             } header: { ModeSectionHeader(L10n.Settings.limits) }
 
@@ -78,7 +105,7 @@ struct SettingsRoute: View {
     }
 
     var body: some View {
-        SettingsScreen(state: model.state, name: $model.name, key: $model.key, query: $model.query,
+        SettingsScreen(state: model.state, name: $model.name, key: $model.key, query: $model.query, claudeCode: $model.claudeCode,
                        costStep: model.costStep, costRange: model.costRange, dailyCapStep: model.dailyCapStep,
                        dailyCapRange: model.dailyCapRange, canSaveKey: model.canSaveKey, onEvent: model.send)
     }

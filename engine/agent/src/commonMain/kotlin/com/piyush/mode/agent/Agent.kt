@@ -1,5 +1,7 @@
 package com.piyush.mode.agent
 
+import com.piyush.mode.llm.ModelProvider
+
 import com.piyush.mode.llm.ChatMessage
 import com.piyush.mode.llm.ChatResult
 import com.piyush.mode.llm.ToolCall
@@ -50,6 +52,8 @@ data class AgentConfig(
     val maxMillis: Long? = 15 * 60_000L,
     /** The planning mind: briefs the hands before the first tap. Null: no brief. */
     val brainModel: String? = null,
+    /** Snapshotted with the models when the task starts. */
+    val provider: ModelProvider = ModelProvider.OpenRouter,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -83,6 +87,7 @@ class StepRecord(
     val millis: Long,
     /** The plan item (1-based) the model said this action works on, when it has a plan. */
     val planItem: Int? = null,
+    val costReported: Boolean = true,
 )
 
 sealed interface AgentOutcome {
@@ -105,6 +110,7 @@ class AgentResult(
     val appsOpened: List<String> = emptyList(),
     /** The last screenshot the model saw. */
     val finalScreen: ByteArray? = null,
+    val costReported: Boolean = true,
 )
 
 /**
@@ -233,6 +239,7 @@ class Agent(
             outcome, step, cost, started.elapsedNow().inWholeMilliseconds,
             transcript = history.toList(), notes = notes.toList(), answers = answers.toList(),
             appsOpened = appsOpened.toList(), finalScreen = finalScreen,
+            costReported = config.provider.reportsCurrencyCost,
         )
 
         /** " Last: tap "Send"." for a stop message, from the latest step. */
@@ -375,7 +382,7 @@ class Agent(
 
             fun record(action: String, reason: String, outcome: String, op: String? = null) {
                 onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds,
-                    planItem = call?.let(AgentTools::itemOf)))
+                    planItem = call?.let(AgentTools::itemOf), costReported = reply.usage.costReported))
                 trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
                 history += "$step. $action — $outcome"
             }

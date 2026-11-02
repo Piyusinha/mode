@@ -78,7 +78,8 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
             usage?.let {
                 put("prompt_tokens", it.promptTokens)
                 put("completion_tokens", it.completionTokens)
-                put("cost_usd", it.costUsd)
+                put("cost_usd", if (it.costReported) JsonPrimitive(it.costUsd) else JsonNull)
+                put("cost_reported", it.costReported)
                 if (it.cachedTokens > 0) put("cached_tokens", it.cachedTokens)
                 if (it.cacheWriteTokens > 0) put("cache_write_tokens", it.cacheWriteTokens)
             }
@@ -102,7 +103,7 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
         event("brief", buildJsonObject {
             put("model", model)
             brief?.let { put("brief", it) }
-            put("cost_usd", costUsd)
+            put("cost_usd", if (config?.provider?.reportsCurrencyCost != false) JsonPrimitive(costUsd) else JsonNull)
             error?.let { put("error", it) }
         })
         AppLog.log("agent", if (brief != null) "brief by $model:\n$brief" else "no brief ($model): ${error ?: "unknown"}")
@@ -112,7 +113,7 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
         event("decide", buildJsonObject {
             put("question", question)
             answer?.let { put("answer", it) }
-            put("cost_usd", costUsd)
+            put("cost_usd", if (config?.provider?.reportsCurrencyCost != false) JsonPrimitive(costUsd) else JsonNull)
             error?.let { put("error", it) }
         })
     }
@@ -155,6 +156,7 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
             tag?.let { put("tag", it) }
             config?.let {
                 put("model", it.model)
+                put("provider", it.provider.id)
                 put("strong_model", it.strongModel?.let(::JsonPrimitive) ?: JsonNull)
                 put("max_steps", it.maxSteps)
             }
@@ -162,7 +164,7 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
                 put("ended", nowIso())
                 put("steps", result.steps)
                 put("ms", result.millis)
-                put("cost_usd", result.costUsd)
+                put("cost_usd", if (config?.provider?.reportsCurrencyCost != false) JsonPrimitive(result.costUsd) else JsonNull)
                 when (val o = result.outcome) {
                     is AgentOutcome.Done -> { put("outcome", if (o.success) "done" else "gave_up"); put("summary", o.summary) }
                     is AgentOutcome.Stopped -> { put("outcome", "stopped"); put("summary", o.why) }

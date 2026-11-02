@@ -161,7 +161,7 @@ private fun AgentScreen(runner: TaskRunner, inbox: TaskQueue, scheduler: Schedul
                     Text("${s.index}. ${s.action}", style = MaterialTheme.typography.bodyMedium)
                     if (s.reason.isNotBlank()) Text(s.reason, style = MaterialTheme.typography.bodySmall)
                     Text(
-                        "${s.outcome} · ${s.model.substringAfter('/')} · ${s.millis / 100 / 10.0}s · $${money(s.costUsd)}",
+                        "${s.outcome} · ${s.model.substringAfter('/')} · ${s.millis / 100 / 10.0}s · ${if (s.costReported) "$${money(s.costUsd)}" else "cost not reported"}",
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -205,8 +205,8 @@ private fun CompareScreen(compare: CompareRunner, runner: TaskRunner, catalog: M
                         for ((model, rows) in byModel) {
                             val wins = rows.count { it.outcome.startsWith("✅") }
                             append("$model: $wins/${rows.size} done, ${rows.sumOf { it.steps }} steps, ")
-                            append("${rows.sumOf { it.seconds }}s, $${money(rows.sumOf { it.costUsd })}\n")
-                            rows.forEach { append("  • ${it.task}: ${it.outcome} (${it.steps} steps, ${it.seconds}s, $${money(it.costUsd)})\n") }
+                            append("${rows.sumOf { it.seconds }}s, ${if (rows.all { it.costReported }) "$${money(rows.sumOf { it.costUsd })}" else "cost not reported"}\n")
+                            rows.forEach { append("  • ${it.task}: ${it.outcome} (${it.steps} steps, ${it.seconds}s, ${if (it.costReported) "$${money(it.costUsd)}" else "cost not reported"})\n") }
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,

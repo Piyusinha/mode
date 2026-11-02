@@ -1,5 +1,7 @@
 package com.piyush.mode.feature.memory.data
 
+import com.piyush.mode.llm.ModelProvider
+
 import com.piyush.mode.feature.memory.domain.MemoryDraft
 import com.piyush.mode.feature.memory.domain.MemoryItem
 import com.piyush.mode.feature.memory.domain.MemoryKind
@@ -62,9 +64,9 @@ public class Reflector(
         public val costUsd: Double,
     )
 
-    public suspend fun reflect(input: Input, model: String): Reflection {
+    public suspend fun reflect(input: Input, model: String, provider: ModelProvider = ModelProvider.OpenRouter): Reflection {
         val known = relevantItems(input)
-        val reply = llm.chat(model, messages(input, known), TOOLS)
+        val reply = llm.forProvider(provider).chat(model, messages(input, known), TOOLS)
         val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
             ?: return Reflection(emptyList(), emptyList(), listOf("the model gave no changes"), null, null, reply.usage.costUsd)
 

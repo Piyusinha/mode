@@ -26,7 +26,7 @@ public data class RunSummary(
 
 /** A one-line description of how a run went, with time, steps and cost. */
 public fun describeResult(result: AgentResult): String {
-    val cost = "$" + ((result.costUsd * 10000).roundToInt() / 10000.0)
+    val cost = if (result.costReported) "$" + ((result.costUsd * 10000).roundToInt() / 10000.0) else "cost not reported"
     val time = "${result.millis / 1000}s"
     return when (val o = result.outcome) {
         is AgentOutcome.Done -> (if (o.success) "Done: " else "Could not finish: ") + PlainText.fromMarkdown(o.summary, oneLine = true) + " ($time, ${result.steps} steps, $cost)"

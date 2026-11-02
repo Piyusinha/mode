@@ -33,6 +33,11 @@ import com.piyush.mode.feature.tasks.presentation.TaskQueue
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import com.piyush.mode.llm.OpenRouterClient
 import com.piyush.mode.llm.OpenRouterModels
+import com.piyush.mode.llm.ClaudeOAuth
+import com.piyush.mode.llm.ClaudeOAuthClient
+import com.piyush.mode.llm.ModelProvider
+import com.piyush.mode.llm.ProviderClients
+import com.piyush.mode.feature.settings.data.ClaudeAccount
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +81,10 @@ class ModeGraph(platform: PlatformServices) {
     val runs: RunRepository = RunRepository(platform.files, database)
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)
-    private val llm = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
+    val claude: ClaudeAccount = ClaudeAccount(settings.claudeCredentials, ClaudeOAuth(platform.http))
+    private val router = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
+    private val claudeClient = ClaudeOAuthClient(platform.http, token = { force -> claude.accessToken(force) })
+    private val llm = ProviderClients(mapOf(ModelProvider.OpenRouter to router, ModelProvider.ClaudeOAuth to claudeClient))
 
     /** "Continue with ChatGPT": the account and the plan's Responses API. */
     val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount =
@@ -112,7 +120,9 @@ class ModeGraph(platform: PlatformServices) {
     val screens: Screens = Screens(
         scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session,
         platform.permissions, platform.phoneChecks, com.piyush.mode.llm.OpenRouterAuth(platform.http), platform.lifecycle,
-        chatGpt, chatGptLlm,
+        claude = claude,
+        claudeLlm = claudeClient,
+        chatGpt = chatGpt, chatGptLlm = chatGptLlm,
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)

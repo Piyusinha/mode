@@ -1,6 +1,7 @@
 package com.piyush.mode.feature.settings.domain
 
 import com.piyush.mode.agent.AgentConfig
+import com.piyush.mode.llm.ModelProvider
 
 /** When Mode asks before a tap that can't be undone (send, pay, delete…). */
 public enum class RiskConfirmation {
@@ -28,12 +29,19 @@ public data class ModeSettings(
     /** First-run setup finished (or skipped); the app opens on Home after that. */
     val onboardingDone: Boolean = false,
     val hasApiKey: Boolean = false,
+    val provider: ModelProvider = ModelProvider.OpenRouter,
+    /** Derived from the credential store, never persisted as a preference. */
+    val hasClaudeAccount: Boolean = false,
 ) {
+    public val hasModelAccess: Boolean get() = when (provider) {
+        ModelProvider.OpenRouter -> hasApiKey
+        ModelProvider.ClaudeOAuth -> hasClaudeAccount
+    }
     /** The same settings with every value brought into range. */
     public fun validated(): ModeSettings = copy(
-        model = model.trim().ifBlank { AgentConfig.DEFAULT_MODEL },
-        strongModel = strongModel?.trim()?.ifBlank { null },
-        reflectionModel = reflectionModel?.trim()?.ifBlank { null },
+        model = model.trim().takeIf { ProviderModels.accepts(provider, it) } ?: ProviderModels.main(provider),
+        strongModel = strongModel?.trim()?.takeIf { it.isNotBlank() && ProviderModels.accepts(provider, it) },
+        reflectionModel = reflectionModel?.trim()?.takeIf { it.isNotBlank() && ProviderModels.accepts(provider, it) },
         maxSteps = maxSteps.coerceIn(STEPS_RANGE),
         maxCostPerTaskUsd = maxCostPerTaskUsd.coerceIn(COST_RANGE),
         dailyCapUsd = dailyCapUsd?.coerceIn(DAILY_CAP_RANGE),
@@ -45,7 +53,8 @@ public data class ModeSettings(
         model = model,
         strongModel = strongModel,
         maxSteps = maxSteps,
-        maxCostUsd = maxCostPerTaskUsd,
+        maxCostUsd = maxCostPerTaskUsd.takeIf { provider.reportsCurrencyCost },
+        provider = provider,
         // The strong model is also the brain: it briefs the hands before the first tap.
         brainModel = strongModel,
     )

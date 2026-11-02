@@ -2,6 +2,7 @@ import Foundation
 import ModeDesignSystem
 import ModeKit
 import Observation
+import UIKit
 
 /// Settings: name, key, models picked from the live list, limits.
 @MainActor
@@ -29,6 +30,13 @@ final class SettingsViewModel {
         var dailyCap = 0.0
         var dailyCapLabel = ""
         var learn = true
+        var useClaude = false
+        var claudeConnected = false
+        var claudeSigningIn = false
+        var claudeAwaitingCode = false
+        var claudeError: String?
+        var claudeChecking = false
+        var claudeCheck: String?
     }
 
     enum Event {
@@ -41,6 +49,8 @@ final class SettingsViewModel {
         case dailyCap(Double)
         case learn(Bool)
         case openDeveloper
+        case useClaude(Bool), connectClaude, finishClaude, cancelClaude, disconnectClaude
+        case checkClaude
         case openChatGPT
     }
 
@@ -48,6 +58,7 @@ final class SettingsViewModel {
     var name = ""
     var key = ""
     var query = ""
+    var claudeCode = ""
     private let presenter: SettingsPresenter
     private let navigate: (Route) -> Void
     private var updates: Updates?
@@ -81,11 +92,29 @@ final class SettingsViewModel {
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
+        case let .useClaude(on): presenter.useClaude(on: on)
+        case .connectClaude:
+            claudeCode = ""
+            if let address = presenter.startClaudeSignIn(), let url = URL(string: address) {
+                UIApplication.shared.open(url)
+            }
+        case .finishClaude:
+            let code = claudeCode
+            claudeCode = ""
+            presenter.finishClaudeSignIn(code: code)
+        case .cancelClaude:
+            claudeCode = ""
+            presenter.cancelClaudeSignIn()
+        case .disconnectClaude:
+            claudeCode = ""
+            presenter.disconnectClaude()
+        case .checkClaude: presenter.checkClaude(image: ClaudeProbeImage.make())
         case .openChatGPT: navigate(.connectChatGPT)
         }
     }
 
     isolated deinit {
+        presenter.cancelClaudeSignIn()
         updates?.cancel()
         presenter.close()
     }
@@ -99,7 +128,7 @@ final class SettingsViewModel {
                 case .strongest: String(localized: L10n.Settings.strongest)
                 }
             }
-            return Model(id: c.id, name: c.name, subtitle: [tag, L10n.Settings.perTask(Format.money(c.costPerTaskUsd)), c.note.isEmpty ? nil : c.note].compactMap { $0 }.joined(separator: " · "),
+            return Model(id: c.id, name: c.name, subtitle: s.useClaude ? String(localized: L10n.Claude.modelDetail) : [tag, L10n.Settings.perTask(Format.money(c.costPerTaskUsd)), c.note.isEmpty ? nil : c.note].compactMap { $0 }.joined(separator: " · "),
                          isMain: c.isMain, isStuck: c.isStuck)
         }
         let cap = s.dailyCapUsd?.doubleValue
@@ -115,7 +144,14 @@ final class SettingsViewModel {
             maxCostLabel: Format.money(s.maxCostPerTaskUsd),
             dailyCap: cap ?? 0,
             dailyCapLabel: cap.map(Format.money) ?? String(localized: L10n.Settings.dailyCapOff),
-            learn: s.learn
+            learn: s.learn,
+            useClaude: s.useClaude,
+            claudeConnected: s.claudeConnected,
+            claudeSigningIn: s.claudeSigningIn,
+            claudeAwaitingCode: s.claudeAwaitingCode,
+            claudeError: s.claudeError,
+            claudeChecking: s.claudeChecking,
+            claudeCheck: s.claudeCheck
         )
     }
 }

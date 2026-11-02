@@ -78,7 +78,7 @@ public class HomePresenter(
                         RecentConversation(c.id, c.title, clock.relativeDay(c.updatedAt), c.updatedAt, seconds, latest?.status?.badge())
                     },
                     running = run.running(tasks),
-                    needsKey = !s.hasApiKey,
+                    needsKey = !s.hasModelAccess,
                 )
             }.collect { mutableState.value = it }
         }

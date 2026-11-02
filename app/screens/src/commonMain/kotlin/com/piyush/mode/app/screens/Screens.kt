@@ -1,5 +1,7 @@
 package com.piyush.mode.app.screens
 
+import com.piyush.mode.feature.settings.data.ClaudeAccount
+
 import com.piyush.mode.app.screens.common.ScreenClock
 import com.piyush.mode.app.screens.conversation.ConversationPresenter
 import com.piyush.mode.app.screens.home.HomePresenter
@@ -50,6 +52,8 @@ public class Screens(
     private val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount,
     private val chatGptLlm: com.piyush.mode.llm.LlmClient,
     private val clock: ScreenClock = ScreenClock(),
+    private val claude: ClaudeAccount? = null,
+    private val claudeLlm: com.piyush.mode.llm.LlmClient? = null,
 ) {
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
 
@@ -67,7 +71,7 @@ public class Screens(
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
-    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog)
+    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm)
 
     public fun connectChatGpt(): com.piyush.mode.app.screens.settings.ConnectChatGptPresenter =
         com.piyush.mode.app.screens.settings.ConnectChatGptPresenter(scope, chatGpt, chatGptLlm)

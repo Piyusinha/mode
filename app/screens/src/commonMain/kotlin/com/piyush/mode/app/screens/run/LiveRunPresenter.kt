@@ -35,7 +35,7 @@ public data class LiveStep(
     val seconds: Double,
 )
 
-public data class FinishedRun(val badge: TaskBadge, val summary: String, val steps: Int, val seconds: Long, val costUsd: Double) {
+public data class FinishedRun(val badge: TaskBadge, val summary: String, val steps: Int, val seconds: Long, val costUsd: Double, val costReported: Boolean = true) {
     /** The reply as blocks, drawn like the chat's. */
     val parts: List<com.piyush.mode.app.screens.conversation.ReplyPart> get() = com.piyush.mode.app.screens.conversation.replyParts(summary)
 }
@@ -61,7 +61,7 @@ public class LiveRunPresenter(
                             is AgentOutcome.Stopped -> TaskBadge.Stopped to o.why
                             is AgentOutcome.Failed -> TaskBadge.Failed to o.why
                         }
-                        FinishedRun(badge, summary, r.steps, r.millis / 1000, r.costUsd)
+                        FinishedRun(badge, summary, r.steps, r.millis / 1000, r.costUsd, r.costReported)
                     },
                 )
             }

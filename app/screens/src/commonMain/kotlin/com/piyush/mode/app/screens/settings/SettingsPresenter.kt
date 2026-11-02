@@ -1,5 +1,7 @@
 package com.piyush.mode.app.screens.settings
 
+import com.piyush.mode.feature.settings.data.ModelSearch
+
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.feature.settings.data.ModelCatalog
 import com.piyush.mode.feature.settings.data.SettingsRepository
@@ -11,6 +13,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import com.piyush.mode.feature.settings.data.ClaudeAccount
+import com.piyush.mode.feature.settings.domain.ProviderModels
+import com.piyush.mode.llm.ModelProvider
+import com.piyush.mode.llm.LlmClient
 
 public data class SettingsUiState(
     val name: String = "",
@@ -27,6 +33,13 @@ public data class SettingsUiState(
     val maxCostPerTaskUsd: Double = ModeSettings.DEFAULT_MAX_COST_USD,
     val dailyCapUsd: Double? = null,
     val learn: Boolean = true,
+    val useClaude: Boolean = false,
+    val claudeConnected: Boolean = false,
+    val claudeSigningIn: Boolean = false,
+    val claudeAwaitingCode: Boolean = false,
+    val claudeError: String? = null,
+    val claudeChecking: Boolean = false,
+    val claudeCheck: String? = null,
 )
 
 public data class ModelChoice(
@@ -44,7 +57,13 @@ public class SettingsPresenter(
     parent: CoroutineScope,
     private val settings: SettingsRepository,
     private val catalog: ModelCatalog,
+    private val claude: ClaudeAccount? = null,
+    private val claudeLlm: LlmClient? = null,
 ) : Presenter<SettingsUiState>(parent, SettingsUiState()) {
+    private val connection = claude?.let { account ->
+        ClaudeConnectionPresenter(scope, account, claudeLlm) { settings.selectProvider(ModelProvider.ClaudeOAuth) }
+    }
+    private val connectionState = connection?.state ?: MutableStateFlow(ClaudeConnectionUiState())
     private val query = MutableStateFlow("")
     /** The key lives in the Keychain, outside the settings flow: bumped when it changes. */
     private val keyChanges = MutableStateFlow(0)
@@ -52,8 +71,10 @@ public class SettingsPresenter(
     init {
         scope.launch { catalog.refresh() }
         scope.launch {
-            combine(settings.settings, catalog.state, query, keyChanges) { s, models, q, _ ->
-                val known = (models.recommended + models.all).associateBy { it.id }
+            combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, q, _, auth ->
+                val recommended = if (s.provider == ModelProvider.ClaudeOAuth) ProviderModels.claude else models.recommended
+                val all = if (s.provider == ModelProvider.ClaudeOAuth) ProviderModels.claude else models.all
+                val known = (recommended + all).associateBy { it.id }
                 fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == s.model, o.id == s.strongModel)
                 fun byId(id: String?) = id?.let { known[it]?.let(::choice) ?: ModelChoice(it, it.substringAfter('/'), 0.0, null, "", it == s.model, it == s.strongModel) }
                 SettingsUiState(
@@ -62,13 +83,20 @@ public class SettingsPresenter(
                     keyEnding = settings.apiKey?.takeIf { it.length > 8 }?.takeLast(4),
                     model = byId(s.model),
                     stuckModel = byId(s.strongModel),
-                    picks = models.recommended.map(::choice),
+                    picks = recommended.map(::choice),
                     query = q,
-                    results = if (q.isBlank()) emptyList() else catalog.search(q).take(MAX_RESULTS).map(::choice),
+                    results = if (q.isBlank()) emptyList() else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q) else ModelSearch.search(all, q)).take(MAX_RESULTS).map(::choice),
                     catalogSource = models.source,
                     maxCostPerTaskUsd = s.maxCostPerTaskUsd,
                     dailyCapUsd = s.dailyCapUsd,
                     learn = s.learnFromTasks,
+                    useClaude = (s.provider == ModelProvider.ClaudeOAuth),
+                    claudeConnected = s.hasClaudeAccount,
+                    claudeSigningIn = auth.signingIn,
+                    claudeAwaitingCode = auth.awaitingCode,
+                    claudeError = auth.error,
+                    claudeChecking = auth.checking,
+                    claudeCheck = auth.check,
                 )
             }.collect { mutableState.value = it }
         }
@@ -76,16 +104,30 @@ public class SettingsPresenter(
 
     public fun setName(name: String): Unit = settings.update { it.copy(userName = name) }
 
+    /** UI adapter only; account lifecycle and connection checks have their own presenter. */
+    public fun useClaude(on: Boolean): Unit = settings.selectProvider(if (on) ModelProvider.ClaudeOAuth else ModelProvider.OpenRouter)
+    public fun startClaudeSignIn(): String? = connection?.start()
+    public fun finishClaudeSignIn(code: String) { connection?.finish(code) }
+    public fun cancelClaudeSignIn() { connection?.cancel() }
+    public fun disconnectClaude() { connection?.disconnect() }
+    public fun checkClaude(image: ByteArray) { connection?.check(image) }
+
     /** Saves the OpenRouter key in the Keychain; blank removes it. */
     public fun setKey(key: String) {
         settings.apiKey = key
         keyChanges.value++
     }
 
-    public fun chooseModel(id: String): Unit = settings.update { it.copy(model = id) }
+    public fun chooseModel(id: String) {
+        if (!ProviderModels.accepts(settings.settings.value.provider, id)) return
+        settings.update { it.copy(model = id) }
+    }
 
     /** Null: never step up. */
-    public fun chooseStuckModel(id: String?): Unit = settings.update { it.copy(strongModel = id) }
+    public fun chooseStuckModel(id: String?) {
+        if (id != null && !ProviderModels.accepts(settings.settings.value.provider, id)) return
+        settings.update { it.copy(strongModel = id) }
+    }
 
     public fun search(text: String) {
         query.value = text

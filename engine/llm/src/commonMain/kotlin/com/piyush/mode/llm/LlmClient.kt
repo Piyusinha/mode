@@ -63,11 +63,16 @@ class Usage(
     val cachedTokens: Int = 0,
     /** Prompt tokens written to the cache on this call. */
     val cacheWriteTokens: Int = 0,
+    /** False means currency cost was not reported, even when the numeric accumulator is zero. */
+    val costReported: Boolean = true,
 )
 
 /** A chat model that can call tools. */
 fun interface LlmClient {
     suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult
+
+    /** A single-provider client is already bound; registries override this to select explicitly. */
+    fun forProvider(provider: ModelProvider): LlmClient = this
 }
 
 /** The model call failed: network, key, credit, or a model that cannot do this. */
