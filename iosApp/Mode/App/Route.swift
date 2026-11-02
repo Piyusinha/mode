@@ -12,6 +12,10 @@ enum Route: Hashable {
     case modelPicker(stuck: Bool)
     case planModels(brain: Bool)
     case access
+    /// Settings → Voice: Mode's voice, Listening, and choosing a voice from a provider.
+    case voice
+    case listening
+    case voicePicker(provider: String)
     case providerDetail(id: String)
     case developer
     case memoryAboutYou

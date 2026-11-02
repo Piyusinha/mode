@@ -117,6 +117,10 @@ struct MainTabs: View {
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "plan": paths[.home] = [.settings, .planModels(brain: parts.last == "brain")]
         case "access": paths[.home] = [.settings, .access]
+        case "voice": paths[.home] = [.settings, .voice]
+        case "listening": paths[.home] = [.settings, .listening]
+        case "voicepicker": paths[.home] = [.settings, .voice, .voicePicker(provider: parts.count > 1 ? parts[1] : "apple")]
+        case "listen": showingListen = true
         case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
@@ -158,6 +162,9 @@ private struct TabRoot<Content: View>: View {
                     case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck, navigate: navigate)
                     case let .planModels(brain): PlanModelsRoute(app: app, brain: brain)
                     case .access: AccessRoute(app: app)
+                    case .voice: VoiceRoute(app: app, hearing: false, navigate: navigate)
+                    case .listening: VoiceRoute(app: app, hearing: true, navigate: navigate)
+                    case let .voicePicker(provider): VoicePickerRoute(app: app, provider: provider)
                     case let .providerDetail(id): ProviderDetailRoute(app: app, id: id, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)

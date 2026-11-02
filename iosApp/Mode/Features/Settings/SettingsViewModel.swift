@@ -39,6 +39,12 @@ final class SettingsViewModel {
         var learn = true
         /// Every task runs without asking (Settings → Access).
         var fullAccess = false
+        // Voice
+        var speaker: String?
+        var voiceName = ""
+        var listener: String?
+        var listenerLabel = ""
+        var talkBack = true
         var query = ""
         var modelCount = 0
     }
@@ -58,16 +64,15 @@ final class SettingsViewModel {
         case showProviders
         case openProvider
         case openAccess
-        case showSpeech
-        case showHearing
+        case openVoice
+        case openListening
+        case talkBack(Bool)
     }
 
     private(set) var state = State()
     var name = ""
     var query = ""
     var showingProviders = false
-    var showingSpeech = false
-    var showingHearing = false
     /// The provider in use (ModelProvider id), for its page.
     private var activeProvider: String { presenter.state.value.provider }
     private(set) var filter: Filter = .all
@@ -110,8 +115,9 @@ final class SettingsViewModel {
         case .openProvider: navigate(.providerDetail(id: activeProvider))
         case .openAccess: navigate(.access)
         case .showProviders: showingProviders = true
-        case .showSpeech: showingSpeech = true
-        case .showHearing: showingHearing = true
+        case .openVoice: navigate(.voice)
+        case .openListening: navigate(.listening)
+        case let .talkBack(on): presenter.setTalkBack(on: on)
         }
     }
 
@@ -175,6 +181,12 @@ final class SettingsViewModel {
             dailyCapLabel: cap.map(Format.money) ?? String(localized: L10n.Settings.dailyCapOff),
             learn: s.learn,
             fullAccess: s.fullAccess,
+            speaker: s.speaker,
+            voiceName: s.voiceName ?? (s.speaker == nil ? String(localized: L10n.Voice.off) : String(localized: L10n.Voice.defaultVoice)),
+            listener: s.listener,
+            listenerLabel: s.listener == nil ? String(localized: L10n.Voice.off)
+                : s.listener == "apple" ? String(localized: L10n.Voice.onIPhone) : (VoiceService(id: s.listener)?.title ?? ""),
+            talkBack: s.talkBack,
             query: s.query,
             modelCount: Int(s.modelCount)
         )

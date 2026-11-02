@@ -55,6 +55,14 @@ public class ListenPresenter(
         }
     }
 
+    /** Type instead: the microphone closes and nothing heard so far is kept. */
+    public fun typeInstead() {
+        job?.cancel()
+        job = null
+        voices.stop()
+        mutableState.value = state.value.copy(phase = ListenPhase.Typing)
+    }
+
     /** Done: stop recording now and hear what was said so far. */
     public fun finish() { voices.finishListening() }
 

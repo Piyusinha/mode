@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The logos of AI providers and model makers, as vector images that take the tile's colour.
-/// From LobeHub's AI icons (@lobehub/icons-static-svg 1.102.0, MIT licence); the marks belong to their owners
-/// and only name the service the user connects or the model they pick.
+/// The logos of AI providers, model makers and voice services, as vector images that take the tile's colour.
+/// From LobeHub's AI icons (@lobehub/icons-static-svg, MIT licence: AI makers, ElevenLabs, Fish Audio), Simple Icons
+/// (CC0: Apple, Deepgram) and soniox.com (Soniox); the marks belong to their owners and only name the service the
+/// user connects or the model or voice they pick.
 public enum ModeLogo: String, CaseIterable, Sendable {
     case openAI = "logo-openai"
     case claude = "logo-claude"
@@ -15,6 +16,11 @@ public enum ModeLogo: String, CaseIterable, Sendable {
     case grok = "logo-grok"
     case moonshot = "logo-moonshot"
     case zhipu = "logo-zhipu"
+    case apple = "logo-apple"
+    case elevenLabs = "logo-elevenlabs"
+    case fishAudio = "logo-fishaudio"
+    case soniox = "logo-soniox"
+    case deepgram = "logo-deepgram"
 
     public var image: Image { Image(rawValue, bundle: .module).renderingMode(.template) }
 

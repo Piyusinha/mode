@@ -41,6 +41,7 @@ struct OnboardingScreen: View {
         case .key: KeyStep(providers: providers, onProvider: onProvider)
         case .model: ModelStep(state: state, onEvent: onEvent)
         case .permissions: PermissionsStep(state: state, onEvent: onEvent)
+        case .voice: VoiceStep(state: state, onEvent: onEvent)
         case .test: TestStep(state: state)
         case .result: ResultStep(state: state, onEvent: onEvent)
         case .diagnose: DiagnoseStep(state: state)
@@ -62,6 +63,9 @@ struct OnboardingScreen: View {
                         onProvider(.connectActive)
                     }
                 }
+            case .voice:
+                ModeButton(L10n.Common.continue, fullWidth: true) { onEvent(.next) }
+                ModeButton(L10n.Voice.notNow, role: .plain) { onEvent(.skipVoice) }
             case .test:
                 ModeButton(L10n.Setup.runTest, icon: .play, fullWidth: true) { onEvent(.runTest) }.disabled(state.testRunning)
             case .result:
@@ -220,6 +224,55 @@ private struct PermissionsStep: View {
             ForEach(state.permissions) { row in
                 ModeRow(String(localized: row.title), subtitle: String(localized: row.why), leading: row.leading, emphasis: .prominent) {
                     ModeStatusView(row.action) { onEvent(.allow(row.id)) }
+                }
+            }
+        }
+    }
+}
+
+/// Talk to Mode (board "Setup · Talk to Mode"): pick one of Apple's voices, and let Apple listen.
+private struct VoiceStep: View {
+    let state: OnboardingViewModel.State
+    let onEvent: (OnboardingViewModel.Event) -> Void
+
+    var body: some View {
+        VStack(spacing: ModeSpacing.l) {
+            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb).padding(.vertical, ModeSpacing.xxl)
+            Text(L10n.Voice.setupTitle).modeText(.largeTitle).multilineTextAlignment(.center)
+            Text(L10n.Voice.setupMessage).modeText(.callout, color: ModeColor.textSecondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        ModeSectionHeader(L10n.Voice.modesVoice)
+        HStack(spacing: ModeSpacing.s) {
+            ForEach(state.voices) { v in
+                Button { onEvent(.chooseVoice(v.id)) } label: {
+                    VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                        HStack {
+                            ModeLeadingView(VoiceService.apple.tile).scaleEffect(0.7).frame(width: ModeSize.badge, height: ModeSize.badge)
+                            Spacer(minLength: 0)
+                            ModePlayButton(L10n.Voice.play(v.name), playing: state.voicePlaying == v.id, size: ModeSize.badge) { onEvent(.playVoice(v.id)) }
+                        }
+                        Text(v.name).modeText(.bodyEmphasis).lineLimit(1)
+                        Text(v.traits).modeText(.caption, color: ModeColor.textSecondary).lineLimit(2)
+                    }
+                    .padding(ModeSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
+                    .overlay(RoundedRectangle(cornerRadius: ModeRadius.field).strokeBorder(state.voice == v.id ? ModeColor.accent : .clear, lineWidth: ModeSize.separator * 2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(state.voice == v.id ? .isSelected : [])
+            }
+        }
+        Text(L10n.Voice.setupMore).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+        ModeSectionHeader(L10n.Voice.listeningRow)
+        ModeCard {
+            ModeRow(String(localized: L10n.Voice.listeningWithApple), subtitle: String(localized: state.hearingDenied ? L10n.Voice.micOff : L10n.Voice.freeAndPrivate),
+                    leading: VoiceService.apple.tile, emphasis: .prominent) {
+                if state.hearingReady {
+                    ModeStatusPill(String(localized: L10n.Voice.ready), tone: .success)
+                } else if !state.hearingDenied {
+                    ModeButton(L10n.Voice.allowMic) { onEvent(.allowMic) }
                 }
             }
         }

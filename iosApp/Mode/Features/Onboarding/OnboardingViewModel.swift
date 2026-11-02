@@ -9,7 +9,10 @@ import UIKit
 @MainActor
 @Observable
 final class OnboardingViewModel {
-    enum Step: Equatable { case welcome, name, key, model, permissions, test, result, diagnose }
+    enum Step: Equatable { case welcome, name, key, model, permissions, voice, test, result, diagnose }
+
+    /// One of Apple's voices to pick in Talk to Mode.
+    struct VoiceCard: Identifiable, Equatable { let id: String; let name: String; let traits: String }
 
     struct Choice: Identifiable, Equatable {
         let id: String
@@ -62,7 +65,7 @@ final class OnboardingViewModel {
     struct State: Equatable {
         var step: Step = .welcome
         var stepNumber: Int?
-        var stepTotal = 5
+        var stepTotal = 6
         var stepLabel = ""
         var paired = true
         // Name
@@ -81,6 +84,13 @@ final class OnboardingViewModel {
         var results: [Choice] = []
         // Permissions
         var permissions: [PermissionRow] = []
+        // Talk to Mode
+        var voices: [VoiceCard] = []
+        var voice: String?
+        var voicePlaying: String?
+        /// Apple listening is ready; or it can be turned on here; or the microphone is off in iPhone Settings.
+        var hearingReady = false
+        var hearingDenied = false
         // Test and result
         var testPhases: [ModeTestStrip.Phase] = [.pending, .pending, .pending]
         var testRunning = false
@@ -99,13 +109,15 @@ final class OnboardingViewModel {
                 && a.keyHint == b.keyHint && a.models == b.models && a.stuck == b.stuck && a.stuckChoices == b.stuckChoices && a.results == b.results && a.permissions == b.permissions
                 && a.testPhases == b.testPhases && a.testRunning == b.testRunning && a.testPassed == b.testPassed && a.did == b.did
                 && (a.shot == nil) == (b.shot == nil) && a.summary == b.summary && a.checks == b.checks && a.checking == b.checking
-                && a.canContinue == b.canContinue
+                && a.canContinue == b.canContinue && a.voices == b.voices && a.voice == b.voice && a.voicePlaying == b.voicePlaying
+                && a.hearingReady == b.hearingReady && a.hearingDenied == b.hearingDenied
         }
     }
 
     enum Event: Equatable {
         case next, back, chooseCard, connect, paste, chooseModel(String), openStuck, chooseStuck(String?), openSearch, allow(PermissionKind)
         case runTest, worked(Bool), checkAgain, sendReport, finish, openCode
+        case chooseVoice(String), playVoice(String), allowMic, skipVoice
     }
 
     private(set) var state = State()
@@ -145,7 +157,7 @@ final class OnboardingViewModel {
     /// board can be compared with the app without tapping.
     private func jumpForScreenshots() {
         guard let target = ProcessInfo.processInfo.environment["MODE_SETUP_STEP"] else { return }
-        let order = ["welcome", "name", "key", "model", "permissions", "test", "result", "diagnose"]
+        let order = ["welcome", "name", "key", "model", "permissions", "voice", "test", "result", "diagnose"]
         guard let index = order.firstIndex(of: target) else { return }
         if index >= 1 { presenter.next() }
         if index >= 2 { cardPicked(given: "Piyush", family: "Sinha"); presenter.next() }
@@ -153,7 +165,8 @@ final class OnboardingViewModel {
         if index >= 4 { presenter.next() }
         if index >= 5 { presenter.next() }
         if index >= 6 { presenter.next() }
-        if index >= 7 {
+        if index >= 7 { presenter.next() }
+        if index >= 8 {
             _Concurrency.Task { @MainActor [weak self] in
                 while self?.state.step != .result { try? await _Concurrency.Task.sleep(for: .milliseconds(200)) }
                 self?.presenter.confirmTest(worked: false)
@@ -182,6 +195,10 @@ final class OnboardingViewModel {
         case .sendReport: report = presenter.report()
         case .finish: presenter.finish()
         case .openCode: openURL = codeURL
+        case let .chooseVoice(id): presenter.chooseVoice(id: id)
+        case let .playVoice(id): presenter.playVoice(id: id)
+        case .allowMic: presenter.allowMic()
+        case .skipVoice: presenter.skipVoice()
         }
     }
 
@@ -236,6 +253,11 @@ final class OnboardingViewModel {
         st.results = s.results.map { choice($0, selected: $0.isMain) }
         st.stuckChoices = s.stuckChoices.map { choice($0, selected: $0.isStuck) }
         st.permissions = s.permissions.map(permission)
+        st.voices = s.voiceOptions.map { VoiceCard(id: $0.id, name: $0.name, traits: $0.traits) }
+        st.voice = s.voice
+        st.voicePlaying = s.voicePlaying
+        st.hearingReady = s.hearing == "ready"
+        st.hearingDenied = s.hearing == "denied"
         st.testRunning = s.testRunning
         let items = s.testItems
         st.testPhases = [TestItemKind.openSettings, .tapWifi, .comeBack].map { kind in
@@ -267,6 +289,7 @@ final class OnboardingViewModel {
         case .key: .key
         case .model: .model
         case .permissions: .permissions
+        case .voice: .voice
         case .test: .test
         case .result: .result
         case .diagnose, .finished: .diagnose

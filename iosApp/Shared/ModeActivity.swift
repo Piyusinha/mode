@@ -55,6 +55,12 @@ enum ModeLinks {
     static let chatGPTUsage = URL(string: "https://chatgpt.com/settings/usage")!
     static let claudeUsage = URL(string: "https://claude.ai/settings/usage")!
     static let openRouterCredits = URL(string: "https://openrouter.ai/settings/credits")!
+
+    /// Where each voice service makes an API key.
+    static let elevenLabsKeys = URL(string: "https://elevenlabs.io/app/settings/api-keys")!
+    static let fishAudioKeys = URL(string: "https://fish.audio/app/api-keys/")!
+    static let sonioxKeys = URL(string: "https://console.soniox.com")!
+    static let deepgramKeys = URL(string: "https://console.deepgram.com")!
 }
 
 /// Stop, from the Dynamic Island or the Lock Screen. A Live Activity intent runs

@@ -96,6 +96,16 @@ public enum ModeSize {
     public static let previewIsland: CGFloat = 250
     public static let previewIslandHeight: CGFloat = 37
 
+    /// Voice: the play button on a voice, the voice card's logo, the wave's bar, the listening orb and its rings.
+    public static let playButton: CGFloat = 40
+    public static let voiceLogo: CGFloat = 52
+    public static let waveBar: CGFloat = 3
+    public static let waveHeight: CGFloat = 18
+    public static let orb: CGFloat = 104
+    public static let orbRing: CGFloat = 26
+    public static let setupOrb: CGFloat = 88
+    public static let dragHandle: CGFloat = 16
+
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520
     /// The glows behind the page's top edge, as a share of its width and height.
@@ -118,4 +128,6 @@ public enum ModeOpacity {
     public static let shimmerWidth: CGFloat = 0.5
     /// A quieter version of a colour beside its full one (the other days in a week's bars).
     public static let muted: Double = 0.28
+    /// The rings around the listening orb, outermost first.
+    public static let orbRings: [Double] = [0.08, 0.14, 0.22]
 }

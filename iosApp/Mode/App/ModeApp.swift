@@ -54,7 +54,11 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
             speechReady: { true },
             hearingState: { [weak self] in self?.hearing ?? "unsupported" },
             // Kotlin's Boolean and Long arrive boxed (KotlinBoolean, KotlinLong).
-            speak: { [weak self] text, done in self?.speak(text) { done(KotlinBoolean(bool: $0)) } },
+            speak: { [weak self] text, voiceId, speed, done in
+                self?.speak(text, voiceId: voiceId, speed: speed.doubleValue) { done(KotlinBoolean(bool: $0)) }
+            },
+            voices: { [weak self] in self?.voiceOptions() ?? [] },
+            finish: { [weak self] in if self?.recordDone != nil { self?.finishRecord() } },
             play: { [weak self] bytes, done in self?.play(bytes) { done(KotlinBoolean(bool: $0)) } },
             record: { [weak self] maxMs, silenceMs, done in
                 self?.record(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value) { _ = done($0) }
@@ -93,12 +97,55 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     /// Says [text] and reports when it has finished (true: sound started), so the microphone never opens
     /// while Mode is still talking and a line that started is not said again by another voice.
-    private func speak(_ text: String, done: @escaping (Bool) -> Void) {
+    private func speak(_ text: String, voiceId: String?, speed: Double, done: @escaping (Bool) -> Void) {
         started = false
         speakDone = done
         VoiceAudio.shared.forSpeech()
         synth.usesApplicationAudioSession = true
-        synth.speak(AVSpeechUtterance(string: text))
+        let line = AVSpeechUtterance(string: text)
+        if let voiceId, let voice = AVSpeechSynthesisVoice(identifier: voiceId) { line.voice = voice }
+        let rate = Double(AVSpeechUtteranceDefaultSpeechRate) * speed
+        line.rate = Float(min(max(rate, Double(AVSpeechUtteranceMinimumSpeechRate)), Double(AVSpeechUtteranceMaximumSpeechRate)))
+        synth.speak(line)
+    }
+
+    /// Apple's voices for this iPhone's language and English, the best first: this region, then Premium, Enhanced.
+    /// Novelty voices are left out; a Personal Voice shows once the user has allowed it.
+    private func voiceOptions() -> [VoiceOption] {
+        let here = Locale.current
+        let language = here.language.languageCode?.identifier ?? "en"
+        let region = here.region?.identifier
+        let wanted = Set([language, "en"])
+        var seen = Set<String>()
+        return AVSpeechSynthesisVoice.speechVoices()
+            .filter { !$0.voiceTraits.contains(.isNoveltyVoice) }
+            .filter { wanted.contains(String($0.language.prefix(2))) || $0.voiceTraits.contains(.isPersonalVoice) }
+            .sorted { a, b in
+                func rank(_ v: AVSpeechSynthesisVoice) -> (Int, Int, Int) {
+                    (v.voiceTraits.contains(.isPersonalVoice) ? 0 : 1,
+                     region.map { v.language.hasSuffix($0) } == true ? 0 : 1,
+                     v.quality == .premium ? 0 : v.quality == .enhanced ? 1 : 2)
+                }
+                return rank(a) != rank(b) ? rank(a) < rank(b) : a.name < b.name
+            }
+            .filter { seen.insert($0.name + $0.language).inserted }
+            .map { v in
+                let place = here.localizedString(forIdentifier: v.language) ?? v.language
+                let personal = v.voiceTraits.contains(.isPersonalVoice)
+                let gender: String? = switch v.gender {
+                case .female: String(localized: L10n.Voice.female)
+                case .male: String(localized: L10n.Voice.male)
+                default: nil
+                }
+                let quality: String? = switch v.quality {
+                case .premium: String(localized: L10n.Voice.premium)
+                case .enhanced: String(localized: L10n.Voice.enhanced)
+                default: nil
+                }
+                return VoiceOption(id: v.identifier, name: personal ? String(localized: L10n.Voice.personalVoice) : v.name,
+                                   traits: [gender, place, quality].compactMap { $0 }.joined(separator: " · "),
+                                   group: place, preview: nil, tag: nil)
+            }
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
