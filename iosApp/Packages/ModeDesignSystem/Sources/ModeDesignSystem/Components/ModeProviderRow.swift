@@ -19,10 +19,13 @@ public struct ModeProviderRow: View {
     private let radio: RadioPlacement
     private let onSelect: () -> Void
     private let onConnect: () -> Void
+    /// Settings: the row opens a connected provider's page (the radio still picks it).
+    private let onOpen: (() -> Void)?
 
     public init(title: String, status: String, logo: ModeLogo, tileBackground: Color, tileForeground: Color, tag: String? = nil,
                 selected: Bool, connected: Bool, connectTitle: String, radio: RadioPlacement = .trailing,
-                onSelect: @escaping () -> Void, onConnect: @escaping () -> Void) {
+                onSelect: @escaping () -> Void, onConnect: @escaping () -> Void, onOpen: (() -> Void)? = nil) {
+        self.onOpen = onOpen
         self.title = title
         self.status = status
         self.logo = logo
@@ -39,7 +42,7 @@ public struct ModeProviderRow: View {
 
     public var body: some View {
         HStack(spacing: ModeSpacing.m) {
-            Button(action: connected || radio == .leading ? onSelect : onConnect) {
+            Button(action: connected ? (onOpen ?? onSelect) : (radio == .leading ? onSelect : onConnect)) {
                 HStack(spacing: ModeSpacing.m) {
                     if radio == .leading { ModeRadio(selected: selected) }
                     ModeLeadingView(.logoTile(logo, background: tileBackground, foreground: tileForeground))

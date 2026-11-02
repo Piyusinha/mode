@@ -116,6 +116,19 @@ public class ProviderDetailPresenter(
     /** Tasks use this provider from now on. */
     public fun use() { settings.selectProvider(provider) }
 
+    /** Signs out or removes the key; if it was in use, the next connected provider takes over. */
+    public fun disconnect() {
+        when (provider) {
+            ModelProvider.OpenRouter -> settings.apiKey = null
+            ModelProvider.ChatGpt -> chatGpt.signOut()
+            ModelProvider.ClaudeOAuth -> claude?.signOut()
+        }
+        if (settings.settings.value.provider == provider) {
+            ModelProvider.entries.firstOrNull { it != provider && settings.hasAccess(it) }?.let(settings::selectProvider)
+        }
+        remote.value = ProviderDetailUiState(providerId, loaded = true)
+    }
+
     @OptIn(ExperimentalTime::class)
     private fun local(r: ProviderDetailUiState): ProviderDetailUiState {
         val s = settings.settings.value

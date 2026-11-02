@@ -23,6 +23,8 @@ public data class ProviderRow(
     val inUse: Boolean,
     /** For OpenRouter: the key's last four characters. */
     val keyEnding: String? = null,
+    /** Who is signed in, when the provider said: "p@example.com · Plus". */
+    val account: String? = null,
 )
 
 public data class ProvidersUiState(
@@ -68,6 +70,9 @@ public class ProvidersPresenter(
                         ProviderRow(
                             p.id, settings.hasAccess(p), p == s.provider,
                             keyEnding = if (p == ModelProvider.OpenRouter) settings.apiKey?.takeIf { it.length > 8 }?.takeLast(4) else null,
+                            account = if (p == ModelProvider.ChatGpt && settings.hasAccess(p)) chatGpt.account()?.let { a ->
+                                listOfNotNull(a.email, a.plan).joinToString(" · ").ifEmpty { null }
+                            } else null,
                         )
                     },
                     active = s.provider.id,

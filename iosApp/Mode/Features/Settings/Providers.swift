@@ -155,8 +155,9 @@ final class ProvidersViewModel {
             case .openRouter: r.keyEnding.map { L10n.Providers.keyEnding($0) } ?? String(localized: L10n.Providers.openRouterDetail)
             }
             let state = String(localized: r.connected ? L10n.Providers.connected : L10n.Providers.notConnected)
-            // Connected first when it is; otherwise what it is: "Not connected · pay as you go".
-            return Row(id: r.id, kind: k, title: title(k), status: [state, detail].joined(separator: " · "), connected: r.connected, inUse: r.inUse)
+            // The account when the provider said who it is ("p@example.com · Plus"); else the state and what it is.
+            let status = r.account ?? [state, detail].joined(separator: " · ")
+            return Row(id: r.id, kind: k, title: title(k), status: status, connected: r.connected, inUse: r.inUse)
         }
         let active = kind(s.active)
         return State(
@@ -200,6 +201,8 @@ struct ProviderList: View {
     /// Setup: radio first and ChatGPT recommended. Settings: radio last and "In use" on the picked one.
     let setup: Bool
     let onEvent: (ProvidersViewModel.Event) -> Void
+    /// Settings: opens a connected provider's page.
+    var onOpen: ((String) -> Void)?
 
     var body: some View {
         ModeCard {
@@ -211,7 +214,8 @@ struct ProviderList: View {
                         : (row.inUse && row.connected ? String(localized: L10n.Providers.inUse) : nil),
                     selected: row.inUse, connected: row.connected, connectTitle: String(localized: L10n.Providers.connect),
                     radio: setup ? .leading : .trailing,
-                    onSelect: { onEvent(.select(row.id)) }, onConnect: { onEvent(.connect(row.id)) }
+                    onSelect: { onEvent(.select(row.id)) }, onConnect: { onEvent(.connect(row.id)) },
+                    onOpen: onOpen.map { open in { open(row.id) } }
                 )
                 .contextMenu {
                     if row.connected {
@@ -225,11 +229,31 @@ struct ProviderList: View {
 
 /// Settings' "AI providers" sheet: connect as many as you like, pick the one Mode uses.
 struct ProvidersSheet: View {
+    let app: AppModel
     let state: ProvidersViewModel.State
     let onEvent: (ProvidersViewModel.Event) -> Void
     let onDone: () -> Void
+    /// A provider's page, and its models, open inside the sheet.
+    @State private var path: [Route] = []
 
     var body: some View {
+        NavigationStack(path: $path) {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: Route.self) { route in
+                    switch route {
+                    case let .providerDetail(id): ProviderDetailRoute(app: app, id: id) { path.append($0) }
+                    case let .planModels(brain): PlanModelsRoute(app: app, brain: brain)
+                    case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck) { path.append($0) }
+                    default: EmptyView()
+                    }
+                }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.m) {
                 HStack(alignment: .top, spacing: ModeSpacing.m) {
@@ -244,7 +268,7 @@ struct ProvidersSheet: View {
                     }
                     .buttonStyle(.glass)
                 }
-                ProviderList(rows: state.rows, setup: false, onEvent: onEvent)
+                ProviderList(rows: state.rows, setup: false, onEvent: onEvent) { path.append(.providerDetail(id: $0)) }
                 Text(L10n.Providers.switchNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
                 ModeNote(icon: .lock, L10n.Providers.keychainNote)
             }
@@ -253,8 +277,6 @@ struct ProvidersSheet: View {
             .padding(.bottom, ModeSpacing.xxl)
         }
         .modeScreen()
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
 

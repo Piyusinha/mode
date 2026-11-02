@@ -49,6 +49,9 @@ public data class SettingsUiState(
     val maker: String? = null,
     /** How many models there are to search. */
     val modelCount: Int = 0,
+    /** The effort picked for each role ("low"…), where the provider takes one. */
+    val modelEffort: String? = null,
+    val stuckEffort: String? = null,
 )
 
 public data class ModelChoice(
@@ -90,8 +93,13 @@ public class SettingsPresenter(
                 }
                 val all = if (s.provider == ModelProvider.OpenRouter) models.all else recommended
                 val known = (recommended + all).associateBy { it.id }
-                fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == s.model, o.id == s.strongModel)
-                fun byId(id: String?) = id?.let { known[it]?.let(::choice) ?: ModelChoice(it, it.substringAfter('/'), 0.0, null, "", it == s.model, it == s.strongModel) }
+                // A plan model carries its effort ("gpt-6.1-terra@low"): matched and named without it.
+                val main = s.model.let(ProviderModels::base)
+                val strong = s.strongModel?.let(ProviderModels::base)
+                fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == main, o.id == strong)
+                fun byId(id: String?) = id?.let(ProviderModels::base)?.let { b ->
+                    known[b]?.let(::choice) ?: ModelChoice(b, if (s.provider == ModelProvider.ChatGpt) ProviderModels.displayName(b) else b.substringAfter('/'), 0.0, null, "", b == main, b == strong)
+                }
                 SettingsUiState(
                     name = s.userName.orEmpty(),
                     hasKey = s.hasApiKey,
@@ -104,6 +112,8 @@ public class SettingsPresenter(
                         else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q, maker?.ifEmpty { null }) else ModelSearch.search(all, q))
                             .take(MAX_RESULTS).map(::choice),
                     modelCount = all.size,
+                    modelEffort = ProviderModels.effort(s.model),
+                    stuckEffort = s.strongModel?.let(ProviderModels::effort),
                     makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),
                     maker = maker,
                     catalogSource = models.source,

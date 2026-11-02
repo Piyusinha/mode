@@ -116,4 +116,6 @@ public enum ModeOpacity {
     /// The brightest point of the working shimmer, and its width as a share of the text.
     public static let shimmer: Double = 0.55
     public static let shimmerWidth: CGFloat = 0.5
+    /// A quieter version of a colour beside its full one (the other days in a week's bars).
+    public static let muted: Double = 0.28
 }

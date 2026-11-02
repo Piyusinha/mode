@@ -54,12 +54,15 @@ final class SettingsViewModel {
         case openMemory
         case openPicker(stuck: Bool)
         case showProviders
+        case openProvider
     }
 
     private(set) var state = State()
     var name = ""
     var query = ""
     var showingProviders = false
+    /// The provider in use (ModelProvider id), for its page.
+    private var activeProvider: String { presenter.state.value.provider }
     private(set) var filter: Filter = .all
     private let presenter: SettingsPresenter
     private let navigate: (Route) -> Void
@@ -96,7 +99,8 @@ final class SettingsViewModel {
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
         case .openMemory: navigate(.memory)
-        case let .openPicker(stuck): navigate(.modelPicker(stuck: stuck))
+        case let .openPicker(stuck): navigate(state.showsCost ? .modelPicker(stuck: stuck) : .planModels(brain: stuck))
+        case .openProvider: navigate(.providerDetail(id: activeProvider))
         case .showProviders: showingProviders = true
         }
     }
@@ -146,8 +150,9 @@ final class SettingsViewModel {
         }
         let cap = s.dailyCapUsd?.doubleValue
         return State(
-            modelName: s.model?.name ?? "",
-            stuckName: s.stuckModel?.name ?? String(localized: L10n.Settings.off),
+            modelName: [s.model?.name, s.modelEffort.map { PlanModelsViewModel.effortName($0) }].compactMap { $0 }.joined(separator: " · "),
+            stuckName: s.stuckModel.map { m in [m.name, s.stuckEffort.map { PlanModelsViewModel.effortName($0) }].compactMap { $0 }.joined(separator: " · ") }
+                ?? String(localized: L10n.Settings.off),
             neverStuck: s.stuckModel == nil,
             picks: s.picks.map(model),
             results: s.results.map(model),

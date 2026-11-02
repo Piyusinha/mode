@@ -28,7 +28,8 @@ struct SettingsScreen: View {
 
                 ModeSectionHeader(L10n.Settings.ai)
                 ModeCard {
-                    Button { onEvent(.showProviders) } label: {
+                    HStack(spacing: ModeSpacing.m) {
+                        Button { onEvent(.openProvider) } label: {
                         HStack(spacing: ModeSpacing.m) {
                             ModeLeadingView(.logoTile(providers.activeKind.logo, background: providers.activeKind.tileBackground,
                                                       foreground: providers.activeKind.tileForeground))
@@ -42,15 +43,19 @@ struct SettingsScreen: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        Button { onEvent(.showProviders) } label: {
                             Text(L10n.Providers.change).modeText(.subheadline).fontWeight(.semibold)
                                 .padding(.horizontal, ModeSpacing.m)
                                 .frame(minHeight: ModeSize.badge)
                                 .background(ModeColor.fill, in: .capsule)
                         }
-                        .padding(.vertical, ModeSpacing.m)
-                        .contentShape(.rect)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, ModeSpacing.m)
                     valueRow(L10n.Settings.mainModel, value: state.modelName) { onEvent(.openPicker(stuck: false)) }
                     valueRow(L10n.Settings.whenStuckShort, value: state.stuckName) { onEvent(.openPicker(stuck: true)) }
                 }
@@ -90,12 +95,7 @@ struct SettingsScreen: View {
     }
 
     private func valueRow(_ title: LocalizedStringResource, value: String, action: @escaping () -> Void) -> some View {
-        ModeRow(String(localized: title), action: action) {
-            HStack(spacing: ModeSpacing.s) {
-                Text(value).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
-                ModeChevron()
-            }
-        }
+        ModeValueRow(String(localized: title), value: value, action: action).frame(minHeight: ModeSize.rowMin)
     }
 }
 
@@ -173,7 +173,7 @@ struct SettingsRoute: View {
         SettingsScreen(state: model.state, providers: providers.state, name: $model.name, costStep: model.costStep,
                        costRange: model.costRange, dailyCapStep: model.dailyCapStep, dailyCapRange: model.dailyCapRange, onEvent: model.send)
             .sheet(isPresented: $model.showingProviders) {
-                ProvidersSheet(state: providers.state, onEvent: providers.send) { model.showingProviders = false }
+                ProvidersSheet(app: app, state: providers.state, onEvent: providers.send) { model.showingProviders = false }
                     .modifier(ProviderLinks(model: providers, app: app))
             }
             #if DEBUG && targetEnvironment(simulator)

@@ -10,6 +10,8 @@ enum Route: Hashable {
     case connectChatGPT
     case memory
     case modelPicker(stuck: Bool)
+    case planModels(brain: Bool)
+    case providerDetail(id: String)
     case developer
     case memoryAboutYou
     /// Routines, all of them or one app's.

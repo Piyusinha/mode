@@ -298,7 +298,7 @@ enum L10n {
         static let change = LocalizedStringResource("providers.change", defaultValue: "Change")
         static let aiInUse = LocalizedStringResource("providers.aiInUse", defaultValue: "AI in use")
         static let notConnectedYet = LocalizedStringResource("providers.notConnectedYet", defaultValue: "Not connected yet")
-        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Switching keeps each provider's models. Long-press a connected provider to disconnect it.")
+        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Switching keeps each provider's models. Tap a connected provider for its models, usage, or to disconnect.")
         static let provider = LocalizedStringResource("providers.provider", defaultValue: "Provider")
         static let models = LocalizedStringResource("providers.models", defaultValue: "Models")
         static let connectedHeader = LocalizedStringResource("providers.connectedHeader", defaultValue: "Connected")
@@ -324,6 +324,110 @@ enum L10n {
 
         static func continueWith(_ name: String) -> String {
             String(localized: "providers.continueWith", defaultValue: "Continue with \(name)")
+        }
+    }
+
+    enum Plan {
+        static let title = LocalizedStringResource("plan.title", defaultValue: "Models")
+        static let phoneControl = LocalizedStringResource("plan.phoneControl", defaultValue: "Phone control")
+        static let brain = LocalizedStringResource("plan.brain", defaultValue: "Brain")
+        static let roleHint = LocalizedStringResource("plan.roleHint", defaultValue: "Phone control taps and types every step: pick fast. The brain plans and decides when Mode gets stuck: pick accurate.")
+        static let effort = LocalizedStringResource("plan.effort", defaultValue: "Effort")
+        static let low = LocalizedStringResource("plan.low", defaultValue: "Low")
+        static let medium = LocalizedStringResource("plan.medium", defaultValue: "Medium")
+        static let high = LocalizedStringResource("plan.high", defaultValue: "High")
+        static let speed = LocalizedStringResource("plan.speed", defaultValue: "Speed")
+        static let accuracy = LocalizedStringResource("plan.accuracy", defaultValue: "Accuracy")
+        static let notMeasured = LocalizedStringResource("plan.notMeasured", defaultValue: "Not measured yet")
+        static let measure = LocalizedStringResource("plan.measure", defaultValue: "Measure on this iPhone")
+        static let measureNote = LocalizedStringResource("plan.measureNote", defaultValue: "Measured by Mode on this iPhone: the same short screen test for each model and effort. Your plan pays, so there is no cost per task.")
+        static let bestForPhone = LocalizedStringResource("plan.tag.bestForPhone", defaultValue: "Best for phone control")
+        static let bestForBrain = LocalizedStringResource("plan.tag.bestForBrain", defaultValue: "Best for brain")
+        static let fastest = LocalizedStringResource("plan.tag.fastest", defaultValue: "Fastest")
+        static let mostAccurate = LocalizedStringResource("plan.tag.mostAccurate", defaultValue: "Most accurate")
+
+        static func perStep(_ seconds: String) -> String {
+            String(localized: "plan.perStep", defaultValue: "\(seconds) s a step")
+        }
+
+        static func right(_ correct: Int, of total: Int) -> String {
+            String(localized: "plan.right", defaultValue: "\(correct) of \(total) right")
+        }
+
+        static func effortName(_ effort: String) -> String {
+            String(localized: "plan.effortName", defaultValue: "\(effort) effort")
+        }
+
+        static func measuring(_ done: Int, of total: Int) -> String {
+            String(localized: "plan.measuring", defaultValue: "Measuring \(done) of \(total)…")
+        }
+
+        static func onPlan(_ provider: String, _ count: Int) -> String {
+            count == 1 ? String(localized: "plan.onPlan.one", defaultValue: "\(provider) · 1 model on your plan")
+                : String(localized: "plan.onPlan", defaultValue: "\(provider) · \(count) models on your plan")
+        }
+    }
+
+    enum Account {
+        static let account = LocalizedStringResource("account.account", defaultValue: "Account")
+        static let usage = LocalizedStringResource("account.usage", defaultValue: "Usage")
+        static let credits = LocalizedStringResource("account.credits", defaultValue: "Credits")
+        static let models = LocalizedStringResource("account.models", defaultValue: "Models")
+        static let signedInAs = LocalizedStringResource("account.signedInAs", defaultValue: "Signed in as")
+        static let name = LocalizedStringResource("account.name", defaultValue: "Name")
+        static let plan = LocalizedStringResource("account.plan", defaultValue: "Plan")
+        static let key = LocalizedStringResource("account.key", defaultValue: "Key")
+        static let keyName = LocalizedStringResource("account.keyName", defaultValue: "Key name")
+        static let notShared = LocalizedStringResource("account.notShared", defaultValue: "Not shared")
+        static let thisWeek = LocalizedStringResource("account.thisWeek", defaultValue: "Mode on your plan · this week")
+        static let today = LocalizedStringResource("account.today", defaultValue: "Today")
+        static let tasksThisWeek = LocalizedStringResource("account.tasksThisWeek", defaultValue: "Tasks this week")
+        static let planLimit = LocalizedStringResource("account.planLimit", defaultValue: "Plan limit")
+        static let available = LocalizedStringResource("account.available", defaultValue: "Available")
+        static let chatGPTNote = LocalizedStringResource("account.chatGPTNote", defaultValue: "Plus shares one 5-hour limit across every app that uses your plan. OpenAI doesn't tell apps what is left: Mode shows what it used, and says so when the limit is reached.")
+        static let claudeNote = LocalizedStringResource("account.claudeNote", defaultValue: "From Claude, for your whole plan (Claude apps and Mode together).")
+        static let claudeNoUsage = LocalizedStringResource("account.claudeNoUsage", defaultValue: "Claude didn't share your usage this time.")
+        static let session = LocalizedStringResource("account.session", defaultValue: "Current session · 5 hours")
+        static let week = LocalizedStringResource("account.week", defaultValue: "This week")
+        static let modeToday = LocalizedStringResource("account.modeToday", defaultValue: "Mode today")
+        static let creditsLeft = LocalizedStringResource("account.creditsLeft", defaultValue: "Credits left")
+        static let spentToday = LocalizedStringResource("account.spentToday", defaultValue: "Spent by Mode today")
+        static let limitPerTask = LocalizedStringResource("account.limitPerTask", defaultValue: "Limit per task")
+        static let seeChatGPTUsage = LocalizedStringResource("account.seeChatGPTUsage", defaultValue: "See usage in ChatGPT")
+        static let seeClaudeUsage = LocalizedStringResource("account.seeClaudeUsage", defaultValue: "See usage in Claude")
+        static let addCredits = LocalizedStringResource("account.addCredits", defaultValue: "Add credits on OpenRouter")
+        static let signOutChatGPT = LocalizedStringResource("account.signOutChatGPT", defaultValue: "Sign out of ChatGPT")
+        static let signOutClaude = LocalizedStringResource("account.signOutClaude", defaultValue: "Sign out of Claude")
+        static let removeKey = LocalizedStringResource("account.removeKey", defaultValue: "Remove key")
+        static let inUse = LocalizedStringResource("account.inUse", defaultValue: "Connected · in use")
+        static let notInUse = LocalizedStringResource("account.notInUse", defaultValue: "Connected · not in use")
+
+        static func steps(_ n: Int) -> String {
+            n == 1 ? String(localized: "account.steps.one", defaultValue: "1 step") : String(localized: "account.steps", defaultValue: "\(n) steps")
+        }
+
+        static func stepsAndTasks(_ steps: Int, _ tasks: Int) -> String {
+            String(localized: "account.stepsAndTasks", defaultValue: "\(Account.steps(steps)) · \(tasks) tasks")
+        }
+
+        static func use(_ provider: String) -> String {
+            String(localized: "account.use", defaultValue: "Use \(provider)")
+        }
+
+        static func reachedAt(_ time: String) -> String {
+            String(localized: "account.reachedAt", defaultValue: "Reached at \(time)")
+        }
+
+        static func used(_ percent: Int) -> String {
+            String(localized: "account.used", defaultValue: "\(percent)% used")
+        }
+
+        static func resets(_ when: String) -> String {
+            String(localized: "account.resets", defaultValue: "Resets \(when)")
+        }
+
+        static func ofTotal(_ total: String) -> String {
+            String(localized: "account.ofTotal", defaultValue: "of \(total) · from OpenRouter")
         }
     }
 
@@ -385,8 +489,8 @@ enum L10n {
         static let memory = LocalizedStringResource("settings.memory", defaultValue: "Memory")
         static let ai = LocalizedStringResource("settings.ai", defaultValue: "AI")
         static let addName = LocalizedStringResource("settings.addName", defaultValue: "Add")
-        static let mainModel = LocalizedStringResource("settings.mainModel", defaultValue: "Main model")
-        static let whenStuckShort = LocalizedStringResource("settings.whenStuckShort", defaultValue: "When stuck")
+        static let mainModel = LocalizedStringResource("settings.mainModel", defaultValue: "Phone control")
+        static let whenStuckShort = LocalizedStringResource("settings.whenStuckShort", defaultValue: "Brain")
         static let off = LocalizedStringResource("settings.off", defaultValue: "Off")
         static let onYourPlan = LocalizedStringResource("settings.onYourPlan", defaultValue: "on your plan")
         static let all = LocalizedStringResource("settings.all", defaultValue: "All")

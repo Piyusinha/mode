@@ -48,6 +48,11 @@ enum ModeLinks {
 
     static let ask = URL(string: "\(scheme)://ask")!
     static let open = URL(string: "\(scheme)://open")!
+
+    /// Where each provider shows its own usage or credits.
+    static let chatGPTUsage = URL(string: "https://chatgpt.com/settings/usage")!
+    static let claudeUsage = URL(string: "https://claude.ai/settings/usage")!
+    static let openRouterCredits = URL(string: "https://openrouter.ai/settings/credits")!
 }
 
 /// Stop, from the Dynamic Island or the Lock Screen. A Live Activity intent runs

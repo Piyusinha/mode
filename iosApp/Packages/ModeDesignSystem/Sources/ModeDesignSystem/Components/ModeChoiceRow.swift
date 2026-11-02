@@ -36,9 +36,16 @@ public struct ModeChoiceRow: View {
             HStack(spacing: ModeSpacing.m) {
                 ModeLeadingView(leading)
                 VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                    HStack(spacing: ModeSpacing.s) {
-                        Text(title).modeText(.bodyEmphasis).lineLimit(1)
-                        if let tag { ModeTag(tag.text, background: tag.background, foreground: tag.foreground).fixedSize() }
+                    // The name is never cut short: when it and its tag don't fit on one line, the tag goes under it.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: ModeSpacing.s) {
+                            Text(title).modeText(.bodyEmphasis).fixedSize()
+                            tagView
+                        }
+                        VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                            Text(title).modeText(.bodyEmphasis).fixedSize(horizontal: false, vertical: true)
+                            tagView
+                        }
                     }
                     Text(detail).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(2)
                 }
@@ -50,6 +57,10 @@ public struct ModeChoiceRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    @ViewBuilder private var tagView: some View {
+        if let tag { ModeTag(tag.text, background: tag.background, foreground: tag.foreground).fixedSize() }
     }
 }
 

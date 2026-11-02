@@ -15,6 +15,9 @@ struct MainTabs: View {
     #if DEBUG && targetEnvironment(simulator)
     @State private var previewActivity: ModeActivityAttributes.ContentState.Phase?
     @State private var previewQuestion: RunStatusViewModel.PendingQuestion?
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var sample: ScreenSample?
+    #endif
     #endif
 
     init(app: AppModel) {
@@ -73,6 +76,7 @@ struct MainTabs: View {
         .task { openForScreenshots() }
         .fullScreenCover(item: $previewActivity) { ActivityPreview(phase: $0) }
         .sheet(item: $previewQuestion) { QuestionSheet(question: $0, onAnswer: { _ in }, onStop: {}) }
+        .fullScreenCover(item: $sample) { ScreenSampleHost(sample: $0) }
         #endif
     }
 
@@ -108,10 +112,13 @@ struct MainTabs: View {
         case "live": showingLive = true
         case "settings": paths[.home] = [.settings]
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
+        case "plan": paths[.home] = [.settings, .planModels(brain: parts.last == "brain")]
+        case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
         case "activity": previewActivity = ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
         case "question": previewQuestion = ActivityPreview.sampleQuestion
+        case "sample": sample = ScreenSample(id: parts.last ?? "")
         default: break
         }
     }
@@ -143,6 +150,8 @@ private struct TabRoot<Content: View>: View {
                     case .connectChatGPT: ConnectChatGPTRoute(app: app)
                     case .memory: MemoryRoute(app: app, navigate: navigate)
                     case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck, navigate: navigate)
+                    case let .planModels(brain): PlanModelsRoute(app: app, brain: brain)
+                    case let .providerDetail(id): ProviderDetailRoute(app: app, id: id, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)
                     case .memoryApps: MemoryAppsRoute(app: app, navigate: navigate)
