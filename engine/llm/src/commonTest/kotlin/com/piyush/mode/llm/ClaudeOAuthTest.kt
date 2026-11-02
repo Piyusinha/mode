@@ -92,6 +92,13 @@ class ClaudeOAuthTest {
         assertEquals("Claude Opus 5.5", models[0].name)
     }
 
+    @Test fun aModelThatNeedsCreditsSaysSoAndOtherFieldsAreKeptForTheLog() {
+        assertTrue(ClaudeOAuthClient.needsCredits("""{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}"""))
+        assertFalse(ClaudeOAuthClient.needsCredits("""{"error":{"message":"model not found"}}"""))
+        val m = ClaudeOAuthClient.parseModels(Json.parseToJsonElement("""{"data":[{"id":"claude-fable-5-1","type":"model","billing":"api_credits"}]}""").jsonObject)
+        assertEquals(listOf("billing=api_credits"), m.single().otherFields)
+    }
+
     @Test fun toolArgumentsAndTokenUsageAreReturnedToTheAgent() {
         val result = ClaudeOAuthClient.parse("""{"content":[{"type":"text","text":"Next"},{"type":"tool_use","name":"tap","input":{"x":42}}],"usage":{"input_tokens":10,"output_tokens":3,"cache_read_input_tokens":20,"cache_creation_input_tokens":5}}""")
         assertEquals("tap", result.toolCall!!.name)

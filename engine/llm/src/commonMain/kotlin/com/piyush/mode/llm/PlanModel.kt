@@ -9,12 +9,18 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 /**
- * A model a plan (ChatGPT, Claude) offers, as the provider lists it: Mode does not pick or trim the list.
+ * A model a plan (ChatGPT, Claude) offers, as the provider lists it (Mode's settings decide which to show).
  * [efforts] are the reasoning efforts the provider says it takes, lowest first: empty when it takes none,
  * null when the provider did not say (Mode then offers the common ones).
  */
 @Serializable
-data class PlanModel(val id: String, val name: String? = null, val efforts: List<String>? = null) {
+data class PlanModel(
+    val id: String,
+    val name: String? = null,
+    val efforts: List<String>? = null,
+    /** Fields the provider sent beyond the ones Mode reads (a billing or access hint, if any), for the log. */
+    val otherFields: List<String> = emptyList(),
+) {
     companion object {
         /** Every effort name seen from a provider, lowest first: for ordering, never for filtering. */
         val LADDER: List<String> = listOf("none", "minimal", "low", "medium", "high", "xhigh", "max")

@@ -66,8 +66,8 @@ class ProvidersTest {
     @Test
     fun chatGptModelsFromThePlanOrTheDefaults() {
         assertEquals(listOf(ProviderModels.CHATGPT_MAIN, ProviderModels.CHATGPT_STRONG), ProviderModels.chatGpt(emptyList()).map { it.id })
-        val plan = ProviderModels.chatGpt(listOf("gpt-6-luna", "gpt-6.1-terra", "claude-x", "openai/gpt"))
-        assertEquals(listOf("gpt-6.1-terra", "gpt-6-luna"), plan.map { it.id }, "the default first; foreign ids left out")
+        val plan = ProviderModels.chatGpt(listOf("gpt-6.1-luna", "gpt-6.1-terra", "claude-x", "openai/gpt"))
+        assertEquals(listOf("gpt-6.1-terra", "gpt-6.1-luna"), plan.map { it.id }, "the default first; foreign ids left out")
         assertEquals("GPT-6.1 Terra", ProviderModels.displayName("gpt-6.1-terra"))
         assertTrue(ProviderModels.accepts(ModelProvider.ChatGpt, "gpt-6.1-sol"))
         assertFalse(ProviderModels.accepts(ModelProvider.ChatGpt, "anthropic/claude-haiku-5.5"))

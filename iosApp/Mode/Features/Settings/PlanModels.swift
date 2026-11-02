@@ -114,7 +114,8 @@ final class PlanModelsViewModel {
                 let effort = m.effort.map { L10n.Plan.effortName(effortName($0)) }
                 return Row(
                     id: m.id, name: m.name, leading: ModelTile.leading(for: m.id, name: m.name), tag: tag,
-                    line: ([effort].compactMap { $0 } + measured).joined(separator: " · "),
+                    // A model billed apart from the plan says so first: choosing it spends API credits.
+                    line: ([m.usesApiCredits ? String(localized: L10n.Plan.usesApiCredits) : nil, effort].compactMap { $0 } + measured).joined(separator: " · "),
                     selected: m.selected, effort: m.effort,
                     effortOptions: m.efforts.map { EffortOption(id: $0.effort, title: effortName($0.effort)) },
                     efforts: m.efforts.map { e in

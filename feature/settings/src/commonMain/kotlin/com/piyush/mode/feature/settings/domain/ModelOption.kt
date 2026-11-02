@@ -14,6 +14,8 @@ public data class ModelOption(
     val note: String = "",
     /** Plan models: the efforts the provider says it takes (empty: none), or null when it did not say. */
     val efforts: List<String>? = null,
+    /** Billed to the account's API credits, not the plan (Claude Fable). */
+    val usesApiCredits: Boolean = false,
 )
 
 /** Where the list came from. */

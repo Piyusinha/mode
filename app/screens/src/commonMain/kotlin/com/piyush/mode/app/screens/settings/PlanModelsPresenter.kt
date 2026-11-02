@@ -39,6 +39,8 @@ public data class PlanModelRow(
     val correct: Int?,
     val total: Int?,
     val efforts: List<EffortRow>,
+    /** Billed to the account's API credits, not the plan: not measured unless chosen. */
+    val usesApiCredits: Boolean = false,
 )
 
 public data class PlanModelsUiState(
@@ -117,9 +119,11 @@ public class PlanModelsPresenter(
         val selected = current()?.let(ProviderModels::base)
         val pairs = buildList {
             // Every model at the role's usual effort (or the nearest it takes), the selected one at all it takes.
-            options.forEach { o -> add(ProviderModels.withEffort(o.id, shownEffort(provider, o, role.value))) }
+            // A model on API credits costs money to measure: only when chosen, and only at its chosen effort.
+            options.filterNot { it.usesApiCredits }.forEach { o -> add(ProviderModels.withEffort(o.id, shownEffort(provider, o, role.value))) }
             options.firstOrNull { it.id == selected }?.let { o ->
-                ProviderModels.efforts(provider, o).forEach { add(ProviderModels.withEffort(o.id, it)) }
+                if (o.usesApiCredits) add(current()!!)
+                else ProviderModels.efforts(provider, o).forEach { add(ProviderModels.withEffort(o.id, it)) }
             }
         }.distinct()
         error.value = null
@@ -148,10 +152,14 @@ public class PlanModelsPresenter(
         settings.update { if (role.value == ModelRole.PhoneControl) it.copy(model = model) else it.copy(strongModel = model) }
     }
 
-    private fun options(provider: ModelProvider): List<ModelOption> = when (provider) {
-        ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGpt.knownModels.value, chatGpt.modelInfo.value)
-        ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels?.known?.value.orEmpty())
-        ModelProvider.OpenRouter -> emptyList()
+    /** The provider's models worth listing, and always the ones in use (never hidden from the user). */
+    private fun options(provider: ModelProvider): List<ModelOption> {
+        val inUse = settings.settings.value.let { s -> listOfNotNull(s.model, s.strongModel).map(ProviderModels::base).toSet() }
+        return when (provider) {
+            ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGpt.knownModels.value, chatGpt.modelInfo.value, inUse)
+            ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels?.known?.value.orEmpty(), inUse)
+            ModelProvider.OpenRouter -> emptyList()
+        }
     }
 
     private fun build(provider: ModelProvider, r: ModelRole, p: Pair<Int, Int>?, e: String?): PlanModelsUiState {
@@ -180,6 +188,7 @@ public class PlanModelsPresenter(
                         val m = results[ProviderModels.withEffort(o.id, ef)]
                         EffortRow(ef, m?.millis, m?.correct, m?.total, selected = ef == effort)
                     },
+                    usesApiCredits = o.usesApiCredits,
                 )
             },
         )

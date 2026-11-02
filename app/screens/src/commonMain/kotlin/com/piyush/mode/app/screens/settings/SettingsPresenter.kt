@@ -91,8 +91,8 @@ public class SettingsPresenter(
         scope.launch {
             combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, (q, maker), _, auth ->
                 val recommended = when (s.provider) {
-                    ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels())
-                    ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels())
+                    ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels(), setOfNotNull(s.model, s.strongModel).map(ProviderModels::base).toSet())
+                    ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels(), keep = setOfNotNull(s.model, s.strongModel).map(ProviderModels::base).toSet())
                     ModelProvider.OpenRouter -> models.recommended
                 }
                 val all = if (s.provider == ModelProvider.OpenRouter) models.all else recommended

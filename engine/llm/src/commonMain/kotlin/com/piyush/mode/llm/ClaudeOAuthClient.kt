@@ -66,13 +66,17 @@ class ClaudeOAuthClient(
                 setBody(TextContent(body.toString(), ContentType.Application.Json))
             }
             if (response.status.value == 401 && attempt == 0) continue
+            val text = response.bodyAsText()
             if (!response.status.isSuccess()) throw LlmFailed(when (response.status.value) {
                 401 -> "Claude needs you to sign in again in Settings."
-                403 -> "Claude refused this OAuth request. Your plan or this client may not be supported."
+                402 -> CREDITS
+                400, 403 -> if (needsCredits(text)) CREDITS
+                    else if (response.status.value == 403) "Claude refused this OAuth request. Your plan or this client may not be supported."
+                    else "Claude request failed (HTTP 400)."
                 429 -> "Claude is rate limited or your plan allowance is exhausted. Wait and try again."
                 else -> "Claude request failed (HTTP ${response.status.value})."
             })
-            return parse(response.bodyAsText())
+            return parse(text)
         }
         error("unreachable")
     }
@@ -82,6 +86,13 @@ class ClaudeOAuthClient(
         const val STRONG_MODEL = "claude-sonnet-5-5"
 
         private const val MAX_MODEL_PAGES = 5
+
+        /** A model the plan does not cover (Fable) asked for API credits the account does not have. */
+        const val CREDITS = "This Claude model uses API credits, not your Claude plan. Add credits in the Claude Console, or choose another model in Settings."
+
+        /** Anthropic's error says it is about credits or billing. */
+        fun needsCredits(body: String): Boolean = Regex("""credit|billing|balance|purchase""", RegexOption.IGNORE_CASE).containsMatchIn(body)
+        private val READ_FIELDS = setOf("id", "display_name", "capabilities", "type", "created_at", "max_input_tokens", "max_tokens")
 
         /**
          * Room for the answer and Claude's thinking (on by default; the thinking counts against it), by effort:
@@ -98,7 +109,11 @@ class ClaudeOAuthClient(
             val o = e as? JsonObject ?: return@mapNotNull null
             val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val caps = o["capabilities"] as? JsonObject
-            PlanModel(id, o["display_name"]?.jsonPrimitive?.contentOrNull, caps?.let { PlanModel.effortsIn(it["effort"] ?: JsonObject(mapOf("supported" to JsonPrimitive(false)))) })
+            PlanModel(
+                id, o["display_name"]?.jsonPrimitive?.contentOrNull,
+                caps?.let { PlanModel.effortsIn(it["effort"] ?: JsonObject(mapOf("supported" to JsonPrimitive(false)))) },
+                otherFields = o.keys.filterNot { it in READ_FIELDS }.map { k -> o[k].let { v -> if (v is JsonPrimitive) "$k=${v.contentOrNull}" else k } },
+            )
         }
 
         fun request(model: String, messages: List<ChatMessage>, tools: JsonArray): JsonObject = buildJsonObject {

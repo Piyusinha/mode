@@ -38,8 +38,8 @@ class PlanModelsTest {
      */
     private val model = LlmClient { m, messages, _ ->
         val shown = messages.last().image!!.size
-        val answer = if (m.startsWith("gpt-6-luna") && shown == 4) "0" else shown.toString()
-        delay(when { m.startsWith("gpt-6-luna") -> 100L; m.startsWith("gpt-6.1-terra") -> 400L; else -> 2000L })
+        val answer = if (m.startsWith("gpt-6.1-luna") && shown == 4) "0" else shown.toString()
+        delay(when { m.startsWith("gpt-6.1-luna") -> 100L; m.startsWith("gpt-6.1-terra") -> 400L; else -> 2000L })
         ChatResult(ToolCall("read_number", JsonObject(mapOf("number" to JsonPrimitive(answer)))), "", Usage(10, 1, 0.0))
     }
 
@@ -68,7 +68,7 @@ class PlanModelsTest {
         secrets.set(ChatGptAccount.CONNECTED_KEY, "r"); settings.accountsChanged()
         settings.selectProvider(ModelProvider.ChatGpt)
         // The plan lists three models.
-        secrets.set("chatgpt_models", "gpt-6.1-terra,gpt-6.1-sol,gpt-6-luna")
+        secrets.set("chatgpt_models", "gpt-6.1-terra,gpt-6.1-sol,gpt-6.1-luna")
         val known = ChatGptAccount(ChatGptAuth(HttpClient(MockEngine { respond("") })), secrets)
         val p = PlanModelsPresenter(backgroundScope, settings, known, bench, model)
         p.state.awaitState { it.models.size == 3 }
@@ -77,11 +77,11 @@ class PlanModelsTest {
         repeat(120) { delay(500) }
         val s = p.state.awaitState { st -> st.measuring == null && st.models.all { it.millis != null } }
         val tags = s.models.associate { it.id to it.tag }
-        assertEquals(PlanTag.Fastest, tags["gpt-6-luna"], "fastest, 3 of 4 right")
+        assertEquals(PlanTag.Fastest, tags["gpt-6.1-luna"], "fastest, 3 of 4 right")
         assertEquals(PlanTag.BestForPhoneControl, tags["gpt-6.1-terra"], "all right and quick enough")
         assertEquals(null, tags["gpt-6.1-sol"], "as accurate as Terra but five times slower")
         assertEquals(400L, s.models.single { it.id == "gpt-6.1-terra" }.millis)
-        assertEquals(3, s.models.single { it.id == "gpt-6-luna" }.correct)
+        assertEquals(3, s.models.single { it.id == "gpt-6.1-luna" }.correct)
         p.role(ModelRole.Brain)
         // The brain's usual effort is high: only Terra (the selected one) was measured at high, so the
         // brain's default is still the one marked.
