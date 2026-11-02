@@ -33,6 +33,8 @@ public class ModelBench @OptIn(ExperimentalTime::class) constructor(
         val correct: Int,
         val total: Int,
         val measuredAt: Long,
+        /** Why the model could not be asked, when no call got an answer ("Claude: …"); null otherwise. */
+        val error: String? = null,
     )
 
     /** What was measured for [provider] in one role's test, by model id (with its effort). */
@@ -45,41 +47,57 @@ public class ModelBench @OptIn(ExperimentalTime::class) constructor(
     /** Runs the brain's test against [model] (id with its effort) and keeps the result. */
     public suspend fun measureBrain(provider: String, client: LlmClient, model: String, probes: List<BrainProbe> = BrainProbe.ALL): Result {
         val brain = Brain(client, model)
-        var correct = 0
-        var totalMs = 0L
+        val tally = Tally()
         for (probe in probes) {
             val started = timeSource.markNow()
-            // The brain's own code turns a failed call into no answer: it counts as wrong, as on a task.
-            if (probe.passes(brain)) correct++
-            totalMs += started.elapsedNow().inWholeMilliseconds
+            // A failed call counts as wrong, as on a task, but not in the speed: only answers are timed.
+            val outcome = probe.run(brain)
+            tally.add(outcome.right, outcome.error, started.elapsedNow().inWholeMilliseconds)
         }
-        return keep(prefix(provider, true) + model, correct, probes.size, totalMs)
+        return keep(prefix(provider, true) + model, tally, probes.size)
     }
 
     /** Runs the probes against [model] (id with its effort) and keeps the result. */
     public suspend fun measure(provider: String, client: LlmClient, model: String, probes: List<Probe>): Result {
-        var correct = 0
-        var totalMs = 0L
+        val tally = Tally()
         for (probe in probes) {
             val started = timeSource.markNow()
+            var error: String? = null
             val ok = try {
                 val reply = client.chat(model, listOf(ChatMessage("system", PROMPT), ChatMessage("user", ASK, probe.image)), TOOLS)
                 reply.toolCall?.takeIf { it.name == "read_number" }?.arguments?.get("number")?.jsonPrimitive?.contentOrNull?.trim() == probe.answer
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
+                error = e.message ?: "the call failed"
                 false
             }
-            totalMs += started.elapsedNow().inWholeMilliseconds
-            if (ok) correct++
+            tally.add(ok, error, started.elapsedNow().inWholeMilliseconds)
         }
-        return keep(prefix(provider, false) + model, correct, probes.size, totalMs)
+        return keep(prefix(provider, false) + model, tally, probes.size)
+    }
+
+    /** Right answers, the time of the calls that got one, and the last reason a call got none. */
+    private class Tally {
+        var correct = 0
+        var answered = 0
+        var answeredMs = 0L
+        var error: String? = null
+
+        fun add(right: Boolean, error: String?, ms: Long) {
+            if (right) correct++
+            if (error == null) { answered++; answeredMs += ms } else this.error = error
+        }
     }
 
     private fun all(): Map<String, Result> =
         prefs.getString(KEY)?.let { runCatching { Json.decodeFromString<Map<String, Result>>(it) }.getOrNull() }.orEmpty()
 
-    private fun keep(key: String, correct: Int, total: Int, totalMs: Long): Result {
-        val result = Result(if (total == 0) 0 else totalMs / total, correct, total, now())
+    private fun keep(key: String, t: Tally, total: Int): Result {
+        val result = Result(
+            millis = if (t.answered == 0) 0 else t.answeredMs / t.answered, correct = t.correct, total = total, measuredAt = now(),
+            // Kept only when nothing got an answer: then the model cannot be used, and this says why.
+            error = t.error.takeIf { t.answered == 0 },
+        )
         prefs.putString(KEY, Json.encodeToString(all() + (key to result)))
         return result
     }

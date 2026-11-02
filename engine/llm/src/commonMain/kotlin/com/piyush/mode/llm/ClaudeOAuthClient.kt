@@ -70,11 +70,12 @@ class ClaudeOAuthClient(
             if (!response.status.isSuccess()) throw LlmFailed(when (response.status.value) {
                 401 -> "Claude needs you to sign in again in Settings."
                 402 -> CREDITS
-                400, 403 -> if (needsCredits(text)) CREDITS
-                    else if (response.status.value == 403) "Claude refused this OAuth request. Your plan or this client may not be supported."
-                    else "Claude request failed (HTTP 400)."
+                400, 403, 404 -> if (needsCredits(text)) CREDITS
+                    else reason(text)?.let { "Claude: $it" }
+                    ?: if (response.status.value == 403) "Claude refused this OAuth request. Your plan or this client may not be supported."
+                    else "Claude request failed (HTTP ${response.status.value})."
                 429 -> "Claude is rate limited or your plan allowance is exhausted. Wait and try again."
-                else -> "Claude request failed (HTTP ${response.status.value})."
+                else -> reason(text)?.let { "Claude: $it" } ?: "Claude request failed (HTTP ${response.status.value})."
             })
             return parse(text)
         }
@@ -89,6 +90,11 @@ class ClaudeOAuthClient(
 
         /** A model the plan does not cover (Fable) asked for API credits the account does not have. */
         const val CREDITS = "This Claude model uses API credits, not your Claude plan. Add credits in the Claude Console, or choose another model in Settings."
+
+        /** Anthropic's own words for an error ({"error":{"message":…}}), short; null if it gave none. */
+        fun reason(body: String): String? = runCatching {
+            Json.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull
+        }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
 
         /** Anthropic's error says it is about credits or billing. */
         fun needsCredits(body: String): Boolean = Regex("""credit|billing|balance|purchase""", RegexOption.IGNORE_CASE).containsMatchIn(body)

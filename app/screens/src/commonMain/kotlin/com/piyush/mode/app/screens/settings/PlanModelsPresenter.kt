@@ -24,7 +24,11 @@ public enum class ModelRole { PhoneControl, Brain }
 /** What a model stands out for, from this iPhone's measurements (or the provider's picks before any). */
 public enum class PlanTag { BestForPhoneControl, BestForBrain, Fastest, MostAccurate, Recommended, Strongest }
 
-public data class EffortRow(val effort: String, val millis: Long?, val correct: Int?, val total: Int?, val selected: Boolean)
+public data class EffortRow(
+    val effort: String, val millis: Long?, val correct: Int?, val total: Int?, val selected: Boolean,
+    /** Why it could not be measured at this effort (every call failed), if so. */
+    val error: String? = null,
+)
 
 public data class PlanModelRow(
     /** The model, without its effort. */
@@ -41,6 +45,8 @@ public data class PlanModelRow(
     val efforts: List<EffortRow>,
     /** Billed to the account's API credits, not the plan: not measured unless chosen. */
     val usesApiCredits: Boolean = false,
+    /** Why the model could not be measured at the effort shown (every call failed: not on the plan, refused). */
+    val error: String? = null,
 )
 
 public data class PlanModelsUiState(
@@ -106,9 +112,9 @@ public class PlanModelsPresenter(
     }
 
     /**
-     * Measures each model at the role's usual effort, and the selected one at every effort, with the role's
-     * own test: phone control reads [probes] (images the app makes); the brain plans and decides
-     * ([BrainProbe.ALL], text only). One pair at a time; the screen updates as each finishes.
+     * Measures every model at every effort it takes, with the role's own test: phone control reads [probes]
+     * (images the app makes); the brain plans and decides ([BrainProbe.ALL], text only). A model on API
+     * credits only when chosen, at its chosen effort. One pair at a time; the screen updates as each finishes.
      */
     public fun measure(probes: List<ModelBench.Probe>) {
         val brain = role.value == ModelRole.Brain
@@ -118,12 +124,13 @@ public class PlanModelsPresenter(
         val options = options(provider)
         val selected = current()?.let(ProviderModels::base)
         val pairs = buildList {
-            // Every model at the role's usual effort (or the nearest it takes), the selected one at all it takes.
+            // The selected model first, so its numbers come soonest; then every other one, each at every effort.
             // A model on API credits costs money to measure: only when chosen, and only at its chosen effort.
-            options.filterNot { it.usesApiCredits }.forEach { o -> add(ProviderModels.withEffort(o.id, shownEffort(provider, o, role.value))) }
-            options.firstOrNull { it.id == selected }?.let { o ->
-                if (o.usesApiCredits) add(current()!!)
-                else ProviderModels.efforts(provider, o).forEach { add(ProviderModels.withEffort(o.id, it)) }
+            options.sortedBy { if (it.id == selected) 0 else 1 }.forEach { o ->
+                when {
+                    o.usesApiCredits -> if (o.id == selected) add(current()!!)
+                    else -> ProviderModels.efforts(provider, o).ifEmpty { listOf(null) }.forEach { add(ProviderModels.withEffort(o.id, it)) }
+                }
             }
         }.distinct()
         error.value = null
@@ -183,12 +190,13 @@ public class PlanModelsPresenter(
                 val shown = results[ProviderModels.withEffort(o.id, effort ?: usual)]
                 PlanModelRow(
                     id = o.id, name = o.name, tag = tags[o.id], selected = selected, effort = effort,
-                    millis = shown?.millis, correct = shown?.correct, total = shown?.total,
+                    millis = shown?.millis.takeIf { shown?.error == null }, correct = shown?.correct, total = shown?.total,
                     efforts = ProviderModels.efforts(provider, o).map { ef ->
                         val m = results[ProviderModels.withEffort(o.id, ef)]
-                        EffortRow(ef, m?.millis, m?.correct, m?.total, selected = ef == effort)
+                        EffortRow(ef, m?.millis.takeIf { m?.error == null }, m?.correct, m?.total, selected = ef == effort, error = m?.error)
                     },
                     usesApiCredits = o.usesApiCredits,
+                    error = shown?.error,
                 )
             },
         )
@@ -217,7 +225,7 @@ public class PlanModelsPresenter(
             val measured = options.mapNotNull { o ->
                 ProviderModels.efforts(provider, o).let { takes -> defaultEffort(role).takeIf { it in takes } ?: nearest(defaultEffort(role), takes) }
                     .let { results[ProviderModels.withEffort(o.id, it)] }?.let { o.id to it }
-            }.filter { it.second.total > 0 }
+            }.filter { it.second.total > 0 && it.second.error == null }
             if (measured.size < 2) {
                 val pick = ProviderModels.base(if (role == ModelRole.Brain) ProviderModels.strong(provider) else ProviderModels.main(provider))
                 return options.filter { it.id == pick }.associate { it.id to PlanTag.Recommended }

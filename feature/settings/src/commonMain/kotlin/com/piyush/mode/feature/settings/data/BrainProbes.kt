@@ -9,8 +9,14 @@ import com.piyush.mode.agent.TaskContext
  * prose. The apps, places and people are invented, so no real app is favoured and nothing personal is sent.
  */
 public sealed interface BrainProbe {
-    /** Runs the probe with [brain]; true when the answer is the right one. */
-    public suspend fun passes(brain: Brain): Boolean
+    /** Right or not, and, when the model could not be asked at all, why (not counted in its speed). */
+    public class Outcome(public val right: Boolean, public val error: String? = null)
+
+    /** Runs the probe with [brain]. */
+    public suspend fun run(brain: Brain): Outcome
+
+    /** True when the answer is the right one. */
+    public suspend fun passes(brain: Brain): Boolean = run(brain).right
 
     /** A choice while stuck: the brain must name the right option's letter first. */
     public class Decide(
@@ -21,13 +27,14 @@ public sealed interface BrainProbe {
         private val options: List<String>,
         private val right: Int,
     ) : BrainProbe {
-        override suspend fun passes(brain: Brain): Boolean {
+        override suspend fun run(brain: Brain): Outcome {
             val question = buildString {
                 append(situation).append(" What should it do now? Start your answer with the letter of one option:\n")
                 options.forEachIndexed { i, o -> append(LETTERS[i]).append(") ").append(o).append('\n') }
             }
-            val answer = brain.decide(question.trim(), task, null, seen, screen).answer ?: return false
-            return letter(answer) == LETTERS[right]
+            val d = brain.decide(question.trim(), task, null, seen, screen)
+            val answer = d.answer ?: return Outcome(false, d.error.takeIf { d.callFailed })
+            return Outcome(letter(answer) == LETTERS[right])
         }
     }
 
@@ -40,11 +47,12 @@ public sealed interface BrainProbe {
         /** Whether the brief must ask the user something first, or null to not check. */
         private val asks: Boolean? = null,
     ) : BrainProbe {
-        override suspend fun passes(brain: Brain): Boolean {
-            val brief = brain.brief(task, context).brief ?: return false
-            if (app != null && brief.app?.contains(app, ignoreCase = true) != true) return false
-            if (asks != null && brief.ask.isNotEmpty() != asks) return false
-            return true
+        override suspend fun run(brain: Brain): Outcome {
+            val r = brain.brief(task, context)
+            val brief = r.brief ?: return Outcome(false, r.error.takeIf { r.callFailed })
+            if (app != null && brief.app?.contains(app, ignoreCase = true) != true) return Outcome(false)
+            if (asks != null && brief.ask.isNotEmpty() != asks) return Outcome(false)
+            return Outcome(true)
         }
     }
 

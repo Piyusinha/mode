@@ -390,6 +390,11 @@ enum L10n {
         static let extraHigh = LocalizedStringResource("plan.extraHigh", defaultValue: "Extra")
         static let max = LocalizedStringResource("plan.max", defaultValue: "Max")
         static let usesApiCredits = LocalizedStringResource("plan.usesApiCredits", defaultValue: "Uses API credits, not your plan")
+        static let failed = LocalizedStringResource("plan.failed", defaultValue: "Didn't run")
+
+        static func couldNotUse(_ reason: String) -> String {
+            String(localized: "plan.couldNotUse", defaultValue: "Couldn't use it: \(reason)")
+        }
         static let speed = LocalizedStringResource("plan.speed", defaultValue: "Speed")
         static let accuracy = LocalizedStringResource("plan.accuracy", defaultValue: "Accuracy")
         static let notMeasured = LocalizedStringResource("plan.notMeasured", defaultValue: "Not measured yet")

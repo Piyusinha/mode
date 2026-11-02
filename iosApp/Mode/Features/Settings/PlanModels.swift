@@ -106,7 +106,10 @@ final class PlanModelsViewModel {
                     case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.tintSoft, foreground: ModeColor.tint)
                     }
                 }
-                let measured: [String] = if let ms = m.millis?.int64Value, let c = m.correct?.intValue, let t = m.total?.intValue {
+                // A model no call reached (not on the plan, refused) says why, in the provider's words.
+                let measured: [String] = if let error = m.error {
+                    [L10n.Plan.couldNotUse(error)]
+                } else if let ms = m.millis?.int64Value, let c = m.correct?.intValue, let t = m.total?.intValue {
                     [speed(seconds(ms)), L10n.Plan.right(c, of: t)]
                 } else {
                     [String(localized: L10n.Plan.notMeasured)]
@@ -122,7 +125,8 @@ final class PlanModelsViewModel {
                         ModeEffortTable.Row(
                             label: effortName(e.effort),
                             speed: e.millis.map { speed(seconds($0.int64Value)) } ?? "—",
-                            accuracy: (e.correct?.intValue).flatMap { c in (e.total?.intValue).map { L10n.Plan.right(c, of: $0) } } ?? "—",
+                            accuracy: e.error != nil ? String(localized: L10n.Plan.failed)
+                                : (e.correct?.intValue).flatMap { c in (e.total?.intValue).map { L10n.Plan.right(c, of: $0) } } ?? "—",
                             selected: e.selected
                         )
                     }

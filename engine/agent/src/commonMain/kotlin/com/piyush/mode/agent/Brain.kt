@@ -50,7 +50,8 @@ class Brain(private val llm: LlmClient, private val model: String) {
         }
     }
 
-    class Result(val brief: Brief?, val costUsd: Double, val error: String? = null)
+    /** [callFailed]: the model could not be asked (an error, not a poor answer). */
+    class Result(val brief: Brief?, val costUsd: Double, val error: String? = null, val callFailed: Boolean = false)
 
     suspend fun brief(task: String, context: TaskContext): Result {
         val messages = listOf(
@@ -63,11 +64,11 @@ class Brain(private val llm: LlmClient, private val model: String) {
             Result(args?.let(::parse), reply.usage.costUsd, if (args == null) "no brief in the reply" else null)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Result(null, 0.0, e.message)
+            Result(null, 0.0, e.message, callFailed = true)
         }
     }
 
-    class Decision(val answer: String?, val costUsd: Double, val error: String? = null)
+    class Decision(val answer: String?, val costUsd: Double, val error: String? = null, val callFailed: Boolean = false)
 
     /**
      * A choice the hands can't make well alone (seen on the phone: the highest-rated restaurant was on
@@ -93,7 +94,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
             Decision(answer, reply.usage.costUsd, if (answer == null) "no decision in the reply" else null)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            Decision(null, 0.0, e.message)
+            Decision(null, 0.0, e.message, callFailed = true)
         }
     }
 

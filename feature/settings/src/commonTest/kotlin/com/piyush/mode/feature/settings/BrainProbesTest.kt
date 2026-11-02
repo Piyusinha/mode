@@ -77,5 +77,19 @@ class BrainProbesTest {
         assertTrue(bench.results("claude_oauth", brain = true).isEmpty())
     }
 
+    @Test
+    fun aModelThatCannotBeAskedSaysWhyAndIsNotTimed() = runTest {
+        val bench = ModelBench(InMemoryKeyValueStore())
+        val refusing = LlmClient { _, _, _ -> throw com.piyush.mode.llm.LlmFailed("Claude: model not available on your plan") }
+        val brain = bench.measureBrain("claude_oauth", refusing, "claude-opus-5-5@high", BrainProbe.ALL.take(3))
+        assertEquals(0, brain.correct)
+        assertEquals(0L, brain.millis)
+        assertEquals("Claude: model not available on your plan", brain.error)
+        val phone = bench.measure("claude_oauth", refusing, "claude-opus-5-5@low", listOf(ModelBench.Probe(ByteArray(1), "1")))
+        assertEquals("Claude: model not available on your plan", phone.error)
+        // A model that answers, even wrongly, has no error.
+        assertNull(bench.measureBrain("claude_oauth", brain("A"), "m", BrainProbe.ALL.take(2)).error)
+    }
+
     private fun letterOf(answer: String): Char? = BrainProbe.letter(answer)
 }
