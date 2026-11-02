@@ -88,7 +88,7 @@ public enum ModeSize {
     public static let islandMark: CGFloat = 22
     /// At or below this size the mark uses its small image (Live Activities can't draw large ones).
     public static let smallMarkLimit: CGFloat = 32
-    public static let activityButton: CGFloat = 28
+    public static let activityButton: CGFloat = 36
     /// The ticking time on the compact Dynamic Island.
     public static let islandTimer: CGFloat = 52
     /// iOS's height limit for a Live Activity (Lock Screen, expanded island), and the compact island's size, for previews.

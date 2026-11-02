@@ -147,14 +147,17 @@ enum ModeActivityAnswer {
     static let maxOptions = 3
 }
 
-/// The start of the answer (a line and two rows), Open chat and Another task.
+/// One line of the answer (two rows at most), then Open chat (with how much more is there) and Another
+/// task: with the header, that fits the 160 pt iOS gives a Live Activity, so nothing is cut.
 struct ModeActivityFinishedBody: View {
     let state: ModeActivityAttributes.ContentState
     let conversationId: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            ModeReply(state.reply, density: .compact)
+            if let line = state.reply.first.flatMap(\.line) {
+                ModeInlineText(line, style: .headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
+            }
             HStack(spacing: ModeSpacing.s) {
                 Link(destination: ModeLinks.conversation(conversationId)) {
                     ModeActivityButtonLabel(state.more > 0 ? ActivityL10n.openChatMore(state.more) : ActivityL10n.openChat, icon: nil, prominent: false)
@@ -220,4 +223,14 @@ struct ModeActivityButtonLabel: View {
 /// How far long lines may shrink before they're cut.
 enum ModeActivityScale {
     static let text: CGFloat = 0.85
+}
+
+private extension ModeReplyBlock {
+    /// The text of a paragraph or heading: the Live Activity's one line.
+    var line: String? {
+        switch self {
+        case let .paragraph(text), let .heading(_, text), let .quote(text): text
+        default: nil
+        }
+    }
 }

@@ -143,8 +143,8 @@ public class LiveActivityPresenter(
 
     private companion object {
         const val PLAN_SHOWN = 3
-        const val ROWS_SHOWN = 2
-        const val HEADLINE = 90
+        /** About two rows of the Live Activity headline. */
+        const val HEADLINE = 80
 
         /** The previous, current and next plan items; current is what the latest action said it works on. */
         fun planSteps(s: TaskState): List<PlanStep> {
@@ -158,23 +158,26 @@ public class LiveActivityPresenter(
         }
 
         /**
-         * The Lock Screen has room for a line and two rows: the first paragraph or
-         * heading, then the first list or agenda cut to two rows.
+         * iOS gives a Live Activity 160 pt: a header, one line of the answer (two rows at most) and the
+         * buttons. The line is the first paragraph or heading, or else the first row of a list; the list's
+         * other rows are counted for "Open chat · 2 more".
          */
         fun lockScreenParts(all: List<ReplyPart>): Pair<List<ReplyPart>, Int> {
-            val headline = all.firstOrNull { it is ReplyPart.Paragraph || it is ReplyPart.Heading }?.let {
-                val text = (it as? ReplyPart.Paragraph)?.text ?: (it as ReplyPart.Heading).text
-                ReplyPart.Paragraph(text.replace('\n', ' ').let { t -> if (t.length > HEADLINE) t.take(HEADLINE - 1).trimEnd() + "…" else t })
-            }
-            val rows: Pair<ReplyPart, Int>? = all.firstNotNullOfOrNull { part ->
+            fun line(t: String) = ReplyPart.Paragraph(t.replace('\n', ' ').let { if (it.length > HEADLINE) it.take(HEADLINE - 1).trimEnd() + "…" else it })
+            val text = all.firstNotNullOfOrNull { (it as? ReplyPart.Paragraph)?.text ?: (it as? ReplyPart.Heading)?.text }
+            val rows: List<String> = all.firstNotNullOfOrNull { part ->
                 when (part) {
-                    is ReplyPart.Agenda -> ReplyPart.Agenda(part.rows.take(ROWS_SHOWN)) to (part.rows.size - ROWS_SHOWN).coerceAtLeast(0)
-                    is ReplyPart.Bullets -> ReplyPart.Bullets(part.items.take(ROWS_SHOWN)) to (part.items.size - ROWS_SHOWN).coerceAtLeast(0)
-                    is ReplyPart.Numbered -> ReplyPart.Numbered(part.start, part.items.take(ROWS_SHOWN)) to (part.items.size - ROWS_SHOWN).coerceAtLeast(0)
+                    is ReplyPart.Agenda -> part.rows.map { listOfNotNull(it.start, it.text).joinToString(" ") }
+                    is ReplyPart.Bullets -> part.items
+                    is ReplyPart.Numbered -> part.items
                     else -> null
                 }
+            }.orEmpty()
+            return when {
+                text != null -> listOf(line(text)) to rows.size
+                rows.isNotEmpty() -> listOf(line(rows.first())) to rows.size - 1
+                else -> emptyList<ReplyPart>() to 0
             }
-            return listOfNotNull(headline, rows?.first) to (rows?.second ?: 0)
         }
     }
 }

@@ -2,7 +2,6 @@ package com.piyush.mode.app.screens
 
 import com.piyush.mode.app.screens.common.TaskBadge
 import com.piyush.mode.app.screens.conversation.ReplyPart
-import com.piyush.mode.app.screens.conversation.TimeRow
 import com.piyush.mode.app.screens.run.ActivityUiState
 import com.piyush.mode.app.screens.run.LiveActivityPresenter
 import com.piyush.mode.app.screens.run.PlanStep
@@ -63,14 +62,9 @@ class LiveActivityTest {
         f.runner.answer("first")
         val done = assertIs<ActivityUiState.Finished>(until(p) { it is ActivityUiState.Finished })
         assertEquals(TaskBadge.Done, done.badge)
-        assertEquals(
-            listOf(
-                ReplyPart.Paragraph("You have **3 things** today."),
-                ReplyPart.Agenda(listOf(TimeRow("14:00", null, "Biozyme"), TimeRow("21:00", null, "Shelcal"))),
-            ),
-            done.parts,
-        )
-        assertEquals(1, done.more, "one row left for the chat")
+        // One line fits the Live Activity (160 pt with the header and buttons); the rows wait in the chat.
+        assertEquals(listOf(ReplyPart.Paragraph("You have **3 things** today.")), done.parts)
+        assertEquals(3, done.more, "the agenda's rows are in the chat")
     }
 
     @Test

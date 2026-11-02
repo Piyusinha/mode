@@ -23,11 +23,10 @@ struct ActivityPreview: View {
         case .waiting:
             .init(phase: .waiting, step: 6, question: "Mode is about to tap \"Book now\" (Auto to Bellandur, ₹163). Allow it?", questionId: "preview", yesNo: true)
         case .finished:
+            // As the presenter sends it: one line; the agenda's rows are counted for the chat.
             .init(phase: .finished, outcome: .done, seconds: 62, reply: [
-                .paragraph("Sent **“Leaving in 10”** to Sonali on WhatsApp. Here's your day:"),
-                .agenda([ModeAgendaRow(time: "14:00", end: nil, text: "Biozyme with lunch", allDay: false),
-                         ModeAgendaRow(time: "21:00", end: nil, text: "Shelcal, fish oil, magnesium", allDay: false)]),
-            ], more: 1)
+                .paragraph("Sent **“Leaving in 10”** to Sonali on WhatsApp. Here's your day: three things, the next at 14:00."),
+            ], more: 3)
         }
     }
 
