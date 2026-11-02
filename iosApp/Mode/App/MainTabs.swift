@@ -138,6 +138,7 @@ private struct TabRoot<Content: View>: View {
                     case .liveRun: LiveRoute(app: app)
                     case let .runScreens(taskId): RunScreensRoute(app: app, taskId: taskId)
                     case .settings: SettingsRoute(app: app, navigate: navigate)
+                    case .connectChatGPT: ConnectChatGPTRoute(app: app)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)
                     case .memoryApps: MemoryAppsRoute(app: app, navigate: navigate)

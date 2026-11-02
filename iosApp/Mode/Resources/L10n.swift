@@ -280,6 +280,24 @@ enum L10n {
         }
     }
 
+    enum ChatGPT {
+        static let title = LocalizedStringResource("chatgpt.title", defaultValue: "Continue with ChatGPT")
+        static let subtitle = LocalizedStringResource("chatgpt.subtitle", defaultValue: "Sign in with your ChatGPT account and allow Mode to use your plan. You come straight back here.")
+        static let continueWith = LocalizedStringResource("chatgpt.continue", defaultValue: "Continue with ChatGPT")
+        static let waiting = LocalizedStringResource("chatgpt.waiting", defaultValue: "Waiting for ChatGPT…")
+        static let waitingHint = LocalizedStringResource("chatgpt.waitingHint", defaultValue: "Finish signing in on the ChatGPT page. Mode never sees your password.")
+        static let checking = LocalizedStringResource("chatgpt.checking", defaultValue: "Checking your plan…")
+        static let connected = LocalizedStringResource("chatgpt.connected", defaultValue: "Connected to ChatGPT")
+        static let notConnected = LocalizedStringResource("chatgpt.notConnected", defaultValue: "Not connected")
+        static let planHint = LocalizedStringResource("chatgpt.planHint", defaultValue: "Uses your ChatGPT Plus or Pro plan. No extra cost per task.")
+        static let models = LocalizedStringResource("chatgpt.models", defaultValue: "Models on your plan")
+        static let notEligible = LocalizedStringResource("chatgpt.notEligible", defaultValue: "Your plan can't be used here")
+        static let failed = LocalizedStringResource("chatgpt.failed", defaultValue: "Couldn't connect")
+        static let check = LocalizedStringResource("chatgpt.check", defaultValue: "Check again")
+        static let signOut = LocalizedStringResource("chatgpt.signOut", defaultValue: "Sign out of ChatGPT")
+        static let usageNote = LocalizedStringResource("chatgpt.usageNote", defaultValue: "Change how much of your plan Mode may use in ChatGPT → Settings → Usage.")
+    }
+
     enum Settings {
         static let you = LocalizedStringResource("settings.you", defaultValue: "You")
         static let name = LocalizedStringResource("settings.name", defaultValue: "Your name")

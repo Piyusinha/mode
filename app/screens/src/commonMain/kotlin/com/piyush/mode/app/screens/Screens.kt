@@ -47,6 +47,8 @@ public class Screens(
     private val phoneChecks: PhoneChecks,
     private val auth: OpenRouterAuth,
     private val lifecycle: AppLifecycle,
+    private val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount,
+    private val chatGptLlm: com.piyush.mode.llm.LlmClient,
     private val clock: ScreenClock = ScreenClock(),
 ) {
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
@@ -66,6 +68,9 @@ public class Screens(
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
     public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog)
+
+    public fun connectChatGpt(): com.piyush.mode.app.screens.settings.ConnectChatGptPresenter =
+        com.piyush.mode.app.screens.settings.ConnectChatGptPresenter(scope, chatGpt, chatGptLlm)
 
     public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle)
 

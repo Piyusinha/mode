@@ -25,6 +25,11 @@ struct SettingsScreen: View {
             } header: { ModeSectionHeader(L10n.Settings.you) }
 
             Section {
+                ModeRow(String(localized: L10n.ChatGPT.continueWith), subtitle: String(localized: L10n.ChatGPT.planHint), leading: .icon(.sparkle),
+                        action: { onEvent(.openChatGPT) }) { ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary) }
+            } header: { ModeSectionHeader(L10n.ChatGPT.title) }
+
+            Section {
                 ForEach(state.picks) { model in modelRow(model, selected: model.isMain) { onEvent(.chooseModel(model.id)) } }
                 ModeTextField(L10n.Settings.search, prompt: L10n.Settings.search, text: $query)
                     .onChange(of: query) { onEvent(.search) }

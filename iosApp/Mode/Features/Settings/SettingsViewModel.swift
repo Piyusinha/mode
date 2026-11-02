@@ -41,6 +41,7 @@ final class SettingsViewModel {
         case dailyCap(Double)
         case learn(Bool)
         case openDeveloper
+        case openChatGPT
     }
 
     private(set) var state = State()
@@ -80,6 +81,7 @@ final class SettingsViewModel {
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
+        case .openChatGPT: navigate(.connectChatGPT)
         }
     }
 

@@ -77,6 +77,11 @@ class ModeGraph(platform: PlatformServices) {
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)
     private val llm = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
+
+    /** "Continue with ChatGPT": the account and the plan's Responses API. */
+    val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount =
+        com.piyush.mode.feature.settings.data.ChatGptAccount(com.piyush.mode.llm.ChatGptAuth(platform.http), platform.secrets)
+    private val chatGptLlm = com.piyush.mode.llm.ResponsesClient(platform.http, accessToken = { chatGpt.accessToken() })
     /** What Mode remembers about the user, skills and app tips; on this iPhone only. */
     val memory: MemoryRepository = MemoryRepository(database)
 
@@ -107,6 +112,7 @@ class ModeGraph(platform: PlatformServices) {
     val screens: Screens = Screens(
         scope, settings, tasks, inbox, scheduler, taskHistory, conversations, memory, runs, models, session,
         platform.permissions, platform.phoneChecks, com.piyush.mode.llm.OpenRouterAuth(platform.http), platform.lifecycle,
+        chatGpt, chatGptLlm,
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
