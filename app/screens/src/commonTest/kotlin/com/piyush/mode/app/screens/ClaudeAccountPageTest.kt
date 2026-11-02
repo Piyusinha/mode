@@ -29,7 +29,7 @@ class ClaudeAccountPageTest {
             asked += req.url.encodedPath
             when (req.url.encodedPath) {
                 "/api/oauth/profile" -> respond("""{"account":{"email":"p@example.com","display_name":"Piyush","has_claude_max":true}}""", headers = json)
-                "/api/oauth/usage" -> respond("""{"five_hour":{"utilization":$used,"resets_at":null}}""", headers = json)
+                "/api/oauth/usage" -> respond(if (used < 0) "{}" else """{"five_hour":{"utilization":$used,"resets_at":null}}""", headers = json)
                 else -> respond("", HttpStatusCode.NotFound)
             }
         })
@@ -51,6 +51,17 @@ class ClaudeAccountPageTest {
         val fresh = next.state.awaitState { it.limits.firstOrNull()?.usedFraction == 0.5 }
         assertEquals("Piyush", fresh.name)
         assertEquals(listOf("/api/oauth/usage"), asked)
+
+        assertEquals(f.now, fresh.usageUpdatedAt, "the time the limits were answered")
+
+        // An answer without limits keeps the last ones and their time.
+        val before = fresh.usageUpdatedAt
+        f.now += 60_000
+        asked.clear()
+        used = -1.0
+        val empty = page().state.awaitState { asked.isNotEmpty() && !it.refreshing && it.loaded }
+        assertEquals(0.5, empty.limits.single().usedFraction)
+        assertEquals(before, empty.usageUpdatedAt)
 
         // Pull to refresh asks for everything.
         asked.clear()

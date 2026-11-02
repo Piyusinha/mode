@@ -34,9 +34,14 @@ public class ClaudeCredentialStore(
         get() = secrets.get(USAGE)?.let { runCatching { Json.decodeFromString<List<UsageWindow>>(it) }.getOrNull() }
         set(value) { secrets.set(USAGE, value?.let { Json.encodeToString(it) }) }
 
+    /** When [usage] was last answered by Claude (epoch ms). */
+    public var usageAt: Long?
+        get() = secrets.get(USAGE_AT)?.toLongOrNull()
+        set(value) { secrets.set(USAGE_AT, value?.toString()) }
+
     public fun save(credentials: ClaudeOAuth.Credentials?) {
         // Signed out, or a new sign-in (not a refresh of the one kept): what was kept about the account goes.
-        if (credentials == null || load() == null) { profile = null; usage = null }
+        if (credentials == null || load() == null) { profile = null; usage = null; usageAt = null }
         val encoded = credentials?.let { Json.encodeToString(it) }
         secrets.set(KEY, encoded)
         check(secrets.get(KEY) == encoded) { "Could not update Claude credentials in secure storage. Unlock this iPhone and try again." }
@@ -48,5 +53,6 @@ public class ClaudeCredentialStore(
         const val KEY = "claude_oauth_credentials"
         const val PROFILE = "claude_profile"
         const val USAGE = "claude_usage"
+        const val USAGE_AT = "claude_usage_at"
     }
 }

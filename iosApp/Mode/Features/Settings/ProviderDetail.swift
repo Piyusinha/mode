@@ -25,7 +25,8 @@ final class ProviderDetailViewModel {
         var limitReached = false
         // Claude: the plan's limits.
         var limits: [Limit] = []
-        var claudeLoaded = false
+        /// "11:32", "1 Nov, 18:05", "Updating…" or "Not yet".
+        var usageUpdated = ""
         // OpenRouter: credits.
         var creditsValue: String?
         var creditsFraction = 0.0
@@ -126,7 +127,12 @@ final class ProviderDetailViewModel {
                       footnote: l.resetsAt.map { L10n.Account.resets(Date(timeIntervalSince1970: Double($0.int64Value) / 1000)
                           .formatted(.dateTime.weekday(.wide).hour().minute())) })
             },
-            claudeLoaded: s.loaded,
+            usageUpdated: s.refreshing ? String(localized: L10n.Account.updating)
+                : s.usageUpdatedAt.map { at in
+                    let date = Date(timeIntervalSince1970: Double(at.int64Value) / 1000)
+                    return Calendar.current.isDateInToday(date) ? date.formatted(date: .omitted, time: .shortened)
+                        : date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
+                } ?? String(localized: L10n.Account.notYet),
             creditsValue: s.creditsLeft.map { Format.money($0.doubleValue) },
             creditsFraction: { () -> Double in
                 guard let left = s.creditsLeft?.doubleValue, let total = s.creditsTotal?.doubleValue, total > 0 else { return 0 }
@@ -209,13 +215,10 @@ struct ProviderDetailScreen: View {
             Text(L10n.Account.chatGPTNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
         case .claude:
             ModeCard {
-                if state.limits.isEmpty {
-                    if state.claudeLoaded { Text(L10n.Account.claudeNoUsage).modeText(.footnote, color: ModeColor.textSecondary).padding(.vertical, ModeSpacing.m) }
-                    else { ProgressView().tint(ModeColor.tint).frame(maxWidth: .infinity, minHeight: ModeSize.rowMin) }
-                }
                 ForEach(state.limits) { l in
                     ModeUsageBar(l.title, value: l.value, fraction: l.fraction, tint: l.fraction < 0.7 ? ModeColor.success : ModeColor.warning, footnote: l.footnote)
                 }
+                ModeValueRow(String(localized: L10n.Account.updated), value: state.usageUpdated)
                 ModeValueRow(String(localized: L10n.Account.modeToday), value: state.todayLine)
             }
             Text(L10n.Account.claudeNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)

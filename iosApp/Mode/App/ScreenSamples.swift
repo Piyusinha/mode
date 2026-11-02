@@ -68,7 +68,7 @@ struct ScreenSample: Identifiable {
         todayLine: "14 steps · 2 tasks",
         limits: [.init(title: "Current session · 5 hours", value: "34% used", fraction: 0.34, footnote: "Resets at 15:40"),
                  .init(title: "This week", value: "12% used", fraction: 0.12, footnote: "Resets Monday 09:00")],
-        claudeLoaded: true, phoneModel: "Haiku 5.5", brainModel: "Sonnet 5.5"
+        usageUpdated: "11:32", phoneModel: "Haiku 5.5", brainModel: "Sonnet 5.5"
     )
 
     static let openRouter = ProviderDetailViewModel.State(

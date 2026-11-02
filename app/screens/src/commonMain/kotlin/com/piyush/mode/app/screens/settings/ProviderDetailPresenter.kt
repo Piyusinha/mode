@@ -47,6 +47,9 @@ public data class ProviderDetailUiState(
     val limitReachedAt: Long? = null,
     /** True once the provider was asked (so "nothing" is an answer, not "still loading"). */
     val loaded: Boolean = false,
+    /** Claude: when the limits shown were last answered (epoch ms), and whether they are being asked now. */
+    val usageUpdatedAt: Long? = null,
+    val refreshing: Boolean = false,
     // What Mode used with this provider, from its run history
     val todaySteps: Int = 0,
     val todayTasks: Int = 0,
@@ -91,7 +94,7 @@ public class ProviderDetailPresenter(
             val usage = kept.usage
             remote.value = ProviderDetailUiState(
                 providerId, email = kept.profile?.email, name = kept.profile?.name, plan = kept.profile?.plan,
-                limits = usage.orEmpty().map(::row), loaded = usage != null,
+                limits = usage.orEmpty().map(::row), loaded = usage != null, usageUpdatedAt = kept.usageAt,
             )
             refreshClaude(profileToo = kept.profile == null)
         } else {
@@ -124,15 +127,20 @@ public class ProviderDetailPresenter(
     private fun refreshClaude(profileToo: Boolean) {
         val account = claude ?: return
         scope.launch {
+            remote.value = remote.value.copy(refreshing = true)
             runCatching {
                 val token = account.accessToken()
                 val kept = settings.claudeCredentials
                 if (profileToo) claudeApi.profile(token)?.let { kept.profile = it }
+                // No limits in the answer (Claude did not share them this time): the last ones stay, with their time.
                 val windows = claudeApi.usage(token)
-                kept.usage = windows
+                if (windows.isNotEmpty()) { kept.usage = windows; kept.usageAt = clock.now() }
                 val p = kept.profile
-                remote.value = remote.value.copy(email = p?.email, name = p?.name, plan = p?.plan, limits = windows.map(::row), loaded = true)
-            }.onFailure { remote.value = remote.value.copy(loaded = true) }
+                remote.value = remote.value.copy(
+                    email = p?.email, name = p?.name, plan = p?.plan, limits = kept.usage.orEmpty().map(::row),
+                    usageUpdatedAt = kept.usageAt, loaded = true, refreshing = false,
+                )
+            }.onFailure { remote.value = remote.value.copy(loaded = true, refreshing = false) }
         }
     }
 
