@@ -89,8 +89,15 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         secrets.set(EXPIRES, (now() + (tokens.expiresIn ?: DEFAULT_LIFETIME_S) * 1000).toString())
     }
 
+    /**
+     * This iPhone's id for OpenAI, made once: "urn:uuid:" and a standard UUID, as OpenAI's guide and working
+     * clients send it. Seen on the phone: a bare hex id got "invalid auth request" from the sign-in page.
+     * An id kept in the old form is replaced (it never registered, so nothing is lost).
+     */
     @OptIn(ExperimentalUuidApi::class)
-    private fun hostId(): String = secrets.get(HOST_ID) ?: Uuid.random().toHexString().also { secrets.set(HOST_ID, it) }
+    private fun hostId(): String =
+        secrets.get(HOST_ID)?.takeIf { it.startsWith(HOST_PREFIX) }
+            ?: (HOST_PREFIX + Uuid.random().toString()).also { secrets.set(HOST_ID, it) }
 
     public companion object {
         /** Present while signed in (SettingsRepository reads it to know ChatGPT is ready). */
@@ -98,6 +105,7 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         private const val MODELS = "chatgpt_models"
         private const val CLIENT_ID = "chatgpt_client_id"
         private const val HOST_ID = "chatgpt_host_id"
+        private const val HOST_PREFIX = "urn:uuid:"
         private const val ACCESS = "chatgpt_access_token"
         private const val REFRESH = CONNECTED_KEY
         private const val EXPIRES = "chatgpt_access_expires_ms"
