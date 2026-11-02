@@ -54,7 +54,9 @@ public class ProvidersPresenter(
     private val claudeConnection = claude?.let { ClaudeConnectionPresenter(scope, it, claudeLlm) { select(ModelProvider.ClaudeOAuth.id) } }
     private val openRouter = MutableStateFlow(Triple(false, null as String?, 0))
     private var verifier: String? = null
+    private var signInKeyRevision = 0L
     private var useWhenConnected = true
+    private var openRouterAttempt = 0
 
     init {
         scope.launch {
@@ -93,9 +95,11 @@ public class ProvidersPresenter(
 
     /** Starts "Sign in with OpenRouter"; returns the page to open. */
     public fun startOpenRouter(callbackUrl: String, useWhenConnected: Boolean = true): String {
+        openRouterAttempt++
         this.useWhenConnected = useWhenConnected
         val start = openRouterAuth.start(callbackUrl)
         verifier = start.verifier
+        signInKeyRevision = settings.openRouterKeyRevision
         openRouter.value = Triple(true, null, openRouter.value.third)
         return start.url
     }
@@ -104,17 +108,33 @@ public class ProvidersPresenter(
     public fun finishOpenRouter(callbackUrl: String?, error: String? = null) {
         val code = callbackUrl?.let(openRouterAuth::codeFrom)
         val v = verifier
-        if (code == null || v == null) {
+        verifier = null
+        if (code == null || v == null || signInKeyRevision != settings.openRouterKeyRevision) {
+            openRouterAttempt++
             openRouter.value = Triple(false, error, openRouter.value.third)
             return
         }
+        val attempt = openRouterAttempt
+        val keyRevision = signInKeyRevision
+        val selectAfter = useWhenConnected
         scope.launch {
             try {
-                connectOpenRouter(openRouterAuth.exchange(code, v))
+                val key = openRouterAuth.exchange(code, v)
+                if (attempt != openRouterAttempt) return@launch
+                if (keyRevision != settings.openRouterKeyRevision) {
+                    openRouter.value = Triple(false, null, openRouter.value.third)
+                    return@launch
+                }
+                connectOpenRouter(key, selectAfter)
                 openRouter.value = Triple(false, null, openRouter.value.third + 1)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (attempt != openRouterAttempt) return@launch
+                if (keyRevision != settings.openRouterKeyRevision) {
+                    openRouter.value = Triple(false, null, openRouter.value.third)
+                    return@launch
+                }
                 openRouter.value = Triple(false, e.message, openRouter.value.third)
             }
         }
@@ -123,11 +143,13 @@ public class ProvidersPresenter(
     /** A pasted OpenRouter key; it is used from now on. */
     public fun saveOpenRouterKey(key: String, useWhenConnected: Boolean = true) {
         if (key.isBlank()) return
-        this.useWhenConnected = useWhenConnected
-        connectOpenRouter(key.trim())
+        openRouterAttempt++
+        verifier = null
+        openRouter.value = Triple(false, null, openRouter.value.third)
+        connectOpenRouter(key.trim(), useWhenConnected)
     }
 
-    private fun connectOpenRouter(key: String) {
+    private fun connectOpenRouter(key: String, useWhenConnected: Boolean) {
         settings.apiKey = key
         if (useWhenConnected) select(ModelProvider.OpenRouter.id)
         openRouter.update { it.copy(third = it.third + 1) }
@@ -142,7 +164,12 @@ public class ProvidersPresenter(
     /** Removes [id]'s sign-in or key. If it was in use, the next connected provider takes over. */
     public fun disconnect(id: String) {
         when (ModelProvider.fromId(id)) {
-            ModelProvider.OpenRouter -> settings.apiKey = null
+            ModelProvider.OpenRouter -> {
+                openRouterAttempt++
+                verifier = null
+                openRouter.value = Triple(false, null, openRouter.value.third)
+                settings.apiKey = null
+            }
             ModelProvider.ChatGpt -> chatGpt.signOut()
             ModelProvider.ClaudeOAuth -> claudeConnection?.disconnect()
         }

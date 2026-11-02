@@ -157,4 +157,27 @@ class OnboardingTest {
         p.finish()
         assertTrue(f.settings.settings.value.onboardingDone)
     }
+
+    @Test fun aNewKeyInvalidatesAnOnboardingLoginStillInFlight() = runTest {
+        val f = Fixture(this)
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine {
+            entered.complete(Unit)
+            release.await()
+            respond("""{"key":"stale-key"}""")
+        })
+        val p = OnboardingPresenter(backgroundScope, f.settings, f.catalog, f.session, f.runner,
+            f.permissions, f.checks, OpenRouterAuth(client), lifecycle)
+        p.startSignIn(OnboardingPresenter.SIGN_IN_CALLBACK)
+        p.finishSignIn("mode://openrouter?code=old-code")
+        testScheduler.runCurrent()
+        entered.await()
+        f.settings.apiKey = "replacement-key"
+        release.complete(Unit)
+        testScheduler.runCurrent()
+        assertEquals("replacement-key", f.settings.apiKey)
+        p.close()
+        client.close()
+    }
 }

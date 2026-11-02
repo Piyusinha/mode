@@ -112,6 +112,8 @@ public class OnboardingPresenter(
     private val chatGptModels: () -> List<String> = { emptyList() },
 ) : Presenter<OnboardingUiState>(parent, OnboardingUiState()) {
     private var verifier: String? = null
+    private var signInKeyRevision = 0L
+    private var signInAttempt = 0
 
     /** When the test tapped Wi-Fi, and how long Mode then took to be back in front. */
     private var wifiTappedAt: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
@@ -148,8 +150,10 @@ public class OnboardingPresenter(
 
     /** Starts "Connect OpenRouter"; returns the page to open. */
     public fun startSignIn(callbackUrl: String): String {
+        signInAttempt++
         val start = auth.start(callbackUrl)
         verifier = start.verifier
+        signInKeyRevision = settings.openRouterKeyRevision
         set { it.copy(signingIn = true, signInError = null) }
         return start.url
     }
@@ -158,17 +162,32 @@ public class OnboardingPresenter(
     public fun finishSignIn(callbackUrl: String?, error: String? = null) {
         val code = callbackUrl?.let(auth::codeFrom)
         val v = verifier
-        if (code == null || v == null) {
+        verifier = null
+        if (code == null || v == null || signInKeyRevision != settings.openRouterKeyRevision) {
+            signInAttempt++
             set { it.copy(signingIn = false, signInError = error) }
             return
         }
+        val attempt = signInAttempt
+        val keyRevision = signInKeyRevision
         scope.launch {
             try {
-                settings.apiKey = auth.exchange(code, v)
+                val key = auth.exchange(code, v)
+                if (attempt != signInAttempt) return@launch
+                if (keyRevision != settings.openRouterKeyRevision) {
+                    set { it.copy(signingIn = false) }
+                    return@launch
+                }
+                settings.apiKey = key
                 set { it.copy(signingIn = false, connected = true, hasSavedKey = true, key = "") }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (attempt != signInAttempt) return@launch
+                if (keyRevision != settings.openRouterKeyRevision) {
+                    set { it.copy(signingIn = false) }
+                    return@launch
+                }
                 set { it.copy(signingIn = false, signInError = e.message) }
             }
         }

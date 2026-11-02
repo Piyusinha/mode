@@ -105,4 +105,25 @@ class ClaudeAccountTest {
         restarted.claudeCredentials.save(null)
         assertFalse(restarted.hasModelAccess, "must not use the saved OpenRouter key when Claude is selected")
     }
+
+    @Test fun replacementSignInClearsThePreviousAccountsProfileAndUsage() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        val store = settings.claudeCredentials
+        store.save(ClaudeOAuth.Credentials("old-access", "old-refresh", 0))
+        store.profile = com.piyush.mode.llm.AccountInfo(email = "old@example.com")
+        store.usage = emptyList()
+        store.usageAt = 123L
+        val http = HttpClient(MockEngine {
+            respond("""{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}""")
+        })
+        val account = ClaudeAccount(store, ClaudeOAuth(http))
+        val state = Url(account.start()).parameters["state"]!!
+        assertEquals("old@example.com", store.profile?.email)
+        account.finish("code#$state")
+        assertEquals("new-refresh", store.load()?.refreshToken)
+        assertNull(store.profile)
+        assertNull(store.usage)
+        assertNull(store.usageAt)
+        http.close()
+    }
 }

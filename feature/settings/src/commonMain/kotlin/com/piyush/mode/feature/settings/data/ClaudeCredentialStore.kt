@@ -20,6 +20,10 @@ public class ClaudeCredentialStore(
     private val mutableConnected = MutableStateFlow(load() != null)
     public val connected: StateFlow<Boolean> = mutableConnected.asStateFlow()
 
+    /** Account identity changes invalidate profile/usage requests started for the previous account. */
+    public var accountRevision: Long = 0
+        private set
+
     public fun load(): ClaudeOAuth.Credentials? = secrets.get(KEY)?.let {
         runCatching { Json.decodeFromString<ClaudeOAuth.Credentials>(it) }.getOrNull()
     }
@@ -39,9 +43,14 @@ public class ClaudeCredentialStore(
         get() = secrets.get(USAGE_AT)?.toLongOrNull()
         set(value) { secrets.set(USAGE_AT, value?.toString()) }
 
-    public fun save(credentials: ClaudeOAuth.Credentials?) {
+    public fun save(credentials: ClaudeOAuth.Credentials?, newSignIn: Boolean = false) {
         // Signed out, or a new sign-in (not a refresh of the one kept): what was kept about the account goes.
-        if (credentials == null || load() == null) { profile = null; usage = null; usageAt = null }
+        if (newSignIn || credentials == null || load() == null) {
+            accountRevision++
+            profile = null
+            usage = null
+            usageAt = null
+        }
         val encoded = credentials?.let { Json.encodeToString(it) }
         secrets.set(KEY, encoded)
         check(secrets.get(KEY) == encoded) { "Could not update Claude credentials in secure storage. Unlock this iPhone and try again." }

@@ -29,7 +29,7 @@ public class ClaudeAccount(private val credentials: ClaudeCredentialStore, priva
         val result = auth.exchange(code, start)
         if (attempt != generation || pending !== start) throw LlmFailed("Claude sign-in was cancelled. Start again.")
         pending = null
-        credentials.save(result)
+        credentials.save(result, newSignIn = true)
         generation++
     }
 

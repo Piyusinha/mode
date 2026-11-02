@@ -45,21 +45,31 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
 
     private var pending: ChatGptAuth.Start? = null
     private val refreshing = Mutex()
+    private var generation = 0
 
     /** The loopback address the app listens on during sign-in. */
     public val redirectUri: String = "http://127.0.0.1:${ChatGptAuth.LOOPBACK_PORT}${ChatGptAuth.REDIRECT_PATH}"
 
-    /** Starts a sign-in: the page to open. */
-    public fun beginSignIn(): String = auth.start(redirectUri, secrets.get(CLIENT_ID), hostId()).also { pending = it }.url
+    /** Starts a new account registration; issued client IDs belong to one account/workspace only. */
+    public fun beginSignIn(): String = auth.start(redirectUri, null, hostId()).also { pending = it }.url
+
+    /** Closing a login must not invalidate a running task's token refresh. */
+    public fun cancelSignIn() { pending = null }
 
     /** Finishes a sign-in from the URL the loopback received. Throws with a plain message when it can't be used. */
     public suspend fun finishSignIn(callbackUrl: String) {
         val start = pending ?: throw LlmFailed("ChatGPT sign-in had not started; please try again")
-        pending = null
+        val attempt = generation
         val callback = auth.callback(callbackUrl, start.state)
-        val clientId = callback.clientId ?: secrets.get(CLIENT_ID) ?: throw LlmFailed("ChatGPT sign-in returned no client id")
+        val clientId = callback.clientId?.takeIf { it.isNotBlank() && it != ChatGptAuth.REGISTER }
+            ?: throw LlmFailed("ChatGPT sign-in returned no client id")
         val tokens = auth.exchange(callback.code, start, clientId)
         if (!tokens.canUsePlan) throw LlmFailed(ResponsesClient.NOT_ELIGIBLE)
+        if (attempt != generation || pending !== start) throw LlmFailed("ChatGPT sign-in was cancelled. Start again.")
+        if (tokens.refreshToken.isNullOrBlank()) throw LlmFailed("ChatGPT sign-in returned no refresh token")
+        pending = null
+        generation++
+        clearAccount()
         secrets.set(CLIENT_ID, clientId)
         keep(tokens)
         secrets.set(LIMIT_AT, null)
@@ -73,17 +83,23 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         val expires = secrets.get(EXPIRES)?.toLongOrNull() ?: 0
         secrets.get(ACCESS)?.takeIf { expires - now() > MARGIN_MS }?.let { return@withLock it }
         val clientId = secrets.get(CLIENT_ID) ?: return@withLock null
+        val attempt = generation
         try {
-            auth.refresh(refresh, clientId).also(::keep).accessToken
+            val tokens = auth.refresh(refresh, clientId)
+            if (attempt != generation) throw LlmFailed("ChatGPT account changed. Try again.")
+            keep(tokens)
+            tokens.accessToken
         } catch (e: LlmFailed) {
-            if ("sign in again" in e.message.orEmpty()) signOut()
+            if (attempt == generation && "sign in again" in e.message.orEmpty()) signOut()
             throw e
         }
     }
 
     /** The models the plan can use. */
     public suspend fun models(): List<String> {
+        val attempt = generation
         val listed = auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN))
+        if (attempt != generation) throw LlmFailed("ChatGPT account changed. Try again.")
         val ids = listed.map { it.id }
         // What OpenAI says about each model (no account data): names, efforts, anything else it sends.
         AppLog.log("models", "ChatGPT models: " + listed.joinToString("; ") { m ->
@@ -106,9 +122,17 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     public fun limitReached() { secrets.set(LIMIT_AT, now().toString()) }
 
     public fun signOut() {
-        listOf(ACCESS, REFRESH, EXPIRES, PROFILE, LIMIT_AT).forEach { secrets.set(it, null) }
+        cancelSignIn()
+        generation++
+        clearAccount()
         mutableConnected.value = false
         onChange()
+    }
+
+    private fun clearAccount() {
+        listOf(CLIENT_ID, ACCESS, REFRESH, EXPIRES, PROFILE, LIMIT_AT, MODELS, MODEL_INFO).forEach { secrets.set(it, null) }
+        mutableModels.value = emptyList()
+        mutableInfo.value = emptyList()
     }
 
     private fun keep(tokens: ChatGptAuth.Tokens) {

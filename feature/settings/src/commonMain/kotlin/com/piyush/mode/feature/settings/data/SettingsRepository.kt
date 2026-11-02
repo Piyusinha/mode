@@ -24,9 +24,14 @@ public class SettingsRepository(
     private val state = MutableStateFlow(read())
     public val settings: StateFlow<ModeSettings> = state.asStateFlow()
 
+    /** Changes even on disconnecting an empty key, invalidating pending OpenRouter logins. */
+    public var openRouterKeyRevision: Long = 0
+        private set
+
     public var apiKey: String?
         get() = secrets.get(API_KEY)
         set(value) {
+            openRouterKeyRevision++
             secrets.set(API_KEY, value?.trim())
             state.value = read()
         }

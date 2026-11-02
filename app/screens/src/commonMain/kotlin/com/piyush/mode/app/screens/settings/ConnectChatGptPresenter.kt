@@ -73,6 +73,7 @@ public class ConnectChatGptPresenter(
 
     /** The page was closed before it came back. */
     public fun cancelled() {
+        account.cancelSignIn()
         if (mutableState.value.phase == ChatGptPhase.Waiting) mutableState.value = mutableState.value.copy(phase = ChatGptPhase.Idle)
     }
 

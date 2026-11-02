@@ -131,9 +131,12 @@ public class ProviderDetailPresenter(
             runCatching {
                 val token = account.accessToken()
                 val kept = settings.claudeCredentials
-                if (profileToo) claudeApi.profile(token)?.let { kept.profile = it }
+                val revision = kept.accountRevision
+                val profile = if (profileToo) claudeApi.profile(token) else null
                 // No limits in the answer (Claude did not share them this time): the last ones stay, with their time.
                 val windows = claudeApi.usage(token)
+                if (revision != kept.accountRevision) return@launch
+                profile?.let { kept.profile = it }
                 if (windows.isNotEmpty()) { kept.usage = windows; kept.usageAt = clock.now() }
                 val p = kept.profile
                 remote.value = remote.value.copy(
