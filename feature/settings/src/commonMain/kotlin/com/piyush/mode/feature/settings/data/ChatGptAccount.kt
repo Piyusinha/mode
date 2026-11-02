@@ -23,8 +23,13 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     private val auth: ChatGptAuth,
     private val secrets: SecretStore,
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** Signed in or out: settings recompute which providers are ready. */
+    private val onChange: () -> Unit = {},
 ) {
     private val mutableConnected = MutableStateFlow(secrets.get(REFRESH) != null)
+    private val mutableModels = MutableStateFlow(secrets.get(MODELS)?.split(',')?.filter { it.isNotBlank() }.orEmpty())
+    /** The plan's models as last asked (empty until the first check). */
+    public val knownModels: StateFlow<List<String>> = mutableModels.asStateFlow()
     /** Signed in, with a plan Mode may use. */
     public val connected: StateFlow<Boolean> = mutableConnected.asStateFlow()
 
@@ -48,6 +53,7 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         secrets.set(CLIENT_ID, clientId)
         keep(tokens)
         mutableConnected.value = true
+        onChange()
     }
 
     /** A token good for at least a minute, refreshed if needed; null when signed out. */
@@ -65,11 +71,16 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     }
 
     /** The models the plan can use. */
-    public suspend fun models(): List<String> = auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN))
+    public suspend fun models(): List<String> =
+        auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN)).also { list ->
+            secrets.set(MODELS, list.joinToString(","))
+            mutableModels.value = list
+        }
 
     public fun signOut() {
         listOf(ACCESS, REFRESH, EXPIRES).forEach { secrets.set(it, null) }
         mutableConnected.value = false
+        onChange()
     }
 
     private fun keep(tokens: ChatGptAuth.Tokens) {
@@ -81,13 +92,16 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     @OptIn(ExperimentalUuidApi::class)
     private fun hostId(): String = secrets.get(HOST_ID) ?: Uuid.random().toHexString().also { secrets.set(HOST_ID, it) }
 
-    private companion object {
-        const val CLIENT_ID = "chatgpt_client_id"
-        const val HOST_ID = "chatgpt_host_id"
-        const val ACCESS = "chatgpt_access_token"
-        const val REFRESH = "chatgpt_refresh_token"
-        const val EXPIRES = "chatgpt_access_expires_ms"
-        const val MARGIN_MS = 60_000L
-        const val DEFAULT_LIFETIME_S = 3600L
+    public companion object {
+        /** Present while signed in (SettingsRepository reads it to know ChatGPT is ready). */
+        public const val CONNECTED_KEY: String = "chatgpt_refresh_token"
+        private const val MODELS = "chatgpt_models"
+        private const val CLIENT_ID = "chatgpt_client_id"
+        private const val HOST_ID = "chatgpt_host_id"
+        private const val ACCESS = "chatgpt_access_token"
+        private const val REFRESH = CONNECTED_KEY
+        private const val EXPIRES = "chatgpt_access_expires_ms"
+        private const val MARGIN_MS = 60_000L
+        private const val DEFAULT_LIFETIME_S = 3600L
     }
 }

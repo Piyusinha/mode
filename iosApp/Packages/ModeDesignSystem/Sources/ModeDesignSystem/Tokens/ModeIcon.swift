@@ -62,6 +62,9 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case laptop = "laptopcomputer"
     case calendar = "calendar"
     case message = "message"
+    /// AI providers.
+    case claude = "asterisk"
+    case router = "arrow.triangle.branch"
     case copy = "doc.on.doc"
 
     public var image: Image { Image(systemName: rawValue) }

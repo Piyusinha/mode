@@ -32,10 +32,13 @@ public data class ModeSettings(
     val provider: ModelProvider = ModelProvider.OpenRouter,
     /** Derived from the credential store, never persisted as a preference. */
     val hasClaudeAccount: Boolean = false,
+    /** Signed in with ChatGPT; derived from the Keychain, never a preference. */
+    val hasChatGptAccount: Boolean = false,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey
         ModelProvider.ClaudeOAuth -> hasClaudeAccount
+        ModelProvider.ChatGpt -> hasChatGptAccount
     }
     /** The same settings with every value brought into range. */
     public fun validated(): ModeSettings = copy(

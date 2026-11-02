@@ -5,7 +5,9 @@ import kotlinx.serialization.json.JsonArray
 /** Stable provider identity, independent of model IDs or authentication state. */
 enum class ModelProvider(val id: String, val reportsCurrencyCost: Boolean) {
     OpenRouter("openrouter", true),
-    ClaudeOAuth("claude_oauth", false);
+    ClaudeOAuth("claude_oauth", false),
+    /** "Continue with ChatGPT": the user's ChatGPT plan pays (ResponsesClient). */
+    ChatGpt("chatgpt", false);
 
     companion object {
         fun fromId(id: String?): ModelProvider = entries.firstOrNull { it.id == id } ?: OpenRouter

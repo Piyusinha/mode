@@ -71,12 +71,18 @@ public class Screens(
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
-    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm)
+    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm) { chatGpt.knownModels.value }
+
+    /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
+    public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =
+        com.piyush.mode.app.screens.settings.ProvidersPresenter(scope, settings, chatGpt, auth, claude, claudeLlm)
 
     public fun connectChatGpt(): com.piyush.mode.app.screens.settings.ConnectChatGptPresenter =
-        com.piyush.mode.app.screens.settings.ConnectChatGptPresenter(scope, chatGpt, chatGptLlm)
+        com.piyush.mode.app.screens.settings.ConnectChatGptPresenter(scope, chatGpt, chatGptLlm) {
+            settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
+        }
 
-    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle)
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle) { chatGpt.knownModels.value }
 
     /** Whether first-run setup still has to be shown. */
     public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone

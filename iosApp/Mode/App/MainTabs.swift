@@ -106,6 +106,8 @@ struct MainTabs: View {
             default: break
             }
         case "live": showingLive = true
+        case "settings": paths[.home] = [.settings]
+        case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
         case "activity": previewActivity = ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
@@ -139,6 +141,8 @@ private struct TabRoot<Content: View>: View {
                     case let .runScreens(taskId): RunScreensRoute(app: app, taskId: taskId)
                     case .settings: SettingsRoute(app: app, navigate: navigate)
                     case .connectChatGPT: ConnectChatGPTRoute(app: app)
+                    case .memory: MemoryRoute(app: app, navigate: navigate)
+                    case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)
                     case .memoryApps: MemoryAppsRoute(app: app, navigate: navigate)

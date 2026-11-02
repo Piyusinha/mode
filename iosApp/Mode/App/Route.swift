@@ -8,6 +8,8 @@ enum Route: Hashable {
     case runScreens(taskId: String)
     case settings
     case connectChatGPT
+    case memory
+    case modelPicker(stuck: Bool)
     case developer
     case memoryAboutYou
     /// Routines, all of them or one app's.

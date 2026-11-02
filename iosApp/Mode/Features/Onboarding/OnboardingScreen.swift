@@ -5,7 +5,8 @@ import SwiftUI
 struct OnboardingScreen: View {
     let state: OnboardingViewModel.State
     @Binding var callName: String
-    @Binding var key: String
+    let providers: ProvidersViewModel.State
+    let onProvider: (ProvidersViewModel.Event) -> Void
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
@@ -37,7 +38,7 @@ struct OnboardingScreen: View {
         switch state.step {
         case .welcome: WelcomeStep(state: state, onEvent: onEvent)
         case .name: NameStep(state: state, callName: $callName, onEvent: onEvent)
-        case .key: KeyStep(state: state, key: $key, onEvent: onEvent)
+        case .key: KeyStep(providers: providers, onProvider: onProvider)
         case .model: ModelStep(state: state, onEvent: onEvent)
         case .permissions: PermissionsStep(state: state, onEvent: onEvent)
         case .test: TestStep(state: state)
@@ -53,6 +54,14 @@ struct OnboardingScreen: View {
             case .welcome:
                 ModeButton(L10n.Setup.getStarted, fullWidth: true) { onEvent(.next) }
                 ModeButton(L10n.Setup.seeCode, role: .plain) { onEvent(.openCode) }
+            case .key:
+                if providers.activeConnected {
+                    ModeButton(L10n.Common.continue, fullWidth: true) { onEvent(.next) }
+                } else {
+                    ModeButton(LocalizedStringResource(stringLiteral: L10n.Providers.continueWith(providers.activeTitle)), fullWidth: true) {
+                        onProvider(.connectActive)
+                    }
+                }
             case .test:
                 ModeButton(L10n.Setup.runTest, icon: .play, fullWidth: true) { onEvent(.runTest) }.disabled(state.testRunning)
             case .result:
@@ -133,27 +142,19 @@ private struct NameStep: View {
     }
 }
 
+/// "Connect your AI": every provider, ChatGPT picked by default; connect as many as you like.
 private struct KeyStep: View {
-    let state: OnboardingViewModel.State
-    @Binding var key: String
-    let onEvent: (OnboardingViewModel.Event) -> Void
+    let providers: ProvidersViewModel.State
+    let onProvider: (ProvidersViewModel.Event) -> Void
 
     var body: some View {
-        StepHeader(title: L10n.Setup.keyTitle, message: L10n.Setup.keyMessage)
-        if state.connected {
-            ModeCard { ModeRow(String(localized: L10n.Setup.connected), leading: .success) }
-        } else {
-            ModeButton(L10n.Setup.connect, icon: .link, fullWidth: true) { onEvent(.connect) }
-                .disabled(state.signingIn)
-                .padding(.top, ModeSpacing.m)
-            Text(L10n.Setup.connectNote).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-            if let error = state.signInError { Text(error).modeText(.footnote, color: ModeColor.danger) }
-            ModeOrDivider(L10n.Setup.or).padding(.vertical, ModeSpacing.s)
-            ModeFieldCard(L10n.Setup.keyLabel, prompt: L10n.Setup.keyPrompt, text: $key, secure: true, buttonTitle: L10n.Setup.paste) { onEvent(.paste) }
-            if let hint = state.keyHint { Text(hint).modeText(.footnote, color: ModeColor.warning) }
-            if state.hasSavedKey { Text(L10n.Setup.savedKey).modeText(.footnote, color: ModeColor.textSecondary) }
-        }
-        ModeNote(icon: .lock, L10n.Setup.keyNote).padding(.top, ModeSpacing.l)
+        StepHeader(title: L10n.Setup.keyTitle, message: L10n.Providers.setupMessage)
+        ProviderList(rows: providers.rows, recommendChatGPT: true, onEvent: onProvider)
+            .padding(.top, ModeSpacing.s)
+        Text(providers.activeConnected ? L10n.Providers.setupHintConnected : L10n.Providers.setupHint)
+            .modeText(.footnote, color: ModeColor.textSecondary)
+            .padding(.horizontal, ModeSpacing.xs)
+        ModeNote(icon: .lock, L10n.Providers.keychainNote).padding(.top, ModeSpacing.m)
     }
 }
 

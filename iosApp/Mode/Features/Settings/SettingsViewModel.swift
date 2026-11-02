@@ -2,9 +2,9 @@ import Foundation
 import ModeDesignSystem
 import ModeKit
 import Observation
-import UIKit
 
-/// Settings: name, key, models picked from the live list, limits.
+/// Settings (its board): your name; the AI in use (providers in their own sheet) and its models; limits;
+/// memory. Also drives the model picker, which searches the provider's models.
 @MainActor
 @Observable
 final class SettingsViewModel {
@@ -12,53 +12,50 @@ final class SettingsViewModel {
         let id: String
         let name: String
         let subtitle: String
+        let leading: ModeRowLeading
         let isMain: Bool
         let isStuck: Bool
     }
 
     struct State: Equatable {
-        var keyStatus = ""
-        var hasKey = false
         var modelName = ""
         var stuckName = ""
         var neverStuck = false
         var picks: [Model] = []
         var results: [Model] = []
+        var makers: [String] = []
+        var maker: String?
+        var showsCost = true
         var maxCost = 0.05
         var maxCostLabel = ""
         /// The daily limit's stepper value; 0 means off.
         var dailyCap = 0.0
         var dailyCapLabel = ""
         var learn = true
-        var useClaude = false
-        var claudeConnected = false
-        var claudeSigningIn = false
-        var claudeAwaitingCode = false
-        var claudeError: String?
-        var claudeChecking = false
-        var claudeCheck: String?
+        /// What the picker lists: the search's results, or the picks when nothing is typed or filtered.
+        var listed: [Model] { query.isEmpty && maker == nil ? picks : results }
+        var query = ""
     }
 
     enum Event {
         case saveName
-        case saveKey
         case chooseModel(String)
         case chooseStuck(String?)
         case search
+        case filter(String?)
         case maxCost(Double)
         case dailyCap(Double)
         case learn(Bool)
         case openDeveloper
-        case useClaude(Bool), connectClaude, finishClaude, cancelClaude, disconnectClaude
-        case checkClaude
-        case openChatGPT
+        case openMemory
+        case openPicker(stuck: Bool)
+        case showProviders
     }
 
     private(set) var state = State()
     var name = ""
-    var key = ""
     var query = ""
-    var claudeCode = ""
+    var showingProviders = false
     private let presenter: SettingsPresenter
     private let navigate: (Route) -> Void
     private var updates: Updates?
@@ -68,9 +65,6 @@ final class SettingsViewModel {
     let costRange = 0.01...1.0
     let dailyCapStep = 0.1
     let dailyCapRange = 0.0...10.0
-
-    /// A new key has been typed and can be saved.
-    var canSaveKey: Bool { !key.isEmpty }
 
     init(screens: Screens, navigate: @escaping (Route) -> Void) {
         presenter = screens.settings()
@@ -82,44 +76,27 @@ final class SettingsViewModel {
     func send(_ event: Event) {
         switch event {
         case .saveName: presenter.setName(name: name)
-        case .saveKey:
-            presenter.setKey(key: key)
-            key = ""
         case let .chooseModel(id): presenter.chooseModel(id: id)
         case let .chooseStuck(id): presenter.chooseStuckModel(id: id)
         case .search: presenter.search(text: query)
+        case let .filter(maker): presenter.filterMaker(maker: maker)
         case let .maxCost(usd): presenter.setMaxCostPerTask(usd: usd)
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
-        case let .useClaude(on): presenter.useClaude(on: on)
-        case .connectClaude:
-            claudeCode = ""
-            if let address = presenter.startClaudeSignIn(), let url = URL(string: address) {
-                UIApplication.shared.open(url)
-            }
-        case .finishClaude:
-            let code = claudeCode
-            claudeCode = ""
-            presenter.finishClaudeSignIn(code: code)
-        case .cancelClaude:
-            claudeCode = ""
-            presenter.cancelClaudeSignIn()
-        case .disconnectClaude:
-            claudeCode = ""
-            presenter.disconnectClaude()
-        case .checkClaude: presenter.checkClaude(image: ClaudeProbeImage.make())
-        case .openChatGPT: navigate(.connectChatGPT)
+        case .openMemory: navigate(.memory)
+        case let .openPicker(stuck): navigate(.modelPicker(stuck: stuck))
+        case .showProviders: showingProviders = true
         }
     }
 
     isolated deinit {
-        presenter.cancelClaudeSignIn()
         updates?.cancel()
         presenter.close()
     }
 
     private static func map(_ s: SettingsUiState) -> State {
+        let onPlan = !s.showsCost
         func model(_ c: ModelChoice) -> Model {
             let tag = c.tag.map { tag -> String in
                 switch tag {
@@ -128,30 +105,29 @@ final class SettingsViewModel {
                 case .strongest: String(localized: L10n.Settings.strongest)
                 }
             }
-            return Model(id: c.id, name: c.name, subtitle: s.useClaude ? String(localized: L10n.Claude.modelDetail) : [tag, L10n.Settings.perTask(Format.money(c.costPerTaskUsd)), c.note.isEmpty ? nil : c.note].compactMap { $0 }.joined(separator: " · "),
+            let cost = onPlan ? String(localized: L10n.Settings.onYourPlan) : L10n.Settings.perTask(Format.money(c.costPerTaskUsd))
+            let maker = c.id.split(separator: "/").first.map(String.init) ?? c.name
+            return Model(id: c.id, name: c.name, subtitle: [tag, cost, c.note.isEmpty ? nil : c.note].compactMap { $0 }.joined(separator: " · "),
+                         leading: .letterTile(String((c.id.contains("/") ? maker : c.name).prefix(1)).uppercased(),
+                                              background: ModeColor.tintSoft, foreground: ModeColor.tint),
                          isMain: c.isMain, isStuck: c.isStuck)
         }
         let cap = s.dailyCapUsd?.doubleValue
         return State(
-            keyStatus: s.keyEnding.map { L10n.Settings.keyEnding($0) } ?? String(localized: L10n.Settings.noKey),
-            hasKey: s.hasKey,
             modelName: s.model?.name ?? "",
-            stuckName: s.stuckModel?.name ?? String(localized: L10n.Settings.never),
+            stuckName: s.stuckModel?.name ?? String(localized: L10n.Settings.off),
             neverStuck: s.stuckModel == nil,
             picks: s.picks.map(model),
             results: s.results.map(model),
+            makers: s.makers,
+            maker: s.maker,
+            showsCost: s.showsCost,
             maxCost: s.maxCostPerTaskUsd,
             maxCostLabel: Format.money(s.maxCostPerTaskUsd),
             dailyCap: cap ?? 0,
             dailyCapLabel: cap.map(Format.money) ?? String(localized: L10n.Settings.dailyCapOff),
             learn: s.learn,
-            useClaude: s.useClaude,
-            claudeConnected: s.claudeConnected,
-            claudeSigningIn: s.claudeSigningIn,
-            claudeAwaitingCode: s.claudeAwaitingCode,
-            claudeError: s.claudeError,
-            claudeChecking: s.claudeChecking,
-            claudeCheck: s.claudeCheck
+            query: s.query
         )
     }
 }

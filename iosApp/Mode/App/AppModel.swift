@@ -14,6 +14,10 @@ final class AppModel {
 
     init() {
         needsOnboarding = IosModeGraphKt.iosModeGraph.screens.needsOnboarding
+        #if DEBUG && targetEnvironment(simulator)
+        // Simulator only: MODE_SETUP_STEP shows setup even when it was finished, for comparing with its boards.
+        if ProcessInfo.processInfo.environment["MODE_SETUP_STEP"] != nil { needsOnboarding = true }
+        #endif
         liveActivity = LiveActivityController(screens: IosModeGraphKt.iosModeGraph.screens)
         // Questions can be answered from their notifications.
         UNUserNotificationCenter.current().delegate = QuestionAnswers.shared

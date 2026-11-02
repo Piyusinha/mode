@@ -280,6 +280,45 @@ enum L10n {
         }
     }
 
+    enum Providers {
+        static let title = LocalizedStringResource("providers.title", defaultValue: "AI providers")
+        static let sheetMessage = LocalizedStringResource("providers.sheetMessage", defaultValue: "Connect as many as you like. Mode uses the one you pick.")
+        static let chatGPT = LocalizedStringResource("providers.chatgpt", defaultValue: "ChatGPT")
+        static let claude = LocalizedStringResource("providers.claude", defaultValue: "Claude")
+        static let openRouter = LocalizedStringResource("providers.openrouter", defaultValue: "OpenRouter")
+        static let chatGPTDetail = LocalizedStringResource("providers.chatgptDetail", defaultValue: "Your Plus or Pro plan · no cost per task")
+        static let claudeDetail = LocalizedStringResource("providers.claudeDetail", defaultValue: "Your Claude account · experimental")
+        static let openRouterDetail = LocalizedStringResource("providers.openrouterDetail", defaultValue: "Pay as you go · any model")
+        static let connected = LocalizedStringResource("providers.connected", defaultValue: "Connected")
+        static let connect = LocalizedStringResource("providers.connect", defaultValue: "Connect")
+        static let recommended = LocalizedStringResource("providers.recommended", defaultValue: "Recommended")
+        static let inUse = LocalizedStringResource("providers.inUse", defaultValue: "In use")
+        static let change = LocalizedStringResource("providers.change", defaultValue: "Change")
+        static let aiInUse = LocalizedStringResource("providers.aiInUse", defaultValue: "AI in use")
+        static let notConnectedYet = LocalizedStringResource("providers.notConnectedYet", defaultValue: "Not connected yet")
+        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Switching keeps each provider's own models.")
+        static let connectedHeader = LocalizedStringResource("providers.connectedHeader", defaultValue: "Connected")
+        static let disconnect = LocalizedStringResource("providers.disconnect", defaultValue: "Disconnect")
+        static let keychainNote = LocalizedStringResource("providers.keychainNote", defaultValue: "Sign-ins and keys stay in this iPhone's Keychain. They only go to that provider, never to us.")
+        static let setupMessage = LocalizedStringResource("providers.setupMessage", defaultValue: "Mode is open source. Use the AI plan you already pay for, or pay as you go.")
+        static let setupHint = LocalizedStringResource("providers.setupHint", defaultValue: "Pick the one Mode should use; connect as many as you like. You can change this anytime in Settings.")
+        static let setupHintConnected = LocalizedStringResource("providers.setupHintConnected", defaultValue: "Connected and picked. You can connect the others now or later in Settings.")
+        static let connectOpenRouter = LocalizedStringResource("providers.connectOpenRouter", defaultValue: "Connect OpenRouter")
+        static let openRouterMessage = LocalizedStringResource("providers.openRouterMessage", defaultValue: "Pay as you go, any model. Usually under a cent a task.")
+        static let signInOpenRouter = LocalizedStringResource("providers.signInOpenRouter", defaultValue: "Sign in with OpenRouter")
+        static let connectClaude = LocalizedStringResource("providers.connectClaude", defaultValue: "Connect Claude")
+        static let planNote = LocalizedStringResource("providers.planNote", defaultValue: "Tasks run on your plan, so there is no cost per task. Set how much of your plan Mode may use in that provider's own settings.")
+
+        static func connectedCount(_ n: Int) -> String {
+            n == 1 ? String(localized: "providers.connectedCount.one", defaultValue: "Connected")
+                : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers ready")
+        }
+
+        static func continueWith(_ name: String) -> String {
+            String(localized: "providers.continueWith", defaultValue: "Continue with \(name)")
+        }
+    }
+
     enum ChatGPT {
         static let title = LocalizedStringResource("chatgpt.title", defaultValue: "Continue with ChatGPT")
         static let subtitle = LocalizedStringResource("chatgpt.subtitle", defaultValue: "Sign in with your ChatGPT account and allow Mode to use your plan. You come straight back here.")
@@ -336,6 +375,15 @@ enum L10n {
         static let dailyCap = LocalizedStringResource("settings.dailyCap", defaultValue: "Daily limit")
         static let dailyCapOff = LocalizedStringResource("settings.dailyCapOff", defaultValue: "No daily limit")
         static let memory = LocalizedStringResource("settings.memory", defaultValue: "Memory")
+        static let ai = LocalizedStringResource("settings.ai", defaultValue: "AI")
+        static let mainModel = LocalizedStringResource("settings.mainModel", defaultValue: "Main model")
+        static let whenStuckShort = LocalizedStringResource("settings.whenStuckShort", defaultValue: "When stuck")
+        static let off = LocalizedStringResource("settings.off", defaultValue: "Off")
+        static let onYourPlan = LocalizedStringResource("settings.onYourPlan", defaultValue: "on your plan")
+        static let all = LocalizedStringResource("settings.all", defaultValue: "All")
+        static let noModels = LocalizedStringResource("settings.noModels", defaultValue: "No model matches that. Try a shorter name or another maker.")
+        static let pickerNote = LocalizedStringResource("settings.pickerNote", defaultValue: "Only models that can see the screen and use tools. Prices are OpenRouter's, for a typical task of about 10 steps.")
+        static let pickerPlanNote = LocalizedStringResource("settings.pickerPlanNote", defaultValue: "These run on your plan, so there is no cost per task.")
         static let recommended = LocalizedStringResource("settings.tag.recommended", defaultValue: "Recommended")
         static let cheapest = LocalizedStringResource("settings.tag.cheapest", defaultValue: "Cheapest")
         static let strongest = LocalizedStringResource("settings.tag.strongest", defaultValue: "Strongest")

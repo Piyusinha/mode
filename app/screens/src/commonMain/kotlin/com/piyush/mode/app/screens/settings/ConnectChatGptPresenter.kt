@@ -36,6 +36,8 @@ public class ConnectChatGptPresenter(
     parent: CoroutineScope,
     private val account: ChatGptAccount,
     private val llm: LlmClient,
+    /** Signed in: ChatGPT becomes the provider in use. */
+    private val onConnected: () -> Unit = {},
 ) : Presenter<ConnectChatGptUiState>(parent, ConnectChatGptUiState(connected = account.connected.value)) {
 
     init {
@@ -58,6 +60,7 @@ public class ConnectChatGptPresenter(
         scope.launch {
             val phase = try {
                 account.finishSignIn(callbackUrl)
+                onConnected()
                 check()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e

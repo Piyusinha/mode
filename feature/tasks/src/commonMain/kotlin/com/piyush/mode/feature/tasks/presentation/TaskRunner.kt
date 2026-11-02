@@ -210,7 +210,11 @@ public class TaskRunner(
         try {
             if (!settings.hasAccess(config.provider)) {
                 outcome = TaskStatus.NotStarted
-                reply = if (config.provider == ModelProvider.ClaudeOAuth) "Connect Claude in Settings first." else "Add your OpenRouter API key in Settings first."
+                reply = when (config.provider) {
+                    ModelProvider.ClaudeOAuth -> "Connect Claude in Settings first."
+                    ModelProvider.ChatGpt -> "Continue with ChatGPT in Settings first."
+                    ModelProvider.OpenRouter -> "Connect OpenRouter in Settings first."
+                }
                 status(reply)
                 recorder.failedToStart(task, "no API key")
                 return null

@@ -1,5 +1,7 @@
 package com.piyush.mode.app.screens.onboarding
 
+import com.piyush.mode.feature.settings.data.ModelSearch
+import com.piyush.mode.feature.settings.domain.ProviderModels
 import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.app.screens.settings.ModelChoice
@@ -104,6 +106,8 @@ public class OnboardingPresenter(
     private val phoneChecks: PhoneChecks,
     private val auth: OpenRouterAuth,
     lifecycle: AppLifecycle,
+    /** The models on the user's ChatGPT plan, as last asked. */
+    private val chatGptModels: () -> List<String> = { emptyList() },
 ) : Presenter<OnboardingUiState>(parent, OnboardingUiState()) {
     private var verifier: String? = null
 
@@ -114,6 +118,8 @@ public class OnboardingPresenter(
     private var stuck: String? = settings.settings.value.strongModel
 
     init {
+        // A new setup starts with ChatGPT picked (the user's plan, no cost per task) unless one is connected already.
+        if (com.piyush.mode.llm.ModelProvider.entries.none(settings::hasAccess)) settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         val s = settings.settings.value
         set { it.copy(paired = phoneChecks.hasPairingFile(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
         // "Come back here" ticks the moment Mode is in front again, not when the run ends:
@@ -121,6 +127,8 @@ public class OnboardingPresenter(
         lifecycle.onForeground { if (scope.isActive) cameBack() }
         scope.launch { catalog.refresh() }
         scope.launch { catalog.state.collect { refreshModels() } }
+        // Picking another provider brings its own models.
+        scope.launch { settings.settings.collect { refreshModels() } }
         scope.launch { runCatching { refreshPermissions() } }
     }
 
@@ -371,20 +379,34 @@ public class OnboardingPresenter(
     }
 
     private fun refreshModels() {
-        val models = catalog.state.value
+        val s = settings.settings.value
+        val provider = s.provider
+        // A choice made for another provider does not carry over: that provider's own models come back.
+        if (selected?.let { ProviderModels.accepts(provider, it) } != true) selected = s.model
+        if (stuck != null && !ProviderModels.accepts(provider, stuck!!)) stuck = s.strongModel
+        val recommended = pickList()
+        val all = if (provider == com.piyush.mode.llm.ModelProvider.OpenRouter) catalog.state.value.all else recommended
         fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == selected, o.id == stuck)
         val strongest = strongest()
         set { st ->
             st.copy(
-                models = models.recommended.filter { it.tag != ModelTag.Strongest }.map(::choice),
-                stuckModel = (stuck?.let { id -> (models.recommended + models.all).firstOrNull { it.id == id } } ?: strongest)?.let(::choice),
-                stuckChoices = models.recommended.map(::choice),
-                results = if (st.query.isBlank()) emptyList() else catalog.search(st.query).take(MAX_RESULTS).map(::choice),
+                models = recommended.filter { it.tag != ModelTag.Strongest }.ifEmpty { recommended }.map(::choice),
+                stuckModel = (stuck?.let { id -> (recommended + all).firstOrNull { it.id == id } } ?: strongest)?.let(::choice),
+                stuckChoices = recommended.map(::choice),
+                results = if (st.query.isBlank()) emptyList()
+                    else (if (all === recommended) ModelSearch.search(all, st.query) else catalog.search(st.query)).take(MAX_RESULTS).map(::choice),
             )
         }
     }
 
-    private fun strongest(): ModelOption? = catalog.state.value.recommended.firstOrNull { it.tag == ModelTag.Strongest }
+    /** The picks for the provider in use. */
+    private fun pickList(): List<ModelOption> = when (settings.settings.value.provider) {
+        com.piyush.mode.llm.ModelProvider.OpenRouter -> catalog.state.value.recommended
+        com.piyush.mode.llm.ModelProvider.ClaudeOAuth -> ProviderModels.claude
+        com.piyush.mode.llm.ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels())
+    }
+
+    private fun strongest(): ModelOption? = pickList().firstOrNull { it.tag == ModelTag.Strongest }
 
     private fun item(kind: TestItemKind, ms: Long?, running: Boolean) =
         TestItem(kind, if (ms != null) TestItemState.Done else if (running && state.value.testRunning) TestItemState.Running else TestItemState.Pending, ms)

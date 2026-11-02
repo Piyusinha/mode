@@ -180,7 +180,7 @@ class TaskRunnerTest {
     fun withoutAKeyItDoesNotConnect() = runTest {
         val f = Fixture(this, ScriptedModel(), key = null)
         assertNull(f.runner.runTask("t", quick))
-        assertTrue("API key" in f.runner.state.value.status)
+        assertTrue("Connect OpenRouter in Settings" in f.runner.state.value.status, f.runner.state.value.status)
         assertEquals(0, f.link.connects)
         assertEquals("not_started", f.runs.runs().single().outcome)
     }

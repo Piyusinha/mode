@@ -40,6 +40,13 @@ public data class SettingsUiState(
     val claudeError: String? = null,
     val claudeChecking: Boolean = false,
     val claudeCheck: String? = null,
+    /** The provider in use (ModelProvider id). */
+    val provider: String = ModelProvider.OpenRouter.id,
+    /** Cost limits apply: the provider bills per task (OpenRouter), not a plan. */
+    val showsCost: Boolean = true,
+    /** Makers to filter the full list by ("anthropic", "openai"…); OpenRouter only. */
+    val makers: List<String> = emptyList(),
+    val maker: String? = null,
 )
 
 public data class ModelChoice(
@@ -59,21 +66,27 @@ public class SettingsPresenter(
     private val catalog: ModelCatalog,
     private val claude: ClaudeAccount? = null,
     private val claudeLlm: LlmClient? = null,
+    /** The models on the user's ChatGPT plan, as last asked. */
+    private val chatGptModels: () -> List<String> = { emptyList() },
 ) : Presenter<SettingsUiState>(parent, SettingsUiState()) {
     private val connection = claude?.let { account ->
         ClaudeConnectionPresenter(scope, account, claudeLlm) { settings.selectProvider(ModelProvider.ClaudeOAuth) }
     }
     private val connectionState = connection?.state ?: MutableStateFlow(ClaudeConnectionUiState())
-    private val query = MutableStateFlow("")
+    private val query = MutableStateFlow("" to (null as String?))
     /** The key lives in the Keychain, outside the settings flow: bumped when it changes. */
     private val keyChanges = MutableStateFlow(0)
 
     init {
         scope.launch { catalog.refresh() }
         scope.launch {
-            combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, q, _, auth ->
-                val recommended = if (s.provider == ModelProvider.ClaudeOAuth) ProviderModels.claude else models.recommended
-                val all = if (s.provider == ModelProvider.ClaudeOAuth) ProviderModels.claude else models.all
+            combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, (q, maker), _, auth ->
+                val recommended = when (s.provider) {
+                    ModelProvider.ClaudeOAuth -> ProviderModels.claude
+                    ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels())
+                    ModelProvider.OpenRouter -> models.recommended
+                }
+                val all = if (s.provider == ModelProvider.OpenRouter) models.all else recommended
                 val known = (recommended + all).associateBy { it.id }
                 fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == s.model, o.id == s.strongModel)
                 fun byId(id: String?) = id?.let { known[it]?.let(::choice) ?: ModelChoice(it, it.substringAfter('/'), 0.0, null, "", it == s.model, it == s.strongModel) }
@@ -85,12 +98,17 @@ public class SettingsPresenter(
                     stuckModel = byId(s.strongModel),
                     picks = recommended.map(::choice),
                     query = q,
-                    results = if (q.isBlank()) emptyList() else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q) else ModelSearch.search(all, q)).take(MAX_RESULTS).map(::choice),
+                    results = if (q.isBlank() && maker == null) emptyList()
+                        else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q, maker) else ModelSearch.search(all, q)).take(MAX_RESULTS).map(::choice),
+                    makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),
+                    maker = maker,
                     catalogSource = models.source,
                     maxCostPerTaskUsd = s.maxCostPerTaskUsd,
                     dailyCapUsd = s.dailyCapUsd,
                     learn = s.learnFromTasks,
                     useClaude = (s.provider == ModelProvider.ClaudeOAuth),
+                    provider = s.provider.id,
+                    showsCost = s.provider.reportsCurrencyCost,
                     claudeConnected = s.hasClaudeAccount,
                     claudeSigningIn = auth.signingIn,
                     claudeAwaitingCode = auth.awaitingCode,
@@ -130,7 +148,12 @@ public class SettingsPresenter(
     }
 
     public fun search(text: String) {
-        query.value = text
+        query.value = text to query.value.second
+    }
+
+    /** Shows one maker's models (null: all). */
+    public fun filterMaker(maker: String?) {
+        query.value = query.value.first to maker
     }
 
     /** Values are brought into range by the settings (0.005 to 5 dollars). */
@@ -142,6 +165,7 @@ public class SettingsPresenter(
     public fun setLearn(on: Boolean): Unit = settings.update { it.copy(learnFromTasks = on) }
 
     private companion object {
-        const val MAX_RESULTS = 20
+        const val MAX_RESULTS = 40
+        const val MAX_MAKERS = 6
     }
 }

@@ -84,12 +84,14 @@ class ModeGraph(platform: PlatformServices) {
     val claude: ClaudeAccount = ClaudeAccount(settings.claudeCredentials, ClaudeOAuth(platform.http))
     private val router = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
     private val claudeClient = ClaudeOAuthClient(platform.http, token = { force -> claude.accessToken(force) })
-    private val llm = ProviderClients(mapOf(ModelProvider.OpenRouter to router, ModelProvider.ClaudeOAuth to claudeClient))
-
     /** "Continue with ChatGPT": the account and the plan's Responses API. */
-    val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount =
-        com.piyush.mode.feature.settings.data.ChatGptAccount(com.piyush.mode.llm.ChatGptAuth(platform.http), platform.secrets)
+    val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount = com.piyush.mode.feature.settings.data.ChatGptAccount(
+        com.piyush.mode.llm.ChatGptAuth(platform.http), platform.secrets, onChange = { settings.accountsChanged() },
+    )
     private val chatGptLlm = com.piyush.mode.llm.ResponsesClient(platform.http, accessToken = { chatGpt.accessToken() })
+    private val llm = ProviderClients(
+        mapOf(ModelProvider.OpenRouter to router, ModelProvider.ClaudeOAuth to claudeClient, ModelProvider.ChatGpt to chatGptLlm),
+    )
     /** What Mode remembers about the user, skills and app tips; on this iPhone only. */
     val memory: MemoryRepository = MemoryRepository(database)
 

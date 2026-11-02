@@ -58,3 +58,29 @@ public struct ModeBadge: View {
         }
     }
 }
+
+/// A filter to switch on or off in a row of them ("All", "Anthropic", "OpenAI").
+public struct ModeFilterChip: View {
+    private let title: String
+    private let selected: Bool
+    private let action: () -> Void
+
+    public init(_ title: String, selected: Bool, action: @escaping () -> Void) {
+        self.title = title
+        self.selected = selected
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) {
+            Text(title)
+                .modeText(.subheadline, color: selected ? ModeColor.onAccent : ModeColor.textPrimary)
+                .fontWeight(.semibold)
+                .padding(.horizontal, ModeSpacing.l)
+                .frame(minHeight: ModeSize.touch)
+        }
+        .buttonStyle(.plain)
+        .background(selected ? ModeColor.accent : ModeColor.card, in: .capsule)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+}

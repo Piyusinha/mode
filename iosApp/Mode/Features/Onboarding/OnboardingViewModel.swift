@@ -274,7 +274,9 @@ final class OnboardingViewModel {
     }
 
     private static func choice(_ m: ModelChoice, selected: Bool) -> Choice {
-        Choice(id: m.id, name: m.name, tag: tag(m.tag), detail: [m.note.isEmpty ? nil : m.note, L10n.Setup.perTask(Format.money(m.costPerTaskUsd))].compactMap { $0 }.joined(separator: " · "),
+        Choice(id: m.id, name: m.name, tag: tag(m.tag), detail: [m.note.isEmpty ? nil : m.note,
+                                                                     // A plan pays (ChatGPT, Claude): no price per task to show.
+                                                                     m.costPerTaskUsd > 0 ? L10n.Setup.perTask(Format.money(m.costPerTaskUsd)) : String(localized: L10n.Settings.onYourPlan)].compactMap { $0 }.joined(separator: " · "),
                leading: maker(m.id), selected: selected)
     }
 

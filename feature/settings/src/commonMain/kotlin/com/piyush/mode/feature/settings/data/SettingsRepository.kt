@@ -40,7 +40,13 @@ public class SettingsRepository(
     public fun hasAccess(provider: ModelProvider): Boolean = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey
         ModelProvider.ClaudeOAuth -> claudeCredentials.connected.value
+        ModelProvider.ChatGpt -> hasChatGpt()
     }
+
+    /** A sign-in or sign-out happened outside this repository (ChatGptAccount): readiness changes. */
+    public fun accountsChanged() { refreshAccounts() }
+
+    private fun hasChatGpt(): Boolean = !secrets.get(ChatGptAccount.CONNECTED_KEY).isNullOrBlank()
 
     /** Each provider retains its own model selections, including an explicitly disabled strong model. */
     public fun selectProvider(provider: ModelProvider) {
@@ -117,6 +123,7 @@ public class SettingsRepository(
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
             provider = ModelProvider.fromId(prefs.getString(PROVIDER)),
             hasClaudeAccount = claudeCredentials.connected.value,
+            hasChatGptAccount = hasChatGpt(),
         ).validated()
     }
 
