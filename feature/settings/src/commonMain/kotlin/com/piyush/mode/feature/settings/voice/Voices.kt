@@ -103,18 +103,23 @@ public class Voices(
         }
     }
 
-    /** One recording, then each ready hearer, in order. */
-    public suspend fun hear(): Heard {
+    /**
+     * One recording, then each ready hearer, in order. With Apple ready, its transcription runs live while the
+     * user speaks: [onPartial] gets the words so far (the screen shows them), and its final text needs no second
+     * pass. The same recording goes to Soniox or Deepgram if Apple heard nothing.
+     */
+    public suspend fun hear(onPartial: (String) -> Unit = {}): Heard {
         val ready = order(hearing = true).filter { block(it, hearing = true) == null }
         if (ready.isEmpty()) return Heard.Nothing
-        val path = device.recordOnce(MAX_RECORD_MS, SILENCE_MS) ?: return Heard.Silence
+        val heard = device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = VoiceKind.Apple in ready, onPartial)
+        val path = heard.path ?: return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim())
         return try {
             val deadline = TimeSource.Monotonic.markNow() + TOTAL_HEAR
             for (kind in ready) {
                 if (deadline.hasPassedNow()) break
                 val text = withTimeoutOrNull(PER_HEAR) {
                     when (kind) {
-                        VoiceKind.Apple -> device.transcribeApple(path)
+                        VoiceKind.Apple -> heard.text ?: device.transcribeApple(path)
                         VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
                         VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
                         else -> null

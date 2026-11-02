@@ -490,11 +490,18 @@ struct VoicePickerScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .safeAreaInset(edge: .bottom) {
-            if let name = state.selectedName {
-                ModeButton(LocalizedStringResource(stringLiteral: L10n.Voice.use(name)), fullWidth: true) { onEvent(.use); done() }
-                    .padding(.horizontal, ModeSpacing.screenEdge)
-                    .padding(.bottom, ModeSpacing.s)
+            VStack(spacing: ModeSpacing.m) {
+                if let playing = state.voices.first(where: { $0.id == state.playing }) {
+                    ModeNowPlaying(name: playing.name, title: L10n.Voice.isSpeaking(playing.name), line: String(localized: L10n.Voice.sampleLine))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                if let name = state.selectedName {
+                    ModeButton(LocalizedStringResource(stringLiteral: L10n.Voice.use(name)), fullWidth: true) { onEvent(.use); done() }
+                }
             }
+            .padding(.horizontal, ModeSpacing.screenEdge)
+            .padding(.bottom, ModeSpacing.s)
+            .animation(ModeMotion.standard, value: state.playing)
         }
         .modeScreen()
         .navigationTitle(Text(L10n.Voice.chooseVoice))
@@ -541,12 +548,15 @@ struct VoicePickerScreen: View {
                 Text(L10n.Voice.noMatch).modeText(.callout, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
             } else {
                 ModeCard {
-                    ForEach(state.voices) { v in
-                        ModeVoiceRow(name: v.name, traits: v.traits, tag: v.tag, selected: v.id == state.selected, onSelect: { onEvent(.select(v.id)) }) {
-                            ModePlayButton(L10n.Voice.play(v.name), playing: state.playing == v.id) { onEvent(.play(v.id)) }
+                    VStack(spacing: ModeSpacing.xxs) {
+                        ForEach(state.voices) { v in
+                            ModeVoiceRow(name: v.name, traits: v.traits, tag: v.tag, selected: v.id == state.selected, playing: state.playing == v.id,
+                                         playLabel: L10n.Voice.play(v.name), onSelect: { onEvent(.select(v.id)) }, onPlay: { onEvent(.play(v.id)) })
                         }
                     }
+                    .padding(.vertical, ModeSpacing.s)
                 }
+                Text(L10n.Voice.pickerNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
             }
         }
     }
@@ -564,133 +574,5 @@ struct VoicePickerRoute: View {
         VoicePickerScreen(state: model.state, query: $model.query, onEvent: model.send) { dismiss() }
             .sheet(item: $model.linking) { service in VoiceKeySheet(service: service) { model.send(.saveKey($0)) } }
             .onDisappear { model.stop() }
-    }
-}
-
-// MARK: - Start Mode
-
-@MainActor
-@Observable
-final class ListenModel {
-    struct State: Equatable {
-        var phase: ListenPhase = .listening
-        var transcript = ""
-        var reply = ""
-        var listener: VoiceService?
-        var speaker: VoiceService?
-        var voiceName: String?
-        var sent = false
-    }
-
-    private(set) var state = State()
-    private let presenter: ListenPresenter
-    private var updates: Updates?
-
-    init(screens: Screens) {
-        presenter = screens.listen()
-        updates = observe(presenter.state) { [weak self] s in
-            self?.state = State(phase: s.phase, transcript: s.transcript, reply: s.reply, listener: VoiceService(id: s.listener),
-                                speaker: VoiceService(id: s.speaker), voiceName: s.voiceName, sent: s.sent)
-        }
-    }
-
-    func begin() { presenter.begin() }
-    func finish() { presenter.finish() }
-    func typeInstead() { presenter.typeInstead() }
-    func submit(_ text: String) { presenter.submitTyped(text: text) }
-    func stop() { presenter.stop() }
-    func close() { if !state.sent { presenter.stop() } }
-
-    isolated deinit {
-        updates?.cancel()
-        presenter.close()
-    }
-}
-
-/// "Start Mode": the orb while listening, what was heard, and Mode saying what it will do.
-struct ListenSheet: View {
-    @State private var model: ListenModel
-    @State private var typed = ""
-    @FocusState private var typing: Bool
-    @Environment(\.dismiss) private var dismiss
-
-    init(app: AppModel) {
-        _model = State(initialValue: ListenModel(screens: app.screens))
-    }
-
-    var body: some View {
-        let s = model.state
-        VStack(spacing: ModeSpacing.xl) {
-            HStack {
-                Spacer()
-                ModeToolbarButton(.close, label: L10n.Voice.close) { model.close(); dismiss() }
-            }
-            Text(s.phase == .heard ? L10n.Voice.gotIt : s.phase == .typing ? L10n.Voice.typeInstead : L10n.Voice.listening).modeText(.headline)
-            ModeVoiceOrb(speaking: s.phase == .heard).padding(.vertical, ModeSpacing.xxl)
-            if let chip = sourceChip(s) {
-                HStack(spacing: ModeSpacing.s) {
-                    ModeLeadingView(chip.0.tile).scaleEffect(0.6).frame(width: ModeSize.icon, height: ModeSize.icon)
-                    Text(chip.1).modeText(.captionEmphasis)
-                }
-                .padding(.horizontal, ModeSpacing.m)
-                .padding(.vertical, ModeSpacing.xs)
-                .background(ModeColor.card, in: .capsule)
-            }
-            switch s.phase {
-            case .listening:
-                Text(L10n.Voice.sayIt).modeText(.title, color: ModeColor.textSecondary).multilineTextAlignment(.center)
-                Text(L10n.Voice.stopsWhenQuiet).modeText(.subheadline, color: ModeColor.textSecondary)
-            case .heard:
-                Text(s.transcript).modeText(.title).multilineTextAlignment(.center)
-                HStack(spacing: ModeSpacing.s) {
-                    ModeIcon.speaker.image.foregroundStyle(ModeColor.tint).accessibilityHidden(true)
-                    Text(s.reply).modeText(.body)
-                }
-                .padding(.horizontal, ModeSpacing.l)
-                .padding(.vertical, ModeSpacing.m)
-                .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
-            default:
-                TextField(text: $typed, axis: .vertical) { Text(L10n.Voice.typeTask) }
-                    .modeText(.title2)
-                    .multilineTextAlignment(.center)
-                    .focused($typing)
-                    .submitLabel(.send)
-                    .onSubmit { model.submit(typed) }
-            }
-            Spacer(minLength: 0)
-            buttons(s)
-        }
-        .padding(.horizontal, ModeSpacing.screenEdge)
-        .padding(.bottom, ModeSpacing.s)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modeScreen()
-        .task { model.begin() }
-        .onChange(of: s.phase) { _, phase in typing = phase == .typing }
-    }
-
-    @ViewBuilder private func buttons(_ s: ListenModel.State) -> some View {
-        switch s.phase {
-        case .listening:
-            HStack(spacing: ModeSpacing.m) {
-                ModeButton(L10n.Voice.typeInstead, icon: .keyboard, role: .secondary, fullWidth: true) { typed = ""; model.typeInstead() }
-                ModeButton(L10n.Voice.done, fullWidth: true) { model.finish() }
-            }
-        case .heard:
-            VStack(spacing: ModeSpacing.m) {
-                Text(L10n.Voice.carriesOn).modeText(.footnote, color: ModeColor.textSecondary).multilineTextAlignment(.center)
-                ModeButton(L10n.Voice.stop, role: .secondary, fullWidth: true) { model.stop(); dismiss() }
-            }
-        default:
-            ModeButton(L10n.Voice.send, fullWidth: true) { model.submit(typed) }
-                .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-    }
-
-    private func sourceChip(_ s: ListenModel.State) -> (VoiceService, String)? {
-        switch s.phase {
-        case .listening: s.listener.map { ($0, L10n.Voice.listeningWith($0.title)) }
-        case .heard: s.speaker.map { ($0, L10n.Voice.speakingAs(s.voiceName ?? $0.title)) }
-        default: nil
-        }
     }
 }

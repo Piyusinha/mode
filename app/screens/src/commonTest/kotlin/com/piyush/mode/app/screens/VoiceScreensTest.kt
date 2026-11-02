@@ -40,4 +40,12 @@ class VoiceScreensTest {
         assertEquals("Let me check.", ListenPresenter.replyLine("what's on my calendar today?"))
         assertEquals("On it.", ListenPresenter.replyLine("please"))
     }
+
+    @Test
+    fun modeGreetsByNameAndTimeOfDay() {
+        assertEquals("Hey Piyush, good evening. What do you want me to do?", ListenPresenter.greetingLine("Piyush Sinha", 19))
+        assertEquals("Hey Piyush, good morning. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 8))
+        assertEquals("Hey, good afternoon. What do you want me to do?", ListenPresenter.greetingLine(null, 14))
+        assertEquals("Hey Piyush. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 1), "late at night: no greeting for the hour")
+    }
 }

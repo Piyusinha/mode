@@ -98,6 +98,7 @@ public enum ModeSize {
 
     /// Voice: the play button on a voice, the voice card's logo, the wave's bar, the listening orb and its rings.
     public static let playButton: CGFloat = 40
+    public static let voiceAvatar: CGFloat = 46
     public static let voiceLogo: CGFloat = 52
     public static let waveBar: CGFloat = 3
     public static let waveHeight: CGFloat = 18
@@ -105,6 +106,13 @@ public enum ModeSize {
     public static let orbRing: CGFloat = 26
     public static let setupOrb: CGFloat = 88
     public static let dragHandle: CGFloat = 16
+    /// Talking mode: the orb, the voice's bars, the big mic and the round buttons beside it.
+    public static let talkOrb: CGFloat = 180
+    public static let talkOrbSmall: CGFloat = 112
+    public static let talkWave: CGFloat = 36
+    public static let talkMic: CGFloat = 76
+    public static let talkSide: CGFloat = 52
+    public static let talkSideWidth: CGFloat = 88
 
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520

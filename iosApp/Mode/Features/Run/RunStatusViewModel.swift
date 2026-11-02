@@ -23,10 +23,14 @@ final class RunStatusViewModel {
         var allowAlways = false
         /** A PIN or password only the user can enter: "I've entered it". */
         var yourTurn = false
+        /** Asked out loud in talking mode, which answers it. */
+        var spoken = false
     }
 
     struct State: Equatable {
         var running: Running?
+        /// Mode came forward to ask out loud: talking mode is on screen.
+        var talking = false
         var question: PendingQuestion?
     }
 
@@ -53,9 +57,10 @@ final class RunStatusViewModel {
         guard let running = s.running else { return State() }
         return State(
             running: Running(title: running.text, status: running.paused ? String(localized: L10n.Run.paused) : running.status, paused: running.paused),
+            talking: running.talking,
             question: running.question.map {
                 PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo, options: $0.options, recommended: $0.recommended,
-                                allowAlways: $0.allowAlways, yourTurn: $0.yourTurn)
+                                allowAlways: $0.allowAlways, yourTurn: $0.yourTurn, spoken: $0.spoken)
             }
         )
     }

@@ -57,7 +57,11 @@ struct MainTabs: View {
             }
         }
         .sheet(isPresented: $showingLive) { NavigationStack { LiveRoute(app: app) } }
-        .sheet(isPresented: $showingListen) { ListenSheet(app: app) }
+        // Talking mode: "Start Mode", and a question in a spoken task (Mode came forward to ask it out loud).
+        .fullScreenCover(isPresented: Binding(get: { showingListen || run.state.talking },
+                                              set: { if !$0 { showingListen = false } })) {
+            TalkRoute(app: app, forQuestion: !showingListen) { showingListen = false }
+        }
         .sheet(isPresented: $showingAsk) {
             AskRoute(app: app) { conversation in
                 showingAsk = false
@@ -65,7 +69,7 @@ struct MainTabs: View {
                 paths[.home, default: []].append(.conversation(id: conversation))
             }
         }
-        .sheet(item: Binding(get: { run.state.question }, set: { _ in })) { question in
+        .sheet(item: Binding(get: { run.state.question.flatMap { $0.spoken ? nil : $0 } }, set: { _ in })) { question in
             QuestionSheet(question: question, onAnswer: run.answer, onStop: run.stopFromQuestion)
         }
         .onOpenURL { url in DeepLink(url).map(open) }

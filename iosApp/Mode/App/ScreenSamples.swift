@@ -9,9 +9,23 @@ struct ScreenSample: Identifiable {
     /// "chatgpt-bottom": the same screen, scrolled to its end.
     var bottom: Bool { id.hasSuffix("-bottom") }
 
+    private func talk(_ state: TalkModel.State, level: Double, speaking: Bool) -> some View {
+        TalkScreen(state: state, level: level, speaking: speaking, typingAnswer: false, typed: .constant(""),
+                   onAllowMic: {}, onDone: {}, onType: {}, onSend: {}, onAnswer: { _ in }, onLater: {}, onStop: {}, onClose: {})
+    }
+
     @ViewBuilder var screen: some View {
         switch id.replacingOccurrences(of: "-bottom", with: "") {
         case "plan": PlanModelsScreen(state: Self.plan, onEvent: { _ in })
+        case "talk-mic": talk(.init(phase: .needsMic), level: 0, speaking: false)
+        case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
+                                 level: 0.7, speaking: false)
+        case "talk-start": talk(.init(phase: .starting, task: "Order my usual from Swiggy", reply: "I'll order my usual from Swiggy.", working: "Opening Swiggy"),
+                                level: 0, speaking: true)
+        case "talk-question": talk(.init(phase: .answering, forming: "Large", task: "Order my usual from Swiggy", question: "Medium or Large?",
+                                         options: ["Medium · ₹249", "Large · ₹399"]), level: 0.5, speaking: false)
+        case "talk-answered": talk(.init(phase: .answered, task: "Order my usual from Swiggy", answer: "Large", answerReply: "Got it. Going back."),
+                                   level: 0, speaking: true)
         case "claude": detail(Self.claude)
         case "openrouter": detail(Self.openRouter)
         default: detail(Self.chatGPT)
@@ -86,6 +100,10 @@ struct ScreenSampleHost: View {
     @State private var path = [0]
 
     var body: some View {
+        if sample.id.hasPrefix("talk") { sample.screen } else { stacked }
+    }
+
+    private var stacked: some View {
         NavigationStack(path: $path) {
             Color.clear.navigationTitle(Text(L10n.Common.settings))
                 .navigationDestination(for: Int.self) { _ in

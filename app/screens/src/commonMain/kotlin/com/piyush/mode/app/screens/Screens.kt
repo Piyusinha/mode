@@ -77,7 +77,11 @@ public class Screens(
         )
 
     public fun listen(): com.piyush.mode.app.screens.settings.ListenPresenter =
-        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue)
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock)
+
+    /** Talking mode for a question in a spoken task: Mode came forward to ask it out loud. */
+    public fun talkQuestion(): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, forQuestion = true)
 
     public fun access(): com.piyush.mode.app.screens.settings.AccessPresenter =
         com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)

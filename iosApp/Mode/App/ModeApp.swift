@@ -58,7 +58,9 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
                 self?.speak(text, voiceId: voiceId, speed: speed.doubleValue) { done(KotlinBoolean(bool: $0)) }
             },
             voices: { [weak self] in self?.voiceOptions() ?? [] },
-            finish: { [weak self] in if self?.recordDone != nil { self?.finishRecord() } },
+            finish: { [weak self] in
+                if LiveListener.shared.active { LiveListener.shared.finishNow() } else if self?.recordDone != nil { self?.finishRecord() }
+            },
             play: { [weak self] bytes, done in self?.play(bytes) { done(KotlinBoolean(bool: $0)) } },
             record: { [weak self] maxMs, silenceMs, done in
                 self?.record(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value) { _ = done($0) }
@@ -66,7 +68,11 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
             transcribe: { [weak self] path, done in _Concurrency.Task { let text = await self?.transcribe(path); done(text) } },
             deleteRecording: { path in try? FileManager.default.removeItem(atPath: path) },
             cancel: { [weak self] in self?.cancel() },
-            prepare: { [weak self] in _Concurrency.Task { await self?.prepareHearing(ask: true) } }
+            prepare: { [weak self] in _Concurrency.Task { await self?.prepareHearing(ask: true) } },
+            listen: { maxMs, silenceMs, live, partial, done in
+                LiveListener.shared.start(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value, live: live.boolValue,
+                                          partial: { _ = partial($0) }, done: { _ = done($0, $1) })
+            }
         )
         // Only reads where things stand: the microphone prompt waits until the user turns Apple hearing on.
         _Concurrency.Task { await prepareHearing(ask: false) }
@@ -108,6 +114,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         if let voiceId, let voice = AVSpeechSynthesisVoice(identifier: voiceId) { line.voice = voice }
         let rate = Double(AVSpeechUtteranceDefaultSpeechRate) * speed
         line.rate = Float(min(max(rate, Double(AVSpeechUtteranceMinimumSpeechRate)), Double(AVSpeechUtteranceMaximumSpeechRate)))
+        VoiceLevel.shared.speaking = true
         synth.speak(line)
     }
 
@@ -163,6 +170,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     }
 
     private func finishSpeaking(_ soundStarted: Bool) {
+        VoiceLevel.shared.speaking = false
         guard let done = speakDone else { return }
         speakDone = nil
         VoiceAudio.shared.done()
@@ -176,6 +184,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         player = try? AVAudioPlayer(data: bytes.toData())
         player?.delegate = self
         guard player?.play() == true else { VoiceAudio.shared.done(); done(false); return }
+        VoiceLevel.shared.speaking = true
         playDone = done
     }
 
@@ -188,6 +197,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     }
 
     private func finishPlaying() {
+        VoiceLevel.shared.speaking = false
         guard let done = playDone else { return }
         playDone = nil
         VoiceAudio.shared.done()
@@ -239,6 +249,8 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     }
 
     private func cancel() {
+        LiveListener.shared.cancel()
+        VoiceLevel.shared.speaking = false
         poll?.invalidate()
         let wasRecording = recordDone != nil
         recorder?.stop()

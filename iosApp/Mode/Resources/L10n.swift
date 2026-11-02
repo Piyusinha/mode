@@ -537,6 +537,45 @@ enum L10n {
         static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
     }
 
+    enum Talk {
+        static let listening = LocalizedStringResource("talk.listening", defaultValue: "Listening")
+        static let speaking = LocalizedStringResource("talk.speaking", defaultValue: "Mode is speaking")
+        static let working = LocalizedStringResource("talk.working", defaultValue: "Working")
+        static let needsYou = LocalizedStringResource("talk.needsYou", defaultValue: "Mode needs you")
+        static let gotIt = LocalizedStringResource("talk.gotIt", defaultValue: "Got it")
+        static let startMode = LocalizedStringResource("talk.startMode", defaultValue: "Start Mode")
+        static let typeIt = LocalizedStringResource("talk.typeIt", defaultValue: "Type it")
+        static let hearingLive = LocalizedStringResource("talk.hearingLive", defaultValue: "Hearing you live")
+        static let sayIt = LocalizedStringResource("talk.sayIt", defaultValue: "Say what you want done")
+        static let wordsAppear = LocalizedStringResource("talk.wordsAppear", defaultValue: "Your words appear as you speak. Mode stops when you pause.")
+        static let micOpensAfter = LocalizedStringResource("talk.micOpensAfter", defaultValue: "The mic opens as soon as Mode stops talking.")
+        static let type = LocalizedStringResource("talk.type", defaultValue: "Type")
+        static let cancel = LocalizedStringResource("talk.cancel", defaultValue: "Cancel")
+        static let done = LocalizedStringResource("talk.done", defaultValue: "Done")
+        static let later = LocalizedStringResource("talk.later", defaultValue: "Later")
+        static let speak = LocalizedStringResource("talk.speak", defaultValue: "Speak")
+        static let stop = LocalizedStringResource("talk.stop", defaultValue: "Stop")
+        static let close = LocalizedStringResource("talk.close", defaultValue: "Close")
+        static let workingOnIt = LocalizedStringResource("talk.workingOnIt", defaultValue: "Working on it")
+        static let inBackground = LocalizedStringResource("talk.inBackground", defaultValue: "Mode works in the background")
+        static let ifNeeded = LocalizedStringResource("talk.ifNeeded", defaultValue: "If Mode needs you, it comes back here and asks out loud. You answer by voice and it carries on.")
+        static let sayOrTap = LocalizedStringResource("talk.sayOrTap", defaultValue: "Say your answer, or tap one.")
+        static let sayAnswer = LocalizedStringResource("talk.sayAnswer", defaultValue: "Say your answer.")
+        static let leavesSoon = LocalizedStringResource("talk.leavesSoon", defaultValue: "Mode goes back to the app by itself in a moment.")
+        static let modeLabel = LocalizedStringResource("talk.modeLabel", defaultValue: "MODE")
+        static let modeSpeaking = LocalizedStringResource("talk.modeSpeaking", defaultValue: "MODE · SPEAKING")
+        static let micTitle = LocalizedStringResource("talk.micTitle", defaultValue: "Let Mode hear you")
+        static let micMessage = LocalizedStringResource("talk.micMessage", defaultValue: "Allow the microphone once. Mode listens only after you say “Start Mode” or tap the mic, and Apple turns your words into text on this iPhone.")
+        static let micModel = LocalizedStringResource("talk.micModel", defaultValue: "First time only: Apple downloads its speech model.")
+        static let micDenied = LocalizedStringResource("talk.micDenied", defaultValue: "The microphone is off for Mode. Turn it on in iPhone Settings → Mode.")
+        static let allowMic = LocalizedStringResource("talk.allowMic", defaultValue: "Allow microphone")
+        static let openSettings = LocalizedStringResource("talk.openSettings", defaultValue: "Open Settings")
+        static let typeInstead = LocalizedStringResource("talk.typeInstead", defaultValue: "Type instead")
+        static let typeTask = LocalizedStringResource("talk.typeTask", defaultValue: "Type what you want done")
+        static let typeAnswer = LocalizedStringResource("talk.typeAnswer", defaultValue: "Type your answer")
+        static let send = LocalizedStringResource("talk.send", defaultValue: "Send")
+    }
+
     enum Voice {
         static let speech = LocalizedStringResource("voice.speech", defaultValue: "Speech")
         static let hearing = LocalizedStringResource("voice.hearing", defaultValue: "Hearing")
@@ -623,6 +662,8 @@ enum L10n {
         static let tryAgain = LocalizedStringResource("voice.tryAgain", defaultValue: "Try again")
         static let noMatch = LocalizedStringResource("voice.noMatch", defaultValue: "No voice matches. Try another word.")
         static func use(_ name: String) -> String { String(localized: "voice.use", defaultValue: "Use \(name)") }
+        static func isSpeaking(_ name: String) -> String { String(localized: "voice.isSpeaking", defaultValue: "\(name) is speaking") }
+        static let pickerNote = LocalizedStringResource("voice.pickerNote", defaultValue: "Tap a voice to choose it. Tap ▶ to hear it; tap again to stop.")
         static func play(_ name: String) -> String { String(localized: "voice.play", defaultValue: "Play \(name)") }
         // Connect a key
         static func connect(_ provider: String) -> String { String(localized: "voice.connect", defaultValue: "Connect \(provider)") }
