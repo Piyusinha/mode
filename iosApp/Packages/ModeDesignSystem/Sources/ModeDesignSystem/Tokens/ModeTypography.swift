@@ -1,8 +1,9 @@
 import CoreText
 import SwiftUI
 
-/// Mode's type scale. Headings use Instrument Sans (SIL Open Font License,
-/// Resources/Fonts/OFL.txt); body text uses SF Pro. Every style scales with the
+/// Mode's type scale. Only page titles use Instrument Sans (SIL Open Font License,
+/// Resources/Fonts/OFL.txt), the brand moment; everything else, section and sheet headings
+/// included, uses SF Pro, so a screen reads as one family. Every style scales with the
 /// iPhone's text size.
 public enum ModeTextStyle: CaseIterable, Sendable {
     case largeTitle, title, title2, headline, body, bodyEmphasis, callout, subheadline, footnote, caption, captionEmphasis
@@ -11,8 +12,8 @@ public enum ModeTextStyle: CaseIterable, Sendable {
         switch self {
         case .largeTitle: ModeTypography.display(.largeTitle, weight: .bold)
         case .title: ModeTypography.display(.title, weight: .bold)
-        case .title2: ModeTypography.display(.title2, weight: .semibold)
-        case .headline: ModeTypography.display(.headline, weight: .semibold)
+        case .title2: .title2.weight(.bold)
+        case .headline: .headline
         case .body: .body
         case .bodyEmphasis: .body.weight(.semibold)
         case .callout: .callout
