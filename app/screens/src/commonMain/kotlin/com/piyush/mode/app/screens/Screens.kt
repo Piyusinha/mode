@@ -69,6 +69,13 @@ public class Screens(
     public fun voice(hearing: Boolean): com.piyush.mode.app.screens.settings.VoicePresenter =
         com.piyush.mode.app.screens.settings.VoicePresenter(scope, settings, voices!!, hearing)
 
+    /** Choose a voice, starting on [provider] (Apple, ElevenLabs, Fish Audio). */
+    public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
+        com.piyush.mode.app.screens.settings.VoicePickerPresenter(
+            scope, settings, voices!!,
+            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple,
+        )
+
     public fun listen(): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue)
 
@@ -100,7 +107,10 @@ public class Screens(
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
-    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
+    public fun settings(): SettingsPresenter = SettingsPresenter(
+        scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() },
+        chatGptModels = { chatGpt.knownModels.value }, voices = voices,
+    )
 
     /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
     public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =
@@ -111,7 +121,10 @@ public class Screens(
             settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         }
 
-    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(
+        scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle,
+        claudeModels = { claudeModels?.known?.value.orEmpty() }, chatGptModels = { chatGpt.knownModels.value }, voices = voices,
+    )
 
     /** Whether first-run setup still has to be shown. */
     public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone

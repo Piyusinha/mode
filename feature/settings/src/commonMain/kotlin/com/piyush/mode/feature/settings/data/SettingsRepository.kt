@@ -7,6 +7,8 @@ import com.piyush.mode.core.storage.KeyValueStore
 import com.piyush.mode.core.storage.SecretStore
 import com.piyush.mode.feature.settings.domain.ModeSettings
 import com.piyush.mode.feature.settings.domain.RiskConfirmation
+import com.piyush.mode.feature.settings.domain.SpeechSpeed
+import com.piyush.mode.feature.settings.domain.VoiceChoice
 import com.piyush.mode.feature.settings.domain.VoiceKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -104,6 +106,10 @@ public class SettingsRepository(
         prefs.putString(ONBOARDING_DONE, next.onboardingDone.toString())
         prefs.putString(SPEECH_ORDER, next.speechOrder.joinToString(","))
         prefs.putString(HEARING_ORDER, next.hearingOrder.joinToString(","))
+        prefs.putString(TALK_BACK, next.talkBack.toString())
+        prefs.putString(SPEAK_RESULT, next.speakResult.toString())
+        prefs.putString(SPEECH_SPEED, next.speechSpeed.id)
+        prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
 
@@ -156,6 +162,12 @@ public class SettingsRepository(
             onboardingDone = prefs.getString(ONBOARDING_DONE)?.toBooleanStrictOrNull() ?: defaults.onboardingDone,
             speechOrder = prefs.getString(SPEECH_ORDER)?.split(',')?.filter { it.isNotBlank() } ?: defaults.speechOrder,
             hearingOrder = prefs.getString(HEARING_ORDER)?.split(',')?.filter { it.isNotBlank() } ?: defaults.hearingOrder,
+            talkBack = prefs.getString(TALK_BACK)?.toBooleanStrictOrNull() ?: defaults.talkBack,
+            speakResult = prefs.getString(SPEAK_RESULT)?.toBooleanStrictOrNull() ?: defaults.speakResult,
+            speechSpeed = SpeechSpeed.fromId(prefs.getString(SPEECH_SPEED)),
+            voices = prefs.getString(VOICES)?.let {
+                runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
+            } ?: defaults.voices,
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
             provider = ModelProvider.fromId(prefs.getString(PROVIDER)),
             hasClaudeAccount = claudeCredentials.connected.value,
@@ -185,6 +197,10 @@ public class SettingsRepository(
         const val ONBOARDING_DONE = "onboarding_done"
         const val SPEECH_ORDER = "speech_order"
         const val HEARING_ORDER = "hearing_order"
+        const val TALK_BACK = "voice_talk_back"
+        const val SPEAK_RESULT = "voice_speak_result"
+        const val SPEECH_SPEED = "voice_speech_speed"
+        const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"
     }

@@ -18,6 +18,19 @@ public enum class VoiceKind(public val id: String, public val needsKey: Boolean)
     }
 }
 
+/** A voice picked from a provider's list: its id there (Apple's identifier, ElevenLabs' voice_id, Fish Audio's model id) and its name. */
+@kotlinx.serialization.Serializable
+public data class VoiceChoice(val id: String, val name: String)
+
+/** How fast Mode talks; [factor] scales each provider's normal speed. */
+public enum class SpeechSpeed(public val id: String, public val factor: Double) {
+    Slower("slower", 0.85), Normal("normal", 1.0), Faster("faster", 1.15);
+
+    public companion object {
+        public fun fromId(id: String?): SpeechSpeed = entries.firstOrNull { it.id == id } ?: Normal
+    }
+}
+
 /** Why a row cannot be used yet. Null means ready. */
 public enum class VoiceBlock {
     NoKey,

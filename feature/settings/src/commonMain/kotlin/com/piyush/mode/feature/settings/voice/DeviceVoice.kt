@@ -11,7 +11,12 @@ public object DeviceVoice {
     public var speechReady: () -> Boolean = { false }
     /** ready, permission, denied, unsupported, or asset. */
     public var hearingState: () -> String = { "unsupported" }
-    public var speak: ((String, (Boolean) -> Unit) -> Unit)? = null
+    /** Says a line in a voice (Apple's identifier; null: the system default) at a speed factor (1 = normal). */
+    public var speak: ((String, String?, Double, (Boolean) -> Unit) -> Unit)? = null
+    /** Apple's voices on this iPhone (Personal Voice too, once allowed). */
+    public var voices: () -> List<VoiceOption> = { emptyList() }
+    /** Ends the recording now, keeping what was said. */
+    public var finish: () -> Unit = {}
     public var play: ((ByteArray, (Boolean) -> Unit) -> Unit)? = null
     /** A file path, or null when nobody spoke or the user cancelled. */
     public var record: ((Long, Long, (String?) -> Unit) -> Unit)? = null
@@ -25,7 +30,9 @@ public object DeviceVoice {
     public fun install(
         speechReady: () -> Boolean,
         hearingState: () -> String,
-        speak: (String, (Boolean) -> Unit) -> Unit,
+        speak: (String, String?, Double, (Boolean) -> Unit) -> Unit,
+        voices: () -> List<VoiceOption>,
+        finish: () -> Unit,
         play: (ByteArray, (Boolean) -> Unit) -> Unit,
         record: (Long, Long, (String?) -> Unit) -> Unit,
         transcribe: (String, (String?) -> Unit) -> Unit,
@@ -36,6 +43,8 @@ public object DeviceVoice {
         this.speechReady = speechReady
         this.hearingState = hearingState
         this.speak = speak
+        this.voices = voices
+        this.finish = finish
         this.play = play
         this.record = record
         this.transcribe = transcribe
@@ -44,7 +53,8 @@ public object DeviceVoice {
         this.prepare = prepare
     }
 
-    public suspend fun speakLine(text: String): Boolean = await { done -> speak?.invoke(text, done) ?: done(false) }
+    public suspend fun speakLine(text: String, voiceId: String? = null, speed: Double = 1.0): Boolean =
+        await { done -> speak?.invoke(text, voiceId, speed, done) ?: done(false) }
 
     public suspend fun playClip(bytes: ByteArray): Boolean = await { done -> play?.invoke(bytes, done) ?: done(false) }
 

@@ -29,8 +29,30 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.JsonArray
+import com.piyush.mode.feature.settings.domain.VoiceChoice
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+
+/**
+ * One voice a provider offers: its [id] there, a name, what it sounds like ("Female · English (India) · Premium"),
+ * the [group] it is filtered by (a language or an accent), a [preview] clip URL when the provider has one, and a
+ * short [tag] ("Free download", "Popular").
+ */
+public data class VoiceOption(
+    val id: String,
+    val name: String,
+    val traits: String = "",
+    val group: String? = null,
+    val preview: String? = null,
+    val tag: String? = null,
+)
+
+/** A provider's voices, or why they could not be listed (no key yet, refused). */
+public data class VoiceList(val options: List<VoiceOption>, val error: VoiceListError? = null)
+
+public enum class VoiceListError { NoKey, Failed }
 
 /** True when sound has started. A later failure must not say the line again. */
 public enum class Spoken { Started, NotStarted }
@@ -70,12 +92,7 @@ public class Voices(
         for (kind in order(hearing = false)) {
             if (block(kind, hearing = false) != null) continue
             val spoken = try {
-                when (kind) {
-                    VoiceKind.Apple -> if (device.speakLine(line)) Spoken.Started else Spoken.NotStarted
-                    VoiceKind.Fish -> cloudSpeak("https://api.fish.audio/v1/tts", settings.voiceKey(kind)!!, fish = true, line)
-                    VoiceKind.ElevenLabs -> cloudSpeak(ELEVEN, settings.voiceKey(kind)!!, fish = false, line)
-                    else -> Spoken.NotStarted
-                }
+                say(kind, settings.settings.value.voices[kind.id]?.id, line)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -112,12 +129,99 @@ public class Voices(
         }
     }
 
+    /** [line] in [voiceId] (null: the provider's default), at the user's speed. */
+    private suspend fun say(kind: VoiceKind, voiceId: String?, line: String): Spoken {
+        val speed = settings.settings.value.speechSpeed.factor
+        return when (kind) {
+            VoiceKind.Apple -> if (device.speakLine(line, voiceId, speed)) Spoken.Started else Spoken.NotStarted
+            VoiceKind.Fish -> cloudSpeak(FISH_TTS, settings.voiceKey(kind)!!, fish = true, line, voiceId, speed)
+            VoiceKind.ElevenLabs -> cloudSpeak(elevenUrl(voiceId), settings.voiceKey(kind)!!, fish = false, line, voiceId, speed)
+            else -> Spoken.NotStarted
+        }
+    }
+
+    /** The speech provider that would speak now (the first ready one), and the voice picked there. */
+    public fun speaker(): Pair<VoiceKind, VoiceChoice?>? =
+        order(hearing = false).firstOrNull { block(it, hearing = false) == null }?.let { it to settings.settings.value.voices[it.id] }
+
+    /** The hearing provider that would listen now (the first ready one). */
+    public fun listener(): VoiceKind? = order(hearing = true).firstOrNull { block(it, hearing = true) == null }
+
+    /** The voices [kind] offers: Apple's on this iPhone; ElevenLabs' library and Fish Audio's public voices with a key. */
+    public suspend fun options(kind: VoiceKind): VoiceList {
+        if (kind == VoiceKind.Apple) return VoiceList(device.voices())
+        val key = settings.voiceKey(kind) ?: return VoiceList(emptyList(), VoiceListError.NoKey)
+        return try {
+            VoiceList(if (kind == VoiceKind.ElevenLabs) elevenVoices(key) else fishVoices(key))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.log("voice", "${kind.id} voices could not be listed: ${e.message}")
+            VoiceList(emptyList(), VoiceListError.Failed)
+        }
+    }
+
+    /** Plays what [option] sounds like: the provider's own clip when it has one, else a sample line. */
+    public suspend fun preview(kind: VoiceKind, option: VoiceOption): Boolean = try {
+        val clip = option.preview?.let { url -> http.get(url).takeIf { it.status.isSuccess() }?.bodyAsBytes()?.takeIf { it.isNotEmpty() } }
+        if (clip != null) device.playClip(clip) else say(kind, option.id, SAMPLE) == Spoken.Started
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.log("voice", "${kind.id} preview failed: ${e.message}")
+        false
+    }
+
+    /** Stops whatever is playing or recording. */
+    public fun stop() { device.cancel() }
+
+    /** Ends the recording now (the user tapped Done): what was said so far is heard. */
+    public fun finishListening() { device.finish() }
+
+    private suspend fun elevenVoices(key: String): List<VoiceOption> {
+        val response = http.get("https://api.elevenlabs.io/v2/voices?page_size=100") { header("xi-api-key", key) }
+        if (!response.status.isSuccess()) error("HTTP ${response.status.value}")
+        val voices = json(response.bodyAsText())?.get("voices") as? JsonArray ?: return emptyList()
+        return voices.mapNotNull { v ->
+            val o = v as? JsonObject ?: return@mapNotNull null
+            val id = o["voice_id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val labels = o["labels"] as? JsonObject
+            fun label(k: String) = labels?.get(k)?.jsonPrimitive?.contentOrNull?.replace('_', ' ')?.trim()?.takeIf { it.isNotEmpty() }
+            VoiceOption(
+                id = id, name = o["name"]?.jsonPrimitive?.contentOrNull?.substringBefore(" - ")?.trim() ?: id,
+                traits = listOfNotNull(label("gender"), label("age"), label("accent"), label("descriptive") ?: label("description"))
+                    .joinToString(" · ") { it.replaceFirstChar(Char::uppercase) },
+                group = label("use_case")?.replaceFirstChar(Char::uppercase),
+                preview = o["preview_url"]?.jsonPrimitive?.contentOrNull,
+            )
+        }
+    }
+
+    private suspend fun fishVoices(key: String): List<VoiceOption> {
+        val response = http.get("https://api.fish.audio/model?page_size=40&sort_by=task_count") { header("Authorization", "Bearer $key") }
+        if (!response.status.isSuccess()) error("HTTP ${response.status.value}")
+        val items = json(response.bodyAsText())?.get("items") as? JsonArray ?: return emptyList()
+        return items.mapIndexedNotNull { i, v ->
+            val o = v as? JsonObject ?: return@mapIndexedNotNull null
+            val id = o["_id"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
+            val languages = (o["languages"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+            val uses = o["task_count"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            val sample = ((o["samples"] as? JsonArray)?.firstOrNull() as? JsonObject)?.get("audio")?.jsonPrimitive?.contentOrNull
+            VoiceOption(
+                id = id, name = o["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: id,
+                traits = (languages.map(::languageName) + listOfNotNull(uses?.let(::usesLabel))).joinToString(" · "),
+                group = languages.firstOrNull()?.let(::languageName),
+                preview = sample, tag = if (i < 3) POPULAR else null,
+            )
+        }
+    }
+
     private fun order(hearing: Boolean): List<VoiceKind> {
         val ids = if (hearing) settings.settings.value.hearingOrder else settings.settings.value.speechOrder
         return ids.mapNotNull(VoiceKind::fromId)
     }
 
-    private suspend fun cloudSpeak(url: String, key: String, fish: Boolean, text: String): Spoken {
+    private suspend fun cloudSpeak(url: String, key: String, fish: Boolean, text: String, voiceId: String?, speed: Double): Spoken {
         val response = http.post(url) {
             if (fish) {
                 header("Authorization", "Bearer $key")
@@ -125,7 +229,7 @@ public class Voices(
             } else {
                 header("xi-api-key", key)
             }
-            setBody(TextContent(speechBody(fish, text), ContentType.Application.Json))
+            setBody(TextContent(speechBody(fish, text, voiceId, speed), ContentType.Application.Json))
         }
         if (!response.status.isSuccess()) {
             AppLog.log("voice", "speech ${response.status.value}")
@@ -136,9 +240,16 @@ public class Voices(
         return if (device.playClip(bytes)) Spoken.Started else Spoken.NotStarted
     }
 
-    private fun speechBody(fish: Boolean, text: String): String = buildJsonObject {
+    private fun speechBody(fish: Boolean, text: String, voiceId: String?, speed: Double): String = buildJsonObject {
         put("text", text)
-        if (fish) put("format", "mp3") else put("model_id", "eleven_flash_v2_5")
+        if (fish) {
+            put("format", "mp3")
+            voiceId?.let { put("reference_id", it) }
+            putJsonObject("prosody") { put("speed", speed) }
+        } else {
+            put("model_id", "eleven_flash_v2_5")
+            putJsonObject("voice_settings") { put("speed", speed) }
+        }
     }.toString()
 
     private suspend fun deepgram(key: String, path: String): String? {
@@ -218,7 +329,29 @@ public class Voices(
         public fun installReader(read: (String) -> ByteArray?) {
             fileReader = read
         }
-        private const val ELEVEN = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"
+        private const val FISH_TTS = "https://api.fish.audio/v1/tts"
+        /** ElevenLabs' default voice until the user picks one. */
+        private const val ELEVEN_DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"
+        private fun elevenUrl(voiceId: String?) = "https://api.elevenlabs.io/v1/text-to-speech/${voiceId ?: ELEVEN_DEFAULT_VOICE}"
+        /** What a voice says when the user plays it in the picker. */
+        public const val SAMPLE: String = "I'll turn on Dark Mode."
+        /** The tag on Fish Audio's most used voices; the app shows its own words for it. */
+        public const val POPULAR: String = "popular"
+
+        /** "en" → "English", "hi" → "Hindi" (Fish Audio lists ISO codes); unknown codes as written. */
+        internal fun languageName(code: String): String = LANGUAGES[code.lowercase().substringBefore('-')] ?: code
+        private val LANGUAGES = mapOf(
+            "en" to "English", "hi" to "Hindi", "zh" to "Chinese", "ja" to "Japanese", "ko" to "Korean", "es" to "Spanish",
+            "fr" to "French", "de" to "German", "pt" to "Portuguese", "ar" to "Arabic", "ru" to "Russian", "it" to "Italian",
+            "bn" to "Bengali", "ta" to "Tamil", "te" to "Telugu", "mr" to "Marathi",
+        )
+
+        /** 1234567 → "1.2M uses". */
+        internal fun usesLabel(n: Long): String = when {
+            n >= 1_000_000 -> "${(n / 100_000) / 10.0}M uses".replace(".0M", "M")
+            n >= 1_000 -> "${n / 1_000}K uses"
+            else -> "$n uses"
+        }
         private val MAX_RECORD_MS = 20.seconds.inWholeMilliseconds
         private val SILENCE_MS = 1200L
         private val PER_HEAR = 8.seconds

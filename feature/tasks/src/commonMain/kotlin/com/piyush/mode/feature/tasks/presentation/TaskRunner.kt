@@ -203,7 +203,7 @@ public class TaskRunner(
     private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
         val task = saved.text
         // Only a task the user spoke is answered by voice: others keep the quiet notification and Live Activity.
-        spoken = saved.source == TaskSource.Voice
+        spoken = saved.source == TaskSource.Voice && settings.settings.value.talkBack
         val private = saved.private
         val conversation = saved.conversationId
         // A follow-up sees how the earlier tasks in its conversation went (not this task's own turn).
@@ -278,7 +278,7 @@ public class TaskRunner(
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // Spoken while the microphone is off. The stream stays up.
-            if (spoken && finished.outcome is AgentOutcome.Done) {
+            if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
                 runCatching { voices?.speak(PlainText.fromMarkdown(reply, oneLine = true)) }
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).

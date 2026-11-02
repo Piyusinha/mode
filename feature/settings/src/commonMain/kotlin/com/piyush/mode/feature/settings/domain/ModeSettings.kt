@@ -46,6 +46,14 @@ public data class ModeSettings(
     val speechOrder: List<String> = VoiceKind.speechDefault(),
     /** Try order for hearing. Unknown ids are dropped. */
     val hearingOrder: List<String> = VoiceKind.hearingDefault(),
+    /** Tasks the user spoke get spoken questions and a spoken result. */
+    val talkBack: Boolean = true,
+    /** Say a short summary when a spoken task is done (the full answer stays in the chat). */
+    val speakResult: Boolean = true,
+    /** How fast Mode talks. */
+    val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
+    /** The voice picked for each speech provider (by [VoiceKind.id]); none: the provider's default. */
+    val voices: Map<String, VoiceChoice> = emptyMap(),
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

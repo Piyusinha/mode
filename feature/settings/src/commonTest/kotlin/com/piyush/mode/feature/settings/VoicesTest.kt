@@ -50,4 +50,65 @@ class VoicesTest {
         DeviceVoice.record = null
         DeviceVoice.hearingState = { "unsupported" }
     }
+
+    @Test
+    fun elevenLabsAndFishVoicesAreListedWithSamples() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.ElevenLabs, "eleven-key-12345678")
+        settings.setVoiceKey(VoiceKind.Fish, "fish-key-12345678")
+        val http = HttpClient(MockEngine { request ->
+            when {
+                request.url.host.contains("elevenlabs") -> {
+                    assertEquals("eleven-key-12345678", request.headers["xi-api-key"])
+                    respond("""{"voices":[{"voice_id":"v1","name":"Sarah - soft","labels":{"gender":"female","age":"young","accent":"american","use_case":"conversational"},"preview_url":"https://x/s.mp3"}],"has_more":false}""")
+                }
+                else -> {
+                    assertEquals("Bearer fish-key-12345678", request.headers["Authorization"])
+                    respond("""{"total":1,"items":[{"_id":"m1","title":"Calm Guide","languages":["en","hi"],"task_count":1234567,"samples":[{"audio":"https://f/a.mp3"}]}]}""")
+                }
+            }
+        })
+        val voices = Voices(settings, http)
+        val sarah = voices.options(VoiceKind.ElevenLabs).options.single()
+        assertEquals("Sarah", sarah.name)
+        assertEquals("Female · Young · American", sarah.traits)
+        assertEquals("Conversational", sarah.group)
+        assertEquals("https://x/s.mp3", sarah.preview)
+        val guide = voices.options(VoiceKind.Fish).options.single()
+        assertEquals("English · Hindi · 1.2M uses", guide.traits)
+        assertEquals(Voices.POPULAR, guide.tag)
+        assertEquals("English", guide.group)
+    }
+
+    @Test
+    fun withoutAKeyTheListSaysSo() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        val list = Voices(settings, HttpClient(MockEngine { error("not called") })).options(VoiceKind.Fish)
+        assertEquals(com.piyush.mode.feature.settings.voice.VoiceListError.NoKey, list.error)
+    }
+
+    @Test
+    fun theChosenVoiceAndSpeedAreSent() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.ElevenLabs, "eleven-key-12345678")
+        settings.update {
+            it.copy(
+                speechOrder = listOf("elevenlabs", "apple", "fish"), speechSpeed = com.piyush.mode.feature.settings.domain.SpeechSpeed.Faster,
+                voices = mapOf("elevenlabs" to com.piyush.mode.feature.settings.domain.VoiceChoice("v1", "Sarah")),
+            )
+        }
+        var url = ""
+        var body = ""
+        DeviceVoice.play = { _, done -> done(true) }
+        val http = HttpClient(MockEngine { request ->
+            url = request.url.toString(); body = (request.body as io.ktor.http.content.TextContent).text
+            respond(byteArrayOf(1, 2, 3))
+        })
+        Voices(settings, http).speak("On it.")
+        DeviceVoice.play = null
+        assertEquals("https://api.elevenlabs.io/v1/text-to-speech/v1", url)
+        kotlin.test.assertTrue("\"speed\":1.15" in body, body)
+        // Kept across launches.
+        assertEquals("Sarah", SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).let { settings.settings.value.voices["elevenlabs"]?.name })
+    }
 }
