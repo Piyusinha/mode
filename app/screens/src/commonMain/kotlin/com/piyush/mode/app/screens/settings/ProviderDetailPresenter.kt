@@ -156,8 +156,8 @@ public class ProviderDetailPresenter(
             weekSteps = mine.sumOf { it.steps ?: 0 }, weekTasks = mine.size,
             todayCostUsd = todays.sumOf { it.costUsd ?: 0.0 }, weekCostUsd = mine.sumOf { it.costUsd ?: 0.0 },
             daySteps = days, todayIndex = today.dayOfWeek.isoDayNumber - 1,
-            phoneModel = name(main), phoneEffort = ProviderModels.effort(main),
-            brainModel = strong?.let(::name), brainEffort = strong?.let(ProviderModels::effort),
+            phoneModel = name(main), phoneEffort = ProviderModels.effortUsed(main),
+            brainModel = strong?.let(::name), brainEffort = strong?.let(ProviderModels::effortUsed),
             maxCostPerTaskUsd = if (provider.reportsCurrencyCost) s.maxCostPerTaskUsd else null,
         )
     }

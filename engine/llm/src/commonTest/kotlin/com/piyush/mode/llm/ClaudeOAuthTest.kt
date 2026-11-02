@@ -61,6 +61,15 @@ class ClaudeOAuthTest {
         assertEquals("tap", request["tools"]!!.jsonArray.single().jsonObject["name"]!!.jsonPrimitive.content)
         assertNotNull(request["tools"]!!.jsonArray.single().jsonObject["input_schema"])
         assertFailsWith<IllegalArgumentException> { ClaudeOAuthClient.request("openai/model", emptyList(), tools) }
+        assertNull(request["output_config"], "no effort chosen: Claude's own default")
+    }
+
+    @Test fun theChosenEffortIsSentAndRoomIsLeftForThinking() {
+        val request = ClaudeOAuthClient.request("claude-sonnet-5-5@high", listOf(ChatMessage("user", "hi")), tools)
+        assertEquals("claude-sonnet-5-5", request["model"]!!.jsonPrimitive.content)
+        assertEquals("high", request["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
+        assertTrue(request["max_tokens"]!!.jsonPrimitive.int >= 4096, "thinking counts against max_tokens")
+        assertNull(ClaudeOAuthClient.request("claude-haiku-5-5@turbo", emptyList(), tools)["output_config"], "unknown efforts are not sent")
     }
 
     @Test fun toolArgumentsAndTokenUsageAreReturnedToTheAgent() {

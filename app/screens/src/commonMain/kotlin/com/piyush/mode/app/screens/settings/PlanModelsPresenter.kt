@@ -130,7 +130,7 @@ public class PlanModelsPresenter(
 
     private fun current(): String? = settings.settings.value.let { if (role.value == ModelRole.PhoneControl) it.model else it.strongModel }
 
-    private fun currentEffort(): String? = current()?.let(ProviderModels::effort)
+    private fun currentEffort(): String? = current()?.let(ProviderModels::effortUsed)
 
     private fun set(model: String) {
         settings.update { if (role.value == ModelRole.PhoneControl) it.copy(model = model) else it.copy(strongModel = model) }
@@ -159,7 +159,7 @@ public class PlanModelsPresenter(
             error = e,
             models = options.map { o ->
                 val selected = chosen != null && ProviderModels.base(chosen) == o.id
-                val effort = if (selected) chosen?.let(ProviderModels::effort) ?: usual else null
+                val effort = if (selected) chosen?.let(ProviderModels::effortUsed) ?: usual else null
                 val shown = results[ProviderModels.withEffort(o.id, effort ?: usual)]
                 PlanModelRow(
                     id = o.id, name = o.name, tag = tags[o.id], selected = selected, effort = effort,

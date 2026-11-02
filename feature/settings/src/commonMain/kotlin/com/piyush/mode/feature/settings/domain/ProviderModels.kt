@@ -20,8 +20,8 @@ public object ProviderModels {
 
     public fun accepts(provider: ModelProvider, model: String): Boolean {
         val base = base(model)
-        // Only ChatGPT models carry an effort ("gpt-6.1-terra@low").
-        if (base != model && (provider != ModelProvider.ChatGpt || effort(model) !in EFFORTS)) return false
+        // Only plan models carry an effort ("gpt-6.1-terra@low", "claude-haiku-5-5@medium").
+        if (base != model && (!supportsEffort(provider) || effort(model) !in EFFORTS)) return false
         return when (provider) {
             ModelProvider.OpenRouter -> '/' in base && !base.startsWith("claude-oauth/")
             ModelProvider.ClaudeOAuth -> base.startsWith("claude-") && '/' !in base
@@ -32,12 +32,22 @@ public object ProviderModels {
     /** Reasoning effort, picked per model and role, for providers that take it. */
     public val EFFORTS: List<String> = listOf("low", "medium", "high")
 
-    public fun supportsEffort(provider: ModelProvider): Boolean = provider == ModelProvider.ChatGpt
+    public fun supportsEffort(provider: ModelProvider): Boolean = provider == ModelProvider.ChatGpt || provider == ModelProvider.ClaudeOAuth
 
     /** The model without its effort: "gpt-6.1-terra@low" → "gpt-6.1-terra". */
     public fun base(id: String): String = id.substringBefore('@')
 
     public fun effort(id: String): String? = id.substringAfter('@', "").ifEmpty { null }
+
+    /**
+     * The effort [id] runs at: the one chosen, or, with none, the model's own default where it is known
+     * (Claude Haiku 5.5 runs at medium and Sonnet 5.5 at high when no effort is sent).
+     */
+    public fun effortUsed(id: String): String? = effort(id) ?: when {
+        base(id).startsWith("claude-haiku-") -> "medium"
+        base(id).startsWith("claude-sonnet-") -> "high"
+        else -> null
+    }
 
     public fun withEffort(id: String, effort: String?): String = base(id) + (effort?.let { "@$it" } ?: "")
 

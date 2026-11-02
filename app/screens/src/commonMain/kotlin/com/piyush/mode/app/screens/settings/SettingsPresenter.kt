@@ -114,9 +114,9 @@ public class SettingsPresenter(
                         else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q, maker?.ifEmpty { null }) else ModelSearch.search(all, q))
                             .take(MAX_RESULTS).map(::choice),
                     modelCount = all.size,
-                    modelEffort = ProviderModels.effort(s.model),
+                    modelEffort = ProviderModels.effortUsed(s.model),
                     fullAccess = s.fullAccess,
-                    stuckEffort = s.strongModel?.let(ProviderModels::effort),
+                    stuckEffort = s.strongModel?.let(ProviderModels::effortUsed),
                     makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),
                     maker = maker,
                     catalogSource = models.source,

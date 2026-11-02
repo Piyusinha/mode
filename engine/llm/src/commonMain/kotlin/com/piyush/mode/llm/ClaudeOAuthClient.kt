@@ -48,10 +48,22 @@ class ClaudeOAuthClient(
         const val MAIN_MODEL = "claude-haiku-5-5"
         const val STRONG_MODEL = "claude-sonnet-5-5"
 
+        /** Efforts Mode offers; Claude also takes xhigh and max, which a phone step does not need. */
+        val EFFORTS = setOf("low", "medium", "high")
+
+        /**
+         * Room for the answer and Claude's thinking (on by default; the thinking counts against it). 1,024 was
+         * too little at high effort: the thinking could use it all and leave no action.
+         */
+        const val MAX_TOKENS = 8192
+
         fun request(model: String, messages: List<ChatMessage>, tools: JsonArray): JsonObject = buildJsonObject {
-            require(model.startsWith("claude-") && '/' !in model) { "Choose a native Claude model for Claude OAuth." }
-            put("model", model)
-            put("max_tokens", 1024)
+            // "claude-haiku-5-5@low": the model, and the effort the user picked for it (none: Claude's own default).
+            val base = model.substringBefore('@')
+            require(base.startsWith("claude-") && '/' !in base) { "Choose a native Claude model for Claude OAuth." }
+            put("model", base)
+            put("max_tokens", MAX_TOKENS)
+            model.substringAfter('@', "").takeIf { it in EFFORTS }?.let { putJsonObject("output_config") { put("effort", it) } }
             put("system", buildJsonArray {
                 add(buildJsonObject { put("type", "text"); put("text", "You are Claude Code, Anthropic's official CLI for Claude.") })
                 messages.filter { it.role == "system" }.forEach { m -> m.parts.filterIsInstance<ChatMessage.Part.Text>().forEach { add(textPart(it)) } }
