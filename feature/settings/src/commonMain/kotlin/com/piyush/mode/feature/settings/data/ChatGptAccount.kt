@@ -1,5 +1,6 @@
 package com.piyush.mode.feature.settings.data
 
+import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.storage.SecretStore
 import com.piyush.mode.llm.AccountInfo
 import com.piyush.mode.llm.ChatGptAuth
@@ -84,6 +85,10 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     public suspend fun models(): List<String> {
         val listed = auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN))
         val ids = listed.map { it.id }
+        // What OpenAI says about each model (no account data): names, efforts, anything else it sends.
+        AppLog.log("models", "ChatGPT models: " + listed.joinToString("; ") { m ->
+            listOfNotNull(m.id, m.name?.let { "name=$it" }, m.efforts?.let { "efforts=${it.joinToString("/")}" }).plus(m.otherFields).joinToString(", ")
+        }.take(2000))
         secrets.set(MODELS, ids.joinToString(","))
         secrets.set(MODEL_INFO, Json.encodeToString(listed))
         mutableInfo.value = listed

@@ -139,7 +139,9 @@ class ChatGptAuth(
                 val name = listOf("display_name", "name").firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.contentOrNull }
                 val efforts = o.entries.filter { (k, _) -> "reasoning" in k || "effort" in k }
                     .firstNotNullOfOrNull { (_, v) -> PlanModel.effortsIn(v) }
-                PlanModel(id, name, efforts)
+                val other = o.entries.filterNot { (k, _) -> k in setOf("id", "slug", "display_name", "name", "object") || "reasoning" in k || "effort" in k }
+                    .map { (k, v) -> if (v is JsonPrimitive) "$k=${v.contentOrNull}" else k }
+                PlanModel(id, name, efforts, other)
             }
         }
 
