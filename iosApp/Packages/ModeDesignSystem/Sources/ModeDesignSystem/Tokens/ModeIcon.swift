@@ -64,6 +64,7 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case message = "message"
     /// AI providers.
     case claude = "asterisk"
+    case search = "magnifyingglass"
     case router = "arrow.triangle.branch"
     case copy = "doc.on.doc"
 

@@ -1,52 +1,78 @@
 import SwiftUI
 
-/// One AI provider in a list (setup's Connect step, the AI screen): its tile, name and one short line;
-/// on the right a check for the one in use, or "Connect" when it is not connected yet. The whole row
-/// is one tap: pick it, or connect it.
+/// One AI provider, as on the "AI providers" and "Connect your AI" boards: its tile; its name with a tag
+/// ("In use", "Recommended"); a status line with a dot (green when connected); and on the right either the
+/// selection (a radio, filled when picked) or a filled "Connect" button. Selection is a state, Connect an
+/// action: they share the accent but never the shape. Setup puts the radio first, Settings last.
 public struct ModeProviderRow: View {
+    public enum RadioPlacement: Sendable { case leading, trailing }
+
     private let title: String
-    private let subtitle: String
+    private let status: String
     private let icon: ModeIcon
     private let tileBackground: Color
     private let tileForeground: Color
-    private let inUse: Bool
+    private let tag: String?
+    private let selected: Bool
     private let connected: Bool
     private let connectTitle: String
-    private let action: () -> Void
+    private let radio: RadioPlacement
+    private let onSelect: () -> Void
+    private let onConnect: () -> Void
 
-    public init(title: String, subtitle: String, icon: ModeIcon, tileBackground: Color, tileForeground: Color,
-                inUse: Bool, connected: Bool, connectTitle: String, action: @escaping () -> Void) {
+    public init(title: String, status: String, icon: ModeIcon, tileBackground: Color, tileForeground: Color, tag: String? = nil,
+                selected: Bool, connected: Bool, connectTitle: String, radio: RadioPlacement = .trailing,
+                onSelect: @escaping () -> Void, onConnect: @escaping () -> Void) {
         self.title = title
-        self.subtitle = subtitle
+        self.status = status
         self.icon = icon
         self.tileBackground = tileBackground
         self.tileForeground = tileForeground
-        self.inUse = inUse
+        self.tag = tag
+        self.selected = selected
         self.connected = connected
         self.connectTitle = connectTitle
-        self.action = action
+        self.radio = radio
+        self.onSelect = onSelect
+        self.onConnect = onConnect
     }
 
     public var body: some View {
-        Button(action: action) {
-            HStack(spacing: ModeSpacing.m) {
-                ModeLeadingView(.iconTile(icon, background: tileBackground, foreground: tileForeground))
-                VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                    Text(title).modeText(.body).lineLimit(1)
-                    Text(subtitle).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(1)
+        HStack(spacing: ModeSpacing.m) {
+            Button(action: connected || radio == .leading ? onSelect : onConnect) {
+                HStack(spacing: ModeSpacing.m) {
+                    if radio == .leading { ModeRadio(selected: selected) }
+                    ModeLeadingView(.iconTile(icon, background: tileBackground, foreground: tileForeground))
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        HStack(spacing: ModeSpacing.s) {
+                            Text(title).modeText(.bodyEmphasis).lineLimit(1).fixedSize()
+                            if let tag { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint).fixedSize() }
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
+                            Circle().fill(connected ? ModeColor.success : ModeColor.separator)
+                                .frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
+                            Text(status).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if !connected {
-                    Text(connectTitle).modeText(.bodyEmphasis, color: ModeColor.tint)
-                } else if inUse {
-                    ModeIcon.checkmark.image.font(ModeTextStyle.bodyEmphasis.font).foregroundStyle(ModeColor.tint)
-                }
+                .contentShape(.rect)
             }
-            .padding(.vertical, ModeSpacing.s)
-            .frame(minHeight: ModeSize.rowMin)
-            .contentShape(.rect)
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
+            if !connected {
+                Button(action: onConnect) {
+                    Text(connectTitle).modeText(.subheadline, color: ModeColor.onAccent).fontWeight(.semibold)
+                        .padding(.horizontal, ModeSpacing.m)
+                        .frame(minHeight: ModeSize.badge)
+                }
+                .buttonStyle(.plain)
+                .background(ModeColor.accent, in: .capsule)
+            } else if radio == .trailing {
+                Button(action: onSelect) { ModeRadio(selected: selected) }.buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(inUse && connected ? [.isSelected] : [])
+        .padding(.vertical, ModeSpacing.m)
+        .frame(minHeight: ModeSize.tile + ModeSpacing.xxl)
     }
 }

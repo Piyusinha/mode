@@ -47,6 +47,8 @@ public data class SettingsUiState(
     /** Makers to filter the full list by ("anthropic", "openai"…); OpenRouter only. */
     val makers: List<String> = emptyList(),
     val maker: String? = null,
+    /** How many models there are to search. */
+    val modelCount: Int = 0,
 )
 
 public data class ModelChoice(
@@ -99,7 +101,9 @@ public class SettingsPresenter(
                     picks = recommended.map(::choice),
                     query = q,
                     results = if (q.isBlank() && maker == null) emptyList()
-                        else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q, maker) else ModelSearch.search(all, q)).take(MAX_RESULTS).map(::choice),
+                        else (if (s.provider == ModelProvider.OpenRouter) catalog.search(q, maker?.ifEmpty { null }) else ModelSearch.search(all, q))
+                            .take(MAX_RESULTS).map(::choice),
+                    modelCount = all.size,
                     makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),
                     maker = maker,
                     catalogSource = models.source,
@@ -151,7 +155,7 @@ public class SettingsPresenter(
         query.value = text to query.value.second
     }
 
-    /** Shows one maker's models (null: all). */
+    /** Shows one maker's models; "" lists every model; null goes back to the picks. */
     public fun filterMaker(maker: String?) {
         query.value = query.value.first to maker
     }

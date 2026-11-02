@@ -106,7 +106,7 @@ struct MainTabs: View {
             default: break
             }
         case "live": showingLive = true
-        case "settings": paths[.home] = parts.last == "ai" ? [.settings, .aiSettings] : [.settings]
+        case "settings": paths[.home] = [.settings]
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
@@ -142,7 +142,6 @@ private struct TabRoot<Content: View>: View {
                     case .settings: SettingsRoute(app: app, navigate: navigate)
                     case .connectChatGPT: ConnectChatGPTRoute(app: app)
                     case .memory: MemoryRoute(app: app, navigate: navigate)
-                    case .aiSettings: AISettingsRoute(app: app, navigate: navigate)
                     case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)

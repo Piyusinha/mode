@@ -11,11 +11,16 @@ final class SettingsViewModel {
     struct Model: Identifiable, Equatable {
         let id: String
         let name: String
+        let tag: ModeChoiceRow.Tag?
         let subtitle: String
         let leading: ModeRowLeading
+        let cost: Double
         let isMain: Bool
         let isStuck: Bool
     }
+
+    /// The picker's chips.
+    enum Filter: Hashable { case all, recommended, cheapest, maker(String) }
 
     struct State: Equatable {
         var modelName = ""
@@ -32,9 +37,8 @@ final class SettingsViewModel {
         var dailyCap = 0.0
         var dailyCapLabel = ""
         var learn = true
-        /// What the picker lists: the search's results, or the picks when nothing is typed or filtered.
-        var listed: [Model] { query.isEmpty && maker == nil ? picks : results }
         var query = ""
+        var modelCount = 0
     }
 
     enum Event {
@@ -42,19 +46,21 @@ final class SettingsViewModel {
         case chooseModel(String)
         case chooseStuck(String?)
         case search
-        case filter(String?)
+        case filter(Filter)
         case maxCost(Double)
         case dailyCap(Double)
         case learn(Bool)
         case openDeveloper
         case openMemory
         case openPicker(stuck: Bool)
-        case openAI
+        case showProviders
     }
 
     private(set) var state = State()
     var name = ""
     var query = ""
+    var showingProviders = false
+    private(set) var filter: Filter = .all
     private let presenter: SettingsPresenter
     private let navigate: (Route) -> Void
     private var updates: Updates?
@@ -78,14 +84,43 @@ final class SettingsViewModel {
         case let .chooseModel(id): presenter.chooseModel(id: id)
         case let .chooseStuck(id): presenter.chooseStuckModel(id: id)
         case .search: presenter.search(text: query)
-        case let .filter(maker): presenter.filterMaker(maker: maker)
+        case let .filter(f):
+            filter = f
+            switch f {
+            case .all, .recommended: presenter.filterMaker(maker: nil)
+            case .cheapest: presenter.filterMaker(maker: "")
+            case let .maker(m): presenter.filterMaker(maker: m)
+            }
         case let .maxCost(usd): presenter.setMaxCostPerTask(usd: usd)
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(.modelPicker(stuck: stuck))
-        case .openAI: navigate(.aiSettings)
+        case .showProviders: showingProviders = true
+        }
+    }
+
+    /// A maker as people write it ("openai" → "OpenAI").
+    static func makerName(_ id: String) -> String {
+        switch id.lowercased() {
+        case "openai": "OpenAI"
+        case "x-ai": "xAI"
+        case "meta-llama": "Meta"
+        case "mistralai": "Mistral"
+        case "deepseek": "DeepSeek"
+        case "z-ai": "Z.ai"
+        default: id.prefix(1).uppercased() + id.dropFirst()
+        }
+    }
+
+    /// What the picker lists for the chip and the search.
+    var listed: [Model] {
+        switch filter {
+        case .recommended: state.picks
+        case .cheapest: state.results.sorted { $0.cost < $1.cost }
+        case .maker: state.results
+        case .all: state.query.isEmpty ? state.picks : state.results
         }
     }
 
@@ -97,19 +132,23 @@ final class SettingsViewModel {
     private static func map(_ s: SettingsUiState) -> State {
         let onPlan = !s.showsCost
         func model(_ c: ModelChoice) -> Model {
-            let tag = c.tag.map { tag -> String in
+            let tag = c.tag.map { tag -> ModeChoiceRow.Tag in
                 switch tag {
-                case .recommended: String(localized: L10n.Settings.recommended)
-                case .cheapest: String(localized: L10n.Settings.cheapest)
-                case .strongest: String(localized: L10n.Settings.strongest)
+                case .recommended: .init(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                case .cheapest: .init(String(localized: L10n.Settings.cheapest), background: ModeColor.tagGreen, foreground: ModeColor.tagGreenText)
+                case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.tintSoft, foreground: ModeColor.tint)
                 }
             }
             let cost = onPlan ? String(localized: L10n.Settings.onYourPlan) : L10n.Settings.perTask(Format.money(c.costPerTaskUsd))
-            let maker = c.id.split(separator: "/").first.map(String.init) ?? c.name
-            return Model(id: c.id, name: c.name, subtitle: [tag, cost, c.note.isEmpty ? nil : c.note].compactMap { $0 }.joined(separator: " · "),
-                         leading: .letterTile(String((c.id.contains("/") ? maker : c.name).prefix(1)).uppercased(),
-                                              background: ModeColor.tintSoft, foreground: ModeColor.tint),
-                         isMain: c.isMain, isStuck: c.isStuck)
+            let maker = c.id.contains("/") ? (c.id.split(separator: "/").first.map(String.init) ?? "") : c.name
+            // The maker's tile, as on the board: Anthropic orange, OpenAI grey, others in the accent.
+            let leading: ModeRowLeading = switch maker.lowercased() {
+            case "anthropic": .letterTile("A", background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText)
+            case "openai": .letterTile("O", background: ModeColor.tileGray, foreground: ModeColor.textPrimary)
+            default: .letterTile(String(maker.prefix(1)).uppercased(), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+            }
+            return Model(id: c.id, name: c.name, tag: tag, subtitle: [c.note.isEmpty ? nil : c.note, cost].compactMap { $0 }.joined(separator: " · "),
+                         leading: leading, cost: c.costPerTaskUsd, isMain: c.isMain, isStuck: c.isStuck)
         }
         let cap = s.dailyCapUsd?.doubleValue
         return State(
@@ -126,7 +165,8 @@ final class SettingsViewModel {
             dailyCap: cap ?? 0,
             dailyCapLabel: cap.map(Format.money) ?? String(localized: L10n.Settings.dailyCapOff),
             learn: s.learn,
-            query: s.query
+            query: s.query,
+            modelCount: Int(s.modelCount)
         )
     }
 }

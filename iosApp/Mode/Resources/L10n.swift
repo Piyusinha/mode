@@ -286,17 +286,19 @@ enum L10n {
         static let chatGPT = LocalizedStringResource("providers.chatgpt", defaultValue: "ChatGPT")
         static let claude = LocalizedStringResource("providers.claude", defaultValue: "Claude")
         static let openRouter = LocalizedStringResource("providers.openrouter", defaultValue: "OpenRouter")
-        static let chatGPTDetail = LocalizedStringResource("providers.chatgptDetail", defaultValue: "Your Plus or Pro plan")
-        static let claudeDetail = LocalizedStringResource("providers.claudeDetail", defaultValue: "Your Claude account · beta")
-        static let openRouterDetail = LocalizedStringResource("providers.openrouterDetail", defaultValue: "Pay as you go, any model")
+        static let chatGPTDetail = LocalizedStringResource("providers.chatgptDetail", defaultValue: "your Plus or Pro plan")
+        static let claudeDetail = LocalizedStringResource("providers.claudeDetail", defaultValue: "experimental")
+        static let openRouterDetail = LocalizedStringResource("providers.openrouterDetail", defaultValue: "pay as you go")
         static let connected = LocalizedStringResource("providers.connected", defaultValue: "Connected")
         static let connect = LocalizedStringResource("providers.connect", defaultValue: "Connect")
+        static let notConnected = LocalizedStringResource("providers.notConnected", defaultValue: "Not connected")
+        static let useOpenRouterOnceConnected = LocalizedStringResource("providers.useOnceConnected", defaultValue: "Use OpenRouter once connected")
         static let recommended = LocalizedStringResource("providers.recommended", defaultValue: "Recommended")
         static let inUse = LocalizedStringResource("providers.inUse", defaultValue: "In use")
         static let change = LocalizedStringResource("providers.change", defaultValue: "Change")
         static let aiInUse = LocalizedStringResource("providers.aiInUse", defaultValue: "AI in use")
         static let notConnectedYet = LocalizedStringResource("providers.notConnectedYet", defaultValue: "Not connected yet")
-        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Connect as many as you like; tap one to use it. Each keeps its own models. Long-press to disconnect.")
+        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Switching keeps each provider's models. Long-press a connected provider to disconnect it.")
         static let provider = LocalizedStringResource("providers.provider", defaultValue: "Provider")
         static let models = LocalizedStringResource("providers.models", defaultValue: "Models")
         static let connectedHeader = LocalizedStringResource("providers.connectedHeader", defaultValue: "Connected")
@@ -313,11 +315,11 @@ enum L10n {
 
         static func connectedCount(_ n: Int) -> String {
             n == 1 ? String(localized: "providers.connectedCount.one", defaultValue: "Connected")
-                : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers ready")
+                : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers connected")
         }
 
         static func keyEnding(_ ending: String) -> String {
-            String(localized: "providers.keyEnding", defaultValue: "Key ending \(ending)")
+            String(localized: "providers.keyEnding", defaultValue: "key …\(ending)")
         }
 
         static func continueWith(_ name: String) -> String {
@@ -388,6 +390,11 @@ enum L10n {
         static let off = LocalizedStringResource("settings.off", defaultValue: "Off")
         static let onYourPlan = LocalizedStringResource("settings.onYourPlan", defaultValue: "on your plan")
         static let all = LocalizedStringResource("settings.all", defaultValue: "All")
+        static let neverDetail = LocalizedStringResource("settings.neverDetail", defaultValue: "Mode keeps going with the main model")
+
+        static func searchCount(_ n: Int) -> String {
+            n > 0 ? String(localized: "settings.searchCount", defaultValue: "Search \(n) models") : String(localized: L10n.Settings.search)
+        }
         static let noModels = LocalizedStringResource("settings.noModels", defaultValue: "No model matches that. Try a shorter name or another maker.")
         static let pickerNote = LocalizedStringResource("settings.pickerNote", defaultValue: "Only models that can see the screen and use tools. Prices are OpenRouter's, for a typical task of about 10 steps.")
         static let pickerPlanNote = LocalizedStringResource("settings.pickerPlanNote", defaultValue: "These run on your plan, so there is no cost per task.")

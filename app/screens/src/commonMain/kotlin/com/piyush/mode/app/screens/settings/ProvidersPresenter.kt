@@ -52,6 +52,7 @@ public class ProvidersPresenter(
     private val claudeConnection = claude?.let { ClaudeConnectionPresenter(scope, it, claudeLlm) { select(ModelProvider.ClaudeOAuth.id) } }
     private val openRouter = MutableStateFlow(Triple(false, null as String?, 0))
     private var verifier: String? = null
+    private var useWhenConnected = true
 
     init {
         scope.launch {
@@ -86,7 +87,8 @@ public class ProvidersPresenter(
     // OpenRouter
 
     /** Starts "Sign in with OpenRouter"; returns the page to open. */
-    public fun startOpenRouter(callbackUrl: String): String {
+    public fun startOpenRouter(callbackUrl: String, useWhenConnected: Boolean = true): String {
+        this.useWhenConnected = useWhenConnected
         val start = openRouterAuth.start(callbackUrl)
         verifier = start.verifier
         openRouter.value = Triple(true, null, openRouter.value.third)
@@ -114,14 +116,15 @@ public class ProvidersPresenter(
     }
 
     /** A pasted OpenRouter key; it is used from now on. */
-    public fun saveOpenRouterKey(key: String) {
+    public fun saveOpenRouterKey(key: String, useWhenConnected: Boolean = true) {
         if (key.isBlank()) return
+        this.useWhenConnected = useWhenConnected
         connectOpenRouter(key.trim())
     }
 
     private fun connectOpenRouter(key: String) {
         settings.apiKey = key
-        select(ModelProvider.OpenRouter.id)
+        if (useWhenConnected) select(ModelProvider.OpenRouter.id)
         openRouter.update { it.copy(third = it.third + 1) }
     }
 

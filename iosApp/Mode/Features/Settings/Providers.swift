@@ -16,7 +16,8 @@ final class ProvidersViewModel {
         let id: String
         let kind: Kind
         let title: String
-        let subtitle: String
+        /// "Plus · connected", "Not connected · pay as you go".
+        let status: String
         let connected: Bool
         let inUse: Bool
     }
@@ -56,6 +57,8 @@ final class ProvidersViewModel {
     var claudeCode = ""
     /// OpenRouter's sign-in page, while it is open.
     var signInURL: URL?
+    /// OpenRouter's sheet: switch to it once connected (on by default).
+    var useOnceConnected = true
     let callbackScheme = "mode"
     /// Setup: picking one that is not connected yet marks it as the one to connect; Settings connects it.
     private let picksUnconnected: Bool
@@ -93,11 +96,12 @@ final class ProvidersViewModel {
         case .connectActive:
             if let row = state.rows.first(where: { $0.inUse }) { send(.connect(row.id)) }
         case .signInOpenRouter:
-            signInURL = URL(string: presenter.startOpenRouter(callbackUrl: OnboardingPresenter.companion.SIGN_IN_CALLBACK))
+            signInURL = URL(string: presenter.startOpenRouter(callbackUrl: OnboardingPresenter.companion.SIGN_IN_CALLBACK,
+                                                               useWhenConnected: useOnceConnected))
         case .pasteKey:
             if let text = UIPasteboard.general.string { key = text.trimmingCharacters(in: .whitespacesAndNewlines) }
         case .saveKey:
-            presenter.saveOpenRouterKey(key: key)
+            presenter.saveOpenRouterKey(key: key, useWhenConnected: useOnceConnected)
             key = ""
         case .startClaude:
             claudeCode = ""
@@ -145,12 +149,14 @@ final class ProvidersViewModel {
         }
         let rows = s.rows.map { r -> Row in
             let k = kind(r.id)
-            let subtitle: String = switch k {
+            let detail: String = switch k {
             case .chatGPT: String(localized: L10n.Providers.chatGPTDetail)
             case .claude: String(localized: L10n.Providers.claudeDetail)
             case .openRouter: r.keyEnding.map { L10n.Providers.keyEnding($0) } ?? String(localized: L10n.Providers.openRouterDetail)
             }
-            return Row(id: r.id, kind: k, title: title(k), subtitle: subtitle, connected: r.connected, inUse: r.inUse)
+            let state = String(localized: r.connected ? L10n.Providers.connected : L10n.Providers.notConnected)
+            // Connected first when it is; otherwise what it is: "Not connected · pay as you go".
+            return Row(id: r.id, kind: k, title: title(k), status: [state, detail].joined(separator: " · "), connected: r.connected, inUse: r.inUse)
         }
         let active = kind(s.active)
         return State(
@@ -188,19 +194,25 @@ extension ProvidersViewModel.Kind {
     }
 }
 
-/// Every provider, its state, and the one in use: tap to pick (or connect), long-press to disconnect.
+/// Every provider, its state, and the one in use (boards "AI providers" and "Connect your AI").
 struct ProviderList: View {
     let rows: [ProvidersViewModel.Row]
+    /// Setup: radio first and ChatGPT recommended. Settings: radio last and "In use" on the picked one.
+    let setup: Bool
     let onEvent: (ProvidersViewModel.Event) -> Void
 
     var body: some View {
         ModeCard {
             ForEach(rows) { row in
                 ModeProviderRow(
-                    title: row.title, subtitle: row.subtitle, icon: row.kind.icon,
+                    title: row.title, status: row.status, icon: row.kind.icon,
                     tileBackground: row.kind.tileBackground, tileForeground: row.kind.tileForeground,
-                    inUse: row.inUse, connected: row.connected, connectTitle: String(localized: L10n.Providers.connect)
-                ) { onEvent(.select(row.id)) }
+                    tag: setup ? (row.kind == .chatGPT ? String(localized: L10n.Providers.recommended) : nil)
+                        : (row.inUse && row.connected ? String(localized: L10n.Providers.inUse) : nil),
+                    selected: row.inUse, connected: row.connected, connectTitle: String(localized: L10n.Providers.connect),
+                    radio: setup ? .leading : .trailing,
+                    onSelect: { onEvent(.select(row.id)) }, onConnect: { onEvent(.connect(row.id)) }
+                )
                 .contextMenu {
                     if row.connected {
                         Button(role: .destructive) { onEvent(.disconnect(row.id)) } label: { Text(L10n.Providers.disconnect) }
@@ -211,36 +223,94 @@ struct ProviderList: View {
     }
 }
 
-/// "Connect OpenRouter": sign in (no copying keys), or paste a key.
-struct OpenRouterLinkSheet: View {
+/// Settings' "AI providers" sheet: connect as many as you like, pick the one Mode uses.
+struct ProvidersSheet: View {
     let state: ProvidersViewModel.State
-    @Binding var key: String
     let onEvent: (ProvidersViewModel.Event) -> Void
     let onDone: () -> Void
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: ModeSpacing.l) {
-                    Text(L10n.Providers.openRouterMessage).modeText(.callout, color: ModeColor.textSecondary)
-                    ModeButton(L10n.Providers.signInOpenRouter, icon: .link, fullWidth: true) { onEvent(.signInOpenRouter) }
-                        .disabled(state.openRouterSigningIn)
-                    Text(L10n.Setup.connectNote).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-                    if let error = state.openRouterError { Text(error).modeText(.footnote, color: ModeColor.danger) }
-                    ModeOrDivider(L10n.Setup.or)
-                    ModeFieldCard(L10n.Setup.keyLabel, prompt: L10n.Setup.keyPrompt, text: $key, secure: true, buttonTitle: L10n.Setup.paste) { onEvent(.pasteKey) }
-                    if !key.isEmpty { ModeButton(L10n.Settings.saveKey, role: .secondary, fullWidth: true) { onEvent(.saveKey) } }
-                    ModeNote(icon: .lock, L10n.Setup.keyNote)
+        ScrollView {
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                HStack(alignment: .top, spacing: ModeSpacing.m) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                        Text(L10n.Providers.title).modeText(.title2)
+                        Text(L10n.Providers.sheetMessage).modeText(.subheadline, color: ModeColor.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(action: onDone) {
+                        Text(L10n.Common.done).modeText(.subheadline).fontWeight(.semibold)
+                            .padding(.horizontal, ModeSpacing.l).frame(minHeight: ModeSize.badge)
+                    }
+                    .buttonStyle(.glass)
                 }
-                .padding(.horizontal, ModeSpacing.screenEdge)
-                .padding(.bottom, ModeSpacing.xxl)
+                ProviderList(rows: state.rows, setup: false, onEvent: onEvent)
+                Text(L10n.Providers.switchNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                ModeNote(icon: .lock, L10n.Providers.keychainNote)
             }
-            .modeScreen()
-            .navigationTitle(Text(L10n.Providers.connectOpenRouter))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(action: onDone) { Text(L10n.Common.cancel) } } }
+            .padding(.horizontal, ModeSpacing.screenEdge)
+            .padding(.top, ModeSpacing.xl)
+            .padding(.bottom, ModeSpacing.xxl)
         }
+        .modeScreen()
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// A sheet's heading with its provider's tile (board "Connect a provider").
+struct ProviderSheetHeader: View {
+    let kind: ProvidersViewModel.Kind
+    let title: LocalizedStringResource
+    let message: LocalizedStringResource
+
+    var body: some View {
+        HStack(spacing: ModeSpacing.m) {
+            ModeLeadingView(.iconTile(kind.icon, background: kind.tileBackground, foreground: kind.tileForeground))
+            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                Text(title).modeText(.title2)
+                Text(message).modeText(.subheadline, color: ModeColor.textSecondary)
+            }
+        }
+    }
+}
+
+/// "Connect OpenRouter", as on its board: sign in (no copying keys), or paste a key; use it once connected.
+struct OpenRouterLinkSheet: View {
+    let state: ProvidersViewModel.State
+    @Binding var key: String
+    @Binding var useOnceConnected: Bool
+    let onEvent: (ProvidersViewModel.Event) -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                ProviderSheetHeader(kind: .openRouter, title: L10n.Providers.connectOpenRouter, message: L10n.Providers.openRouterMessage)
+                ModeButton(L10n.Providers.signInOpenRouter, icon: .link, fullWidth: true) { onEvent(.signInOpenRouter) }
+                    .disabled(state.openRouterSigningIn)
+                Text(L10n.Setup.connectNote).modeText(.footnote, color: ModeColor.textSecondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
+                if let error = state.openRouterError { Text(error).modeText(.footnote, color: ModeColor.danger) }
+                ModeOrDivider(L10n.Setup.or)
+                ModeFieldCard(L10n.Setup.keyLabel, prompt: L10n.Setup.keyPrompt, text: $key, secure: true, buttonTitle: L10n.Setup.paste) { onEvent(.pasteKey) }
+                if !key.isEmpty { ModeButton(L10n.Settings.saveKey, role: .secondary, fullWidth: true) { onEvent(.saveKey) } }
+                Button { useOnceConnected.toggle() } label: {
+                    HStack(spacing: ModeSpacing.s) {
+                        ModeRadio(selected: useOnceConnected)
+                        Text(L10n.Providers.useOpenRouterOnceConnected).modeText(.subheadline)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, ModeSpacing.xs)
+                ModeNote(icon: .lock, L10n.Setup.keyNote)
+            }
+            .padding(.horizontal, ModeSpacing.screenEdge)
+            .padding(.top, ModeSpacing.xl)
+            .padding(.bottom, ModeSpacing.xxl)
+        }
+        .modeScreen()
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 }
 
@@ -299,7 +369,7 @@ struct ProviderLinks: ViewModifier {
                             .toolbar { ToolbarItem(placement: .confirmationAction) { Button { model.link = nil } label: { Text(L10n.Common.done) } } }
                     }
                 case .openRouter:
-                    OpenRouterLinkSheet(state: model.state, key: $model.key, onEvent: model.send) { model.link = nil }
+                    OpenRouterLinkSheet(state: model.state, key: $model.key, useOnceConnected: $model.useOnceConnected, onEvent: model.send) { model.link = nil }
                         .task(id: model.signInURL) {
                             guard let url = model.signInURL else { return }
                             do {

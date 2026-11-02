@@ -76,7 +76,7 @@ struct ConnectChatGPTScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.l) {
                 Text(L10n.ChatGPT.subtitle).modeText(.callout, color: ModeColor.textSecondary)
-                ModeCard { status }
+                status
                 switch phase {
                 case .waiting, .checking: EmptyView()
                 default:
@@ -97,20 +97,42 @@ struct ConnectChatGPTScreen: View {
         .navigationBarTitleDisplayMode(.large)
     }
 
+    /// The state as a card with a round icon, as on the board: waiting, checking, connected, or why not.
     @ViewBuilder private var status: some View {
         switch phase {
-        case .waiting: ModeRow(String(localized: L10n.ChatGPT.waiting), subtitle: String(localized: L10n.ChatGPT.waitingHint), leading: .progress) { EmptyView() }
-        case .checking: ModeRow(String(localized: L10n.ChatGPT.checking), leading: .progress) { EmptyView() }
+        case .waiting: card(.progress, ModeColor.tintSoft, L10n.ChatGPT.waiting, String(localized: L10n.ChatGPT.waitingHint))
+        case .checking: card(.progress, ModeColor.tintSoft, L10n.ChatGPT.checking, nil)
         case let .connected(models, check):
-            ModeRow(String(localized: L10n.ChatGPT.connected), subtitle: check, leading: .success) { EmptyView() }
-            ModeRow(String(localized: L10n.ChatGPT.models), subtitle: models.joined(separator: ", "), leading: .icon(.model)) { EmptyView() }
+            card(.icon(.checkmark), ModeColor.tagGreen, L10n.ChatGPT.connected, check)
+            card(.icon(.model), ModeColor.tintSoft, L10n.ChatGPT.models, models.joined(separator: ", "))
         case let .failed(message, notEligible):
-            ModeRow(String(localized: notEligible ? L10n.ChatGPT.notEligible : L10n.ChatGPT.failed), subtitle: message,
-                    leading: .symbol(.warning, ModeColor.warning)) { EmptyView() }
+            card(.icon(.warning), ModeColor.tileOrange, notEligible ? L10n.ChatGPT.notEligible : L10n.ChatGPT.failed, message)
         case .idle:
-            ModeRow(String(localized: connected ? L10n.ChatGPT.connected : L10n.ChatGPT.notConnected),
-                    subtitle: String(localized: L10n.ChatGPT.planHint), leading: connected ? .success : .icon(.sparkle)) { EmptyView() }
+            card(connected ? .icon(.checkmark) : .icon(.sparkle), connected ? ModeColor.tagGreen : ModeColor.tintSoft,
+                 connected ? L10n.ChatGPT.connected : L10n.ChatGPT.notConnected, String(localized: L10n.ChatGPT.planHint))
         }
+    }
+
+    private enum Glyph { case progress, icon(ModeIcon) }
+
+    private func card(_ glyph: Glyph, _ background: Color, _ title: LocalizedStringResource, _ text: String?) -> some View {
+        HStack(alignment: .top, spacing: ModeSpacing.m) {
+            Group {
+                switch glyph {
+                case .progress: ProgressView().tint(ModeColor.tint)
+                case let .icon(icon): icon.image.foregroundStyle(ModeColor.textPrimary)
+                }
+            }
+            .frame(width: ModeSize.tile, height: ModeSize.tile)
+            .background(background, in: .circle)
+            VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                Text(title).modeText(.bodyEmphasis)
+                if let text { Text(text).modeText(.subheadline, color: ModeColor.textSecondary) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(ModeSpacing.l)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
     }
 }
 
