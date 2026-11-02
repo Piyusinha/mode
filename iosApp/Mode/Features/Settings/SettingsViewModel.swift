@@ -49,13 +49,12 @@ final class SettingsViewModel {
         case openDeveloper
         case openMemory
         case openPicker(stuck: Bool)
-        case showProviders
+        case openAI
     }
 
     private(set) var state = State()
     var name = ""
     var query = ""
-    var showingProviders = false
     private let presenter: SettingsPresenter
     private let navigate: (Route) -> Void
     private var updates: Updates?
@@ -86,7 +85,7 @@ final class SettingsViewModel {
         case .openDeveloper: navigate(.developer)
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(.modelPicker(stuck: stuck))
-        case .showProviders: showingProviders = true
+        case .openAI: navigate(.aiSettings)
         }
     }
 

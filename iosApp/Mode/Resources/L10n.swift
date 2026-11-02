@@ -286,9 +286,9 @@ enum L10n {
         static let chatGPT = LocalizedStringResource("providers.chatgpt", defaultValue: "ChatGPT")
         static let claude = LocalizedStringResource("providers.claude", defaultValue: "Claude")
         static let openRouter = LocalizedStringResource("providers.openrouter", defaultValue: "OpenRouter")
-        static let chatGPTDetail = LocalizedStringResource("providers.chatgptDetail", defaultValue: "Your Plus or Pro plan · no cost per task")
-        static let claudeDetail = LocalizedStringResource("providers.claudeDetail", defaultValue: "Your Claude account · experimental")
-        static let openRouterDetail = LocalizedStringResource("providers.openrouterDetail", defaultValue: "Pay as you go · any model")
+        static let chatGPTDetail = LocalizedStringResource("providers.chatgptDetail", defaultValue: "Your Plus or Pro plan")
+        static let claudeDetail = LocalizedStringResource("providers.claudeDetail", defaultValue: "Your Claude account · beta")
+        static let openRouterDetail = LocalizedStringResource("providers.openrouterDetail", defaultValue: "Pay as you go, any model")
         static let connected = LocalizedStringResource("providers.connected", defaultValue: "Connected")
         static let connect = LocalizedStringResource("providers.connect", defaultValue: "Connect")
         static let recommended = LocalizedStringResource("providers.recommended", defaultValue: "Recommended")
@@ -296,7 +296,9 @@ enum L10n {
         static let change = LocalizedStringResource("providers.change", defaultValue: "Change")
         static let aiInUse = LocalizedStringResource("providers.aiInUse", defaultValue: "AI in use")
         static let notConnectedYet = LocalizedStringResource("providers.notConnectedYet", defaultValue: "Not connected yet")
-        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Switching keeps each provider's own models.")
+        static let switchNote = LocalizedStringResource("providers.switchNote", defaultValue: "Connect as many as you like; tap one to use it. Each keeps its own models. Long-press to disconnect.")
+        static let provider = LocalizedStringResource("providers.provider", defaultValue: "Provider")
+        static let models = LocalizedStringResource("providers.models", defaultValue: "Models")
         static let connectedHeader = LocalizedStringResource("providers.connectedHeader", defaultValue: "Connected")
         static let disconnect = LocalizedStringResource("providers.disconnect", defaultValue: "Disconnect")
         static let keychainNote = LocalizedStringResource("providers.keychainNote", defaultValue: "Sign-ins and keys stay in this iPhone's Keychain. They only go to that provider, never to us.")
@@ -312,6 +314,10 @@ enum L10n {
         static func connectedCount(_ n: Int) -> String {
             n == 1 ? String(localized: "providers.connectedCount.one", defaultValue: "Connected")
                 : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers ready")
+        }
+
+        static func keyEnding(_ ending: String) -> String {
+            String(localized: "providers.keyEnding", defaultValue: "Key ending \(ending)")
         }
 
         static func continueWith(_ name: String) -> String {
@@ -376,6 +382,7 @@ enum L10n {
         static let dailyCapOff = LocalizedStringResource("settings.dailyCapOff", defaultValue: "No daily limit")
         static let memory = LocalizedStringResource("settings.memory", defaultValue: "Memory")
         static let ai = LocalizedStringResource("settings.ai", defaultValue: "AI")
+        static let addName = LocalizedStringResource("settings.addName", defaultValue: "Add")
         static let mainModel = LocalizedStringResource("settings.mainModel", defaultValue: "Main model")
         static let whenStuckShort = LocalizedStringResource("settings.whenStuckShort", defaultValue: "When stuck")
         static let off = LocalizedStringResource("settings.off", defaultValue: "Off")
@@ -406,7 +413,7 @@ enum L10n {
         static let appName = LocalizedStringResource("setup.welcome.appName", defaultValue: "Mode")
         static let tagline = LocalizedStringResource("setup.welcome.tagline", defaultValue: "Tell your iPhone what to do.\nMode does it in your apps.")
         static let pillOpenSource = LocalizedStringResource("setup.welcome.openSource", defaultValue: "Open source")
-        static let pillOwnKey = LocalizedStringResource("setup.welcome.ownKey", defaultValue: "Your own AI key")
+        static let pillOwnKey = LocalizedStringResource("setup.welcome.ownKey", defaultValue: "Your own AI")
         static let pillOnPhone = LocalizedStringResource("setup.welcome.onPhone", defaultValue: "Runs on your iPhone")
         static let thisIPhone = LocalizedStringResource("setup.welcome.thisIPhone", defaultValue: "This iPhone")
         static let paired = LocalizedStringResource("setup.welcome.paired", defaultValue: "Paired with Mode Setup on your Mac")
@@ -414,7 +421,7 @@ enum L10n {
         static let stepName = LocalizedStringResource("setup.welcome.stepName", defaultValue: "Your name")
         static let stepNameDetail = LocalizedStringResource("setup.welcome.stepNameDetail", defaultValue: "From your contact card, one tap")
         static let stepAI = LocalizedStringResource("setup.welcome.stepAI", defaultValue: "Your AI")
-        static let stepAIDetail = LocalizedStringResource("setup.welcome.stepAIDetail", defaultValue: "Connect OpenRouter and pick a model")
+        static let stepAIDetail = LocalizedStringResource("setup.welcome.stepAIDetail", defaultValue: "ChatGPT, Claude or OpenRouter, and a model")
         static let stepTest = LocalizedStringResource("setup.welcome.stepTest", defaultValue: "Permissions and a quick test")
         static let stepTestDetail = LocalizedStringResource("setup.welcome.stepTestDetail", defaultValue: "Mode opens Settings, taps Wi-Fi and comes back")
         static let getStarted = LocalizedStringResource("setup.welcome.getStarted", defaultValue: "Get started")

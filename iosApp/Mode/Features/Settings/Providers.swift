@@ -81,7 +81,7 @@ final class ProvidersViewModel {
         switch event {
         case let .select(id):
             guard let row = state.rows.first(where: { $0.id == id }) else { return }
-            if row.connected || picksUnconnected { presenter.select(id: id) } else { send(.connect(id)) }
+            if row.connected { presenter.select(id: id) } else { send(.connect(id)) }
         case let .connect(id):
             guard let row = state.rows.first(where: { $0.id == id }) else { return }
             if picksUnconnected { presenter.select(id: id) }
@@ -148,7 +148,7 @@ final class ProvidersViewModel {
             let subtitle: String = switch k {
             case .chatGPT: String(localized: L10n.Providers.chatGPTDetail)
             case .claude: String(localized: L10n.Providers.claudeDetail)
-            case .openRouter: r.keyEnding.map { L10n.Settings.keyEnding($0) } ?? String(localized: L10n.Providers.openRouterDetail)
+            case .openRouter: r.keyEnding.map { L10n.Providers.keyEnding($0) } ?? String(localized: L10n.Providers.openRouterDetail)
             }
             return Row(id: r.id, kind: k, title: title(k), subtitle: subtitle, connected: r.connected, inUse: r.inUse)
         }
@@ -188,11 +188,9 @@ extension ProvidersViewModel.Kind {
     }
 }
 
-/// Every provider, its state, and the one in use. Draws state, sends events.
+/// Every provider, its state, and the one in use: tap to pick (or connect), long-press to disconnect.
 struct ProviderList: View {
     let rows: [ProvidersViewModel.Row]
-    /// Setup marks ChatGPT as recommended; Settings marks the one in use.
-    let recommendChatGPT: Bool
     let onEvent: (ProvidersViewModel.Event) -> Void
 
     var body: some View {
@@ -201,53 +199,15 @@ struct ProviderList: View {
                 ModeProviderRow(
                     title: row.title, subtitle: row.subtitle, icon: row.kind.icon,
                     tileBackground: row.kind.tileBackground, tileForeground: row.kind.tileForeground,
-                    tag: recommendChatGPT ? (row.kind == .chatGPT ? String(localized: L10n.Providers.recommended) : nil)
-                        : (row.inUse && row.connected ? String(localized: L10n.Providers.inUse) : nil),
-                    selected: row.inUse, connected: row.connected,
-                    connectedTitle: String(localized: L10n.Providers.connected), connectTitle: String(localized: L10n.Providers.connect),
-                    onSelect: { onEvent(.select(row.id)) }, onConnect: { onEvent(.connect(row.id)) }
-                )
-            }
-        }
-    }
-}
-
-/// Settings' "AI providers" sheet: connect as many as you like, pick the one Mode uses, disconnect.
-struct ProvidersSheet: View {
-    let state: ProvidersViewModel.State
-    let onEvent: (ProvidersViewModel.Event) -> Void
-    let onDone: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                    Text(L10n.Providers.sheetMessage).modeText(.callout, color: ModeColor.textSecondary)
-                    ProviderList(rows: state.rows, recommendChatGPT: false, onEvent: onEvent)
-                    Text(L10n.Providers.switchNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                    let connected = state.rows.filter(\.connected)
-                    if !connected.isEmpty {
-                        ModeSectionHeader(L10n.Providers.connectedHeader)
-                        ModeCard {
-                            ForEach(connected) { row in
-                                ModeRow(row.title, subtitle: row.subtitle,
-                                        leading: .iconTile(row.kind.icon, background: row.kind.tileBackground, foreground: row.kind.tileForeground)) {
-                                    ModeButton(L10n.Providers.disconnect, role: .destructive) { onEvent(.disconnect(row.id)) }
-                                }
-                            }
-                        }
+                    inUse: row.inUse, connected: row.connected, connectTitle: String(localized: L10n.Providers.connect)
+                ) { onEvent(.select(row.id)) }
+                .contextMenu {
+                    if row.connected {
+                        Button(role: .destructive) { onEvent(.disconnect(row.id)) } label: { Text(L10n.Providers.disconnect) }
                     }
-                    ModeNote(icon: .lock, L10n.Providers.keychainNote)
                 }
-                .padding(.horizontal, ModeSpacing.screenEdge)
-                .padding(.bottom, ModeSpacing.xxl)
             }
-            .modeScreen()
-            .navigationTitle(Text(L10n.Providers.title))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(action: onDone) { Text(L10n.Common.done) } } }
         }
-        .presentationDetents([.medium, .large])
     }
 }
 

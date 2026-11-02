@@ -149,7 +149,7 @@ private struct KeyStep: View {
 
     var body: some View {
         StepHeader(title: L10n.Setup.keyTitle, message: L10n.Providers.setupMessage)
-        ProviderList(rows: providers.rows, recommendChatGPT: true, onEvent: onProvider)
+        ProviderList(rows: providers.rows, onEvent: onProvider)
             .padding(.top, ModeSpacing.s)
         Text(providers.activeConnected ? L10n.Providers.setupHintConnected : L10n.Providers.setupHint)
             .modeText(.footnote, color: ModeColor.textSecondary)

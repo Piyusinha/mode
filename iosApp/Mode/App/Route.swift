@@ -9,6 +9,7 @@ enum Route: Hashable {
     case settings
     case connectChatGPT
     case memory
+    case aiSettings
     case modelPicker(stuck: Bool)
     case developer
     case memoryAboutYou
