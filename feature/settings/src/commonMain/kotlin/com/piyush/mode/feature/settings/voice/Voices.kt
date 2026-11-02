@@ -163,8 +163,11 @@ public class Voices(
 
     /** Plays what [option] sounds like: the provider's own clip when it has one, else a sample line. */
     public suspend fun preview(kind: VoiceKind, option: VoiceOption): Boolean = try {
-        val clip = option.preview?.let { url -> http.get(url).takeIf { it.status.isSuccess() }?.bodyAsBytes()?.takeIf { it.isNotEmpty() } }
-        if (clip != null) device.playClip(clip) else say(kind, option.id, SAMPLE) == Spoken.Started
+        // A sample that never reports its end still ends: the play button must not stay on "playing".
+        withTimeoutOrNull(MAX_PREVIEW) {
+            val clip = option.preview?.let { url -> http.get(url).takeIf { it.status.isSuccess() }?.bodyAsBytes()?.takeIf { it.isNotEmpty() } }
+            if (clip != null) device.playClip(clip) else say(kind, option.id.ifEmpty { null }, SAMPLE) == Spoken.Started
+        } ?: run { device.cancel(); false }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -330,6 +333,7 @@ public class Voices(
             fileReader = read
         }
         private const val FISH_TTS = "https://api.fish.audio/v1/tts"
+        private val MAX_PREVIEW = 30.seconds
         /** ElevenLabs' default voice until the user picks one. */
         private const val ELEVEN_DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"
         private fun elevenUrl(voiceId: String?) = "https://api.elevenlabs.io/v1/text-to-speech/${voiceId ?: ELEVEN_DEFAULT_VOICE}"

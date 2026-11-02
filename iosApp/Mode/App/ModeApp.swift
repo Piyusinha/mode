@@ -98,6 +98,8 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     /// Says [text] and reports when it has finished (true: sound started), so the microphone never opens
     /// while Mode is still talking and a line that started is not said again by another voice.
     private func speak(_ text: String, voiceId: String?, speed: Double, done: @escaping (Bool) -> Void) {
+        // A line still waiting for its end is over now: its caller must not wait forever.
+        if let old = speakDone { speakDone = nil; synth.stopSpeaking(at: .immediate); old(started) }
         started = false
         speakDone = done
         VoiceAudio.shared.forSpeech()
@@ -169,6 +171,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     /// Plays a cloud clip to its end; true once sound started.
     private func play(_ bytes: KotlinByteArray, done: @escaping (Bool) -> Void) {
+        if let old = playDone { playDone = nil; player?.stop(); old(true) }
         VoiceAudio.shared.forSpeech()
         player = try? AVAudioPlayer(data: bytes.toData())
         player?.delegate = self
@@ -249,27 +252,30 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         player = nil
     }
 
+    /// Apple's on-device transcription of the one recording. The analyzer reads the file itself, converting it to the
+    /// format its model needs (handing it the file's own buffers crashed: AnalyzerInput traps on a format it can't take).
     private func transcribe(_ path: String) async -> String? {
         let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? Locale.current
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) else { return nil }
-        let stream = AsyncStream<AnalyzerInput> { continuation in
-            while true {
-                guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4096) else { break }
-                guard (try? file.read(into: buffer)) != nil, buffer.frameLength > 0 else { break }
-                continuation.yield(AnalyzerInput(buffer: buffer))
-            }
-            continuation.finish()
-        }
-        async let running: Void = { try? await analyzer.analyzeSequence(stream) }()
-        var text = ""
+        // Each result is one finished stretch of speech: they add up to what was said.
+        async let heard: String = {
+            var text = ""
+            do {
+                for try await result in transcriber.results {
+                    let part = String(result.text.characters).trimmingCharacters(in: .whitespaces)
+                    if !part.isEmpty { text += (text.isEmpty ? "" : " ") + part }
+                }
+            } catch {}
+            return text
+        }()
         do {
-            for try await result in transcriber.results { text = String(result.text.characters) }
+            try await analyzer.start(inputAudioFile: file, finishAfterFile: true)
         } catch {
-            return nil
+            await analyzer.cancelAndFinishNow()
         }
-        _ = await running
+        let text = await heard
         return text.isEmpty ? nil : text
     }
 }
