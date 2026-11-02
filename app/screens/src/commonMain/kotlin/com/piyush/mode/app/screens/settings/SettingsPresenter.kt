@@ -74,6 +74,8 @@ public class SettingsPresenter(
     private val claude: ClaudeAccount? = null,
     private val claudeLlm: LlmClient? = null,
     /** The models on the user's ChatGPT plan, as last asked. */
+    /** The models the user's Claude account offers, as last listed. */
+    private val claudeModels: () -> List<com.piyush.mode.llm.PlanModel> = { emptyList() },
     private val chatGptModels: () -> List<String> = { emptyList() },
 ) : Presenter<SettingsUiState>(parent, SettingsUiState()) {
     private val connection = claude?.let { account ->
@@ -89,7 +91,7 @@ public class SettingsPresenter(
         scope.launch {
             combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, (q, maker), _, auth ->
                 val recommended = when (s.provider) {
-                    ModelProvider.ClaudeOAuth -> ProviderModels.claude
+                    ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels())
                     ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels())
                     ModelProvider.OpenRouter -> models.recommended
                 }

@@ -12,6 +12,8 @@ public data class ModelOption(
     val tag: ModelTag? = null,
     /** One line on what it's good at, for picked models. */
     val note: String = "",
+    /** Plan models: the efforts the provider says it takes (empty: none), or null when it did not say. */
+    val efforts: List<String>? = null,
 )
 
 /** Where the list came from. */

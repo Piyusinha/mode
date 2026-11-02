@@ -93,4 +93,21 @@ class ChatGptTest {
         }
         assertEquals(ResponsesClient.SHARE_USED_UP, midStream.message)
     }
+
+    @Test
+    fun theModelListKeepsEveryModelAndAnyEffortsOpenAiStates() {
+        val models = ChatGptAuth.parseModels(
+            """{"data":[
+              {"id":"gpt-6.1-sol","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"high"},{"effort":"xhigh"}]},
+              {"id":"gpt-6.1-terra","reasoning_efforts":["minimal","low","medium","high"]},
+              {"id":"gpt-6-luna","object":"model"}
+            ]}""",
+        )
+        assertEquals(listOf("gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"), models.map { it.id })
+        assertEquals(listOf("low", "medium", "high", "xhigh"), models[0].efforts)
+        assertEquals(listOf("minimal", "low", "medium", "high"), models[1].efforts)
+        assertNull(models[2].efforts, "not said: Mode offers the common ones")
+        val body = ResponsesClient.request("gpt-6.1-sol@xhigh", emptyList(), JsonArray(emptyList()))
+        assertEquals("xhigh", body["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content, "sent as listed")
+    }
 }

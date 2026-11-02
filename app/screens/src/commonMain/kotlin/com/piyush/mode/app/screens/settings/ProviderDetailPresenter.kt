@@ -166,7 +166,7 @@ public class ProviderDetailPresenter(
         val base = ProviderModels.base(id)
         return when (provider) {
             ModelProvider.ChatGpt -> ProviderModels.displayName(base)
-            ModelProvider.ClaudeOAuth -> ProviderModels.claude.firstOrNull { it.id == base }?.name ?: base
+            ModelProvider.ClaudeOAuth -> ProviderModels.claudeName(base)
             ModelProvider.OpenRouter -> (catalog.state.value.recommended + catalog.state.value.all).firstOrNull { it.id == base }?.name ?: base.substringAfter('/')
         }
     }

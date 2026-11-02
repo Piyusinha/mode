@@ -12,6 +12,7 @@ import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -97,13 +98,12 @@ class ChatGptAuth(
         "grant_type" to "refresh_token", "client_id" to clientId, "refresh_token" to refreshToken, "resource" to api,
     )
 
-    /** The models the plan can use, by id. */
-    suspend fun models(accessToken: String): List<String> {
+    /** The models the plan can use, as OpenAI lists them, with their reasoning efforts when it says. */
+    suspend fun models(accessToken: String): List<PlanModel> {
         val response = http.get("$api/models") { header("Authorization", "Bearer $accessToken") }
         val text = response.bodyAsText()
         if (!response.status.isSuccess()) throw LlmFailed("ChatGPT models: HTTP ${response.status.value}: ${text.take(300)}")
-        return Json.parseToJsonElement(text).jsonObject["data"]?.jsonArray.orEmpty()
-            .mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull }
+        return parseModels(text)
     }
 
     private suspend fun token(vararg fields: Pair<String, String>): Tokens {
@@ -125,6 +125,23 @@ class ChatGptAuth(
         /** The loopback port OpenAI's guide uses; scheme, host and path must stay the same across sign-ins. */
         const val LOOPBACK_PORT = 1455
         const val REDIRECT_PATH = "/auth/callback"
+
+        /**
+         * A model list: "data" (or "models") entries with an id ("id" or "slug"), a name if given, and any field
+         * about reasoning or effort read as its efforts, whatever its shape.
+         */
+        fun parseModels(text: String): List<PlanModel> {
+            val root = Json.parseToJsonElement(text).jsonObject
+            val entries = (root["data"] ?: root["models"])?.jsonArray.orEmpty()
+            return entries.mapNotNull { e ->
+                val o = e as? JsonObject ?: return@mapNotNull null
+                val id = listOf("id", "slug").firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.contentOrNull } ?: return@mapNotNull null
+                val name = listOf("display_name", "name").firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.contentOrNull }
+                val efforts = o.entries.filter { (k, _) -> "reasoning" in k || "effort" in k }
+                    .firstNotNullOfOrNull { (_, v) -> PlanModel.effortsIn(v) }
+                PlanModel(id, name, efforts)
+            }
+        }
 
         internal fun parseTokens(o: JsonObject): Tokens = Tokens(
             accessToken = o["access_token"]?.jsonPrimitive?.contentOrNull ?: throw LlmFailed("ChatGPT sign-in returned no token"),

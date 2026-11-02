@@ -1,6 +1,7 @@
 package com.piyush.mode.llm
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -20,16 +21,48 @@ class ClaudeOAuthClient(
     private val token: suspend (forceRefresh: Boolean) -> String,
     private val baseUrl: String = "https://api.anthropic.com",
 ) : LlmClient {
+    /**
+     * Every model this Claude account can use, as Anthropic lists it (newest first), with the efforts each
+     * takes from its capabilities. Mode keeps the whole list: the user picks.
+     */
+    suspend fun models(): List<PlanModel> {
+        val found = mutableListOf<PlanModel>()
+        var after: String? = null
+        repeat(MAX_MODEL_PAGES) {
+            val page = getModels(after)
+            val root = runCatching { Json.parseToJsonElement(page).jsonObject }.getOrElse { throw LlmFailed("Claude returned an unreadable model list.") }
+            found += parseModels(root)
+            if (root["has_more"]?.jsonPrimitive?.booleanOrNull != true) return found
+            after = root["last_id"]?.jsonPrimitive?.contentOrNull ?: return found
+        }
+        return found
+    }
+
+    private suspend fun getModels(after: String?): String {
+        for (attempt in 0..1) {
+            val access = token(attempt == 1)
+            val response = http.get("$baseUrl/v1/models?limit=1000" + (after?.let { "&after_id=$it" } ?: "")) { headers(access) }
+            if (response.status.value == 401 && attempt == 0) continue
+            if (!response.status.isSuccess()) throw LlmFailed("Claude models: HTTP ${response.status.value}.")
+            return response.bodyAsText()
+        }
+        error("unreachable")
+    }
+
+    private fun io.ktor.client.request.HttpRequestBuilder.headers(access: String) {
+        header("Authorization", "Bearer $access")
+        header("anthropic-version", "2023-06-01")
+        header("anthropic-beta", "claude-code-20250219,oauth-2025-04-20")
+        header("User-Agent", "claude-cli/2.1.75")
+        header("x-app", "cli")
+    }
+
     override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
         val body = request(model, messages, tools)
         for (attempt in 0..1) {
             val access = token(attempt == 1)
             val response = http.post("$baseUrl/v1/messages") {
-                header("Authorization", "Bearer $access")
-                header("anthropic-version", "2023-06-01")
-                header("anthropic-beta", "claude-code-20250219,oauth-2025-04-20")
-                header("User-Agent", "claude-cli/2.1.75")
-                header("x-app", "cli")
+                headers(access)
                 setBody(TextContent(body.toString(), ContentType.Application.Json))
             }
             if (response.status.value == 401 && attempt == 0) continue
@@ -48,22 +81,34 @@ class ClaudeOAuthClient(
         const val MAIN_MODEL = "claude-haiku-5-5"
         const val STRONG_MODEL = "claude-sonnet-5-5"
 
-        /** Efforts Mode offers; Claude also takes xhigh and max, which a phone step does not need. */
-        val EFFORTS = setOf("low", "medium", "high")
+        private const val MAX_MODEL_PAGES = 5
 
         /**
-         * Room for the answer and Claude's thinking (on by default; the thinking counts against it). 1,024 was
-         * too little at high effort: the thinking could use it all and leave no action.
+         * Room for the answer and Claude's thinking (on by default; the thinking counts against it), by effort:
+         * 1,024 was too little at high effort, where the thinking could use it all and leave no action.
          */
-        const val MAX_TOKENS = 8192
+        fun maxTokens(effort: String?): Int = when (effort) {
+            "xhigh", "max" -> 32_768
+            "high", null -> 16_384
+            else -> 8_192
+        }
+
+        /** Anthropic's model list: id, display name, and the efforts its capabilities mark supported. */
+        fun parseModels(root: JsonObject): List<PlanModel> = (root["data"] as? JsonArray).orEmpty().mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val caps = o["capabilities"] as? JsonObject
+            PlanModel(id, o["display_name"]?.jsonPrimitive?.contentOrNull, caps?.let { PlanModel.effortsIn(it["effort"] ?: JsonObject(mapOf("supported" to JsonPrimitive(false)))) })
+        }
 
         fun request(model: String, messages: List<ChatMessage>, tools: JsonArray): JsonObject = buildJsonObject {
-            // "claude-haiku-5-5@low": the model, and the effort the user picked for it (none: Claude's own default).
+            // "claude-opus-5-5@max": the model, and the effort the user picked from its list (none: Claude's own default).
             val base = model.substringBefore('@')
             require(base.startsWith("claude-") && '/' !in base) { "Choose a native Claude model for Claude OAuth." }
+            val effort = model.substringAfter('@', "").takeIf { it.isNotEmpty() && it.all(Char::isLetter) }
             put("model", base)
-            put("max_tokens", MAX_TOKENS)
-            model.substringAfter('@', "").takeIf { it in EFFORTS }?.let { putJsonObject("output_config") { put("effort", it) } }
+            put("max_tokens", maxTokens(effort))
+            effort?.let { putJsonObject("output_config") { put("effort", it) } }
             put("system", buildJsonArray {
                 add(buildJsonObject { put("type", "text"); put("text", "You are Claude Code, Anthropic's official CLI for Claude.") })
                 messages.filter { it.role == "system" }.forEach { m -> m.parts.filterIsInstance<ChatMessage.Part.Text>().forEach { add(textPart(it)) } }

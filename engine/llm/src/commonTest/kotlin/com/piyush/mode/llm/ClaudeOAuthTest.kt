@@ -68,8 +68,28 @@ class ClaudeOAuthTest {
         val request = ClaudeOAuthClient.request("claude-sonnet-5-5@high", listOf(ChatMessage("user", "hi")), tools)
         assertEquals("claude-sonnet-5-5", request["model"]!!.jsonPrimitive.content)
         assertEquals("high", request["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
-        assertTrue(request["max_tokens"]!!.jsonPrimitive.int >= 4096, "thinking counts against max_tokens")
-        assertNull(ClaudeOAuthClient.request("claude-haiku-5-5@turbo", emptyList(), tools)["output_config"], "unknown efforts are not sent")
+        assertTrue(request["max_tokens"]!!.jsonPrimitive.int >= 16_384, "thinking counts against max_tokens")
+        val max = ClaudeOAuthClient.request("claude-opus-5-5@max", emptyList(), tools)
+        assertEquals("max", max["output_config"]!!.jsonObject["effort"]!!.jsonPrimitive.content, "any effort the model listed is sent")
+        assertTrue(max["max_tokens"]!!.jsonPrimitive.int > request["max_tokens"]!!.jsonPrimitive.int, "more room to think at max")
+    }
+
+    @Test fun theAccountsModelListKeepsEveryModelAndTheEffortsEachTakes() {
+        val root = Json.parseToJsonElement(
+            """{"data":[
+              {"id":"claude-opus-5-5","display_name":"Claude Opus 5.5","capabilities":{"effort":{"supported":true,"low":{"supported":true},"medium":{"supported":true},"high":{"supported":true},"xhigh":{"supported":true},"max":{"supported":true}}}},
+              {"id":"claude-sonnet-5-5","display_name":"Claude Sonnet 5.5","capabilities":{"effort":{"supported":true,"max":{"supported":true},"low":{"supported":true},"high":{"supported":true},"medium":{"supported":false}}}},
+              {"id":"claude-3-5-haiku-20241022","display_name":"Claude Haiku 3.5","capabilities":{"effort":{"supported":false}}},
+              {"id":"claude-haiku-5-5"}
+            ],"has_more":false}""",
+        ).jsonObject
+        val models = ClaudeOAuthClient.parseModels(root)
+        assertEquals(listOf("claude-opus-5-5", "claude-sonnet-5-5", "claude-3-5-haiku-20241022", "claude-haiku-5-5"), models.map { it.id }, "nothing trimmed, Anthropic's order")
+        assertEquals(listOf("low", "medium", "high", "xhigh", "max"), models[0].efforts)
+        assertEquals(listOf("low", "high", "max"), models[1].efforts, "only those marked supported, lowest first")
+        assertEquals(emptyList(), models[2].efforts, "takes no effort")
+        assertNull(models[3].efforts, "not said: Mode offers the common ones")
+        assertEquals("Claude Opus 5.5", models[0].name)
     }
 
     @Test fun toolArgumentsAndTokenUsageAreReturnedToTheAgent() {

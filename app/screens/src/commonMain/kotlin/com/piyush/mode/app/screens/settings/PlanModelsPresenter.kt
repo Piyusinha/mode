@@ -3,13 +3,14 @@ package com.piyush.mode.app.screens.settings
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.feature.settings.data.BrainProbe
 import com.piyush.mode.feature.settings.data.ChatGptAccount
+import com.piyush.mode.feature.settings.data.ClaudeModels
 import com.piyush.mode.feature.settings.data.ModelBench
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.domain.ModelOption
-import com.piyush.mode.feature.settings.domain.ModelTag
 import com.piyush.mode.feature.settings.domain.ProviderModels
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.llm.ModelProvider
+import com.piyush.mode.llm.PlanModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ public class PlanModelsPresenter(
     private val chatGpt: ChatGptAccount,
     private val bench: ModelBench,
     private val llm: LlmClient,
+    /** The Claude account's own model list (null: Mode's two defaults). */
+    private val claudeModels: ClaudeModels? = null,
 ) : Presenter<PlanModelsUiState>(parent, PlanModelsUiState()) {
     private val role = MutableStateFlow(ModelRole.PhoneControl)
     private val progress = MutableStateFlow<Pair<Int, Int>?>(null)
@@ -68,21 +71,30 @@ public class PlanModelsPresenter(
     private val measured = MutableStateFlow(0)
 
     init {
-        // The plan's own list, fresh (it can change when OpenAI adds a model).
-        if (settings.settings.value.provider == ModelProvider.ChatGpt) scope.launch { runCatching { chatGpt.models() } }
+        // The plan's own list, fresh (it changes when OpenAI or Anthropic adds a model).
+        when (settings.settings.value.provider) {
+            ModelProvider.ChatGpt -> scope.launch { runCatching { chatGpt.models() } }
+            ModelProvider.ClaudeOAuth -> claudeModels?.let { c -> scope.launch { runCatching { c.refresh() } } }
+            ModelProvider.OpenRouter -> Unit
+        }
+        val lists = combine(chatGpt.knownModels, chatGpt.modelInfo, claudeModels?.known ?: MutableStateFlow(emptyList())) { _, _, _ -> Unit }
         scope.launch {
-            combine(settings.settings, chatGpt.knownModels, role, progress, combine(error, measured) { e, _ -> e }) { s, known, r, p, e ->
-                build(s.provider, known, r, p, e)
+            combine(settings.settings, lists, role, progress, combine(error, measured) { e, _ -> e }) { s, _, r, p, e ->
+                build(s.provider, r, p, e)
             }.collect { mutableState.value = it }
         }
     }
 
     public fun role(role: ModelRole) { this.role.value = role }
 
-    /** Picks [id] for the role shown, keeping the effort it had (or the role's usual one). */
+    /**
+     * Picks [id] for the role shown, keeping the effort it had if the new model takes it, else the role's
+     * usual one, else the nearest the model takes. A model that takes none gets none.
+     */
     public fun choose(id: String) {
         val provider = settings.settings.value.provider
-        val effort = if (ProviderModels.supportsEffort(provider)) currentEffort() ?: defaultEffort(role.value) else null
+        val takes = ProviderModels.efforts(provider, options(provider).firstOrNull { it.id == id })
+        val effort = listOfNotNull(currentEffort(), defaultEffort(role.value)).firstOrNull { it in takes } ?: nearest(defaultEffort(role.value), takes)
         set(ProviderModels.withEffort(id, effort))
     }
 
@@ -101,15 +113,15 @@ public class PlanModelsPresenter(
         if (progress.value != null || (!brain && probes.isEmpty())) return
         val provider = settings.settings.value.provider
         val client = llm.forProvider(provider)
-        val models = options(provider).map { it.id }
+        val options = options(provider)
         val selected = current()?.let(ProviderModels::base)
         val pairs = buildList {
-            val usual = if (ProviderModels.supportsEffort(provider)) defaultEffort(role.value) else null
-            models.forEach { add(ProviderModels.withEffort(it, usual)) }
-            if (selected != null && ProviderModels.supportsEffort(provider)) {
-                ProviderModels.EFFORTS.filter { it != usual }.forEach { add(ProviderModels.withEffort(selected, it)) }
+            // Every model at the role's usual effort (or the nearest it takes), the selected one at all it takes.
+            options.forEach { o -> add(ProviderModels.withEffort(o.id, shownEffort(provider, o, role.value))) }
+            options.firstOrNull { it.id == selected }?.let { o ->
+                ProviderModels.efforts(provider, o).forEach { add(ProviderModels.withEffort(o.id, it)) }
             }
-        }
+        }.distinct()
         error.value = null
         scope.launch {
             try {
@@ -137,19 +149,18 @@ public class PlanModelsPresenter(
     }
 
     private fun options(provider: ModelProvider): List<ModelOption> = when (provider) {
-        ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGpt.knownModels.value)
-        ModelProvider.ClaudeOAuth -> ProviderModels.claude
+        ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGpt.knownModels.value, chatGpt.modelInfo.value)
+        ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels?.known?.value.orEmpty())
         ModelProvider.OpenRouter -> emptyList()
     }
 
-    private fun build(provider: ModelProvider, known: List<String>, r: ModelRole, p: Pair<Int, Int>?, e: String?): PlanModelsUiState {
+    private fun build(provider: ModelProvider, r: ModelRole, p: Pair<Int, Int>?, e: String?): PlanModelsUiState {
         val s = settings.settings.value
         val chosen = if (r == ModelRole.PhoneControl) s.model else s.strongModel
         val results = bench.results(provider.id, brain = r == ModelRole.Brain)
         val supportsEffort = ProviderModels.supportsEffort(provider)
-        val usual = if (supportsEffort) defaultEffort(r) else null
-        val options = if (provider == ModelProvider.ChatGpt) ProviderModels.chatGpt(known) else options(provider)
-        val tags = tags(options, results, usual, r)
+        val options = options(provider)
+        val tags = tags(provider, options, results, r)
         return PlanModelsUiState(
             provider = provider.id,
             plan = if (provider == ModelProvider.ChatGpt) chatGpt.account()?.plan else null,
@@ -159,12 +170,13 @@ public class PlanModelsPresenter(
             error = e,
             models = options.map { o ->
                 val selected = chosen != null && ProviderModels.base(chosen) == o.id
+                val usual = shownEffort(provider, o, r)
                 val effort = if (selected) chosen?.let(ProviderModels::effortUsed) ?: usual else null
                 val shown = results[ProviderModels.withEffort(o.id, effort ?: usual)]
                 PlanModelRow(
                     id = o.id, name = o.name, tag = tags[o.id], selected = selected, effort = effort,
                     millis = shown?.millis, correct = shown?.correct, total = shown?.total,
-                    efforts = if (!supportsEffort) emptyList() else ProviderModels.EFFORTS.map { ef ->
+                    efforts = ProviderModels.efforts(provider, o).map { ef ->
                         val m = results[ProviderModels.withEffort(o.id, ef)]
                         EffortRow(ef, m?.millis, m?.correct, m?.total, selected = ef == effort)
                     },
@@ -173,22 +185,33 @@ public class PlanModelsPresenter(
         )
     }
 
+    /** The effort [o] is shown and measured at for [r]: the role's usual one, or the nearest it takes. */
+    private fun shownEffort(provider: ModelProvider, o: ModelOption, r: ModelRole): String? =
+        ProviderModels.efforts(provider, o).let { takes -> defaultEffort(r).takeIf { it in takes } ?: nearest(defaultEffort(r), takes) }
+
     private companion object {
         /** Phone control acts every step: low effort. The brain decides: high. */
         fun defaultEffort(role: ModelRole) = if (role == ModelRole.PhoneControl) "low" else "high"
 
+        /** Of [takes], the effort closest to [wanted] on the ladder (none when the model takes none). */
+        fun nearest(wanted: String, takes: List<String>): String? {
+            val at = PlanModel.LADDER.indexOf(wanted)
+            return takes.minByOrNull { kotlin.math.abs(PlanModel.LADDER.indexOf(it).let { i -> if (i < 0) PlanModel.LADDER.size else i } - at) }
+        }
+
         /**
-         * From measurements at the role's usual effort: the fastest (of those right most of the time), the most
-         * accurate (then faster), and the best for the role (phone control: accuracy minus a tenth per second;
-         * brain: the most accurate). Before any, the provider's own picks.
+         * From measurements at each model's shown effort: the fastest (of those right most of the time), the
+         * most accurate (then faster), and the best for the role (phone control: accuracy minus a tenth per
+         * second; brain: the most accurate). Before any, Mode's default for the role is marked.
          */
-        fun tags(options: List<ModelOption>, results: Map<String, ModelBench.Result>, usual: String?, role: ModelRole): Map<String, PlanTag> {
-            val measured = options.mapNotNull { o -> results[ProviderModels.withEffort(o.id, usual)]?.let { o.id to it } }
-                .filter { it.second.total > 0 }
+        fun tags(provider: ModelProvider, options: List<ModelOption>, results: Map<String, ModelBench.Result>, role: ModelRole): Map<String, PlanTag> {
+            val measured = options.mapNotNull { o ->
+                ProviderModels.efforts(provider, o).let { takes -> defaultEffort(role).takeIf { it in takes } ?: nearest(defaultEffort(role), takes) }
+                    .let { results[ProviderModels.withEffort(o.id, it)] }?.let { o.id to it }
+            }.filter { it.second.total > 0 }
             if (measured.size < 2) {
-                return options.mapNotNull { o ->
-                    when (o.tag) { ModelTag.Recommended -> o.id to PlanTag.Recommended; ModelTag.Strongest -> o.id to PlanTag.Strongest; else -> null }
-                }.toMap()
+                val pick = ProviderModels.base(if (role == ModelRole.Brain) ProviderModels.strong(provider) else ProviderModels.main(provider))
+                return options.filter { it.id == pick }.associate { it.id to PlanTag.Recommended }
             }
             fun accuracy(r: ModelBench.Result) = r.correct.toDouble() / r.total
             val accurate = measured.sortedWith(compareByDescending<Pair<String, ModelBench.Result>> { accuracy(it.second) }.thenBy { it.second.millis }).first().first

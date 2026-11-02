@@ -83,8 +83,9 @@ class PlanModelsTest {
         assertEquals(400L, s.models.single { it.id == "gpt-6.1-terra" }.millis)
         assertEquals(3, s.models.single { it.id == "gpt-6-luna" }.correct)
         p.role(ModelRole.Brain)
-        // The brain's usual effort is high: only Terra (the selected one) was measured at high.
-        assertEquals(PlanTag.Recommended, p.state.awaitState { it.role == ModelRole.Brain }.models.single { it.id == "gpt-6.1-terra" }.tag)
+        // The brain's usual effort is high: only Terra (the selected one) was measured at high, so the
+        // brain's default is still the one marked.
+        assertEquals(PlanTag.Recommended, p.state.awaitState { it.role == ModelRole.Brain }.models.single { it.id == ProviderModels.CHATGPT_STRONG }.tag)
         val selected = s.models.single { it.selected }
         assertEquals(3, selected.efforts.count { it.millis != null }, "the selected model measured at every effort")
         assertTrue(selected.efforts.single { it.selected }.effort == "low")

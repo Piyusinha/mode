@@ -54,7 +54,6 @@ class ResponsesClient(
     }
 
     companion object {
-        val EFFORTS = setOf("low", "medium", "high")
         const val SIGN_IN_AGAIN = "ChatGPT needs you to sign in again: open Settings → AI."
         const val SHARE_USED_UP = "Your ChatGPT plan's share for Mode is used up for now. Raise it in ChatGPT → Settings → Usage, or switch to OpenRouter in Mode's Settings."
         const val NOT_ELIGIBLE = "Continue with ChatGPT needs a Plus or Pro plan. You can connect OpenRouter in Settings instead."
@@ -63,7 +62,8 @@ class ResponsesClient(
         fun request(model: String, messages: List<ChatMessage>, tools: JsonArray): JsonObject = buildJsonObject {
             // "gpt-6.1-terra@low": the model, and the reasoning effort the user picked for it.
             put("model", model.substringBefore('@'))
-            model.substringAfter('@', "").takeIf { it in EFFORTS }?.let { put("reasoning", buildJsonObject { put("effort", it) }) }
+            // Any effort the model's listing offered is sent as is: Mode does not narrow what OpenAI allows.
+            model.substringAfter('@', "").takeIf { it.isNotEmpty() && it.all(Char::isLetter) }?.let { put("reasoning", buildJsonObject { put("effort", it) }) }
             put("store", false)
             put("stream", true)
             val system = messages.filter { it.role == "system" }.joinToString("\n\n") { it.text }

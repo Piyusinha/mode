@@ -6,6 +6,7 @@ import com.piyush.mode.llm.ChatGptAuth
 import com.piyush.mode.llm.Jwt
 import kotlinx.serialization.json.Json
 import com.piyush.mode.llm.LlmFailed
+import com.piyush.mode.llm.PlanModel
 import com.piyush.mode.llm.ResponsesClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +34,11 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     private val mutableModels = MutableStateFlow(secrets.get(MODELS)?.split(',')?.filter { it.isNotBlank() }.orEmpty())
     /** The plan's models as last asked (empty until the first check). */
     public val knownModels: StateFlow<List<String>> = mutableModels.asStateFlow()
+    private val mutableInfo = MutableStateFlow(
+        secrets.get(MODEL_INFO)?.let { runCatching { Json.decodeFromString<List<PlanModel>>(it) }.getOrNull() }.orEmpty(),
+    )
+    /** The same models with what OpenAI says about each (its efforts), when it says. */
+    public val modelInfo: StateFlow<List<PlanModel>> = mutableInfo.asStateFlow()
     /** Signed in, with a plan Mode may use. */
     public val connected: StateFlow<Boolean> = mutableConnected.asStateFlow()
 
@@ -75,11 +81,15 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     }
 
     /** The models the plan can use. */
-    public suspend fun models(): List<String> =
-        auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN)).also { list ->
-            secrets.set(MODELS, list.joinToString(","))
-            mutableModels.value = list
-        }
+    public suspend fun models(): List<String> {
+        val listed = auth.models(accessToken() ?: throw LlmFailed(ResponsesClient.SIGN_IN_AGAIN))
+        val ids = listed.map { it.id }
+        secrets.set(MODELS, ids.joinToString(","))
+        secrets.set(MODEL_INFO, Json.encodeToString(listed))
+        mutableInfo.value = listed
+        mutableModels.value = ids
+        return ids
+    }
 
     /** Who is signed in, from the sign-in's ID token (null before the first sign-in that brought one). */
     public fun account(): AccountInfo? = secrets.get(PROFILE)?.let { runCatching { Json.decodeFromString<AccountInfo>(it) }.getOrNull() }
@@ -117,6 +127,7 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         /** Present while signed in (SettingsRepository reads it to know ChatGPT is ready). */
         public const val CONNECTED_KEY: String = "chatgpt_refresh_token"
         private const val MODELS = "chatgpt_models"
+        private const val MODEL_INFO = "chatgpt_model_info"
         private const val PROFILE = "chatgpt_profile"
         private const val LIMIT_AT = "chatgpt_limit_at"
         private const val CLIENT_ID = "chatgpt_client_id"

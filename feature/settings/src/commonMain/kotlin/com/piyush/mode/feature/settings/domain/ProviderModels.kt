@@ -3,6 +3,7 @@ package com.piyush.mode.feature.settings.domain
 import com.piyush.mode.agent.AgentConfig
 import com.piyush.mode.llm.ClaudeOAuthClient
 import com.piyush.mode.llm.ModelProvider
+import com.piyush.mode.llm.PlanModel
 
 /** Provider-specific defaults/catalogue metadata live here, not in UI or the task runner. */
 public object ProviderModels {
@@ -20,8 +21,8 @@ public object ProviderModels {
 
     public fun accepts(provider: ModelProvider, model: String): Boolean {
         val base = base(model)
-        // Only plan models carry an effort ("gpt-6.1-terra@low", "claude-haiku-5-5@medium").
-        if (base != model && (!supportsEffort(provider) || effort(model) !in EFFORTS)) return false
+        // Only plan models carry an effort ("gpt-6.1-terra@low", "claude-opus-5-5@max"): any the provider listed.
+        if (base != model && (!supportsEffort(provider) || effort(model)?.all(Char::isLetter) != true)) return false
         return when (provider) {
             ModelProvider.OpenRouter -> '/' in base && !base.startsWith("claude-oauth/")
             ModelProvider.ClaudeOAuth -> base.startsWith("claude-") && '/' !in base
@@ -29,8 +30,12 @@ public object ProviderModels {
         }
     }
 
-    /** Reasoning effort, picked per model and role, for providers that take it. */
-    public val EFFORTS: List<String> = listOf("low", "medium", "high")
+    /** Offered for a plan model when its provider does not say which efforts it takes. */
+    public val EFFORTS: List<String> = PlanModel.COMMON
+
+    /** The efforts [option] takes: what its provider listed, or the common ones when it did not say. */
+    public fun efforts(provider: ModelProvider, option: ModelOption?): List<String> =
+        if (!supportsEffort(provider)) emptyList() else option?.efforts ?: EFFORTS
 
     public fun supportsEffort(provider: ModelProvider): Boolean = provider == ModelProvider.ChatGpt || provider == ModelProvider.ClaudeOAuth
 
@@ -59,14 +64,44 @@ public object ProviderModels {
      * The models on the user's ChatGPT plan ([known], from the account), or the defaults when the plan
      * has not been asked yet. The defaults are marked; the rest keep the plan's order.
      */
-    public fun chatGpt(known: List<String>): List<ModelOption> {
+    public fun chatGpt(known: List<String>, info: List<PlanModel> = emptyList()): List<ModelOption> {
         val ids = known.filter { accepts(ModelProvider.ChatGpt, it) }.ifEmpty { listOf(CHATGPT_MAIN, CHATGPT_STRONG) }
+        val about = info.associateBy { it.id }
         return ids.map { id ->
             ModelOption(
-                id, displayName(id), 0.0,
+                id, about[id]?.name ?: displayName(id), 0.0,
                 when (id) { CHATGPT_MAIN -> ModelTag.Recommended; CHATGPT_STRONG -> ModelTag.Strongest; else -> null },
+                efforts = about[id]?.efforts,
             )
         }.sortedBy { if (it.tag != null) 0 else 1 }
+    }
+
+    /**
+     * Every model the user's Claude account offers ([known], as Anthropic listed it, newest first), with its
+     * name and efforts; Mode's two defaults until the account has been asked.
+     */
+    public fun claude(known: List<PlanModel> = emptyList()): List<ModelOption> {
+        val models = known.filter { accepts(ModelProvider.ClaudeOAuth, it.id) }.ifEmpty {
+            listOf(PlanModel(ClaudeOAuthClient.MAIN_MODEL), PlanModel(ClaudeOAuthClient.STRONG_MODEL))
+        }
+        return models.map { m ->
+            ModelOption(
+                m.id, m.name ?: claudeName(m.id), 0.0,
+                when (m.id) { ClaudeOAuthClient.MAIN_MODEL -> ModelTag.Recommended; ClaudeOAuthClient.STRONG_MODEL -> ModelTag.Strongest; else -> null },
+                efforts = m.efforts,
+            )
+        }
+    }
+
+    /** "claude-sonnet-5-5" → "Claude Sonnet 5.5"; "claude-3-5-haiku-20241022" → "Claude 3.5 Haiku". */
+    public fun claudeName(id: String): String {
+        val words = mutableListOf<String>()
+        base(id).split('-').filterNot { it.length == 8 && it.all(Char::isDigit) }.forEach { part ->
+            val last = words.lastOrNull()
+            if (part.all(Char::isDigit) && last != null && last.first().isDigit()) words[words.lastIndex] = "$last.$part"
+            else words += part.replaceFirstChar { it.uppercase() }
+        }
+        return words.joinToString(" ")
     }
 
     /** "gpt-6.1-terra" → "GPT-6.1 Terra". */
@@ -74,9 +109,4 @@ public object ProviderModels {
         if (part.equals("gpt", true)) "GPT" else part.replaceFirstChar { it.uppercase() }
     }.replace(Regex("""^GPT (\d)"""), "GPT-$1")
 
-    /** Currency cost is unavailable for OAuth; UI must use provider billing metadata, not these placeholders. */
-    public val claude: List<ModelOption> = listOf(
-        ModelOption(ClaudeOAuthClient.MAIN_MODEL, "Claude Haiku 5.5", 0.0, ModelTag.Recommended),
-        ModelOption(ClaudeOAuthClient.STRONG_MODEL, "Claude Sonnet 5.5", 0.0, ModelTag.Strongest),
-    )
 }

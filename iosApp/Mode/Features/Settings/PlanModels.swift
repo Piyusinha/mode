@@ -18,8 +18,12 @@ final class PlanModelsViewModel {
         let line: String
         let selected: Bool
         let effort: String?
+        /// The efforts this model takes, as its provider listed them (empty: it takes none).
+        let effortOptions: [EffortOption]
         let efforts: [ModeEffortTable.Row]
     }
+
+    struct EffortOption: Equatable, Hashable { let id: String; let title: String }
 
     struct State: Equatable {
         var chip = ""
@@ -66,11 +70,17 @@ final class PlanModelsViewModel {
         presenter.close()
     }
 
+    /// Any effort a provider lists; one Mode has no name for shows as the provider wrote it.
     static func effortName(_ e: String) -> String {
         switch e {
+        case "none": String(localized: L10n.Plan.effortNone)
+        case "minimal": String(localized: L10n.Plan.minimal)
         case "low": String(localized: L10n.Plan.low)
         case "medium": String(localized: L10n.Plan.medium)
-        default: String(localized: L10n.Plan.high)
+        case "high": String(localized: L10n.Plan.high)
+        case "xhigh": String(localized: L10n.Plan.extraHigh)
+        case "max": String(localized: L10n.Plan.max)
+        default: e.capitalized
         }
     }
 
@@ -106,6 +116,7 @@ final class PlanModelsViewModel {
                     id: m.id, name: m.name, leading: ModelTile.leading(for: m.id, name: m.name), tag: tag,
                     line: ([effort].compactMap { $0 } + measured).joined(separator: " · "),
                     selected: m.selected, effort: m.effort,
+                    effortOptions: m.efforts.map { EffortOption(id: $0.effort, title: effortName($0.effort)) },
                     efforts: m.efforts.map { e in
                         ModeEffortTable.Row(
                             label: effortName(e.effort),
@@ -143,10 +154,10 @@ struct PlanModelsScreen: View {
                     ForEach(state.rows) { row in
                         VStack(alignment: .leading, spacing: ModeSpacing.s) {
                             ModeChoiceRow(row.name, tag: row.tag, detail: row.line, leading: row.leading, selected: row.selected) { onEvent(.choose(row.id)) }
-                            if row.selected && state.supportsEffort {
+                            if row.selected && !row.effortOptions.isEmpty {
                                 Text(L10n.Plan.effort).modeText(.footnote, color: ModeColor.textSecondary).fontWeight(.semibold)
-                                ModeSegmented([("low", L10n.Plan.low), ("medium", L10n.Plan.medium), ("high", L10n.Plan.high)],
-                                              selection: Binding(get: { row.effort ?? "low" }, set: { onEvent(.effort($0)) }))
+                                ModeSegmented(row.effortOptions.map { ($0.id, LocalizedStringResource(stringLiteral: $0.title)) },
+                                              selection: Binding(get: { row.effort ?? row.effortOptions[0].id }, set: { onEvent(.effort($0)) }))
                                 ModeEffortTable(headers: (String(localized: L10n.Plan.effort), String(localized: L10n.Plan.speed),
                                                           String(localized: L10n.Plan.accuracy)), rows: row.efforts)
                                     .padding(.bottom, ModeSpacing.m)

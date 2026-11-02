@@ -59,6 +59,8 @@ public class Screens(
     private val bench: com.piyush.mode.feature.settings.data.ModelBench? = null,
     private val claudeApi: com.piyush.mode.llm.ClaudeAccountApi? = null,
     private val openRouterApi: com.piyush.mode.llm.OpenRouterAccountApi? = null,
+    /** The Claude account's model list (null: Mode's two defaults). */
+    private val claudeModels: com.piyush.mode.feature.settings.data.ClaudeModels? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -66,7 +68,7 @@ public class Screens(
         com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)
 
     public fun planModels(): com.piyush.mode.app.screens.settings.PlanModelsPresenter =
-        com.piyush.mode.app.screens.settings.PlanModelsPresenter(scope, settings, chatGpt, bench!!, providers!!)
+        com.piyush.mode.app.screens.settings.PlanModelsPresenter(scope, settings, chatGpt, bench!!, providers!!, claudeModels)
 
     /** One provider's page: account, usage, models. [id] is a ModelProvider id. */
     public fun providerDetail(id: String): com.piyush.mode.app.screens.settings.ProviderDetailPresenter =
@@ -90,7 +92,7 @@ public class Screens(
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
-    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm) { chatGpt.knownModels.value }
+    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
 
     /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
     public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =
@@ -101,7 +103,7 @@ public class Screens(
             settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         }
 
-    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle) { chatGpt.knownModels.value }
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
 
     /** Whether first-run setup still has to be shown. */
     public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone

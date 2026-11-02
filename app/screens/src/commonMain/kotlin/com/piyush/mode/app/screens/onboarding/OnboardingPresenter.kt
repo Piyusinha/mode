@@ -106,6 +106,8 @@ public class OnboardingPresenter(
     private val phoneChecks: PhoneChecks,
     private val auth: OpenRouterAuth,
     lifecycle: AppLifecycle,
+    /** The models the user's Claude account offers, as last listed. */
+    private val claudeModels: () -> List<com.piyush.mode.llm.PlanModel> = { emptyList() },
     /** The models on the user's ChatGPT plan, as last asked. */
     private val chatGptModels: () -> List<String> = { emptyList() },
 ) : Presenter<OnboardingUiState>(parent, OnboardingUiState()) {
@@ -402,7 +404,7 @@ public class OnboardingPresenter(
     /** The picks for the provider in use. */
     private fun pickList(): List<ModelOption> = when (settings.settings.value.provider) {
         com.piyush.mode.llm.ModelProvider.OpenRouter -> catalog.state.value.recommended
-        com.piyush.mode.llm.ModelProvider.ClaudeOAuth -> ProviderModels.claude
+        com.piyush.mode.llm.ModelProvider.ClaudeOAuth -> ProviderModels.claude(claudeModels())
         com.piyush.mode.llm.ModelProvider.ChatGpt -> ProviderModels.chatGpt(chatGptModels())
     }
 
