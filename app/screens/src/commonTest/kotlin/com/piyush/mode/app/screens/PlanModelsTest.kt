@@ -3,6 +3,7 @@ package com.piyush.mode.app.screens
 import com.piyush.mode.app.screens.settings.ModelRole
 import com.piyush.mode.app.screens.settings.PlanModelsPresenter
 import com.piyush.mode.app.screens.settings.PlanTag
+import com.piyush.mode.feature.settings.data.BrainProbe
 import com.piyush.mode.feature.settings.data.ChatGptAccount
 import com.piyush.mode.feature.settings.data.ModelBench
 import com.piyush.mode.feature.settings.data.SettingsRepository
@@ -87,5 +88,33 @@ class PlanModelsTest {
         val selected = s.models.single { it.selected }
         assertEquals(3, selected.efforts.count { it.millis != null }, "the selected model measured at every effort")
         assertTrue(selected.efforts.single { it.selected }.effort == "low")
+    }
+
+    @Test
+    fun theBrainHasItsOwnTestAndScores() = runTest {
+        val bench = ModelBench(prefs, timeSource = testScheduler.timeSource)
+        secrets.set(ChatGptAccount.CONNECTED_KEY, "r"); settings.accountsChanged()
+        settings.selectProvider(ModelProvider.ChatGpt)
+        secrets.set("chatgpt_models", "gpt-6.1-terra,gpt-6.1-sol")
+        val known = ChatGptAccount(ChatGptAuth(HttpClient(MockEngine { respond("") })), secrets)
+        // Sol decides well (B on every choice: the first three are right); Terra answers A (none right). Neither writes a brief.
+        val brainModel = LlmClient { m, _, _ ->
+            delay(if (m.startsWith("gpt-6.1-sol")) 1000L else 300L)
+            val letter = if (m.startsWith("gpt-6.1-sol")) "B" else "A"
+            ChatResult(ToolCall("decision", JsonObject(mapOf("answer" to JsonPrimitive("$letter) yes")))), "", Usage(10, 1, 0.0))
+        }
+        val p = PlanModelsPresenter(backgroundScope, settings, known, bench, brainModel)
+        p.state.awaitState { it.models.size == 2 }
+        p.role(ModelRole.Brain)
+        p.measure(emptyList())
+        repeat(120) { delay(500) }
+        val s = p.state.awaitState { st -> st.measuring == null && st.role == ModelRole.Brain && st.models.all { it.millis != null } }
+        val sol = s.models.single { it.id == "gpt-6.1-sol" }
+        assertEquals(3, sol.correct)
+        assertEquals(BrainProbe.ALL.size, sol.total)
+        assertEquals(0, s.models.single { it.id == "gpt-6.1-terra" }.correct)
+        assertEquals(PlanTag.BestForBrain, sol.tag, "more right, though slower")
+        p.role(ModelRole.PhoneControl)
+        assertTrue(p.state.awaitState { it.role == ModelRole.PhoneControl }.models.all { it.millis == null }, "phone control not measured")
     }
 }

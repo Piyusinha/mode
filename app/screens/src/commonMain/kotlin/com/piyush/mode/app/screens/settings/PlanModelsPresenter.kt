@@ -1,6 +1,7 @@
 package com.piyush.mode.app.screens.settings
 
 import com.piyush.mode.app.screens.common.Presenter
+import com.piyush.mode.feature.settings.data.BrainProbe
 import com.piyush.mode.feature.settings.data.ChatGptAccount
 import com.piyush.mode.feature.settings.data.ModelBench
 import com.piyush.mode.feature.settings.data.SettingsRepository
@@ -91,11 +92,13 @@ public class PlanModelsPresenter(
     }
 
     /**
-     * Measures each model at the role's usual effort, and the selected one at every effort, with [probes]
-     * (images the app makes). One pair at a time; the screen updates as each finishes.
+     * Measures each model at the role's usual effort, and the selected one at every effort, with the role's
+     * own test: phone control reads [probes] (images the app makes); the brain plans and decides
+     * ([BrainProbe.ALL], text only). One pair at a time; the screen updates as each finishes.
      */
     public fun measure(probes: List<ModelBench.Probe>) {
-        if (progress.value != null || probes.isEmpty()) return
+        val brain = role.value == ModelRole.Brain
+        if (progress.value != null || (!brain && probes.isEmpty())) return
         val provider = settings.settings.value.provider
         val client = llm.forProvider(provider)
         val models = options(provider).map { it.id }
@@ -112,7 +115,7 @@ public class PlanModelsPresenter(
             try {
                 pairs.forEachIndexed { i, model ->
                     progress.value = i to pairs.size
-                    bench.measure(provider.id, client, model, probes)
+                    if (brain) bench.measureBrain(provider.id, client, model) else bench.measure(provider.id, client, model, probes)
                     measured.update { it + 1 }
                 }
             } catch (e: CancellationException) {
@@ -142,7 +145,7 @@ public class PlanModelsPresenter(
     private fun build(provider: ModelProvider, known: List<String>, r: ModelRole, p: Pair<Int, Int>?, e: String?): PlanModelsUiState {
         val s = settings.settings.value
         val chosen = if (r == ModelRole.PhoneControl) s.model else s.strongModel
-        val results = bench.results(provider.id)
+        val results = bench.results(provider.id, brain = r == ModelRole.Brain)
         val supportsEffort = ProviderModels.supportsEffort(provider)
         val usual = if (supportsEffort) defaultEffort(r) else null
         val options = if (provider == ModelProvider.ChatGpt) ProviderModels.chatGpt(known) else options(provider)

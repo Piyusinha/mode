@@ -80,6 +80,8 @@ final class PlanModelsViewModel {
 
     private static func map(_ s: PlanModelsUiState, provider: String) -> State {
         let plan = [provider, s.plan].compactMap { $0 }.joined(separator: " ")
+        // Phone control is timed per step; the brain per answer (a plan or a decision).
+        let speed: (String) -> String = s.role == .brain ? L10n.Plan.perAnswer : L10n.Plan.perStep
         return State(
             chip: L10n.Plan.onPlan(plan, s.models.count),
             role: s.role == .brain ? .brain : .phoneControl,
@@ -95,7 +97,7 @@ final class PlanModelsViewModel {
                     }
                 }
                 let measured: [String] = if let ms = m.millis?.int64Value, let c = m.correct?.intValue, let t = m.total?.intValue {
-                    [L10n.Plan.perStep(seconds(ms)), L10n.Plan.right(c, of: t)]
+                    [speed(seconds(ms)), L10n.Plan.right(c, of: t)]
                 } else {
                     [String(localized: L10n.Plan.notMeasured)]
                 }
@@ -107,7 +109,7 @@ final class PlanModelsViewModel {
                     efforts: m.efforts.map { e in
                         ModeEffortTable.Row(
                             label: effortName(e.effort),
-                            speed: e.millis.map { L10n.Plan.perStep(seconds($0.int64Value)) } ?? "—",
+                            speed: e.millis.map { speed(seconds($0.int64Value)) } ?? "—",
                             accuracy: (e.correct?.intValue).flatMap { c in (e.total?.intValue).map { L10n.Plan.right(c, of: $0) } } ?? "—",
                             selected: e.selected
                         )
@@ -162,7 +164,7 @@ struct PlanModelsScreen: View {
                     ModeButton(L10n.Plan.measure, icon: .clock, role: .secondary, fullWidth: true) { onEvent(.measure) }
                 }
                 if let error = state.error { Text(error).modeText(.footnote, color: ModeColor.danger) }
-                Text(L10n.Plan.measureNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                Text(state.role == .brain ? L10n.Plan.brainMeasureNote : L10n.Plan.measureNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)

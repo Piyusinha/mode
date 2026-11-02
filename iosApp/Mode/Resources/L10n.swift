@@ -390,6 +390,7 @@ enum L10n {
         static let notMeasured = LocalizedStringResource("plan.notMeasured", defaultValue: "Not measured yet")
         static let measure = LocalizedStringResource("plan.measure", defaultValue: "Measure on this iPhone")
         static let measureNote = LocalizedStringResource("plan.measureNote", defaultValue: "Measured by Mode on this iPhone: the same short screen test for each model and effort. Your plan pays, so there is no cost per task.")
+        static let brainMeasureNote = LocalizedStringResource("plan.brainMeasureNote", defaultValue: "The brain's own test, run on this iPhone: made-up moments where Mode must plan or decide, like skipping a sponsored place for the best-rated one, typing instead of tapping a field again, or knowing a task is done. Your plan pays, so there is no cost per task.")
         static let bestForPhone = LocalizedStringResource("plan.tag.bestForPhone", defaultValue: "Best for phone control")
         static let bestForBrain = LocalizedStringResource("plan.tag.bestForBrain", defaultValue: "Best for brain")
         static let fastest = LocalizedStringResource("plan.tag.fastest", defaultValue: "Fastest")
@@ -397,6 +398,10 @@ enum L10n {
 
         static func perStep(_ seconds: String) -> String {
             String(localized: "plan.perStep", defaultValue: "\(seconds) s a step")
+        }
+
+        static func perAnswer(_ seconds: String) -> String {
+            String(localized: "plan.perAnswer", defaultValue: "\(seconds) s an answer")
         }
 
         static func right(_ correct: Int, of total: Int) -> String {
