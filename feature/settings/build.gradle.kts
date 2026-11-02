@@ -1,5 +1,6 @@
 plugins {
     id("mode.kmp.feature")
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 kotlin {

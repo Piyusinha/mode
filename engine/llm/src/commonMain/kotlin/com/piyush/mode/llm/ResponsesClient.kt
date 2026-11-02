@@ -32,6 +32,8 @@ class ResponsesClient(
     /** A fresh access token (refreshed by its owner when needed), or null when not signed in. */
     private val accessToken: suspend () -> String?,
     private val baseUrl: String = "https://api.openai.com/v1",
+    /** The plan's share for Mode ran out (to show when, on the account page). */
+    private val onLimit: () -> Unit = {},
 ) : LlmClient {
 
     override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
@@ -42,18 +44,26 @@ class ResponsesClient(
             setBody(TextContent(request(model, messages, tools).toString(), ContentType.Application.Json))
         }
         val text = response.bodyAsText()
-        if (!response.status.isSuccess()) throw failure(response.status.value, text)
-        return parse(text)
+        try {
+            if (!response.status.isSuccess()) throw failure(response.status.value, text)
+            return parse(text)
+        } catch (e: LlmFailed) {
+            if (e.message == SHARE_USED_UP) onLimit()
+            throw e
+        }
     }
 
     companion object {
+        val EFFORTS = setOf("low", "medium", "high")
         const val SIGN_IN_AGAIN = "ChatGPT needs you to sign in again: open Settings → AI."
         const val SHARE_USED_UP = "Your ChatGPT plan's share for Mode is used up for now. Raise it in ChatGPT → Settings → Usage, or switch to OpenRouter in Mode's Settings."
         const val NOT_ELIGIBLE = "Continue with ChatGPT needs a Plus or Pro plan. You can connect OpenRouter in Settings instead."
 
         /** The request body: Mode's chat messages and function tools in the Responses shape. */
         fun request(model: String, messages: List<ChatMessage>, tools: JsonArray): JsonObject = buildJsonObject {
-            put("model", model)
+            // "gpt-6.1-terra@low": the model, and the reasoning effort the user picked for it.
+            put("model", model.substringBefore('@'))
+            model.substringAfter('@', "").takeIf { it in EFFORTS }?.let { put("reasoning", buildJsonObject { put("effort", it) }) }
             put("store", false)
             put("stream", true)
             val system = messages.filter { it.role == "system" }.joinToString("\n\n") { it.text }

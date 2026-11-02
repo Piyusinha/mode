@@ -48,6 +48,16 @@ public class SettingsRepository(
 
     private fun hasChatGpt(): Boolean = !secrets.get(ChatGptAccount.CONNECTED_KEY).isNullOrBlank()
 
+    /** [provider]'s phone-control and brain models: the live ones if it is in use, else the ones it keeps. */
+    public fun modelsFor(provider: ModelProvider): Pair<String, String?> {
+        val s = state.value
+        if (s.provider == provider) return s.model to s.strongModel
+        val prefix = "provider_${provider.id}_"
+        val strong = prefs.getString(prefix + "strong")
+        return (prefs.getString(prefix + "main") ?: ProviderModels.main(provider)) to
+            (if (strong == null) ProviderModels.strong(provider) else strong.ifBlank { null })
+    }
+
     /** Each provider retains its own model selections, including an explicitly disabled strong model. */
     public fun selectProvider(provider: ModelProvider) {
         val old = state.value

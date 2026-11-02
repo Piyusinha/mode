@@ -54,7 +54,22 @@ public class Screens(
     private val clock: ScreenClock = ScreenClock(),
     private val claude: ClaudeAccount? = null,
     private val claudeLlm: com.piyush.mode.llm.LlmClient? = null,
+    /** Every provider's client (tasks pick one per provider), for measuring models. */
+    private val providers: com.piyush.mode.llm.LlmClient? = null,
+    private val bench: com.piyush.mode.feature.settings.data.ModelBench? = null,
+    private val claudeApi: com.piyush.mode.llm.ClaudeAccountApi? = null,
+    private val openRouterApi: com.piyush.mode.llm.OpenRouterAccountApi? = null,
 ) {
+    /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
+    public fun planModels(): com.piyush.mode.app.screens.settings.PlanModelsPresenter =
+        com.piyush.mode.app.screens.settings.PlanModelsPresenter(scope, settings, chatGpt, bench!!, providers!!)
+
+    /** One provider's page: account, usage, models. [id] is a ModelProvider id. */
+    public fun providerDetail(id: String): com.piyush.mode.app.screens.settings.ProviderDetailPresenter =
+        com.piyush.mode.app.screens.settings.ProviderDetailPresenter(
+            scope, id, settings, chatGpt, claude, claudeApi!!, openRouterApi!!, runs, catalog, clock,
+        )
+
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
 
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)

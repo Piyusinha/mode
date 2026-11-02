@@ -18,11 +18,28 @@ public object ProviderModels {
         ModelProvider.ChatGpt -> CHATGPT_STRONG
     }
 
-    public fun accepts(provider: ModelProvider, model: String): Boolean = when (provider) {
-        ModelProvider.OpenRouter -> '/' in model && !model.startsWith("claude-oauth/")
-        ModelProvider.ClaudeOAuth -> model.startsWith("claude-") && '/' !in model
-        ModelProvider.ChatGpt -> '/' !in model && !model.startsWith("claude-") && model.isNotBlank()
+    public fun accepts(provider: ModelProvider, model: String): Boolean {
+        val base = base(model)
+        // Only ChatGPT models carry an effort ("gpt-6.1-terra@low").
+        if (base != model && (provider != ModelProvider.ChatGpt || effort(model) !in EFFORTS)) return false
+        return when (provider) {
+            ModelProvider.OpenRouter -> '/' in base && !base.startsWith("claude-oauth/")
+            ModelProvider.ClaudeOAuth -> base.startsWith("claude-") && '/' !in base
+            ModelProvider.ChatGpt -> '/' !in base && !base.startsWith("claude-") && base.isNotBlank()
+        }
     }
+
+    /** Reasoning effort, picked per model and role, for providers that take it. */
+    public val EFFORTS: List<String> = listOf("low", "medium", "high")
+
+    public fun supportsEffort(provider: ModelProvider): Boolean = provider == ModelProvider.ChatGpt
+
+    /** The model without its effort: "gpt-6.1-terra@low" → "gpt-6.1-terra". */
+    public fun base(id: String): String = id.substringBefore('@')
+
+    public fun effort(id: String): String? = id.substringAfter('@', "").ifEmpty { null }
+
+    public fun withEffort(id: String, effort: String?): String = base(id) + (effort?.let { "@$it" } ?: "")
 
     /** The defaults until the plan's own list is known (OpenAI names them; the list replaces these). */
     public const val CHATGPT_MAIN: String = "gpt-6.1-terra"

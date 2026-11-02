@@ -1,7 +1,10 @@
 package com.piyush.mode.feature.settings.data
 
 import com.piyush.mode.core.storage.SecretStore
+import com.piyush.mode.llm.AccountInfo
 import com.piyush.mode.llm.ChatGptAuth
+import com.piyush.mode.llm.Jwt
+import kotlinx.serialization.json.Json
 import com.piyush.mode.llm.LlmFailed
 import com.piyush.mode.llm.ResponsesClient
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +55,7 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         if (!tokens.canUsePlan) throw LlmFailed(ResponsesClient.NOT_ELIGIBLE)
         secrets.set(CLIENT_ID, clientId)
         keep(tokens)
+        secrets.set(LIMIT_AT, null)
         mutableConnected.value = true
         onChange()
     }
@@ -77,13 +81,23 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
             mutableModels.value = list
         }
 
+    /** Who is signed in, from the sign-in's ID token (null before the first sign-in that brought one). */
+    public fun account(): AccountInfo? = secrets.get(PROFILE)?.let { runCatching { Json.decodeFromString<AccountInfo>(it) }.getOrNull() }
+
+    /** When the plan's share for Mode last ran out, if it has. */
+    public fun limitReachedAt(): Long? = secrets.get(LIMIT_AT)?.toLongOrNull()
+
+    /** The plan said its share for Mode is used up (ResponsesClient). */
+    public fun limitReached() { secrets.set(LIMIT_AT, now().toString()) }
+
     public fun signOut() {
-        listOf(ACCESS, REFRESH, EXPIRES).forEach { secrets.set(it, null) }
+        listOf(ACCESS, REFRESH, EXPIRES, PROFILE, LIMIT_AT).forEach { secrets.set(it, null) }
         mutableConnected.value = false
         onChange()
     }
 
     private fun keep(tokens: ChatGptAuth.Tokens) {
+        Jwt.chatGptAccount(tokens.idToken)?.let { secrets.set(PROFILE, Json.encodeToString(it)) }
         secrets.set(ACCESS, tokens.accessToken)
         tokens.refreshToken?.let { secrets.set(REFRESH, it) }
         secrets.set(EXPIRES, (now() + (tokens.expiresIn ?: DEFAULT_LIFETIME_S) * 1000).toString())
@@ -103,6 +117,8 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
         /** Present while signed in (SettingsRepository reads it to know ChatGPT is ready). */
         public const val CONNECTED_KEY: String = "chatgpt_refresh_token"
         private const val MODELS = "chatgpt_models"
+        private const val PROFILE = "chatgpt_profile"
+        private const val LIMIT_AT = "chatgpt_limit_at"
         private const val CLIENT_ID = "chatgpt_client_id"
         private const val HOST_ID = "chatgpt_host_id"
         private const val HOST_PREFIX = "urn:uuid:"

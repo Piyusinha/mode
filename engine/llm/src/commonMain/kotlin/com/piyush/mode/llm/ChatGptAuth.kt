@@ -44,6 +44,8 @@ class ChatGptAuth(
         /** Seconds the access token is good for. */
         val expiresIn: Long?,
         val scopes: Set<String>,
+        /** Who signed in (email, name, plan), for showing the account; not checked here. */
+        val idToken: String? = null,
     ) {
         /** Without this scope the plan can't be used, whatever else was granted. */
         val canUsePlan: Boolean get() = PLAN_SCOPE in scopes
@@ -129,6 +131,7 @@ class ChatGptAuth(
             refreshToken = o["refresh_token"]?.jsonPrimitive?.contentOrNull,
             expiresIn = o["expires_in"]?.jsonPrimitive?.longOrNull,
             scopes = o["scope"]?.jsonPrimitive?.contentOrNull.orEmpty().split(' ').filter { it.isNotBlank() }.toSet(),
+            idToken = o["id_token"]?.jsonPrimitive?.contentOrNull,
         )
 
         private fun decode(s: String): String =

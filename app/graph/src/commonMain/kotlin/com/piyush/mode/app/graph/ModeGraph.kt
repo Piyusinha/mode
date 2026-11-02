@@ -88,7 +88,9 @@ class ModeGraph(platform: PlatformServices) {
     val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount = com.piyush.mode.feature.settings.data.ChatGptAccount(
         com.piyush.mode.llm.ChatGptAuth(platform.http), platform.secrets, onChange = { settings.accountsChanged() },
     )
-    private val chatGptLlm = com.piyush.mode.llm.ResponsesClient(platform.http, accessToken = { chatGpt.accessToken() })
+    private val chatGptLlm = com.piyush.mode.llm.ResponsesClient(
+        platform.http, accessToken = { chatGpt.accessToken() }, onLimit = { chatGpt.limitReached() },
+    )
     private val llm = ProviderClients(
         mapOf(ModelProvider.OpenRouter to router, ModelProvider.ClaudeOAuth to claudeClient, ModelProvider.ChatGpt to chatGptLlm),
     )
@@ -125,6 +127,10 @@ class ModeGraph(platform: PlatformServices) {
         claude = claude,
         claudeLlm = claudeClient,
         chatGpt = chatGpt, chatGptLlm = chatGptLlm,
+        providers = llm,
+        bench = com.piyush.mode.feature.settings.data.ModelBench(platform.prefs),
+        claudeApi = com.piyush.mode.llm.ClaudeAccountApi(platform.http),
+        openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
