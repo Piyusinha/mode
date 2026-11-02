@@ -140,13 +140,7 @@ final class SettingsViewModel {
                 }
             }
             let cost = onPlan ? String(localized: L10n.Settings.onYourPlan) : L10n.Settings.perTask(Format.money(c.costPerTaskUsd))
-            let maker = c.id.contains("/") ? (c.id.split(separator: "/").first.map(String.init) ?? "") : c.name
-            // The maker's tile, as on the board: Anthropic orange, OpenAI grey, others in the accent.
-            let leading: ModeRowLeading = switch maker.lowercased() {
-            case "anthropic": .letterTile("A", background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText)
-            case "openai": .letterTile("O", background: ModeColor.tileGray, foreground: ModeColor.textPrimary)
-            default: .letterTile(String(maker.prefix(1)).uppercased(), background: ModeColor.tintSoft, foreground: ModeColor.tint)
-            }
+            let leading = ModelTile.leading(for: c.id, name: c.name)
             return Model(id: c.id, name: c.name, tag: tag, subtitle: [c.note.isEmpty ? nil : c.note, cost].compactMap { $0 }.joined(separator: " · "),
                          leading: leading, cost: c.costPerTaskUsd, isMain: c.isMain, isStuck: c.isStuck)
         }

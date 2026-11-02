@@ -25,6 +25,8 @@ public enum ModeRowLeading: Equatable, Sendable {
     case letterTile(String, background: Color, foreground: Color)
     /// A rounded square with an icon, in a colour (permissions, waiting tasks).
     case iconTile(ModeIcon, background: Color, foreground: Color)
+    /// A rounded square with a provider's or maker's logo, in a colour (AI providers, models).
+    case logoTile(ModeLogo, background: Color, foreground: Color)
 }
 
 /// Plain rows (lists) or prominent ones (setup, choices): a semibold title and a larger second line.
@@ -130,6 +132,15 @@ public struct ModeLeadingView: View {
         case let .iconTile(icon, background, foreground):
             icon.image
                 .font(ModeTextStyle.callout.font)
+                .foregroundStyle(foreground)
+                .frame(width: ModeSize.tile, height: ModeSize.tile)
+                .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))
+                .accessibilityHidden(true)
+        case let .logoTile(logo, background, foreground):
+            logo.image
+                .resizable()
+                .scaledToFit()
+                .frame(width: ModeSize.icon + ModeSpacing.xs, height: ModeSize.icon + ModeSpacing.xs)
                 .foregroundStyle(foreground)
                 .frame(width: ModeSize.tile, height: ModeSize.tile)
                 .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))

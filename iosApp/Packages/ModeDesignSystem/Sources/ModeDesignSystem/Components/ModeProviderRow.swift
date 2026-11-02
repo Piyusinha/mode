@@ -9,7 +9,7 @@ public struct ModeProviderRow: View {
 
     private let title: String
     private let status: String
-    private let icon: ModeIcon
+    private let logo: ModeLogo
     private let tileBackground: Color
     private let tileForeground: Color
     private let tag: String?
@@ -20,12 +20,12 @@ public struct ModeProviderRow: View {
     private let onSelect: () -> Void
     private let onConnect: () -> Void
 
-    public init(title: String, status: String, icon: ModeIcon, tileBackground: Color, tileForeground: Color, tag: String? = nil,
+    public init(title: String, status: String, logo: ModeLogo, tileBackground: Color, tileForeground: Color, tag: String? = nil,
                 selected: Bool, connected: Bool, connectTitle: String, radio: RadioPlacement = .trailing,
                 onSelect: @escaping () -> Void, onConnect: @escaping () -> Void) {
         self.title = title
         self.status = status
-        self.icon = icon
+        self.logo = logo
         self.tileBackground = tileBackground
         self.tileForeground = tileForeground
         self.tag = tag
@@ -42,7 +42,7 @@ public struct ModeProviderRow: View {
             Button(action: connected || radio == .leading ? onSelect : onConnect) {
                 HStack(spacing: ModeSpacing.m) {
                     if radio == .leading { ModeRadio(selected: selected) }
-                    ModeLeadingView(.iconTile(icon, background: tileBackground, foreground: tileForeground))
+                    ModeLeadingView(.logoTile(logo, background: tileBackground, foreground: tileForeground))
                     VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                         HStack(spacing: ModeSpacing.s) {
                             Text(title).modeText(.bodyEmphasis).lineLimit(1).fixedSize()

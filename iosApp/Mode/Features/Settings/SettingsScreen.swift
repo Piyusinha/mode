@@ -30,7 +30,7 @@ struct SettingsScreen: View {
                 ModeCard {
                     Button { onEvent(.showProviders) } label: {
                         HStack(spacing: ModeSpacing.m) {
-                            ModeLeadingView(.iconTile(providers.activeKind.icon, background: providers.activeKind.tileBackground,
+                            ModeLeadingView(.logoTile(providers.activeKind.logo, background: providers.activeKind.tileBackground,
                                                       foreground: providers.activeKind.tileForeground))
                             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                                 Text(L10n.Providers.aiInUse).modeText(.caption, color: ModeColor.textSecondary)

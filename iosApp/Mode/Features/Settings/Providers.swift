@@ -169,11 +169,11 @@ final class ProvidersViewModel {
 }
 
 extension ProvidersViewModel.Kind {
-    var icon: ModeIcon {
+    var logo: ModeLogo {
         switch self {
-        case .chatGPT: .sparkle
+        case .chatGPT: .openAI
         case .claude: .claude
-        case .openRouter: .router
+        case .openRouter: .openRouter
         }
     }
 
@@ -205,7 +205,7 @@ struct ProviderList: View {
         ModeCard {
             ForEach(rows) { row in
                 ModeProviderRow(
-                    title: row.title, status: row.status, icon: row.kind.icon,
+                    title: row.title, status: row.status, logo: row.kind.logo,
                     tileBackground: row.kind.tileBackground, tileForeground: row.kind.tileForeground,
                     tag: setup ? (row.kind == .chatGPT ? String(localized: L10n.Providers.recommended) : nil)
                         : (row.inUse && row.connected ? String(localized: L10n.Providers.inUse) : nil),
@@ -266,7 +266,7 @@ struct ProviderSheetHeader: View {
 
     var body: some View {
         HStack(spacing: ModeSpacing.m) {
-            ModeLeadingView(.iconTile(kind.icon, background: kind.tileBackground, foreground: kind.tileForeground))
+            ModeLeadingView(.logoTile(kind.logo, background: kind.tileBackground, foreground: kind.tileForeground))
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                 Text(title).modeText(.title2)
                 Text(message).modeText(.subheadline, color: ModeColor.textSecondary)

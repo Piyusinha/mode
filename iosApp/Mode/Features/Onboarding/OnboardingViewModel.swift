@@ -297,16 +297,8 @@ final class OnboardingViewModel {
         }
     }
 
-    /// A tile with the model maker's first letter: orange for Anthropic, violet for most, grey for the rest.
-    private static func maker(_ id: String) -> ModeRowLeading {
-        let maker = id.split(separator: "/").first.map(String.init) ?? id
-        let letter = String(maker.prefix(1)).uppercased()
-        switch maker {
-        case "anthropic": return .letterTile(letter, background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText)
-        case "openai": return .letterTile(letter, background: ModeColor.tileGray, foreground: ModeColor.textPrimary)
-        default: return .letterTile(letter, background: ModeColor.tintSoft, foreground: ModeColor.tint)
-        }
-    }
+    /// The model maker's tile: its logo when known, else its first letter.
+    private static func maker(_ id: String) -> ModeRowLeading { ModelTile.leading(for: id, name: id) }
 
     private static func permission(_ p: ModeKit.PermissionRow) -> PermissionRow {
         let (title, why, leading): (LocalizedStringResource, LocalizedStringResource, ModeRowLeading) = switch p.kind {
