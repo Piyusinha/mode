@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -83,6 +84,9 @@ public class TaskRunner(
     /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
     private val voices: Voices? = null,
 ) {
+    /** Messages for the running task, taken by the agent at its next step. */
+    private val steers = MutableStateFlow<List<String>>(emptyList())
+
     /** The spoken question being asked now (Later cancels it). */
     private var voiceJob: kotlinx.coroutines.Job? = null
 
@@ -394,6 +398,8 @@ public class TaskRunner(
         /** "Yes, and don't ask again" was tapped in this task: the rest of it asks no more. */
         var alwaysYes = false
 
+        override fun steering(): List<String> = steers.getAndUpdate { emptyList() }
+
         override suspend fun confirm(question: String): Boolean {
             if (alwaysYes) return true
             val answer = askUser(phone, question, yesNo = true, allowAlways = true)
@@ -488,6 +494,18 @@ public class TaskRunner(
                 withContext(NonCancellable) { runCatching { hands.resumeStream() } }
             }
         }
+    }
+
+    /**
+     * A message for the running task from its conversation ("It's not there, search for Dark Mode"): the agent takes
+     * it at its next step and does it that way. False when no task runs.
+     */
+    public fun steer(text: String): Boolean {
+        val said = text.trim()
+        if (said.isEmpty() || !state.value.running) return false
+        steers.update { it + said }
+        AppLog.log("agent", "steered while working")
+        return true
     }
 
     /** Later: the spoken question stops listening and waits on the notification and Live Activity instead. */

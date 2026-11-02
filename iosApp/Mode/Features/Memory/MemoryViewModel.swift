@@ -136,7 +136,9 @@ final class MemoryViewModel {
     private static func map(_ s: MemoryUiState) -> State {
         func card(_ e: MemoryEntry, _ kind: Kind) -> Card {
             let worked = e.uses > 0 ? L10n.Memory.worked(Int(e.successes), of: Int(e.uses)) : nil
-            let footer = [L10n.Memory.learnedOn(Format.day(e.learned).lowercased()), worked].compactMap { $0 }.joined(separator: " · ")
+            // What the user taught says so: theirs, not something Mode picked up.
+            let when = Format.day(e.learned).lowercased()
+            let footer = [e.taught ? L10n.Memory.taughtOn(when) : L10n.Memory.learnedOn(when), worked].compactMap { $0 }.joined(separator: " · ")
             return Card(id: e.id, kind: kind, title: e.title, body: e.body.isEmpty ? nil : e.body, steps: e.steps, footer: footer,
                         text: e.text, learnedFrom: L10n.Memory.learnedFrom(e.evidence), worked: worked)
         }

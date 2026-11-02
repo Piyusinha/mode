@@ -36,6 +36,21 @@ final class ConversationViewModel {
         var working: String?
         var remembered: [Remembered] = []
         var isPrivate = false
+        /// Tips taught in this chat, each under the reply it came with.
+        var lessons: [Lesson] = []
+        /// "Also do it this way next time?" after steering the running task.
+        var offerRemember = false
+        /// Mode is writing a tip.
+        var teaching = false
+        /// The task runs: the message box steers it.
+        var running = false
+    }
+
+    struct Lesson: Identifiable, Equatable {
+        let id: String
+        let context: String
+        let text: String
+        let afterTurnId: String
     }
 
     struct Remembered: Identifiable, Equatable {
@@ -46,6 +61,7 @@ final class ConversationViewModel {
     enum Event {
         case send, speak, togglePrivate, undo(String), openScreens(String), stop, share, repeatTask, askDelete, confirmDelete
         case copy(Message), retry(Message), shareReply(Message), openLive
+        case remember, notNow, undoLesson(String), editLesson(String), saveLesson(String)
     }
 
     private(set) var state = State()
@@ -54,6 +70,8 @@ final class ConversationViewModel {
     var sharing: SharedText?
     var repeating: SharedText?
     var confirmingDelete = false
+    /// The lesson being edited.
+    var editing: Lesson?
     /// The first few screenshots of each task, for "See all N screens".
     private(set) var thumbnails: [String: [Image]] = [:]
 
@@ -85,6 +103,13 @@ final class ConversationViewModel {
         case let .retry(message): _ = presenter.retry(turnId: message.id)
         case let .shareReply(message): sharing = SharedText(text: message.text)
         case .openLive: navigate(.liveRun)
+        case .remember: presenter.remember()
+        case .notNow: presenter.dismissRemember()
+        case let .undoLesson(id): presenter.undoLesson(itemId: id)
+        case let .editLesson(id): editing = state.lessons.first { $0.id == id }
+        case let .saveLesson(text):
+            if let lesson = editing { presenter.editLesson(itemId: lesson.id, text: text) }
+            editing = nil
         case .askDelete: confirmingDelete = true
         case .confirmDelete:
             presenter.delete()
@@ -129,7 +154,11 @@ final class ConversationViewModel {
             },
             working: s.running.map { $0.paused ? String(localized: L10n.Run.paused) : $0.status },
             remembered: s.remembered.map { Remembered(id: $0.itemId, text: L10n.Conversation.remembered($0.text)) },
-            isPrivate: s.privateNext
+            isPrivate: s.privateNext,
+            lessons: s.lessons.map { l in
+                Lesson(id: l.itemId, context: [l.app, l.title].compactMap { $0 }.joined(separator: " · "), text: l.text, afterTurnId: l.afterTurnId)
+            },
+            offerRemember: s.offerRemember != nil, teaching: s.teaching, running: s.running != nil
         )
     }
 }

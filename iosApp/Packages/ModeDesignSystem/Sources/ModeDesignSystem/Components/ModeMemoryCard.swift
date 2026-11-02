@@ -79,3 +79,46 @@ public struct ModeTextAreaCard: View {
         .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
     }
 }
+
+/// A tip the user just taught in a chat: what it is for and which app, the tip, Edit and Undo.
+public struct ModeLessonCard: View {
+    private let heading: LocalizedStringResource
+    private let context: String
+    private let text: String
+    private let editTitle: LocalizedStringResource
+    private let undoTitle: LocalizedStringResource
+    private let onEdit: () -> Void
+    private let onUndo: () -> Void
+
+    public init(heading: LocalizedStringResource, context: String, text: String, editTitle: LocalizedStringResource, undoTitle: LocalizedStringResource,
+                onEdit: @escaping () -> Void, onUndo: @escaping () -> Void) {
+        self.heading = heading
+        self.context = context
+        self.text = text
+        self.editTitle = editTitle
+        self.undoTitle = undoTitle
+        self.onEdit = onEdit
+        self.onUndo = onUndo
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+            HStack(spacing: ModeSpacing.m) {
+                ModeLeadingView(.iconTile(.tip, background: ModeColor.tintSoft, foreground: ModeColor.tint))
+                VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                    Text(heading).modeText(.captionEmphasis, color: ModeColor.tint)
+                    Text(context).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(1)
+                }
+            }
+            Text(text).modeText(.bodyEmphasis)
+            HStack(spacing: ModeSpacing.s) {
+                Button(action: onEdit) { Text(editTitle).modeText(.subheadline).fontWeight(.semibold).padding(.horizontal, ModeSpacing.l).frame(minHeight: ModeSize.touch - ModeSpacing.s) }
+                    .buttonStyle(.plain).background(ModeColor.fill, in: .capsule)
+                Button(action: onUndo) { Text(undoTitle).modeText(.subheadline).fontWeight(.semibold).padding(.horizontal, ModeSpacing.l).frame(minHeight: ModeSize.touch - ModeSpacing.s) }
+                    .buttonStyle(.plain).background(ModeColor.fill, in: .capsule)
+            }
+        }
+        .padding(ModeSpacing.l)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+    }
+}

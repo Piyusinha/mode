@@ -100,14 +100,24 @@ public class Screens(
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)
 
     public fun conversation(conversationId: String): ConversationPresenter =
-        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock)
+        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock, teacher, memory)
+
+    /** Turns what the user teaches into tips, written by the brain's model. */
+    private val teacher: com.piyush.mode.feature.memory.data.Teacher? by lazy {
+        providers?.let { llm ->
+            com.piyush.mode.feature.memory.data.Teacher(llm, memory) {
+                val s = settings.settings.value
+                (s.strongModel ?: s.model) to s.provider
+            }
+        }
+    }
 
     public fun liveRun(): LiveRunPresenter = LiveRunPresenter(scope, runner, tasks)
 
     /** The Live Activity: one for the app's lifetime. */
     public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks)
 
-    public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks)
+    public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks, runner, queue, teacher)
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 

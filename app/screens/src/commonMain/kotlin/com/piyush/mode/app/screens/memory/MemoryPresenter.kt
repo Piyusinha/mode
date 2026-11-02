@@ -53,6 +53,8 @@ public data class MemoryEntry(
     val successes: Int,
     /** Where Mode learned it: the step or answer it came from. */
     val evidence: String,
+    /** The user taught it (in a chat, or on a step Mode got wrong). */
+    val taught: Boolean = false,
 )
 
 /** Memory: what Mode has learned, by kind; delete one, forget everything, stop learning. */
@@ -105,6 +107,7 @@ public class MemoryPresenter(
         return MemoryEntry(
             id, shownTitle, text, steps, if (steps.isEmpty()) text else MemoryApps.notes(text), appName,
             clock.relativeDay(createdAt), uses, successes, evidence,
+            taught = com.piyush.mode.feature.memory.data.Teacher.taught(this),
         )
     }
 

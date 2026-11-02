@@ -89,6 +89,12 @@ interface UserGate {
      * say they did it, false to stop. Mode also carries on by itself once the screen changes.
      */
     suspend fun yourTurn(what: String): Boolean = ask(what) != null
+
+    /**
+     * What the user typed or said to Mode while it worked ("It's not there, search for Dark Mode"), since the last
+     * step; each is handed over once. The agent does it their way from then on.
+     */
+    fun steering(): List<String> = emptyList()
 }
 
 /** One step, for the live log. */
@@ -367,6 +373,13 @@ class Agent(
                 (config.maxCostUsd == null || config.maxCostUsd - forSteps > STEP_UP_BUDGET_SHARE * (lastStrongCost ?: STRONG_STEP_GUESS_USD))
             if (stepUp) stepUps++
 
+            // The user steered while Mode worked: it shows every step from now on, like an answer, and counts as
+            // progress (a new route), so the loop checker starts afresh.
+            gate.steering().map { it.trim() }.filter { it.isNotEmpty() }.forEach { said ->
+                answers += STEERED to said
+                history += "$step. the user told you while you worked: \"$said\" (do it their way now)"
+                stuck.progressed()
+            }
             val messages = ContextBuilder.build(
                 ContextBuilder.Input(
                     systemPrompt = SYSTEM_PROMPT + accessRules(config),
@@ -1022,6 +1035,8 @@ class Agent(
 
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        /** How a message from the user mid-task shows among their answers. */
+        const val STEERED = "While you worked, the user said (do it this way)"
         private const val TOP_OF_PAGE = " → top of the page: nothing is above. What you are looking for is not on this page " +
             "(apps change where things are). Use the app's Search with the thing's own name (a setting: its name, such as " +
             "\"Dark Mode\"), or take another route; do not scroll up again"

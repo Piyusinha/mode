@@ -119,6 +119,15 @@ enum L10n {
     }
 
     enum Conversation {
+        static let savedForNextTime = LocalizedStringResource("conversation.savedForNextTime", defaultValue: "SAVED FOR NEXT TIME")
+        static let edit = LocalizedStringResource("conversation.edit", defaultValue: "Edit")
+        static let alsoNextTime = LocalizedStringResource("conversation.alsoNextTime", defaultValue: "Also do it this way next time?")
+        static let remember = LocalizedStringResource("conversation.remember", defaultValue: "Remember")
+        static let saving = LocalizedStringResource("conversation.saving", defaultValue: "Saving it for next time…")
+        static let steerPrompt = LocalizedStringResource("conversation.steerPrompt", defaultValue: "Tell Mode what to do differently…")
+        static let teachPrompt = LocalizedStringResource("conversation.teachPrompt", defaultValue: "Ask for more, or teach Mode")
+        static let editLesson = LocalizedStringResource("conversation.editLesson", defaultValue: "Edit the tip")
+        static let editLessonPrompt = LocalizedStringResource("conversation.editLessonPrompt", defaultValue: "What Mode should do next time")
         static let working = LocalizedStringResource("conversation.working", defaultValue: "Working on it")
         static let spoken = LocalizedStringResource("conversation.spoken", defaultValue: "Spoken")
         static let allDay = LocalizedStringResource("conversation.allDay", defaultValue: "All day")
@@ -201,6 +210,18 @@ enum L10n {
     }
 
     enum Screens {
+        static let wrongStep = LocalizedStringResource("screens.wrongStep", defaultValue: "This step was wrong")
+        static let whatInstead = LocalizedStringResource("screens.whatInstead", defaultValue: "What should Mode have done?")
+        static let whatInsteadPrompt = LocalizedStringResource("screens.whatInsteadPrompt", defaultValue: "Search Settings for “Dark Mode” instead")
+        static let justThisTime = LocalizedStringResource("screens.justThisTime", defaultValue: "Just this time")
+        static let everyTime = LocalizedStringResource("screens.everyTime", defaultValue: "Every time")
+        static let everyTimeNote = LocalizedStringResource("screens.everyTimeNote", defaultValue: "Mode keeps it as a tip for that app and uses it on the next task.")
+        static let justThisTimeNote = LocalizedStringResource("screens.justThisTimeNote", defaultValue: "Mode does it that way now: in the task if it's still running, or by running it again.")
+        static let savingFix = LocalizedStringResource("screens.savingFix", defaultValue: "Saving it…")
+        static let ok = LocalizedStringResource("screens.ok", defaultValue: "OK")
+        static func stepLine(_ number: String, _ label: String) -> String {
+            String(localized: "screens.stepLine", defaultValue: "Step \(number) · \(label)")
+        }
         static let title = LocalizedStringResource("screens.title", defaultValue: "All screens")
         static let grid = LocalizedStringResource("screens.grid", defaultValue: "Grid")
         static let play = LocalizedStringResource("screens.play", defaultValue: "Play")
@@ -284,6 +305,10 @@ enum L10n {
 
         static func learnedOn(_ day: String) -> String {
             String(localized: "memory.learnedOn", defaultValue: "Learned \(day)")
+        }
+
+        static func taughtOn(_ day: String) -> String {
+            String(localized: "memory.taughtOn", defaultValue: "You taught this \(day)")
         }
     }
 
