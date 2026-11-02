@@ -92,6 +92,27 @@ class PlanModelsTest {
     }
 
     @Test
+    fun lunaReserveIsListedAndLeftOutOfTheComparison() = runTest {
+        val bench = ModelBench(prefs, timeSource = testScheduler.timeSource)
+        secrets.set(ChatGptAccount.CONNECTED_KEY, "r"); settings.accountsChanged()
+        settings.selectProvider(ModelProvider.ChatGpt)
+        secrets.set("chatgpt_models", "gpt-6.1-terra,gpt-reserve,codex-auto-review")
+        val known = ChatGptAccount(ChatGptAuth(HttpClient(MockEngine { respond("") })), secrets)
+        val p = PlanModelsPresenter(backgroundScope, settings, known, bench, model)
+        val listed = p.state.awaitState { it.models.map { m -> m.id } == listOf("gpt-6.1-terra", "gpt-reserve") }
+        assertTrue(listed.models.single { it.id == "gpt-reserve" }.reserve)
+        assertTrue(listed.models.single { it.id == "gpt-reserve" }.efforts.isEmpty())
+        val before = settings.settings.value.model
+        p.choose("gpt-reserve")
+        assertEquals(before, settings.settings.value.model, "an allowance is not a model to pick")
+        p.measure(probes())
+        repeat(120) { delay(500) }
+        val done = p.state.awaitState { st -> st.measuring == null && st.models.single { it.id == "gpt-6.1-terra" }.millis != null }
+        assertEquals(null, done.models.single { it.id == "gpt-reserve" }.millis)
+        assertEquals(null, done.models.single { it.id == "gpt-reserve" }.tag)
+    }
+
+    @Test
     fun theBrainHasItsOwnTestAndScores() = runTest {
         val bench = ModelBench(prefs, timeSource = testScheduler.timeSource)
         secrets.set(ChatGptAccount.CONNECTED_KEY, "r"); settings.accountsChanged()

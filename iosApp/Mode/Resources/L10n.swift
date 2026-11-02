@@ -391,6 +391,7 @@ enum L10n {
         static let max = LocalizedStringResource("plan.max", defaultValue: "Max")
         static let usesApiCredits = LocalizedStringResource("plan.usesApiCredits", defaultValue: "Uses API credits, not your plan")
         static let failed = LocalizedStringResource("plan.failed", defaultValue: "Didn't run")
+        static let reserveNote = LocalizedStringResource("plan.reserveNote", defaultValue: "Luna Reserve: extra usage after your plan runs out.")
 
         static func couldNotUse(_ reason: String) -> String {
             String(localized: "plan.couldNotUse", defaultValue: "Couldn't use it: \(reason)")

@@ -17,6 +17,8 @@ final class PlanModelsViewModel {
         let tag: ModeChoiceRow.Tag?
         let line: String
         let selected: Bool
+        /// An allowance mentioned under the models, not a row to pick or compare.
+        var reserve = false
         let effort: String?
         /// The efforts this model takes, as its provider listed them (empty: it takes none).
         let effortOptions: [EffortOption]
@@ -93,7 +95,7 @@ final class PlanModelsViewModel {
         // Phone control is timed per step; the brain per answer (a plan or a decision).
         let speed: (String) -> String = s.role == .brain ? L10n.Plan.perAnswer : L10n.Plan.perStep
         return State(
-            chip: L10n.Plan.onPlan(plan, s.models.count),
+            chip: L10n.Plan.onPlan(plan, s.models.filter { !$0.reserve }.count),
             role: s.role == .brain ? .brain : .phoneControl,
             rows: s.models.map { m in
                 let tag: ModeChoiceRow.Tag? = m.tag.map { t in
@@ -107,7 +109,9 @@ final class PlanModelsViewModel {
                     }
                 }
                 // A model no call reached (not on the plan, refused) says why, in the provider's words.
-                let measured: [String] = if let error = m.error {
+                let measured: [String] = if m.reserve {
+                    [String(localized: L10n.Plan.reserveNote)]
+                } else if let error = m.error {
                     [L10n.Plan.couldNotUse(error)]
                 } else if let ms = m.millis?.int64Value, let c = m.correct?.intValue, let t = m.total?.intValue {
                     [speed(seconds(ms)), L10n.Plan.right(c, of: t)]
@@ -116,12 +120,13 @@ final class PlanModelsViewModel {
                 }
                 let effort = m.effort.map { L10n.Plan.effortName(effortName($0)) }
                 return Row(
-                    id: m.id, name: m.name, leading: ModelTile.leading(for: m.id, name: m.name), tag: tag,
+                    id: m.id, name: m.name, leading: ModelTile.leading(for: m.id, name: m.name), tag: m.reserve ? nil : tag,
                     // A model billed apart from the plan says so first: choosing it spends API credits.
-                    line: ([m.usesApiCredits ? String(localized: L10n.Plan.usesApiCredits) : nil, effort].compactMap { $0 } + measured).joined(separator: " · "),
-                    selected: m.selected, effort: m.effort,
-                    effortOptions: m.efforts.map { EffortOption(id: $0.effort, title: effortName($0.effort)) },
-                    efforts: m.efforts.map { e in
+                    // Luna Reserve is one line under the list: what it is, with no speed or accuracy.
+                    line: m.reserve ? measured[0] : ([m.usesApiCredits ? String(localized: L10n.Plan.usesApiCredits) : nil, effort].compactMap { $0 } + measured).joined(separator: " · "),
+                    selected: m.selected && !m.reserve, reserve: m.reserve, effort: m.reserve ? nil : m.effort,
+                    effortOptions: m.reserve ? [] : m.efforts.map { EffortOption(id: $0.effort, title: effortName($0.effort)) },
+                    efforts: m.reserve ? [] : m.efforts.map { e in
                         ModeEffortTable.Row(
                             label: effortName(e.effort),
                             speed: e.millis.map { speed(seconds($0.int64Value)) } ?? "—",
@@ -157,15 +162,23 @@ struct PlanModelsScreen: View {
                 Text(L10n.Plan.roleHint).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
                 ModeCard {
                     ForEach(state.rows) { row in
-                        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                            ModeChoiceRow(row.name, tag: row.tag, detail: row.line, leading: row.leading, selected: row.selected) { onEvent(.choose(row.id)) }
-                            if row.selected && !row.effortOptions.isEmpty {
-                                Text(L10n.Plan.effort).modeText(.footnote, color: ModeColor.textSecondary).fontWeight(.semibold)
-                                ModeSegmented(row.effortOptions.map { ($0.id, LocalizedStringResource(stringLiteral: $0.title)) },
-                                              selection: Binding(get: { row.effort ?? row.effortOptions[0].id }, set: { onEvent(.effort($0)) }))
-                                ModeEffortTable(headers: (String(localized: L10n.Plan.effort), String(localized: L10n.Plan.speed),
-                                                          String(localized: L10n.Plan.accuracy)), rows: row.efforts)
-                                    .padding(.bottom, ModeSpacing.m)
+                        if row.reserve {
+                            Text(row.line)
+                                .modeText(.footnote, color: ModeColor.textSecondary)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, ModeSpacing.m)
+                        } else {
+                            VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                                ModeChoiceRow(row.name, tag: row.tag, detail: row.line, leading: row.leading, selected: row.selected) { onEvent(.choose(row.id)) }
+                                if row.selected && !row.effortOptions.isEmpty {
+                                    Text(L10n.Plan.effort).modeText(.footnote, color: ModeColor.textSecondary).fontWeight(.semibold)
+                                    ModeSegmented(row.effortOptions.map { ($0.id, LocalizedStringResource(stringLiteral: $0.title)) },
+                                                  selection: Binding(get: { row.effort ?? row.effortOptions[0].id }, set: { onEvent(.effort($0)) }))
+                                    ModeEffortTable(headers: (String(localized: L10n.Plan.effort), String(localized: L10n.Plan.speed),
+                                                              String(localized: L10n.Plan.accuracy)), rows: row.efforts)
+                                        .padding(.bottom, ModeSpacing.m)
+                                }
                             }
                         }
                     }

@@ -16,6 +16,8 @@ public data class ModelOption(
     val efforts: List<String>? = null,
     /** Billed to the account's API credits, not the plan (Claude Fable). */
     val usesApiCredits: Boolean = false,
+    /** An extra allowance after the plan's own runs out (ChatGPT's Luna Reserve), not a model to compare. */
+    val reserve: Boolean = false,
 )
 
 /** Where the list came from. */

@@ -74,14 +74,18 @@ public object ProviderModels {
      * has not been asked yet. The defaults are marked; the rest keep the plan's order.
      */
     public fun chatGpt(known: List<String>, info: List<PlanModel> = emptyList(), keep: Set<String> = emptySet()): List<ModelOption> {
-        val ids = known.filter { accepts(ModelProvider.ChatGpt, it) && (base(it) in keep || worthListing(ModelProvider.ChatGpt, it, known)) }
+        val ids = known.filter {
+            accepts(ModelProvider.ChatGpt, it) && CHATGPT_HIDDEN.none { h -> h in it } &&
+                (base(it) in keep || worthListing(ModelProvider.ChatGpt, it, known))
+        }
             .ifEmpty { listOf(CHATGPT_MAIN, CHATGPT_STRONG) }
         val about = info.associateBy { it.id }
         return ids.map { id ->
             ModelOption(
-                id, about[id]?.name ?: displayName(id), 0.0,
+                id, CHATGPT_NAMES[id] ?: about[id]?.name ?: displayName(id), 0.0,
                 when (id) { CHATGPT_MAIN -> ModelTag.Recommended; CHATGPT_STRONG -> ModelTag.Strongest; else -> null },
                 efforts = about[id]?.efforts,
+                reserve = isReserve(id),
             )
         }.sortedBy { if (it.tag != null) 0 else 1 }
     }
@@ -104,6 +108,18 @@ public object ProviderModels {
             )
         }
     }
+
+    /** ChatGPT entries that are not models to pick for Mode (Codex's own reviewer). Hidden even if one was in use. */
+    private val CHATGPT_HIDDEN = listOf("auto-review", "codex-auto-review")
+
+    /**
+     * ChatGPT's Luna Reserve: extra Luna usage after the plan's own allowance runs out, with its own limit
+     * (help.openai.com, "Luna Reserve in Codex and ChatGPT work"). Listed with what it is, never compared.
+     */
+    private val CHATGPT_RESERVE = setOf("gpt-reserve")
+    private val CHATGPT_NAMES = mapOf("gpt-reserve" to "Luna Reserve")
+
+    public fun isReserve(id: String): Boolean = base(id) in CHATGPT_RESERVE
 
     /** Below this, older models only fill the list: the newer ones do the same job better. */
     public const val CHATGPT_MIN_VERSION: Double = 6.1

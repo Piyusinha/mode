@@ -47,6 +47,8 @@ public data class PlanModelRow(
     val usesApiCredits: Boolean = false,
     /** Why the model could not be measured at the effort shown (every call failed: not on the plan, refused). */
     val error: String? = null,
+    /** An extra allowance (Luna Reserve), not a model: never measured or compared. */
+    val reserve: Boolean = false,
 )
 
 public data class PlanModelsUiState(
@@ -101,7 +103,10 @@ public class PlanModelsPresenter(
      */
     public fun choose(id: String) {
         val provider = settings.settings.value.provider
-        val takes = ProviderModels.efforts(provider, options(provider).firstOrNull { it.id == id })
+        val option = options(provider).firstOrNull { it.id == id } ?: return
+        // Luna Reserve is an allowance mentioned in the list, not a model to pick or compare.
+        if (option.reserve) return
+        val takes = ProviderModels.efforts(provider, option)
         val effort = listOfNotNull(currentEffort(), defaultEffort(role.value)).firstOrNull { it in takes } ?: nearest(defaultEffort(role.value), takes)
         set(ProviderModels.withEffort(id, effort))
     }
@@ -128,6 +133,7 @@ public class PlanModelsPresenter(
             // A model on API credits costs money to measure: only when chosen, and only at its chosen effort.
             options.sortedBy { if (it.id == selected) 0 else 1 }.forEach { o ->
                 when {
+                    o.reserve -> Unit
                     o.usesApiCredits -> if (o.id == selected) add(current()!!)
                     else -> ProviderModels.efforts(provider, o).ifEmpty { listOf(null) }.forEach { add(ProviderModels.withEffort(o.id, it)) }
                 }
@@ -191,12 +197,13 @@ public class PlanModelsPresenter(
                 PlanModelRow(
                     id = o.id, name = o.name, tag = tags[o.id], selected = selected, effort = effort,
                     millis = shown?.millis.takeIf { shown?.error == null }, correct = shown?.correct, total = shown?.total,
-                    efforts = ProviderModels.efforts(provider, o).map { ef ->
+                    efforts = if (o.reserve) emptyList() else ProviderModels.efforts(provider, o).map { ef ->
                         val m = results[ProviderModels.withEffort(o.id, ef)]
                         EffortRow(ef, m?.millis.takeIf { m?.error == null }, m?.correct, m?.total, selected = ef == effort, error = m?.error)
                     },
                     usesApiCredits = o.usesApiCredits,
                     error = shown?.error,
+                    reserve = o.reserve,
                 )
             },
         )
@@ -222,7 +229,7 @@ public class PlanModelsPresenter(
          * second; brain: the most accurate). Before any, Mode's default for the role is marked.
          */
         fun tags(provider: ModelProvider, options: List<ModelOption>, results: Map<String, ModelBench.Result>, role: ModelRole): Map<String, PlanTag> {
-            val measured = options.mapNotNull { o ->
+            val measured = options.filterNot { it.reserve }.mapNotNull { o ->
                 ProviderModels.efforts(provider, o).let { takes -> defaultEffort(role).takeIf { it in takes } ?: nearest(defaultEffort(role), takes) }
                     .let { results[ProviderModels.withEffort(o.id, it)] }?.let { o.id to it }
             }.filter { it.second.total > 0 && it.second.error == null }

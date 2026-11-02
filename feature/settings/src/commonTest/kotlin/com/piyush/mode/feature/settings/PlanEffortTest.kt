@@ -50,6 +50,15 @@ class PlanEffortTest {
         val shown = ProviderModels.chatGpt(listOf("gpt-6.1-terra", "gpt-6.2-sol", "gpt-6-luna", "gpt-6-astra", "gpt-5.5", "gpt-reserve"))
         assertEquals(setOf("gpt-6.1-terra", "gpt-6.2-sol", "gpt-6-astra", "gpt-reserve"), shown.map { it.id }.toSet(), "no version: age unknown, kept")
         assertEquals(setOf("gpt-6.1-terra", "gpt-6-luna"), ProviderModels.chatGpt(listOf("gpt-6.1-terra", "gpt-6-luna"), keep = setOf("gpt-6-luna")).map { it.id }.toSet())
+        val withReserve = ProviderModels.chatGpt(listOf("gpt-6.1-terra", "gpt-reserve", "codex-auto-review"))
+        assertEquals(listOf("gpt-6.1-terra", "gpt-reserve"), withReserve.map { it.id }, "Codex's reviewer is not listed")
+        assertEquals("Luna Reserve", withReserve[1].name)
+        assertTrue(withReserve[1].reserve && !withReserve[0].reserve)
+        assertEquals(
+            listOf("gpt-6.1-terra"),
+            ProviderModels.chatGpt(listOf("gpt-6.1-terra", "codex-auto-review"), keep = setOf("codex-auto-review")).map { it.id },
+            "a reviewer in use is still not listed",
+        )
     }
 
     @Test
