@@ -10,6 +10,8 @@ enum ActivityL10n {
     static let allow = LocalizedStringResource("activity.allow", defaultValue: "Allow")
     static let dontAllow = LocalizedStringResource("activity.dontAllow", defaultValue: "Don't allow")
     static let reply = LocalizedStringResource("activity.reply", defaultValue: "Reply")
+    static let yourTurn = LocalizedStringResource("activity.yourTurn", defaultValue: "Your turn")
+    static let entered = LocalizedStringResource("activity.entered", defaultValue: "I've entered it")
     static let openChat = LocalizedStringResource("activity.openChat", defaultValue: "Open chat")
     static let anotherTask = LocalizedStringResource("activity.anotherTask", defaultValue: "Another task")
     static let gaveUp = LocalizedStringResource("activity.gaveUp", defaultValue: "Couldn't finish")

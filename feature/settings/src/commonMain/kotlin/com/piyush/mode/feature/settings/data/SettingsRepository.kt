@@ -94,6 +94,11 @@ public class SettingsRepository(
         prefs.putString(DAILY_CAP, next.dailyCapUsd?.toString().orEmpty())
         prefs.putString(LEARN, next.learnFromTasks.toString())
         prefs.putString(ASK_BEFORE_RISKY, next.askBeforeRisky.name)
+        prefs.putString(FULL_ACCESS, next.fullAccess.toString())
+        // One per line: a word may hold spaces ("just do it").
+        prefs.putString(TRIGGER_WORDS, next.triggerWords.joinToString("\n"))
+        prefs.putString(READ_CODES, next.readCodes.toString())
+        prefs.putString(ASK_ABOVE, next.askAboveAmount?.toString().orEmpty())
         prefs.putString(USER_NAME, next.userName.orEmpty())
         prefs.putString(ONBOARDING_DONE, next.onboardingDone.toString())
         state.value = read()
@@ -128,6 +133,10 @@ public class SettingsRepository(
             learnFromTasks = prefs.getString(LEARN)?.toBooleanStrictOrNull() ?: defaults.learnFromTasks,
             askBeforeRisky = prefs.getString(ASK_BEFORE_RISKY)
                 ?.let { name -> RiskConfirmation.entries.firstOrNull { it.name == name } } ?: defaults.askBeforeRisky,
+            fullAccess = prefs.getString(FULL_ACCESS)?.toBooleanStrictOrNull() ?: defaults.fullAccess,
+            triggerWords = prefs.getString(TRIGGER_WORDS)?.split('\n')?.filter { it.isNotBlank() } ?: defaults.triggerWords,
+            readCodes = prefs.getString(READ_CODES)?.toBooleanStrictOrNull() ?: defaults.readCodes,
+            askAboveAmount = prefs.getString(ASK_ABOVE)?.toDoubleOrNull(),
             userName = prefs.getString(USER_NAME)?.ifBlank { null },
             onboardingDone = prefs.getString(ONBOARDING_DONE)?.toBooleanStrictOrNull() ?: defaults.onboardingDone,
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
@@ -151,6 +160,10 @@ public class SettingsRepository(
         const val DAILY_CAP = "daily_cap_usd"
         const val LEARN = "learn_from_tasks"
         const val ASK_BEFORE_RISKY = "ask_before_risky"
+        const val FULL_ACCESS = "full_access"
+        const val TRIGGER_WORDS = "full_access_words"
+        const val READ_CODES = "read_one_time_codes"
+        const val ASK_ABOVE = "full_access_ask_above"
         const val USER_NAME = "user_name"
         const val ONBOARDING_DONE = "onboarding_done"
     }

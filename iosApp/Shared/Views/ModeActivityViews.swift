@@ -24,7 +24,7 @@ struct ModeActivityLockScreen: View {
                     ModeActivityWorkingHeader(state: state)
                     ModeActivityWorkingBody(state: state)
                 case .waiting:
-                    ModeActivityHeader { ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning) }
+                    ModeActivityHeader { ModeActivityWaitingBadge(state: state) }
                     ModeActivityWaitingBody(state: state)
                 case .finished:
                     ModeActivityHeader { ModeActivityOutcome(state: state) }
@@ -118,7 +118,12 @@ struct ModeActivityWaitingBody: View {
         VStack(alignment: .leading, spacing: ModeSpacing.s) {
             Text(state.question ?? "").modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
             HStack(spacing: ModeSpacing.s) {
-                if let id = state.questionId, state.yesNo {
+                if let id = state.questionId, state.yourTurn {
+                    ModeActivityStopLabelButton()
+                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.done)) {
+                        ModeActivityButtonLabel(ActivityL10n.entered, icon: nil, prominent: true)
+                    }.buttonStyle(.plain)
+                } else if let id = state.questionId, state.yesNo {
                     Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.no)) {
                         ModeActivityButtonLabel(ActivityL10n.dontAllow, icon: nil, prominent: false)
                     }.buttonStyle(.plain)
@@ -144,6 +149,7 @@ struct ModeActivityWaitingBody: View {
 enum ModeActivityAnswer {
     static let yes = "yes"
     static let no = "no"
+    static let done = "done"
     static let maxOptions = 3
 }
 
@@ -166,6 +172,29 @@ struct ModeActivityFinishedBody: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// "Mode needs you", or "Your turn" when only the user can do the next bit (a PIN, a password).
+struct ModeActivityWaitingBadge: View {
+    let state: ModeActivityAttributes.ContentState
+
+    var body: some View {
+        if state.yourTurn {
+            ModeBadge(ActivityL10n.yourTurn, icon: .lock, tone: .warning)
+        } else {
+            ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning)
+        }
+    }
+}
+
+/// Stop as a capsule beside another answer (the red disc is for the working state).
+struct ModeActivityStopLabelButton: View {
+    var body: some View {
+        Button(intent: StopTaskIntent()) {
+            ModeActivityButtonLabel(ActivityL10n.stop, icon: nil, prominent: false)
+        }
+        .buttonStyle(.plain)
     }
 }
 

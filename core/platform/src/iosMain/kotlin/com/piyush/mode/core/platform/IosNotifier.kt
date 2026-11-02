@@ -56,12 +56,14 @@ public class IosNotifier : Notifier {
     override fun ask(id: String, text: String, kind: QuestionKind, options: List<String>) {
         val category = when (kind) {
             QuestionKind.YesNo -> CATEGORY_YES_NO
+            QuestionKind.YesNoAlways -> CATEGORY_YES_NO_ALWAYS
             QuestionKind.Text -> CATEGORY_TEXT
             QuestionKind.Choice -> CATEGORY_CHOICE
+            QuestionKind.YourTurn -> CATEGORY_YOUR_TURN
         }
         registerCategories(options.take(MAX_OPTIONS))
         val content = UNMutableNotificationContent().apply {
-            setTitle("Mode needs you")
+            setTitle(if (kind == QuestionKind.YourTurn) "Your turn" else "Mode needs you")
             setBody(text)
             setSound(UNNotificationSound.defaultSound)
             setCategoryIdentifier(category)
@@ -82,6 +84,20 @@ public class IosNotifier : Notifier {
             ),
             emptyList<String>(), UNNotificationCategoryOptionNone,
         )
+        val yesNoAlways = UNNotificationCategory.categoryWithIdentifier(
+            CATEGORY_YES_NO_ALWAYS,
+            listOf(
+                UNNotificationAction.actionWithIdentifier(ACTION_YES, "Yes", UNNotificationActionOptionNone),
+                UNNotificationAction.actionWithIdentifier(ACTION_ALWAYS, "Yes, and don't ask again", UNNotificationActionOptionNone),
+                UNNotificationAction.actionWithIdentifier(ACTION_NO, "No", UNNotificationActionOptionDestructive),
+            ),
+            emptyList<String>(), UNNotificationCategoryOptionNone,
+        )
+        val yourTurn = UNNotificationCategory.categoryWithIdentifier(
+            CATEGORY_YOUR_TURN,
+            listOf(UNNotificationAction.actionWithIdentifier(ACTION_DONE, "I've entered it", UNNotificationActionOptionNone)),
+            emptyList<String>(), UNNotificationCategoryOptionNone,
+        )
         val reply = UNTextInputNotificationAction.actionWithIdentifier(
             ACTION_TEXT, "Reply", UNNotificationActionOptionNone, "Reply", "Your answer",
         )
@@ -92,13 +108,17 @@ public class IosNotifier : Notifier {
                 UNTextInputNotificationAction.actionWithIdentifier(ACTION_TEXT, "Something else…", UNNotificationActionOptionNone, "Send", "Your answer"),
             emptyList<String>(), UNNotificationCategoryOptionNone,
         )
-        center.setNotificationCategories(setOf(yesNo, text, choice))
+        center.setNotificationCategories(setOf(yesNo, yesNoAlways, yourTurn, text, choice))
     }
 
     public companion object {
         public const val CATEGORY_YES_NO: String = "mode.yesno"
         public const val CATEGORY_TEXT: String = "mode.text"
         public const val CATEGORY_CHOICE: String = "mode.choice"
+        public const val CATEGORY_YES_NO_ALWAYS: String = "mode.yesno.always"
+        public const val CATEGORY_YOUR_TURN: String = "mode.yourturn"
+        public const val ACTION_ALWAYS: String = "answer.always"
+        public const val ACTION_DONE: String = "answer.done"
         public const val ACTION_YES: String = "answer.yes"
         public const val ACTION_NO: String = "answer.no"
         public const val ACTION_TEXT: String = "answer.text"
@@ -129,6 +149,10 @@ public class IosNotifier : Notifier {
         val trigger = UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(seconds, repeats = false)
         val request = UNNotificationRequest.requestWithIdentifier(id, content, trigger)
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request, null)
+    }
+
+    override fun withdraw(id: String) {
+        UNUserNotificationCenter.currentNotificationCenter().removeDeliveredNotificationsWithIdentifiers(listOf(id))
     }
 
     override fun cancel(id: String) {

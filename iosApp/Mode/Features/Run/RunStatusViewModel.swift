@@ -19,6 +19,10 @@ final class RunStatusViewModel {
         /** Choices to tap; empty for a free answer. */
         var options: [String] = []
         var recommended: String?
+        /** Also offers "Yes, and don't ask again". */
+        var allowAlways = false
+        /** A PIN or password only the user can enter: "I've entered it". */
+        var yourTurn = false
     }
 
     struct State: Equatable {
@@ -50,7 +54,8 @@ final class RunStatusViewModel {
         return State(
             running: Running(title: running.text, status: running.paused ? String(localized: L10n.Run.paused) : running.status, paused: running.paused),
             question: running.question.map {
-                PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo, options: $0.options, recommended: $0.recommended)
+                PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo, options: $0.options, recommended: $0.recommended,
+                                allowAlways: $0.allowAlways, yourTurn: $0.yourTurn)
             }
         )
     }

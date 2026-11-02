@@ -47,7 +47,7 @@ public struct ModeChoiceRow: View {
                             tagView
                         }
                     }
-                    Text(detail).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(2)
+                    Text(detail).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 ModeRadio(selected: selected)

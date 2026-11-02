@@ -47,11 +47,12 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
     }
 
     override fun looked(step: Int, jpeg: ByteArray, imageWidth: Int, imageHeight: Int, texts: List<Triple<String, Int, Int>>, millis: Long) {
-        store.write("$dir/step-$step.jpg", jpeg)
+        // An empty image is a screen that showed a one-time code: it is not kept.
+        if (jpeg.isNotEmpty()) store.write("$dir/step-$step.jpg", jpeg)
         event("look", buildJsonObject {
             put("step", step)
             put("ms", millis)
-            put("image", "step-$step.jpg")
+            if (jpeg.isNotEmpty()) put("image", "step-$step.jpg")
             put("w", imageWidth)
             put("h", imageHeight)
             put("texts", texts.size)

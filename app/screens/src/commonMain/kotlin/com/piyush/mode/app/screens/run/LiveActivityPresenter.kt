@@ -47,6 +47,8 @@ public sealed interface ActivityUiState {
         val questionId: String = "",
         val yesNo: Boolean = false,
         val options: List<String> = emptyList(),
+        /** Something only the user can do (a PIN, a password): "Your turn", with "I've entered it". */
+        val yourTurn: Boolean = false,
     ) : ActivityUiState
 
     public data class Finished(
@@ -115,7 +117,7 @@ public class LiveActivityPresenter(
         val result = s.lastResult
         return when {
             s.running && s.question != null -> s.question!!.let { q ->
-                ActivityUiState.Waiting(id, task, q.text, s.conversationId, q.id, q.yesNo, q.options)
+                ActivityUiState.Waiting(id, task, q.text, s.conversationId, q.id, q.yesNo, q.options, q.yourTurn)
             }
             s.running -> ActivityUiState.Working(
                 taskId = id,

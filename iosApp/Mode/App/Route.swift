@@ -11,6 +11,7 @@ enum Route: Hashable {
     case memory
     case modelPicker(stuck: Bool)
     case planModels(brain: Bool)
+    case access
     case providerDetail(id: String)
     case developer
     case memoryAboutYou

@@ -24,7 +24,7 @@ struct ModeLiveActivity: Widget {
                     Group {
                         switch state.phase {
                         case .working: ModeActivityStopButton()
-                        case .waiting: ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning)
+                        case .waiting: ModeActivityWaitingBadge(state: state)
                         case .finished: ModeActivityOutcome(state: state)
                         }
                     }
@@ -79,7 +79,7 @@ private struct ModeIslandTrailing: View {
                     .fixedSize()
             }
         case .waiting:
-            ModeIcon.waiting.image.foregroundStyle(ModeColor.warning)
+            (state.yourTurn ? ModeIcon.lock : ModeIcon.waiting).image.foregroundStyle(ModeColor.warning)
         case .finished:
             if let badge = state.outcome?.badge(seconds: state.seconds) {
                 badge.icon.image.foregroundStyle(badge.tone == .success ? ModeColor.success : ModeColor.warning)

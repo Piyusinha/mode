@@ -189,6 +189,12 @@ object AgentTools {
             ),
         ),
         Tool(
+            "wait_for_user", "Hand over to the user for something only they can do on this screen: a UPI or bank PIN, " +
+                "a password or passcode, Face ID, or a screen that is black or blank (hidden from Mode). Mode waits " +
+                "until the screen moves on, then you carry on.", null,
+            listOf(Param("what", "string", "What they should do, in a few words: \"Enter your UPI PIN in PhonePe\"."), reason),
+        ),
+        Tool(
             "done", "The task is complete, or cannot be done. Check the screen first.", null,
             listOf(
                 Param(

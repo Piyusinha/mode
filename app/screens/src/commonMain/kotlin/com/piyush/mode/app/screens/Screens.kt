@@ -61,6 +61,10 @@ public class Screens(
     private val openRouterApi: com.piyush.mode.llm.OpenRouterAccountApi? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
+    /** How much Mode does on its own (Settings → Access). */
+    public fun access(): com.piyush.mode.app.screens.settings.AccessPresenter =
+        com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)
+
     public fun planModels(): com.piyush.mode.app.screens.settings.PlanModelsPresenter =
         com.piyush.mode.app.screens.settings.PlanModelsPresenter(scope, settings, chatGpt, bench!!, providers!!)
 

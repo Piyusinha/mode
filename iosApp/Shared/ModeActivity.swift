@@ -26,6 +26,8 @@ struct ModeActivityAttributes: ActivityAttributes {
         var questionId: String?
         var yesNo = false
         var options: [String] = []
+        /// Something only the user can do (a UPI PIN, a password): "Your turn", with "I've entered it".
+        var yourTurn = false
         /// Finished: how it ended, how long it took, the start of the answer, how much more is in the chat.
         var outcome: Outcome?
         var seconds = 0

@@ -16,8 +16,19 @@ public class PendingQuestion(
     public val recommended: String? = null,
     /** Matches an answer from a notification or the Live Activity to this question. */
     public val id: String = "q" + kotlin.random.Random.nextLong().toULong().toString(36),
+    /** A yes/no before paying or sending: it also offers "Yes, and don't ask again" (full access). */
+    public val allowAlways: Boolean = false,
+    /** Something only the user can do on the phone (a PIN, a password): Mode waits, the app stays in front. */
+    public val yourTurn: Boolean = false,
 ) {
     internal val answer: CompletableDeferred<String?> = CompletableDeferred()
+
+    public companion object {
+        /** The answer "Yes, and don't ask again". */
+        public const val ALWAYS: String = "always"
+        /** The answer "I've entered it". */
+        public const val DONE: String = "done"
+    }
 }
 
 /** Everything a screen needs to show the current task. */

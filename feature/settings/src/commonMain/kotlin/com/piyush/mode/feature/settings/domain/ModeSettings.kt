@@ -34,6 +34,14 @@ public data class ModeSettings(
     val hasClaudeAccount: Boolean = false,
     /** Signed in with ChatGPT; derived from the Keychain, never a preference. */
     val hasChatGptAccount: Boolean = false,
+    /** Every task runs with full access: no "Allow it?" and no questions about choices. */
+    val fullAccess: Boolean = false,
+    /** Words that give one task full access ("just do it, order my usual"). */
+    val triggerWords: List<String> = DEFAULT_TRIGGER_WORDS,
+    /** The agent may read one-time codes and type them; they are never kept. */
+    val readCodes: Boolean = true,
+    /** With full access, still ask before paying more than this; null: never ask. */
+    val askAboveAmount: Double? = null,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey
@@ -49,6 +57,8 @@ public data class ModeSettings(
         maxCostPerTaskUsd = maxCostPerTaskUsd.coerceIn(COST_RANGE),
         dailyCapUsd = dailyCapUsd?.coerceIn(DAILY_CAP_RANGE),
         userName = userName?.trim()?.ifBlank { null },
+        triggerWords = triggerWords.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct().take(MAX_TRIGGER_WORDS),
+        askAboveAmount = askAboveAmount?.takeIf { it > 0 },
     )
 
     /** What the agent runs with. */
@@ -60,6 +70,9 @@ public data class ModeSettings(
         provider = provider,
         // The strong model is also the brain: it briefs the hands before the first tap.
         brainModel = strongModel,
+        fullAccess = fullAccess,
+        askAboveAmount = askAboveAmount,
+        readCodes = readCodes,
     )
 
     public companion object {
@@ -71,5 +84,8 @@ public data class ModeSettings(
         public val STEPS_RANGE: IntRange = 1..200
         public val COST_RANGE: ClosedFloatingPointRange<Double> = 0.005..5.0
         public val DAILY_CAP_RANGE: ClosedFloatingPointRange<Double> = 0.01..100.0
+        /** Not "auto": in India that is also a ride ("auto to Bellandur"). */
+        public val DEFAULT_TRIGGER_WORDS: List<String> = listOf("just do it", "full access")
+        public const val MAX_TRIGGER_WORDS: Int = 8
     }
 }

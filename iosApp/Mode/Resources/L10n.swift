@@ -47,6 +47,13 @@ enum L10n {
         static let dontAllow = LocalizedStringResource("question.dontAllow", defaultValue: "Don't allow")
         static let recommended = LocalizedStringResource("question.recommended", defaultValue: "Mode's pick")
         static let somethingElse = LocalizedStringResource("question.somethingElse", defaultValue: "Or type something else")
+        static let yes = LocalizedStringResource("question.yes", defaultValue: "Yes")
+        static let no = LocalizedStringResource("question.no", defaultValue: "No")
+        static let always = LocalizedStringResource("question.always", defaultValue: "Yes, and don't ask again")
+        static let alwaysNote = LocalizedStringResource("question.alwaysNote", defaultValue: "“Don't ask again” gives Mode full access for every task. You can change it in Settings → Access.")
+        static let yourTurn = LocalizedStringResource("question.yourTurn", defaultValue: "Your turn")
+        static let yourTurnNote = LocalizedStringResource("question.yourTurnNote", defaultValue: "Mode can't see or type this. When you're done, Mode carries on by itself.")
+        static let entered = LocalizedStringResource("question.entered", defaultValue: "I've entered it")
     }
 
     enum Run {
@@ -324,6 +331,48 @@ enum L10n {
 
         static func continueWith(_ name: String) -> String {
             String(localized: "providers.continueWith", defaultValue: "Continue with \(name)")
+        }
+    }
+
+    enum Access {
+        static let title = LocalizedStringResource("access.title", defaultValue: "Access")
+        static let subtitle = LocalizedStringResource("access.subtitle", defaultValue: "How much Mode does on its own.")
+        static let section = LocalizedStringResource("access.section", defaultValue: "Access")
+        static let howModeActs = LocalizedStringResource("access.howModeActs", defaultValue: "How Mode acts")
+        static let askFirst = LocalizedStringResource("access.askFirst", defaultValue: "Ask before paying or sending")
+        static let askFirstShort = LocalizedStringResource("access.askFirstShort", defaultValue: "Ask first")
+        static let askFirstDetail = LocalizedStringResource("access.askFirstDetail", defaultValue: "Mode stops right before it pays, books, orders, sends or deletes, and asks you.")
+        static let full = LocalizedStringResource("access.full", defaultValue: "Full access")
+        static let fullDetail = LocalizedStringResource("access.fullDetail", defaultValue: "Mode does the whole task without asking. It stops only where iPhone hides the screen or you must type: a UPI PIN, a password, Face ID.")
+        static let spending = LocalizedStringResource("access.spending", defaultValue: "Spending")
+        static let askAbove = LocalizedStringResource("access.askAbove", defaultValue: "Ask before paying more than")
+        static let askAboveOffNote = LocalizedStringResource("access.askAboveOffNote", defaultValue: "Off: Mode pays any amount a task needs. Set an amount to be asked above it.")
+        static let askAboveOnNote = LocalizedStringResource("access.askAboveOnNote", defaultValue: "Mode asks you before paying more than this. Smaller payments go ahead.")
+        static let oneTask = LocalizedStringResource("access.oneTask", defaultValue: "Full access for one task")
+        static let addWord = LocalizedStringResource("access.addWord", defaultValue: "Add a word")
+        static let addWordTitle = LocalizedStringResource("access.addWordTitle", defaultValue: "Add a word")
+        static let addWordPrompt = LocalizedStringResource("access.addWordPrompt", defaultValue: "no questions")
+        static let addWordMessage = LocalizedStringResource("access.addWordMessage", defaultValue: "Start or end a task with it to run that task with full access.")
+        static let add = LocalizedStringResource("access.add", defaultValue: "Add")
+        static let codes = LocalizedStringResource("access.codes", defaultValue: "One-time codes")
+        static let readCodes = LocalizedStringResource("access.readCodes", defaultValue: "Read OTPs for my tasks")
+        static let readCodesNote = LocalizedStringResource("access.readCodesNote", defaultValue: "When a task needs a code, Mode reads it from Messages or the notification and types it in. Codes are never saved: not in memory, the task’s screens or its log.")
+        static let askCodesNote = LocalizedStringResource("access.askCodesNote", defaultValue: "Off: when a task needs a code, Mode asks you for it.")
+        static let alwaysAsks = LocalizedStringResource("access.alwaysAsks", defaultValue: "Mode always asks you for")
+        static let pin = LocalizedStringResource("access.pin", defaultValue: "UPI PIN and bank screens")
+        static let pinDetail = LocalizedStringResource("access.pinDetail", defaultValue: "iPhone hides these screens from Mode")
+        static let passwords = LocalizedStringResource("access.passwords", defaultValue: "Passwords and passcodes")
+        static let passwordsDetail = LocalizedStringResource("access.passwordsDetail", defaultValue: "Mode never types them")
+        static let faceID = LocalizedStringResource("access.faceID", defaultValue: "Face ID")
+        static let faceIDDetail = LocalizedStringResource("access.faceIDDetail", defaultValue: "Only you can look at the phone")
+        static let alwaysAsksNote = LocalizedStringResource("access.alwaysAsksNote", defaultValue: "Mode waits on that screen for you. Enter it, and Mode carries on from there.")
+
+        static func remove(_ word: String) -> String {
+            String(localized: "access.remove", defaultValue: "Remove “\(word)”")
+        }
+
+        static func oneTaskNote(_ word: String) -> String {
+            String(localized: "access.oneTaskNote", defaultValue: "Start or end a task with one of these, like “\(word), order my usual from Swiggy”, and that task runs with full access. Others still ask.")
         }
     }
 

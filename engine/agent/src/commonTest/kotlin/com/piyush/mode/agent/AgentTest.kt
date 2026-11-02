@@ -215,7 +215,7 @@ class AgentTest {
         val model = ScriptedModel(call("done", "evidence" to "on screen", "summary" to "x"))
         Agent(phone, model, Gate(), noSettle).run("t")
         val names = model.lastTools!!.map { it.jsonObject.getValue("function").jsonObject.getValue("name").jsonPrimitive.content }
-        assertEquals(listOf("tap", "plan", "wait", "ask_user", "done"), names)
+        assertEquals(listOf("tap", "plan", "wait", "ask_user", "wait_for_user", "done"), names)
     }
 
     @Test

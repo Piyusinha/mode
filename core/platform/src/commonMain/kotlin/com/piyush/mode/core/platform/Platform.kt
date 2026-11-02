@@ -24,7 +24,8 @@ public interface BackgroundWork {
 }
 
 /** What kind of answer a question wants: Allow / Don't allow, one of a few options, or words. */
-public enum class QuestionKind { YesNo, Choice, Text }
+/** How a question can be answered: yes/no (with "don't ask again" when [YesNoAlways]), options, typed, or done. */
+public enum class QuestionKind { YesNo, YesNoAlways, Choice, Text, YourTurn }
 
 /** Other places a finished task's answer shows, so it isn't announced twice. */
 public object ResultSurfaces {
@@ -57,6 +58,9 @@ public interface Notifier {
 
     /** A notification at [atEpochMs], replacing any earlier one with the same [id]. Tapping it opens Mode. */
     public fun schedule(id: String, title: String, body: String, atEpochMs: Long) {}
+
+    /** Takes back a question's notification once it no longer waits (answered elsewhere, or moved on). */
+    public fun withdraw(id: String) {}
 
     /** Takes back a scheduled notification. */
     public fun cancel(id: String) {}

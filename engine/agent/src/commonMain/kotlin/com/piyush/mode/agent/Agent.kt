@@ -10,7 +10,10 @@ import com.piyush.mode.llm.LlmFailed
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.wireName
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.ensureActive
@@ -54,6 +57,12 @@ data class AgentConfig(
     val brainModel: String? = null,
     /** Snapshotted with the models when the task starts. */
     val provider: ModelProvider = ModelProvider.OpenRouter,
+    /** Full access: no "Allow it?" before paying, sending or booking, and no questions about choices. */
+    val fullAccess: Boolean = false,
+    /** With full access, still ask before paying more than this (in the screen's currency); null: never. */
+    val askAboveAmount: Double? = null,
+    /** The agent may read one-time codes from Messages or a notification and type them (never kept). */
+    val readCodes: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -74,6 +83,12 @@ interface UserGate {
      * stops the task. Without options it is the same as [ask].
      */
     suspend fun choose(question: String, options: List<String>, recommended: String?): String? = ask(question)
+
+    /**
+     * Something only the user can do on the phone ([what]: "Enter your UPI PIN in PhonePe"). True when they
+     * say they did it, false to stop. Mode also carries on by itself once the screen changes.
+     */
+    suspend fun yourTurn(what: String): Boolean = ask(what) != null
 }
 
 /** One step, for the live log. */
@@ -126,7 +141,7 @@ class Agent(
     private val config: AgentConfig = AgentConfig(),
     private val onStep: (StepRecord) -> Unit = {},
     private val onStatus: (String) -> Unit = {},
-    private val trace: AgentTrace = AgentTrace.None,
+    trace: AgentTrace = AgentTrace.None,
     /** What Mode remembers; null runs without recall or app tips. */
     private val memory: AgentMemory? = null,
     /** Pausing between steps; null: the task can't be paused. */
@@ -136,6 +151,10 @@ class Agent(
     /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
     private val onPlan: (List<PlanItem>) -> Unit = {},
 ) {
+    /** One-time codes seen on screen: masked in everything recorded. */
+    private val codes = OneTimeCodes()
+    private val trace: AgentTrace = RedactingTrace(trace, codes)
+
     private val clock = TimeSource.Monotonic
 
     /**
@@ -273,7 +292,8 @@ class Agent(
             onStatus(WORKING)
             val lookStarted = clock.markNow()
             val screen = look()
-            finalScreen = screen.jpeg
+            // A screen showing a one-time code is not kept as the task's last screen.
+            finalScreen = screen.jpeg.takeIf { screen.texts.none { OneTimeCodes.codesIn(it.first).isNotEmpty() } }
             onScreen(screen.jpeg)
             trace.looked(
                 step, screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.texts,
@@ -344,7 +364,7 @@ class Agent(
 
             val messages = ContextBuilder.build(
                 ContextBuilder.Input(
-                    systemPrompt = SYSTEM_PROMPT,
+                    systemPrompt = SYSTEM_PROMPT + accessRules(config),
                     task = task,
                     brief = brief?.brief?.text(),
                     context = context,
@@ -380,7 +400,11 @@ class Agent(
             var actionStarted = clock.markNow()
             lastWasPhoneAction = false
 
-            fun record(action: String, reason: String, outcome: String, op: String? = null) {
+            fun record(action0: String, reason0: String, outcome0: String, op: String? = null) {
+                // No one-time code is kept: not in the steps the user sees, the log or the history.
+                val action = codes.mask(action0)
+                val reason = codes.mask(reason0)
+                val outcome = codes.mask(outcome0)
                 onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds,
                     planItem = call?.let(AgentTools::itemOf), costReported = reply.usage.costReported))
                 trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
@@ -396,13 +420,13 @@ class Agent(
             AgentTools.noteOf(call)?.let { note ->
                 // Seen on the phone: the same note kept again a few steps later.
                 if (notes.none { it.equals(note, ignoreCase = true) }) {
-                    notes += note
+                    notes += codes.mask(note)
                     trace.noted(step, note)
                 }
             }
             when (call.name) {
                 "done" -> {
-                    val summary = call.arguments.string("summary").orEmpty()
+                    val summary = codes.mask(call.arguments.string("summary").orEmpty())
                     val success = call.arguments["success"]?.jsonPrimitive?.booleanOrNull ?: true
                     val evidence = call.arguments.string("evidence")?.trim().orEmpty()
                     val lastUnchanged = history.lastOrNull()?.contains(UNCHANGED) == true
@@ -447,13 +471,31 @@ class Agent(
                     val back = lastApp?.let { app ->
                         runCatching { phone.send(Op.LaunchApp(app)) }.isSuccess.also { settle() }
                     } == true
-                    answers += question to reply2
+                    answers += codes.mask(question) to codes.mask(reply2)
                     answeredSinceAction = true
                     record(
                         "ask_user", question,
                         "the user answered \"$reply2\"" + if (back) " (Mode reopened $lastApp)" else
                             " (Mode is on screen now: open the app you need)",
                     )
+                }
+                "wait_for_user" -> {
+                    val what = call.arguments.string("what")?.trim().orEmpty().ifEmpty { reason }
+                    onStatus("Your turn")
+                    when (yourTurn(what, screen)) {
+                        null -> {
+                            record("wait_for_user", what, "you stopped the task")
+                            return result(AgentOutcome.Stopped("Stopped at: $what"), step)
+                        }
+                        false -> {
+                            record("wait_for_user", what, "waited ${WAIT_FOR_USER_MS / 60_000} minutes and nothing changed")
+                            return result(AgentOutcome.Stopped("Waited for you: $what"), step)
+                        }
+                        true -> {
+                            answeredSinceAction = false
+                            record("wait_for_user", what, "the user did it and the screen moved on. Carry on from this screen")
+                        }
+                    }
                 }
                 "plan" -> {
                     // Seen on the phone: nine plan rewrites in a 30-step run. A plan right after a plan is
@@ -576,7 +618,7 @@ class Agent(
                     }
                     val risky = riskyTarget(op, screen)
                     val typed = lastTyped?.let { " It typed: \"${it.take(200)}\"." }.orEmpty()
-                    if (risky != null) {
+                    if (risky != null && needsYes(risky, screen)) {
                         if (!gate.confirm("Mode is about to tap \"$risky\" ($reason).$typed Allow it?")) {
                             record(described, reason, "the user did not allow it; do not try again without asking")
                             continue
@@ -884,6 +926,40 @@ class Agent(
             ?.first?.first
     }
 
+    /**
+     * Whether a risky tap needs the user's yes: always without full access; with it, only above the
+     * amount the user set (the tap's own amount, or else the largest on the page).
+     */
+    private fun needsYes(label: String, screen: Screen): Boolean {
+        if (!config.fullAccess) return true
+        val limit = config.askAboveAmount ?: return false
+        val amount = RiskGuard.amountIn(label) ?: screen.pageTexts().mapNotNull(RiskGuard::amountIn).maxOrNull() ?: return false
+        return amount > limit
+    }
+
+    /**
+     * Waits while the user does something only they can (a PIN, a password, Face ID): until they say so
+     * (true), the page changes (true), they stop (null) or [WAIT_FOR_USER_MS] passes (false).
+     */
+    private suspend fun yourTurn(what: String, before: Screen): Boolean? = coroutineScope {
+        val page = ChangeLedger.page(before.pageTexts())
+        val watched = async {
+            // Counted in polls, not by the clock: each poll is a pause plus a look.
+            repeat((WAIT_FOR_USER_MS / WAIT_POLL_MS).toInt()) {
+                delay(WAIT_POLL_MS)
+                val now = runCatching { look() }.getOrNull() ?: return@repeat
+                // A new page: the PIN or password screen is gone. Typing on the same page is not enough.
+                if (ChangeLedger.similarity(page, ChangeLedger.page(now.pageTexts())) < SAME_PAGE) return@async true
+            }
+            false
+        }
+        val asked = async { gate.yourTurn(what) }
+        select<Boolean?> {
+            watched.onAwait { it }
+            asked.onAwait { if (it) true else null }
+        }.also { watched.cancel(); asked.cancel() }
+    }
+
     /** The label of a tap target that looks irreversible (pay, book, send…), or null. */
     private fun riskyTarget(op: Op, screen: Screen): String? {
         if (op !is Op.Tap) return null
@@ -894,6 +970,46 @@ class Agent(
     private fun money(usd: Double): String = "$" + ((usd * 10000).roundToInt() / 10000.0).toString()
 
     companion object {
+        /** How long Mode waits for the user to enter a PIN or password before stopping. */
+        const val WAIT_FOR_USER_MS: Long = 5 * 60_000L
+        private const val WAIT_POLL_MS: Long = 1_500L
+
+        /** The rules that depend on what the user allowed: codes, screens only they can do, full access. */
+        fun accessRules(config: AgentConfig): String = buildString {
+            append("""
+
+                SCREENS ONLY THE USER CAN DO
+                A UPI or bank PIN pad, a password or passcode field, Face ID, or a screen that is black or blank where
+                an app should be (iPhone hides bank and PIN screens from Mode): call wait_for_user, saying in a few
+                words what they should do ("Enter your UPI PIN in PhonePe"). Mode waits until the screen moves on,
+                then you carry on from the new screen. Never type a PIN, password or passcode yourself.
+            """.trimIndent())
+            append("\n\n")
+            append(
+                if (config.readCodes) """
+                    ONE-TIME CODES
+                    When the app wants a one-time code (OTP), get it yourself instead of asking: tap it if iOS
+                    suggests it above the keyboard ("From Messages"); otherwise read it from the notification
+                    banner, or open Messages, read the newest code, go back to the app and type it. Never put a
+                    code in a note, the plan or your summary.
+                """.trimIndent() else """
+                    ONE-TIME CODES
+                    When the app wants a one-time code (OTP), ask the user for it.
+                """.trimIndent(),
+            )
+            if (config.fullAccess) {
+                append("\n\n")
+                append("""
+                    FULL ACCESS
+                    The user gave you full access for this task: do all of it yourself, without asking. Mode will not
+                    ask them before paying, sending or booking either. Where the rules above say to ask about a choice
+                    (which dish, size, slot, contact), choose yourself: what ABOUT THE USER says they like, else the
+                    option you would recommend, and say in your summary what you chose. Use ask_user only when the task
+                    cannot go on without something only they know (an address or a person Mode has never seen).
+                """.trimIndent())
+            }
+        }
+
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
         private const val END_OF_LIST = " → end of the list: nothing new appeared. Everything seen is under SEEN WHILE " +
@@ -1041,7 +1157,8 @@ class Agent(
             you typed and asks them right before such a tap. So type the message and tap Send.
 
             Ask the user (ask_user) when:
-            - you are blocked: a login, passcode, Face ID, verification code or payment details are needed;
+            - you are blocked by something only they know: which account to sign in with, or payment details
+              Mode does not have (a PIN, password or Face ID is wait_for_user instead, below);
             - a choice is theirs to make. Decide yourself what the task handed to you ("a highly rated
               restaurant", which screen or route, the obvious match for a name they gave). But when the task
               leaves open something they will eat, wear, use or pay for (which dish or product, size,
@@ -1111,6 +1228,12 @@ object RiskGuard {
         "pay", "buy", "purchase", "order", "book", "confirm", "request", "send", "post", "delete",
         "remove", "subscribe", "checkout", "check out", "transfer", "submit", "place", "donate",
     )
+
+    private val AMOUNT = Regex("""(?:₹|rs\.?|inr|\$|€|£)\s*([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE)
+
+    /** The money amount in [text] ("Pay ₹1,348" → 1348.0), or null. */
+    fun amountIn(text: String): Double? =
+        AMOUNT.find(text)?.groupValues?.get(1)?.replace(",", "")?.toDoubleOrNull()
 
     fun isRisky(label: String): Boolean {
         val text = label.lowercase()

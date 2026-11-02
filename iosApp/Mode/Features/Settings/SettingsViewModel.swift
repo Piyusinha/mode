@@ -37,6 +37,8 @@ final class SettingsViewModel {
         var dailyCap = 0.0
         var dailyCapLabel = ""
         var learn = true
+        /// Every task runs without asking (Settings → Access).
+        var fullAccess = false
         var query = ""
         var modelCount = 0
     }
@@ -55,6 +57,7 @@ final class SettingsViewModel {
         case openPicker(stuck: Bool)
         case showProviders
         case openProvider
+        case openAccess
     }
 
     private(set) var state = State()
@@ -101,6 +104,7 @@ final class SettingsViewModel {
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(state.showsCost ? .modelPicker(stuck: stuck) : .planModels(brain: stuck))
         case .openProvider: navigate(.providerDetail(id: activeProvider))
+        case .openAccess: navigate(.access)
         case .showProviders: showingProviders = true
         }
     }
@@ -164,6 +168,7 @@ final class SettingsViewModel {
             dailyCap: cap ?? 0,
             dailyCapLabel: cap.map(Format.money) ?? String(localized: L10n.Settings.dailyCapOff),
             learn: s.learn,
+            fullAccess: s.fullAccess,
             query: s.query,
             modelCount: Int(s.modelCount)
         )

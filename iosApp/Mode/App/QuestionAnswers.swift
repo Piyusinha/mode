@@ -29,6 +29,8 @@ final class QuestionAnswers: NSObject, UNUserNotificationCenterDelegate {
         switch action {
         case IosNotifier.companion.ACTION_YES: return "yes"
         case IosNotifier.companion.ACTION_NO: return "no"
+        case IosNotifier.companion.ACTION_ALWAYS: return "always"
+        case IosNotifier.companion.ACTION_DONE: return "done"
         case IosNotifier.companion.ACTION_TEXT:
             return (response as? UNTextInputNotificationResponse)?.userText.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         default:

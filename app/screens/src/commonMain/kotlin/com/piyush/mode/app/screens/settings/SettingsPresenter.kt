@@ -49,6 +49,8 @@ public data class SettingsUiState(
     val maker: String? = null,
     /** How many models there are to search. */
     val modelCount: Int = 0,
+    /** Every task runs without asking (Settings → Access). */
+    val fullAccess: Boolean = false,
     /** The effort picked for each role ("low"…), where the provider takes one. */
     val modelEffort: String? = null,
     val stuckEffort: String? = null,
@@ -113,6 +115,7 @@ public class SettingsPresenter(
                             .take(MAX_RESULTS).map(::choice),
                     modelCount = all.size,
                     modelEffort = ProviderModels.effort(s.model),
+                    fullAccess = s.fullAccess,
                     stuckEffort = s.strongModel?.let(ProviderModels::effort),
                     makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),
                     maker = maker,

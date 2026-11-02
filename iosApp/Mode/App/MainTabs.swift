@@ -113,10 +113,13 @@ struct MainTabs: View {
         case "settings": paths[.home] = [.settings]
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "plan": paths[.home] = [.settings, .planModels(brain: parts.last == "brain")]
+        case "access": paths[.home] = [.settings, .access]
         case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
-        case "activity": previewActivity = ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
+        case "activity":
+            ActivityPreview.yourTurn = parts.last == "yourturn"
+            previewActivity = ActivityPreview.yourTurn ? .waiting : ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
         case "question": previewQuestion = ActivityPreview.sampleQuestion
         case "sample": sample = ScreenSample(id: parts.last ?? "")
         default: break
@@ -151,6 +154,7 @@ private struct TabRoot<Content: View>: View {
                     case .memory: MemoryRoute(app: app, navigate: navigate)
                     case let .modelPicker(stuck): ModelPickerRoute(app: app, stuck: stuck, navigate: navigate)
                     case let .planModels(brain): PlanModelsRoute(app: app, brain: brain)
+                    case .access: AccessRoute(app: app)
                     case let .providerDetail(id): ProviderDetailRoute(app: app, id: id, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)
                     case let .memoryRoutines(appName): MemoryRoutinesRoute(app: app, appName: appName, navigate: navigate)

@@ -12,12 +12,24 @@ struct QuestionSheet: View {
         ScrollView {
         VStack(alignment: .leading, spacing: ModeSpacing.l) {
             // The question is what matters: in full, large; "Mode needs you" is just its label.
-            Label { Text(L10n.Question.title) } icon: { ModeIcon.waiting.image }
-                .modeText(.subheadline, color: ModeColor.tint)
+            Label { Text(question.yourTurn ? L10n.Question.yourTurn : L10n.Question.title) } icon: {
+                (question.yourTurn ? ModeIcon.lock : ModeIcon.waiting).image
+            }
+            .modeText(.subheadline, color: question.yourTurn ? ModeColor.warning : ModeColor.tint)
             Text(question.text).modeText(.title2).fixedSize(horizontal: false, vertical: true)
-            if question.yesNo {
-                ModeButton(L10n.Question.allow, fullWidth: true) { onAnswer(Answer.yes) }
-                ModeButton(L10n.Question.dontAllow, role: .secondary, fullWidth: true) { onAnswer(Answer.no) }
+            if question.yourTurn {
+                Text(L10n.Question.yourTurnNote).modeText(.callout, color: ModeColor.textSecondary)
+                ModeButton(L10n.Question.entered, fullWidth: true) { onAnswer(Answer.done) }
+                ModeButton(L10n.Question.stopTask, role: .destructive) { onStop() }
+            } else if question.yesNo {
+                ModeButton(L10n.Question.yes, fullWidth: true) { onAnswer(Answer.yes) }
+                if question.allowAlways {
+                    ModeButton(L10n.Question.always, role: .secondary, fullWidth: true) { onAnswer(Answer.always) }
+                }
+                ModeButton(L10n.Question.no, role: .secondary, fullWidth: true) { onAnswer(Answer.no) }
+                if question.allowAlways {
+                    Text(L10n.Question.alwaysNote).modeText(.footnote, color: ModeColor.textSecondary)
+                }
             } else if !question.options.isEmpty {
                 ModeOptionList(question.options, recommended: question.recommended,
                                recommendedLabel: String(localized: L10n.Question.recommended), onPick: onAnswer)
@@ -41,5 +53,7 @@ struct QuestionSheet: View {
     private enum Answer {
         static let yes = "yes"
         static let no = "no"
+        static let always = "always"
+        static let done = "done"
     }
 }

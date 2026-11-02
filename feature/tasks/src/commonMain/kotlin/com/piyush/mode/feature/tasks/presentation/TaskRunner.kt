@@ -12,6 +12,7 @@ import com.piyush.mode.agent.AgentResult
 import com.piyush.mode.agent.PauseGate
 import com.piyush.mode.agent.TaskContext
 import com.piyush.mode.agent.UserGate
+import com.piyush.mode.feature.settings.domain.AccessRules
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.common.startOfTodayMillis
@@ -235,14 +236,21 @@ public class TaskRunner(
                 recorder.failedToStart(task, "could not connect: ${e.message}")
                 throw e
             }
+            // A trigger word ("just do it, order my usual") gives this task full access; the agent reads the rest.
+            val access = AccessRules.forTask(task, settings.settings.value.triggerWords)
+            val agentTask = if (budget.fullAccess) task else access.task
+            val runConfig = if (access.fullAccess && !budget.fullAccess) {
+                AppLog.log("agent", "full access for this task (trigger word)")
+                budget.copy(fullAccess = true, askAboveAmount = settings.settings.value.askAboveAmount)
+            } else budget
             val useMemory = !private && tag == null
             val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier, today = today())
-            val prepared = memory?.prepare(task, base, useMemory, saved.id)
+            val prepared = memory?.prepare(agentTask, base, useMemory, saved.id)
             val agent = Agent(
                 phone = phone,
                 llm = llm.forProvider(budget.provider),
                 gate = gate(phone),
-                config = budget,
+                config = runConfig,
                 onStep = { step -> mutableState.update { it.copy(steps = it.steps + step) } },
                 onPlan = { items -> mutableState.update { it.copy(plan = items) } },
                 onStatus = ::status,
@@ -252,7 +260,7 @@ public class TaskRunner(
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
             )
             // Started from Mode's own screen; the agent goes straight to the app it needs.
-            val finished = background.run { agent.run(task, startsInMode = true, context = prepared?.context ?: base) }
+            val finished = background.run { agent.run(agentTask, startsInMode = true, context = prepared?.context ?: base) }
             result = finished
             if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget)
             outcome = statusOf(finished.outcome)
@@ -363,7 +371,22 @@ public class TaskRunner(
      * the model is then told Mode is in front so it reopens its app.
      */
     private fun gate(phone: PhoneBackend) = object : UserGate {
-        override suspend fun confirm(question: String): Boolean = askUser(phone, question, yesNo = true) == "yes"
+        /** "Yes, and don't ask again" was tapped in this task: the rest of it asks no more. */
+        var alwaysYes = false
+
+        override suspend fun confirm(question: String): Boolean {
+            if (alwaysYes) return true
+            val answer = askUser(phone, question, yesNo = true, allowAlways = true)
+            if (answer == PendingQuestion.ALWAYS) {
+                // From now on every task has full access (Settings → Access turns it back).
+                settings.update { it.copy(fullAccess = true) }
+                alwaysYes = true
+                AppLog.log("agent", "full access turned on from a question")
+            }
+            return answer == "yes" || answer == PendingQuestion.ALWAYS
+        }
+
+        override suspend fun yourTurn(what: String): Boolean = askUser(phone, what, yesNo = false, yourTurn = true) != null
 
         override suspend fun ask(question: String): String? = askUser(phone, question, yesNo = false)?.let(::whereAnswered)
 
@@ -377,24 +400,32 @@ public class TaskRunner(
         yesNo: Boolean,
         options: List<String> = emptyList(),
         recommended: String? = null,
+        allowAlways: Boolean = false,
+        yourTurn: Boolean = false,
     ): String? {
-        val pending = PendingQuestion(text, yesNo, options, recommended)
+        val pending = PendingQuestion(text, yesNo, options, recommended, allowAlways = allowAlways, yourTurn = yourTurn)
         AppLog.log("agent", (if (yesNo) "confirm: " else "ask: ") + text)
         mutableState.update { it.copy(question = pending, status = "Waiting for you") }
         state.value.taskId?.let { tasks.setStatus(it, TaskStatus.WaitingForUser) }
         // Answerable from the notification and the Live Activity: the app being used stays in front.
         // Without notifications Mode opens to ask (and the agent reopens the app after).
         val kind = when {
+            yourTurn -> QuestionKind.YourTurn
+            yesNo && allowAlways -> QuestionKind.YesNoAlways
             yesNo -> QuestionKind.YesNo
             options.size >= 2 -> QuestionKind.Choice
             else -> QuestionKind.Text
         }
         notifier.ask(pending.id, text, kind, options)
-        askedInMode = !notifier.canAskInPlace()
+        // A PIN or password screen must stay in front: Mode never comes forward for the user's turn.
+        askedInMode = !yourTurn && !notifier.canAskInPlace()
         if (askedInMode) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
-        return pending.answer.await().also {
-            AppLog.log("agent", "user answered: ${it ?: "(stopped)"}")
-            mutableState.update { state -> state.copy(question = null) }
+        try {
+            return pending.answer.await().also { AppLog.log("agent", "user answered: ${it ?: "(stopped)"}") }
+        } finally {
+            // Also when the agent moved on by itself (the PIN screen went away): the question is gone.
+            notifier.withdraw(pending.id)
+            mutableState.update { state -> if (state.question?.id == pending.id) state.copy(question = null) else state }
             state.value.taskId?.let { id -> tasks.setStatus(id, TaskStatus.Running) }
         }
     }

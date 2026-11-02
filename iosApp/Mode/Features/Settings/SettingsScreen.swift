@@ -60,6 +60,16 @@ struct SettingsScreen: View {
                     valueRow(L10n.Settings.whenStuckShort, value: state.stuckName) { onEvent(.openPicker(stuck: true)) }
                 }
 
+                ModeSectionHeader(L10n.Access.section)
+                ModeCard {
+                    ModeRow(String(localized: L10n.Access.howModeActs), leading: .icon(.shield), action: { onEvent(.openAccess) }) {
+                        HStack(spacing: ModeSpacing.s) {
+                            Text(state.fullAccess ? L10n.Access.full : L10n.Access.askFirstShort).modeText(.body, color: ModeColor.textSecondary)
+                            ModeChevron()
+                        }
+                    }
+                }
+
                 ModeSectionHeader(L10n.Settings.limits)
                 ModeCard {
                     if state.showsCost {

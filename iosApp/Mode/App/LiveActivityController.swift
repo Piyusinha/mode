@@ -66,7 +66,7 @@ final class LiveActivityController {
             ))
         case let .waiting(w):
             show(taskId: w.taskId, task: w.task, conversationId: w.conversationId, content: Content(
-                phase: .waiting, question: w.question, questionId: w.questionId, yesNo: w.yesNo, options: w.options
+                phase: .waiting, question: w.question, questionId: w.questionId, yesNo: w.yesNo, options: w.options, yourTurn: w.yourTurn
             ))
         case let .finished(f):
             finish(taskId: f.taskId, content: Content(

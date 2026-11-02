@@ -7,6 +7,8 @@ import SwiftUI
 /// (`MODE_OPEN=activity:working|waiting|finished`). The real one is checked on the phone.
 struct ActivityPreview: View {
     let phase: ModeActivityAttributes.ContentState.Phase
+    /// `MODE_OPEN=activity:yourturn`: the waiting state for a PIN only the user can enter.
+    static var yourTurn = false
 
     /// A question with options, as the agent asks it, for the question sheet's screenshot.
     static let sampleQuestion = RunStatusViewModel.PendingQuestion(
@@ -20,6 +22,8 @@ struct ActivityPreview: View {
         case .working:
             .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Sonali",
                   plan: [.init("Open WhatsApp", state: .done), .init("Send message", state: .now), .init("Read calendar", state: .next)])
+        case .waiting where Self.yourTurn:
+            .init(phase: .waiting, step: 6, question: "Enter your UPI PIN in PhonePe. Mode carries on when you’re done.", questionId: "preview", yourTurn: true)
         case .waiting:
             .init(phase: .waiting, step: 6, question: "Mode is about to tap \"Book now\" (Auto to Bellandur, ₹163). Allow it?", questionId: "preview", yesNo: true)
         case .finished:
