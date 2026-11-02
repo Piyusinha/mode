@@ -235,6 +235,8 @@ class Agent(
         var focusTapRefused = false
         /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
         var lastOp: String? = null
+        /** The last phone action was a scroll up (nothing new then means the top of the page). */
+        var lastScrollUp = false
         var lastPage: List<String> = emptyList()
         /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
         val ledger = ChangeLedger()
@@ -317,6 +319,9 @@ class Agent(
             }
             if (changed != null && history.isNotEmpty()) {
                 history[history.lastIndex] += when {
+                    // Seen on the phone: an iOS update moved Light/Dark out of Display & Brightness; the agent scrolled
+                    // up at the top of the page five times. Nothing above means it is not on this page.
+                    endOfList && lastScrollUp -> TOP_OF_PAGE
                     endOfList -> END_OF_LIST
                     lastOp == "back" && samePage -> { changed = false; BACK_DID_NOTHING }
                     !changed -> UNCHANGED + (if (lastOp == "tap") labelHint(lastTapLabel, screen.layout) else "")
@@ -408,7 +413,11 @@ class Agent(
                 onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds,
                     planItem = call?.let(AgentTools::itemOf), costReported = reply.usage.costReported))
                 trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
-                history += "$step. $action — $outcome"
+                // A step the stronger model took is on purpose: the next steps build on it, not undo it.
+                // Seen on the phone: it opened Control Center for the Dark Mode switch; the next step called that
+                // a mistake and reopened Settings, twice.
+                val chosen = if (stepUp && model == config.strongModel && reason.isNotBlank()) " (on purpose: $reason; carry on from here)" else ""
+                history += "$step. $action — $outcome$chosen"
             }
 
             if (call == null || tools.none { it.name == call.name }) {
@@ -647,6 +656,7 @@ class Agent(
                         lastPage = screen.pageTexts()
                         stuck.acted()
                         stuck.scrolled(if (op is Op.Scroll) call.arguments.string("direction") else null)
+                        lastScrollUp = op is Op.Scroll && call.arguments.string("direction") == "up"
                         if (op is Op.LaunchApp) {
                             lastApp = result.jsonPrimitiveOrNull() ?: op.name
                             if (op.name !in appsOpened) {
@@ -1012,6 +1022,9 @@ class Agent(
 
         private const val NEAR_PX = 60.0
         private const val UNCHANGED = " → screen did NOT change"
+        private const val TOP_OF_PAGE = " → top of the page: nothing is above. What you are looking for is not on this page " +
+            "(apps change where things are). Use the app's Search with the thing's own name (a setting: its name, such as " +
+            "\"Dark Mode\"), or take another route; do not scroll up again"
         private const val END_OF_LIST = " → end of the list: nothing new appeared. Everything seen is under SEEN WHILE " +
             "SCROLLING; choose from it, or scroll the other way once if what you need was above"
         private val ROUTE_STEP = Regex("""^\d{1,2}[.)]\s*(.+)$""")

@@ -211,20 +211,17 @@ public class ListenPresenter(
             return "$hey. What do you want me to do?"
         }
 
-        private val POLITE = Regex(
-            """^(please\s+|can you\s+|could you\s+|would you\s+|hey mode,?\s+|mode,?\s+|i want to\s+|i need to\s+|i'd like to\s+|i would like to\s+)+""",
-            RegexOption.IGNORE_CASE,
-        )
         /** A question, not a task: Mode looks it up. */
-        private val QUESTION = Regex("""^(what|when|where|who|which|why|how|is|are|do|does|did|am i|have i)\b""", RegexOption.IGNORE_CASE)
-        private val TRAILING = Regex("""[\s,]*(please|for me|thanks|thank you)?[\s.!?]*$""", RegexOption.IGNORE_CASE)
+        private val QUESTION = Regex("""^(what|when|where|who|which|why|how|is|are|do|does|did|am i|have i|can you tell|tell me)\b""", RegexOption.IGNORE_CASE)
 
-        /** "can you turn on dark mode please" → "I'll turn on dark mode." Plain, from the user's own words. */
+        /** What a personal assistant says when handed a task: short, warm, and never the task read back. */
+        private val ON_IT = listOf("Sure, let me do that for you.", "On it.", "Sure, I'll take care of it.", "Got it, doing it now.")
+
+        /** "Sure, let me do that for you." for a task; "Let me check." for a question. The same task gets the same line. */
         fun replyLine(task: String): String {
-            val core = task.trim().replace(POLITE, "").replace(TRAILING, "").trim()
-            if (core.isEmpty()) return "On it."
-            if (QUESTION.containsMatchIn(core) || task.trim().endsWith("?")) return "Let me check."
-            return "I'll " + core.replaceFirstChar { it.lowercaseChar() } + "."
+            val said = task.trim()
+            if (QUESTION.containsMatchIn(said.removePrefix("hey mode").trim(' ', ',')) || said.endsWith("?")) return "Let me check."
+            return ON_IT[said.lowercase().hashCode().mod(ON_IT.size)]
         }
     }
 }

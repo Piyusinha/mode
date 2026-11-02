@@ -11,6 +11,7 @@ import io.ktor.client.engine.mock.MockEngine
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class VoiceScreensTest {
     @Test
@@ -34,11 +35,12 @@ class VoiceScreensTest {
     }
 
     @Test
-    fun modeSaysWhatItWillDoInTheUsersWords() {
-        assertEquals("I'll turn on dark mode.", ListenPresenter.replyLine("can you turn on dark mode please"))
-        assertEquals("I'll order my usual from Swiggy.", ListenPresenter.replyLine("Hey Mode, I want to order my usual from Swiggy"))
+    fun modeAnswersLikeAnAssistantWithoutReadingTheTaskBack() {
+        val line = ListenPresenter.replyLine("can you turn on dark mode please")
+        assertTrue(line in listOf("Sure, let me do that for you.", "On it.", "Sure, I'll take care of it.", "Got it, doing it now."), line)
+        assertTrue("dark mode" !in line.lowercase(), "never the task read back")
+        assertEquals(line, ListenPresenter.replyLine("can you turn on dark mode please"), "the same task, the same line")
         assertEquals("Let me check.", ListenPresenter.replyLine("what's on my calendar today?"))
-        assertEquals("On it.", ListenPresenter.replyLine("please"))
     }
 
     @Test
