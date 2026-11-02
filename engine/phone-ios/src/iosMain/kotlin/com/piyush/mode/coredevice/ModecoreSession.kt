@@ -13,6 +13,8 @@ import com.piyush.mode.coredevice.native.mc_paste_text
 import com.piyush.mode.coredevice.native.mc_screenshot
 import com.piyush.mode.coredevice.native.mc_session_close
 import com.piyush.mode.coredevice.native.mc_session_open_rppairing
+import com.piyush.mode.coredevice.native.mc_session_pause_stream
+import com.piyush.mode.coredevice.native.mc_session_resume_stream
 import com.piyush.mode.coredevice.native.mc_string_free
 import com.piyush.mode.coredevice.native.mc_touch
 import com.piyush.mode.coredevice.native.mc_type_ascii
@@ -85,6 +87,10 @@ class ModecoreSession private constructor(
             InstalledApp(app.getValue("name").jsonPrimitive.content, app.getValue("bundle_id").jsonPrimitive.content)
         }
     }
+
+    override fun pauseStream() = check(mc_session_pause_stream(live()))
+
+    override fun resumeStream() = check(mc_session_resume_stream(live()))
 
     override fun close() {
         handle?.let(::mc_session_close)

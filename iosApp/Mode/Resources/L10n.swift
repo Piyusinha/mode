@@ -537,6 +537,32 @@ enum L10n {
         static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
     }
 
+    enum Voice {
+        static let speech = LocalizedStringResource("voice.speech", defaultValue: "Speech")
+        static let hearing = LocalizedStringResource("voice.hearing", defaultValue: "Hearing")
+        static let speechInUse = LocalizedStringResource("voice.speechInUse", defaultValue: "Speech in use")
+        static let hearingInUse = LocalizedStringResource("voice.hearingInUse", defaultValue: "Hearing in use")
+        static let apple = LocalizedStringResource("voice.apple", defaultValue: "Apple")
+        static let fish = LocalizedStringResource("voice.fish", defaultValue: "Fish Audio")
+        static let eleven = LocalizedStringResource("voice.eleven", defaultValue: "ElevenLabs")
+        static let soniox = LocalizedStringResource("voice.soniox", defaultValue: "Soniox")
+        static let deepgram = LocalizedStringResource("voice.deepgram", defaultValue: "Deepgram")
+        static let ready = LocalizedStringResource("voice.ready", defaultValue: "Ready")
+        static let first = LocalizedStringResource("voice.first", defaultValue: "First")
+        static let noKey = LocalizedStringResource("voice.noKey", defaultValue: "Add a key")
+        static let permission = LocalizedStringResource("voice.permission", defaultValue: "Microphone permission needed")
+        static let denied = LocalizedStringResource("voice.denied", defaultValue: "Microphone is off")
+        static let unsupported = LocalizedStringResource("voice.unsupported", defaultValue: "Not available on this iPhone")
+        static let asset = LocalizedStringResource("voice.asset", defaultValue: "Downloading the speech model")
+        static let moveUp = LocalizedStringResource("voice.moveUp", defaultValue: "Move up")
+        static let key = LocalizedStringResource("voice.key", defaultValue: "API key")
+        static let elevenNote = LocalizedStringResource("voice.elevenNote", defaultValue: "The free plan is for trying Mode on your own phone. A shipped app needs ElevenLabs' paid plan.")
+        static let listening = LocalizedStringResource("voice.listening", defaultValue: "Listening")
+        static let listeningHint = LocalizedStringResource("voice.listeningHint", defaultValue: "Tell Mode what to do. It will say what it will do, then start.")
+        static let typeInstead = LocalizedStringResource("voice.typeInstead", defaultValue: "Type it instead")
+        static let send = LocalizedStringResource("voice.send", defaultValue: "Send")
+    }
+
     enum Settings {
         static let you = LocalizedStringResource("settings.you", defaultValue: "You")
         static let name = LocalizedStringResource("settings.name", defaultValue: "Your name")

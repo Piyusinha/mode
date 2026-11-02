@@ -111,6 +111,7 @@ class ModeGraph(platform: PlatformServices) {
         activity = activity,
         scope = scope,
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
+        voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http),
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
@@ -132,6 +133,7 @@ class ModeGraph(platform: PlatformServices) {
         claudeApi = com.piyush.mode.llm.ClaudeAccountApi(platform.http),
         openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
         claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() }),
+        voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http),
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)

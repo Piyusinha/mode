@@ -1,4 +1,5 @@
 import ModeDesignSystem
+import ModeKit
 import SwiftUI
 
 /// Settings, as on its board: You, AI (the provider in use and its models), Limits, Memory. Draws state, sends events.
@@ -24,6 +25,15 @@ struct SettingsScreen: View {
                             .submitLabel(.done)
                             .onSubmit { onEvent(.saveName) }
                     }
+                }
+
+                ModeSectionHeader(L10n.Voice.speech)
+                ModeCard {
+                    ModeRow(String(localized: L10n.Voice.speechInUse), leading: .icon(.microphone), action: { onEvent(.showSpeech) }) { ModeChevron() }
+                }
+                ModeSectionHeader(L10n.Voice.hearing)
+                ModeCard {
+                    ModeRow(String(localized: L10n.Voice.hearingInUse), leading: .icon(.microphone), action: { onEvent(.showHearing) }) { ModeChevron() }
                 }
 
                 ModeSectionHeader(L10n.Settings.ai)
@@ -186,6 +196,8 @@ struct SettingsRoute: View {
                 ProvidersSheet(app: app, state: providers.state, onEvent: providers.send) { model.showingProviders = false }
                     .modifier(ProviderLinks(model: providers, app: app))
             }
+            .sheet(isPresented: $model.showingSpeech) { VoiceSheet(app: app, hearing: false) }
+            .sheet(isPresented: $model.showingHearing) { VoiceSheet(app: app, hearing: true) }
             #if DEBUG && targetEnvironment(simulator)
             // Simulator only: MODE_OPEN=settings:providers opens the providers sheet, for comparing with its board.
             .task { if ProcessInfo.processInfo.environment["MODE_OPEN"] == "settings:providers" { model.send(.showProviders) } }
@@ -205,4 +217,185 @@ struct ModelPickerRoute: View {
     var body: some View {
         ModelPickerScreen(state: model.state, listed: model.listed, filter: model.filter, stuck: stuck, query: $model.query, onEvent: model.send)
     }
+}
+
+/// Speech or hearing, in the same shape as the AI provider list: order is the fallback, a key is pasted.
+@MainActor
+@Observable
+final class VoiceListModel {
+    struct Row: Identifiable, Equatable {
+        let id: String
+        let title: String
+        let status: String
+        let ready: Bool
+        let first: Bool
+        let needsKey: Bool
+    }
+
+    private(set) var rows: [Row] = []
+    var key = ""
+    var linking: String?
+    private let presenter: VoicePresenter
+    private var updates: Updates?
+    private let hearing: Bool
+
+    init(screens: Screens, hearing: Bool) {
+        self.hearing = hearing
+        presenter = screens.voice(hearing: hearing)
+        updates = observe(presenter.state) { [weak self] s in self?.rows = Self.map(s) }
+    }
+
+    func moveUp(_ id: String) { presenter.moveUp(id: id) }
+    func save() {
+        guard let linking else { return }
+        presenter.saveKey(id: linking, key: key)
+        key = ""
+        self.linking = nil
+    }
+    func disconnect(_ id: String) { presenter.disconnect(id: id) }
+
+    private static func map(_ s: VoiceUiState) -> [Row] {
+        s.rows.map { row in
+            let needsKey = row.id != "apple"
+            let status: String = if row.first && row.ready {
+                String(localized: L10n.Voice.first)
+            } else if let ending = row.keyEnding {
+                String(localized: L10n.Providers.keyEnding(ending))
+            } else {
+                switch row.block {
+                case "NoKey": String(localized: L10n.Voice.noKey)
+                case "Permission": String(localized: L10n.Voice.permission)
+                case "Denied": String(localized: L10n.Voice.denied)
+                case "Asset": String(localized: L10n.Voice.asset)
+                case "Unsupported": String(localized: L10n.Voice.unsupported)
+                default: String(localized: row.ready ? L10n.Voice.ready : L10n.Voice.unsupported)
+                }
+            }
+            return Row(id: row.id, title: title(row.id), status: status, ready: row.ready, first: row.first, needsKey: needsKey)
+        }
+    }
+
+    private static func title(_ id: String) -> String {
+        switch id {
+        case "apple": String(localized: L10n.Voice.apple)
+        case "fish": String(localized: L10n.Voice.fish)
+        case "elevenlabs": String(localized: L10n.Voice.eleven)
+        case "soniox": String(localized: L10n.Voice.soniox)
+        case "deepgram": String(localized: L10n.Voice.deepgram)
+        default: id
+        }
+    }
+}
+
+struct VoiceSheet: View {
+    let app: AppModel
+    let hearing: Bool
+    @State private var model: VoiceListModel
+    @Environment(\.dismiss) private var dismiss
+
+    init(app: AppModel, hearing: Bool) {
+        self.app = app
+        self.hearing = hearing
+        _model = State(initialValue: VoiceListModel(screens: app.screens, hearing: hearing))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                Text(hearing ? L10n.Voice.hearing : L10n.Voice.speech).modeText(.title)
+                ModeCard {
+                    ForEach(model.rows) { row in
+                        ModeRow(row.title, subtitle: row.status) {
+                            HStack(spacing: ModeSpacing.s) {
+                                if row.id != "apple" {
+                                    Button(String(localized: L10n.Voice.moveUp)) { model.moveUp(row.id) }
+                                        .buttonStyle(.plain)
+                                }
+                                if row.needsKey {
+                                    Button(String(localized: row.ready ? L10n.Providers.disconnect : L10n.Providers.connect)) {
+                                        if row.ready { model.disconnect(row.id) } else { model.linking = row.id }
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+                if model.linking == "elevenlabs" {
+                    Text(L10n.Voice.elevenNote).modeText(.footnote, color: ModeColor.textSecondary)
+                }
+            }
+            .padding(ModeSpacing.screenEdge)
+        }
+        .modeScreen()
+        .presentationDetents([.medium, .large])
+        .sheet(isPresented: Binding(get: { model.linking != nil }, set: { if !$0 { model.linking = nil } })) {
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                Text(L10n.Voice.key).modeText(.title)
+                TextField(text: $model.key) { Text(L10n.Voice.key) }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button(String(localized: L10n.Common.save)) { model.save() }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(ModeSpacing.screenEdge)
+            .modeScreen()
+            .presentationDetents([.medium])
+        }
+        .task { await AppleVoice.shared.prepareHearing() }
+    }
+}
+
+struct ListenSheet: View {
+    let app: AppModel
+    @State private var model: ListenModel
+    @State private var typed = ""
+    @Environment(\.dismiss) private var dismiss
+
+    init(app: AppModel) {
+        self.app = app
+        _model = State(initialValue: ListenModel(screens: app.screens))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+            Text(L10n.Voice.listening).modeText(.title)
+            Text(model.phase == "typing" ? L10n.Voice.typeInstead : L10n.Voice.listeningHint)
+                .modeText(.body, color: ModeColor.textSecondary)
+            if !model.transcript.isEmpty {
+                Text(model.transcript).modeText(.body)
+            }
+            if model.phase == "typing" {
+                TextField(text: $typed) { Text(L10n.Voice.typeInstead) }
+                Button(String(localized: L10n.Voice.send)) { model.submit(typed) }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(ModeSpacing.screenEdge)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .modeScreen()
+        .task { model.begin() }
+        .onDisappear { model.stop() }
+    }
+}
+
+@MainActor
+@Observable
+final class ListenModel {
+    private(set) var phase = "listening"
+    private(set) var transcript = ""
+    private let presenter: ListenPresenter
+    private var updates: Updates?
+
+    init(screens: Screens) {
+        presenter = screens.listen()
+        updates = observe(presenter.state) { [weak self] s in
+            self?.phase = s.phase
+            self?.transcript = s.transcript
+        }
+    }
+
+    func begin() { presenter.begin() }
+    func submit(_ text: String) { presenter.submitTyped(text: text) }
+    func stop() { presenter.stop() }
 }

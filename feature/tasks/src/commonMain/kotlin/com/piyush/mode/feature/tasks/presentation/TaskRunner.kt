@@ -24,6 +24,8 @@ import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.runs.data.RunRecorder
 import com.piyush.mode.feature.runs.data.RunRepository
 import com.piyush.mode.feature.settings.data.SettingsRepository
+import com.piyush.mode.feature.settings.voice.Heard
+import com.piyush.mode.feature.settings.voice.Voices
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.conversations.domain.TurnRole
 import com.piyush.mode.feature.tasks.data.TaskMemory
@@ -46,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -74,6 +77,8 @@ public class TaskRunner(
     private val memory: TaskMemory? = null,
     /** Midnight today, for the daily spend cap. */
     private val startOfToday: () -> Long = ::startOfTodayMillis,
+    /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
+    private val voices: Voices? = null,
 ) {
     private val mutableState = MutableStateFlow(TaskState())
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
@@ -138,8 +143,9 @@ public class TaskRunner(
     }
 
     public fun answer(text: String?) {
-        state.value.question?.answer?.complete(text)
-        mutableState.update { it.copy(question = null) }
+        val question = state.value.question ?: return
+        if (!question.answer.complete(text)) return
+        mutableState.update { if (it.question?.id == question.id) it.copy(question = null) else it }
     }
 
     /**
@@ -267,6 +273,10 @@ public class TaskRunner(
             reply = replyFor(finished.outcome)
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
+            // Spoken while the microphone is off. The stream stays up.
+            if (finished.outcome is AgentOutcome.Done) {
+                runCatching { voices?.speak(PlainText.fromMarkdown(reply, oneLine = true)) }
+            }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
             // Come back so the user sees how it went.
@@ -418,15 +428,40 @@ public class TaskRunner(
         }
         notifier.ask(pending.id, text, kind, options)
         // A PIN or password screen must stay in front: Mode never comes forward for the user's turn.
-        askedInMode = !yourTurn && !notifier.canAskInPlace()
-        if (askedInMode) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+        val voice = if (yourTurn || voices == null) null else scope.launch { hearQuestion(phone, pending) }
+        askedInMode = !yourTurn && (!notifier.canAskInPlace() || voice != null)
+        if (askedInMode && voice == null) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
         try {
             return pending.answer.await().also { AppLog.log("agent", "user answered: ${it ?: "(stopped)"}") }
         } finally {
+            voice?.cancel()
             // Also when the agent moved on by itself (the PIN screen went away): the question is gone.
             notifier.withdraw(pending.id)
             mutableState.update { state -> if (state.question?.id == pending.id) state.copy(question = null) else state }
             state.value.taskId?.let { id -> tasks.setStatus(id, TaskStatus.Running) }
+        }
+    }
+
+    /**
+     * Speaks [pending], then listens, on the session the agent already holds.
+     * Agent ops wait. A notification answer for the same id wins once and this
+     * does not record. The stream is restored even if this is cancelled.
+     */
+    private suspend fun hearQuestion(phone: PhoneBackend, pending: PendingQuestion) {
+        session.duringVoice { live ->
+            val hands = live ?: return@duringVoice
+            runCatching { hands.send(Op.LaunchApp(appInfo.bundleId)) }
+            hands.pauseStream()
+            try {
+                voices?.speak(pending.text)
+                if (pending.answer.isCompleted) return@duringVoice
+                when (val heard = voices?.hear()) {
+                    is Heard.Words -> answer(pending.id, heard.text)
+                    else -> Unit
+                }
+            } finally {
+                withContext(NonCancellable) { runCatching { hands.resumeStream() } }
+            }
         }
     }
 

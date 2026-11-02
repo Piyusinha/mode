@@ -27,6 +27,7 @@ enum DeepLink: Equatable {
     case conversation(id: String)
     case ask
     case open
+    case listen
 
     init?(_ url: URL) {
         guard url.scheme == ModeLinks.scheme else { return nil }

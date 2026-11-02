@@ -12,6 +12,7 @@ struct MainTabs: View {
     @State private var run: RunStatusViewModel
     @State private var showingLive = false
     @State private var showingAsk = false
+    @State private var showingListen = false
     #if DEBUG && targetEnvironment(simulator)
     @State private var previewActivity: ModeActivityAttributes.ContentState.Phase?
     @State private var previewQuestion: RunStatusViewModel.PendingQuestion?
@@ -56,6 +57,7 @@ struct MainTabs: View {
             }
         }
         .sheet(isPresented: $showingLive) { NavigationStack { LiveRoute(app: app) } }
+        .sheet(isPresented: $showingListen) { ListenSheet(app: app) }
         .sheet(isPresented: $showingAsk) {
             AskRoute(app: app) { conversation in
                 showingAsk = false
@@ -89,6 +91,7 @@ struct MainTabs: View {
             paths[.home] = [.conversation(id: id)]
         case .ask: showingAsk = true
         case .open: break
+        case .listen: showingListen = true
         }
     }
 

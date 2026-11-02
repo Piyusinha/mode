@@ -33,18 +33,39 @@ struct StartModeIntent: AppIntent {
 }
 
 /// The phrases Siri knows without any setup.
+/// "Hey Siri, start Mode" opens the app and listens. It does not take the task.
+struct StartListeningIntent: AppIntent {
+    static let title: LocalizedStringResource = "Start Mode"
+    static let description = IntentDescription("Open Mode and tell it what to do.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard !IosModeGraphKt.iosModeGraph.screens.needsOnboarding else {
+            return .result(dialog: "Open Mode and finish setting it up first.")
+        }
+        AppLinks.shared.pending = .listen
+        return .result(dialog: "Listening.")
+    }
+}
+
 struct ModeShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: StartListeningIntent(),
+            phrases: ["Start \(.applicationName)"],
+            shortTitle: "Start Mode",
+            systemImageName: "mic.fill"
+        )
+        AppShortcut(
             intent: StartModeIntent(),
             phrases: [
-                "Start \(.applicationName)",
                 "Ask \(.applicationName)",
                 "Tell \(.applicationName)",
                 "\(.applicationName), do something",
             ],
             shortTitle: "Ask Mode",
-            systemImageName: "mic.fill"
+            systemImageName: "text.bubble"
         )
     }
 }

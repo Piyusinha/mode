@@ -58,12 +58,16 @@ final class SettingsViewModel {
         case showProviders
         case openProvider
         case openAccess
+        case showSpeech
+        case showHearing
     }
 
     private(set) var state = State()
     var name = ""
     var query = ""
     var showingProviders = false
+    var showingSpeech = false
+    var showingHearing = false
     /// The provider in use (ModelProvider id), for its page.
     private var activeProvider: String { presenter.state.value.provider }
     private(set) var filter: Filter = .all
@@ -106,6 +110,8 @@ final class SettingsViewModel {
         case .openProvider: navigate(.providerDetail(id: activeProvider))
         case .openAccess: navigate(.access)
         case .showProviders: showingProviders = true
+        case .showSpeech: showingSpeech = true
+        case .showHearing: showingHearing = true
         }
     }
 

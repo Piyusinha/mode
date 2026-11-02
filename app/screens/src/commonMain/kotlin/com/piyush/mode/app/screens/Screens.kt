@@ -61,9 +61,17 @@ public class Screens(
     private val openRouterApi: com.piyush.mode.llm.OpenRouterAccountApi? = null,
     /** The Claude account's model list (null: Mode's two defaults). */
     private val claudeModels: com.piyush.mode.feature.settings.data.ClaudeModels? = null,
+    private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
+    /** [hearing] is the transcription list; otherwise the speech list. */
+    public fun voice(hearing: Boolean): com.piyush.mode.app.screens.settings.VoicePresenter =
+        com.piyush.mode.app.screens.settings.VoicePresenter(scope, settings, voices!!, hearing)
+
+    public fun listen(): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue)
+
     public fun access(): com.piyush.mode.app.screens.settings.AccessPresenter =
         com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)
 

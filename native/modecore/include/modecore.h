@@ -20,6 +20,9 @@ char *mc_session_open_rppairing(const char *host, uint16_t port, const char *hos
                                 const char *disk_image_dir, McSession **out,
                                 uint8_t *out_mounted);
 void mc_session_close(McSession *s);
+/* Stop the screen stream and keep the session. Resume before any touch. */
+char *mc_session_pause_stream(McSession *s);
+char *mc_session_resume_stream(McSession *s);
 
 /* clock: 0 = mach_absolute_time, 1 = wall clock */
 char *mc_set_clock(McSession *s, uint8_t clock);

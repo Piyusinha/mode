@@ -91,6 +91,18 @@ pub unsafe extern "C" fn mc_session_open_rppairing(
     })
 }
 
+/// Stops the screen stream and keeps the session. NULL is an error.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mc_session_pause_stream(s: *mut McSession) -> *mut c_char {
+    guard(|| unsafe { session(s) }?.pause_stream())
+}
+
+/// Starts the screen stream again on the same session.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mc_session_resume_stream(s: *mut McSession) -> *mut c_char {
+    guard(|| unsafe { session(s) }?.resume_stream())
+}
+
 /// Closes the session and frees it. NULL is a no-op.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mc_session_close(s: *mut McSession) {
