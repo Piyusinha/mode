@@ -230,6 +230,9 @@ final class VoiceListModel {
         let ready: Bool
         let first: Bool
         let needsKey: Bool
+        /// Apple hearing that the user can turn on here (microphone prompt, speech model), or open Settings for.
+        let canTurnOn: Bool
+        let denied: Bool
     }
 
     private(set) var rows: [Row] = []
@@ -253,6 +256,7 @@ final class VoiceListModel {
         self.linking = nil
     }
     func disconnect(_ id: String) { presenter.disconnect(id: id) }
+    func turnOnApple() { presenter.prepareApple() }
 
     private static func map(_ s: VoiceUiState) -> [Row] {
         s.rows.map { row in
@@ -260,7 +264,7 @@ final class VoiceListModel {
             let status: String = if row.first && row.ready {
                 String(localized: L10n.Voice.first)
             } else if let ending = row.keyEnding {
-                String(localized: L10n.Providers.keyEnding(ending))
+                L10n.Providers.keyEnding(ending)
             } else {
                 switch row.block {
                 case "NoKey": String(localized: L10n.Voice.noKey)
@@ -271,7 +275,9 @@ final class VoiceListModel {
                 default: String(localized: row.ready ? L10n.Voice.ready : L10n.Voice.unsupported)
                 }
             }
-            return Row(id: row.id, title: title(row.id), status: status, ready: row.ready, first: row.first, needsKey: needsKey)
+            return Row(id: row.id, title: title(row.id), status: status, ready: row.ready, first: row.first, needsKey: needsKey,
+                       canTurnOn: s.hearing && row.id == "apple" && (row.block == "Permission" || row.block == "Asset"),
+                       denied: s.hearing && row.id == "apple" && row.block == "Denied")
         }
     }
 
@@ -292,6 +298,7 @@ struct VoiceSheet: View {
     let hearing: Bool
     @State private var model: VoiceListModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     init(app: AppModel, hearing: Bool) {
         self.app = app
@@ -310,6 +317,12 @@ struct VoiceSheet: View {
                                 if row.id != "apple" {
                                     Button(String(localized: L10n.Voice.moveUp)) { model.moveUp(row.id) }
                                         .buttonStyle(.plain)
+                                }
+                                if row.canTurnOn {
+                                    Button(String(localized: L10n.Voice.turnOn)) { model.turnOnApple() }.buttonStyle(.plain)
+                                }
+                                if row.denied, let settings = URL(string: UIApplication.openSettingsURLString) {
+                                    Button(String(localized: L10n.Voice.openSettings)) { openURL(settings) }.buttonStyle(.plain)
                                 }
                                 if row.needsKey {
                                     Button(String(localized: row.ready ? L10n.Providers.disconnect : L10n.Providers.connect)) {
@@ -342,7 +355,7 @@ struct VoiceSheet: View {
             .modeScreen()
             .presentationDetents([.medium])
         }
-        .task { await AppleVoice.shared.prepareHearing() }
+        .task { await AppleVoice.shared.prepareHearing(ask: false) }
     }
 }
 

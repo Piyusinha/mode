@@ -75,6 +75,8 @@ class ModeGraph(platform: PlatformServices) {
     val database: ModeDatabase = platform.database.create()
 
     val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
+    /** Speaks and hears (one instance: the runner and the Settings lists share it). */
+    private val voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http)
     /** The models to pick from: OpenRouter's live list, cached for a day. */
     val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
     val session: PhoneSession = PhoneSession(platform.phoneLink)
@@ -111,7 +113,7 @@ class ModeGraph(platform: PlatformServices) {
         activity = activity,
         scope = scope,
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
-        voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http),
+        voices = voices,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
@@ -133,7 +135,7 @@ class ModeGraph(platform: PlatformServices) {
         claudeApi = com.piyush.mode.llm.ClaudeAccountApi(platform.http),
         openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
         claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() }),
-        voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http),
+        voices = voices,
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)

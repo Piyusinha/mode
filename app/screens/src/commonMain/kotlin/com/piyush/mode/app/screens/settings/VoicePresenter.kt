@@ -8,6 +8,8 @@ import com.piyush.mode.feature.settings.voice.Voices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** One speech or hearing row. Words for [block] come from the UI. */
 public data class VoiceRow(
@@ -62,9 +64,23 @@ public class VoicePresenter(
         }
     }
 
-    /** Asks Apple to install a missing speech model. The phone does the work. */
-    public fun installAppleAsset() {
-        DeviceVoice.hearingState()
+    /**
+     * Turns Apple hearing on when the user asks: the microphone permission prompt, then Apple's speech model.
+     * The row follows along until it is ready, denied, or a minute has passed.
+     */
+    public fun prepareApple() {
+        DeviceVoice.prepare()
+        scope.launch {
+            repeat(PREPARE_CHECKS) {
+                delay(1_000)
+                publish()
+                if (DeviceVoice.hearingState() in setOf("ready", "denied", "unsupported")) return@launch
+            }
+        }
+    }
+
+    private companion object {
+        const val PREPARE_CHECKS = 60
     }
 
     private fun publish() {

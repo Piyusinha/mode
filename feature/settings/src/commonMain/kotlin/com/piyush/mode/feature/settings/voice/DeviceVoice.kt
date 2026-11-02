@@ -18,6 +18,8 @@ public object DeviceVoice {
     public var transcribe: ((String, (String?) -> Unit) -> Unit)? = null
     public var deleteRecording: (String) -> Unit = {}
     public var cancel: () -> Unit = {}
+    /** Asks for the microphone and installs Apple's speech model: only when the user turns Apple hearing on. */
+    public var prepare: () -> Unit = {}
 
     /** The app installs the phone's voice once, at launch. */
     public fun install(
@@ -29,6 +31,7 @@ public object DeviceVoice {
         transcribe: (String, (String?) -> Unit) -> Unit,
         deleteRecording: (String) -> Unit,
         cancel: () -> Unit,
+        prepare: () -> Unit,
     ) {
         this.speechReady = speechReady
         this.hearingState = hearingState
@@ -38,6 +41,7 @@ public object DeviceVoice {
         this.transcribe = transcribe
         this.deleteRecording = deleteRecording
         this.cancel = cancel
+        this.prepare = prepare
     }
 
     public suspend fun speakLine(text: String): Boolean = await { done -> speak?.invoke(text, done) ?: done(false) }

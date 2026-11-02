@@ -80,6 +80,8 @@ public class TaskRunner(
     /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
     private val voices: Voices? = null,
 ) {
+    /** The running task was spoken to Mode: its questions and summary are spoken and heard. */
+    @kotlin.concurrent.Volatile private var spoken = false
     private val mutableState = MutableStateFlow(TaskState())
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
 
@@ -200,6 +202,8 @@ public class TaskRunner(
 
     private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
         val task = saved.text
+        // Only a task the user spoke is answered by voice: others keep the quiet notification and Live Activity.
+        spoken = saved.source == TaskSource.Voice
         val private = saved.private
         val conversation = saved.conversationId
         // A follow-up sees how the earlier tasks in its conversation went (not this task's own turn).
@@ -274,7 +278,7 @@ public class TaskRunner(
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // Spoken while the microphone is off. The stream stays up.
-            if (finished.outcome is AgentOutcome.Done) {
+            if (spoken && finished.outcome is AgentOutcome.Done) {
                 runCatching { voices?.speak(PlainText.fromMarkdown(reply, oneLine = true)) }
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
@@ -428,7 +432,7 @@ public class TaskRunner(
         }
         notifier.ask(pending.id, text, kind, options)
         // A PIN or password screen must stay in front: Mode never comes forward for the user's turn.
-        val voice = if (yourTurn || voices == null) null else scope.launch { hearQuestion(phone, pending) }
+        val voice = if (yourTurn || voices == null || !spoken) null else scope.launch { hearQuestion(phone, pending) }
         askedInMode = !yourTurn && (!notifier.canAskInPlace() || voice != null)
         if (askedInMode && voice == null) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
         try {

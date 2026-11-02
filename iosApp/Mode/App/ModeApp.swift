@@ -53,18 +53,24 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         DeviceVoice.shared.install(
             speechReady: { true },
             hearingState: { [weak self] in self?.hearing ?? "unsupported" },
-            speak: { [weak self] text, done in self?.speak(text, done: done) },
-            play: { [weak self] bytes, done in self?.play(bytes, done: done) },
-            record: { [weak self] maxMs, silenceMs, done in self?.record(maxMs: maxMs, silenceMs: silenceMs, done: done) },
-            transcribe: { [weak self] path, done in Task { let text = await self?.transcribe(path); done(text) } },
+            // Kotlin's Boolean and Long arrive boxed (KotlinBoolean, KotlinLong).
+            speak: { [weak self] text, done in self?.speak(text) { done(KotlinBoolean(bool: $0)) } },
+            play: { [weak self] bytes, done in self?.play(bytes) { done(KotlinBoolean(bool: $0)) } },
+            record: { [weak self] maxMs, silenceMs, done in
+                self?.record(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value) { _ = done($0) }
+            },
+            transcribe: { [weak self] path, done in _Concurrency.Task { let text = await self?.transcribe(path); done(text) } },
             deleteRecording: { path in try? FileManager.default.removeItem(atPath: path) },
-            cancel: { [weak self] in self?.cancel() }
+            cancel: { [weak self] in self?.cancel() },
+            prepare: { [weak self] in _Concurrency.Task { await self?.prepareHearing(ask: true) } }
         )
-        Task { await prepareHearing() }
+        // Only reads where things stand: the microphone prompt waits until the user turns Apple hearing on.
+        _Concurrency.Task { await prepareHearing(ask: false) }
     }
 
-    func prepareHearing() async {
-        if AVAudioApplication.shared.recordPermission == .undetermined {
+    /// Where Apple hearing stands; with [ask], the microphone prompt and the speech model download too.
+    func prepareHearing(ask: Bool) async {
+        if ask, AVAudioApplication.shared.recordPermission == .undetermined {
             _ = await AVAudioApplication.requestRecordPermission()
         }
         switch AVAudioApplication.shared.recordPermission {
@@ -78,34 +84,63 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         if !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) {
             hearing = "asset"
-            if let request = try? await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                try? await request.downloadAndInstall()
-            }
+            guard ask else { return }
+            guard let request = try? await AssetInventory.assetInstallationRequest(supporting: [transcriber]) else { return }
+            do { try await request.downloadAndInstall() } catch { return }
         }
         hearing = "ready"
     }
 
+    /// Says [text] and reports when it has finished (true: sound started), so the microphone never opens
+    /// while Mode is still talking and a line that started is not said again by another voice.
     private func speak(_ text: String, done: @escaping (Bool) -> Void) {
         started = false
         speakDone = done
+        VoiceAudio.shared.forSpeech()
+        synth.usesApplicationAudioSession = true
         synth.speak(AVSpeechUtterance(string: text))
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
         started = true
-        speakDone?(true)
-        speakDone = nil
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        finishSpeaking(true)
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        if !started { speakDone?(false) }
-        speakDone = nil
+        finishSpeaking(started)
     }
 
+    private func finishSpeaking(_ soundStarted: Bool) {
+        guard let done = speakDone else { return }
+        speakDone = nil
+        VoiceAudio.shared.done()
+        done(soundStarted)
+    }
+
+    /// Plays a cloud clip to its end; true once sound started.
     private func play(_ bytes: KotlinByteArray, done: @escaping (Bool) -> Void) {
+        VoiceAudio.shared.forSpeech()
         player = try? AVAudioPlayer(data: bytes.toData())
         player?.delegate = self
-        guard player?.play() == true else { done(false); return }
+        guard player?.play() == true else { VoiceAudio.shared.done(); done(false); return }
+        playDone = done
+    }
+
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        _Concurrency.Task { @MainActor in self.finishPlaying() }
+    }
+
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        _Concurrency.Task { @MainActor in self.finishPlaying() }
+    }
+
+    private func finishPlaying() {
+        guard let done = playDone else { return }
+        playDone = nil
+        VoiceAudio.shared.done()
         done(true)
     }
 
@@ -116,17 +151,19 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
             AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 16_000, AVNumberOfChannelsKey: 1,
             AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
         ]
-        guard let recorder = try? AVAudioRecorder(url: url, settings: settings) else { done(nil); return }
+        // The session must allow recording first: Mode's keep-alive audio is playback only.
+        VoiceAudio.shared.forRecording()
+        guard let recorder = try? AVAudioRecorder(url: url, settings: settings) else { VoiceAudio.shared.done(); done(nil); return }
+        recorder.isMeteringEnabled = true
+        guard recorder.record() else { VoiceAudio.shared.done(); done(nil); return }
         self.recorder = recorder
         recordURL = url
         recordDone = done
         heardSpeech = false
         silenceSince = nil
-        recorder.isMeteringEnabled = true
-        recorder.record()
         let limit = Date().addingTimeInterval(TimeInterval(maxMs) / 1000)
         poll = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] timer in
-            Task { @MainActor in
+            _Concurrency.Task { @MainActor in
                 guard let self else { return }
                 recorder.updateMeters()
                 let power = recorder.averagePower(forChannel: 0)
@@ -144,6 +181,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     private func finishRecord() {
         poll?.invalidate()
         recorder?.stop()
+        VoiceAudio.shared.done()
         let url = recordURL
         let spoke = heardSpeech
         recordDone?(spoke ? url?.path : nil)
@@ -152,13 +190,16 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     private func cancel() {
         poll?.invalidate()
+        let wasRecording = recordDone != nil
         recorder?.stop()
         synth.stopSpeaking(at: .immediate)
         player?.stop()
         recordDone?(nil)
         recordDone = nil
-        if !started { speakDone?(false) }
-        speakDone = nil
+        if let done = playDone { playDone = nil; done(true) }
+        if let done = speakDone { speakDone = nil; done(started) }
+        if wasRecording || player != nil { VoiceAudio.shared.done() }
+        player = nil
     }
 
     private func transcribe(_ path: String) async -> String? {
@@ -176,7 +217,11 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         }
         async let running: Void = { try? await analyzer.analyzeSequence(stream) }()
         var text = ""
-        for try await result in transcriber.results { text = String(result.text.characters) }
+        do {
+            for try await result in transcriber.results { text = String(result.text.characters) }
+        } catch {
+            return nil
+        }
         _ = await running
         return text.isEmpty ? nil : text
     }

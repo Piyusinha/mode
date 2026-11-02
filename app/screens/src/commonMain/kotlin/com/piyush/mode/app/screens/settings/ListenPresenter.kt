@@ -35,7 +35,7 @@ public class ListenPresenter(
                         is Heard.Words -> {
                             mutableState.value = ListenUiState("sent", heard.text)
                             voices.speak("I'll ${heard.text}")
-                            queue.submit(heard.text, TaskSource.Siri, null, false)
+                            queue.submit(heard.text, TaskSource.Voice, null, false)
                             return@launch
                         }
                         Heard.Nothing -> {
@@ -55,7 +55,7 @@ public class ListenPresenter(
         if (task.isEmpty()) return
         scope.launch {
             voices.speak("I'll $task")
-            queue.submit(task, TaskSource.Siri, null, false)
+            queue.submit(task, TaskSource.App, null, false)
             mutableState.value = ListenUiState("sent", task)
         }
     }

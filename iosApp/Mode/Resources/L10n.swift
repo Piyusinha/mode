@@ -555,6 +555,8 @@ enum L10n {
         static let unsupported = LocalizedStringResource("voice.unsupported", defaultValue: "Not available on this iPhone")
         static let asset = LocalizedStringResource("voice.asset", defaultValue: "Downloading the speech model")
         static let moveUp = LocalizedStringResource("voice.moveUp", defaultValue: "Move up")
+        static let turnOn = LocalizedStringResource("voice.turnOn", defaultValue: "Turn on")
+        static let openSettings = LocalizedStringResource("voice.openSettings", defaultValue: "Open Settings")
         static let key = LocalizedStringResource("voice.key", defaultValue: "API key")
         static let elevenNote = LocalizedStringResource("voice.elevenNote", defaultValue: "The free plan is for trying Mode on your own phone. A shipped app needs ElevenLabs' paid plan.")
         static let listening = LocalizedStringResource("voice.listening", defaultValue: "Listening")

@@ -11,8 +11,13 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
 import platform.AVFAudio.AVAudioPlayer
 import platform.AVFAudio.AVAudioSession
+import platform.AVFAudio.AVAudioSessionCategoryOptionDefaultToSpeaker
+import platform.AVFAudio.AVAudioSessionCategoryOptionDuckOthers
 import platform.AVFAudio.AVAudioSessionCategoryOptionMixWithOthers
+import platform.AVFAudio.AVAudioSessionCategoryPlayAndRecord
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
+import platform.AVFAudio.AVAudioSessionModeDefault
+import platform.AVFAudio.AVAudioSessionModeSpokenAudio
 import platform.AVFAudio.AVAudioSessionInterruptionNotification
 import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
 import platform.AVFAudio.AVAudioSessionInterruptionTypeKey
@@ -41,6 +46,14 @@ internal object KeepAwake {
 
     /** True while silence is playing. */
     val active: Boolean get() = player?.playing == true
+
+    /** A task holds it (the silence should be playing). */
+    val holding: Boolean get() = holders > 0
+
+    /** Plays the silence again after the session was switched for speech or recording. */
+    fun resume() {
+        if (holders > 0 && player?.playing != true) player?.play()
+    }
 
     fun start() {
         holders++
@@ -91,5 +104,43 @@ internal object KeepAwake {
         le(24, rate, 4); le(28, rate * 2, 4); le(32, 2, 2); le(34, 16, 2)
         ascii(36, "data"); le(40, dataSize, 4)
         return out
+    }
+}
+
+/**
+ * The one owner of the audio session while Mode speaks or listens (the microphone and the screen stream are
+ * never on together; the caller pauses phone control first). KeepAwake's silence keeps playing throughout,
+ * so iOS does not suspend Mode; each step switches the session, and [done] puts KeepAwake's back.
+ * Main thread only.
+ */
+public object VoiceAudio {
+    /** Before Mode says a line: spoken audio, other apps ducked. The microphone is off. */
+    public fun forSpeech() {
+        val session = AVAudioSession.sharedInstance()
+        session.setCategory(AVAudioSessionCategoryPlayback, AVAudioSessionModeSpokenAudio, AVAudioSessionCategoryOptionDuckOthers, null)
+        session.setActive(true, null)
+    }
+
+    /** Before the microphone opens: record and play, through the speaker, other apps ducked. */
+    public fun forRecording() {
+        val session = AVAudioSession.sharedInstance()
+        session.setCategory(
+            AVAudioSessionCategoryPlayAndRecord, AVAudioSessionModeDefault,
+            AVAudioSessionCategoryOptionDuckOthers or AVAudioSessionCategoryOptionDefaultToSpeaker, null,
+        )
+        session.setActive(true, null)
+    }
+
+    /** After speaking or recording: KeepAwake's silent, mixable playback while a task runs; otherwise off. */
+    public fun done() {
+        val session = AVAudioSession.sharedInstance()
+        if (KeepAwake.holding) {
+            session.setCategory(AVAudioSessionCategoryPlayback, AVAudioSessionModeDefault, AVAudioSessionCategoryOptionMixWithOthers, null)
+            session.setActive(true, null)
+            KeepAwake.resume()
+        } else {
+            session.setActive(false, AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation, null)
+        }
+        AppLog.log("voice", "audio back to " + if (KeepAwake.holding) "silent playback" else "off")
     }
 }
