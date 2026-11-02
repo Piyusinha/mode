@@ -74,7 +74,7 @@ struct ModeActivityWorkingHeader: View {
     }
 }
 
-/// "Step 4 · 0:24", the time ticking on its own; "Paused" while paused.
+/// "Working · 0:24", the time ticking on its own; "Paused" while paused.
 struct ModeActivityStepClock: View {
     let state: ModeActivityAttributes.ContentState
 
@@ -83,11 +83,11 @@ struct ModeActivityStepClock: View {
             if state.paused {
                 Text(ActivityL10n.paused)
             } else if let start = state.startedAt {
-                Text(ActivityL10n.step(state.step)).fixedSize()
+                Text(ActivityL10n.working).fixedSize()
                 Text(timerInterval: start...Date.distantFuture, countsDown: false)
                     .frame(width: ModeSize.islandTimer, alignment: .leading)
             } else {
-                Text(ActivityL10n.stepShort(state.step))
+                Text(ActivityL10n.workingNow)
             }
         }
         .modeText(.subheadline, color: ModeColor.textSecondary)
