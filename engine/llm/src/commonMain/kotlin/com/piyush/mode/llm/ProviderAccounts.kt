@@ -21,6 +21,7 @@ import kotlin.time.Instant
 data class AccountInfo(val email: String? = null, val name: String? = null, val plan: String? = null)
 
 /** One usage limit of a plan: how much of it is used, and when it starts again. */
+@Serializable
 data class UsageWindow(val kind: Kind, val usedFraction: Double, val resetsAtMillis: Long?) {
     enum class Kind { Session, Week }
 }

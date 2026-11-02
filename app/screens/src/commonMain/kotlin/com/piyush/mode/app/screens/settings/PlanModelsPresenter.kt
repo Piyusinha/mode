@@ -76,7 +76,7 @@ public class PlanModelsPresenter(
         // The plan's own list, fresh (it changes when OpenAI or Anthropic adds a model).
         when (settings.settings.value.provider) {
             ModelProvider.ChatGpt -> scope.launch { runCatching { chatGpt.models() } }
-            ModelProvider.ClaudeOAuth -> claudeModels?.let { c -> scope.launch { runCatching { c.refresh() } } }
+            ModelProvider.ClaudeOAuth -> claudeModels?.let { c -> scope.launch { runCatching { c.refreshIfOld() } } }
             ModelProvider.OpenRouter -> Unit
         }
         val lists = combine(chatGpt.knownModels, chatGpt.modelInfo, claudeModels?.known ?: MutableStateFlow(emptyList())) { _, _, _ -> Unit }

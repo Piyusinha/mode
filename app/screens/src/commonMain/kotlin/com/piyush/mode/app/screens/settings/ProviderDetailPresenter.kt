@@ -84,11 +84,24 @@ public class ProviderDetailPresenter(
 
     init {
         scope.launch { settings.settings.combine(remote) { _, r -> local(r) }.collect { mutableState.value = it } }
-        refresh()
+        // Claude: who is signed in and the last limits show at once from what is kept; only the limits are
+        // asked again (and the profile, if it was never kept).
+        if (provider == ModelProvider.ClaudeOAuth) {
+            val kept = settings.claudeCredentials
+            val usage = kept.usage
+            remote.value = ProviderDetailUiState(
+                providerId, email = kept.profile?.email, name = kept.profile?.name, plan = kept.profile?.plan,
+                limits = usage.orEmpty().map(::row), loaded = usage != null,
+            )
+            refreshClaude(profileToo = kept.profile == null)
+        } else {
+            refresh()
+        }
     }
 
-    /** Asks the provider again (account, limits, credits). */
+    /** Asks the provider again (account, limits, credits): pull to refresh. */
     public fun refresh() {
+        if (provider == ModelProvider.ClaudeOAuth) return refreshClaude(profileToo = true)
         scope.launch {
             val r = ProviderDetailUiState(providerId, loaded = true)
             remote.value = runCatching {
@@ -96,13 +109,7 @@ public class ProviderDetailPresenter(
                     ModelProvider.ChatGpt -> chatGpt.account().let { a ->
                         r.copy(email = a?.email, name = a?.name, plan = a?.plan, limitReachedAt = chatGpt.limitReachedAt())
                     }
-                    ModelProvider.ClaudeOAuth -> {
-                        val token = claude?.accessToken()
-                        val profile = token?.let { claudeApi.profile(it) }
-                        val windows = token?.let { claudeApi.usage(it) }.orEmpty()
-                        r.copy(email = profile?.email, name = profile?.name, plan = profile?.plan,
-                            limits = windows.map { UsageLimitRow(it.kind == UsageWindow.Kind.Session, it.usedFraction, it.resetsAtMillis) })
-                    }
+                    ModelProvider.ClaudeOAuth -> r
                     ModelProvider.OpenRouter -> settings.apiKey?.takeIf { it.isNotBlank() }?.let { key ->
                         openRouterApi.balance(key)?.let { b ->
                             r.copy(keyLabel = b.label, creditsLeft = b.creditsLeft, creditsTotal = b.creditsTotal ?: b.keyLimit)
@@ -112,6 +119,24 @@ public class ProviderDetailPresenter(
             }.getOrElse { r }
         }
     }
+
+    /** Claude's limits (and its profile when [profileToo]), kept for next time; on failure what is shown stays. */
+    private fun refreshClaude(profileToo: Boolean) {
+        val account = claude ?: return
+        scope.launch {
+            runCatching {
+                val token = account.accessToken()
+                val kept = settings.claudeCredentials
+                if (profileToo) claudeApi.profile(token)?.let { kept.profile = it }
+                val windows = claudeApi.usage(token)
+                kept.usage = windows
+                val p = kept.profile
+                remote.value = remote.value.copy(email = p?.email, name = p?.name, plan = p?.plan, limits = windows.map(::row), loaded = true)
+            }.onFailure { remote.value = remote.value.copy(loaded = true) }
+        }
+    }
+
+    private fun row(w: UsageWindow) = UsageLimitRow(w.kind == UsageWindow.Kind.Session, w.usedFraction, w.resetsAtMillis)
 
     /** Tasks use this provider from now on. */
     public fun use() { settings.selectProvider(provider) }

@@ -131,7 +131,7 @@ class ModeGraph(platform: PlatformServices) {
         bench = com.piyush.mode.feature.settings.data.ModelBench(platform.prefs),
         claudeApi = com.piyush.mode.llm.ClaudeAccountApi(platform.http),
         openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
-        claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs) { claudeClient.models() },
+        claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() }),
     )
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
