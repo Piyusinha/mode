@@ -100,4 +100,39 @@ class VoiceScreensTest {
         val task = f.tasks.recent(10).first().first { t -> t.text == "Turn it back on" }
         assertEquals(chat.id, task.conversationId)
     }
+
+    /** Records spans and events, to check what a talking session leaves in the trace. */
+    private class Recorded : com.piyush.mode.core.telemetry.Telemetry {
+        val spans = mutableListOf<Pair<com.piyush.mode.core.telemetry.Operation, MutableMap<com.piyush.mode.core.telemetry.Field, String>>>()
+        val events = mutableListOf<com.piyush.mode.core.telemetry.Event>()
+        var ended = 0
+        override fun start(operation: com.piyush.mode.core.telemetry.Operation, parent: com.piyush.mode.core.telemetry.TraceContext?,
+                           fields: com.piyush.mode.core.telemetry.Fields): com.piyush.mode.core.telemetry.TraceSpan {
+            val f = fields.toMutableMap(); spans += operation to f
+            return object : com.piyush.mode.core.telemetry.TraceSpan {
+                override val context: com.piyush.mode.core.telemetry.TraceContext? = null
+                override fun fields(fields: com.piyush.mode.core.telemetry.Fields) { f.putAll(fields) }
+                override fun event(event: com.piyush.mode.core.telemetry.Event, fields: com.piyush.mode.core.telemetry.Fields) { events += event }
+                override fun end() { ended++ }
+            }
+        }
+    }
+
+    @Test
+    fun aTalkingSessionIsOneTraceFromHowItOpenedToHowItEnded() = runTest {
+        val f = Fixture(backgroundScope)
+        val traces = Recorded()
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            telemetry = traces, entry = "chat_mic")
+
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.sent }
+        talk.dismiss()
+
+        val (_, fields) = traces.spans.single { it.first == com.piyush.mode.core.telemetry.Operation.VoiceSession }
+        assertEquals("chat_mic", fields[com.piyush.mode.core.telemetry.Field.Entry])
+        assertEquals("TaskTyped", fields[com.piyush.mode.core.telemetry.Field.Outcome])
+        assertTrue(com.piyush.mode.core.telemetry.Event.TaskSent in traces.events)
+        assertTrue(traces.ended >= 1)
+    }
 }

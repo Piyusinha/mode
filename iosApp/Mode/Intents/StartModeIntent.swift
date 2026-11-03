@@ -21,11 +21,14 @@ struct StartModeIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let graph = IosModeGraphKt.iosModeGraph
         guard !graph.screens.needsOnboarding else {
+            graph.screens.intentRan(listen: false, outcome: "SetupNotDone")
             return .result(dialog: "Open Mode and finish setting it up first.")
         }
         guard let started = graph.inbox.submit(text: task, source: .siri, conversationId: nil, private: false) else {
+            graph.screens.intentRan(listen: false, outcome: "Empty")
             return .result(dialog: "Tell me what Mode should do.")
         }
+        graph.screens.intentRan(listen: false, outcome: "TaskSent")
         // Mode shows the conversation while it works and when it comes back.
         AppLinks.shared.pending = started.conversationId.map { .conversation(id: $0) }
         return .result(dialog: "On it.")
@@ -41,9 +44,12 @@ struct StartListeningIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        guard !IosModeGraphKt.iosModeGraph.screens.needsOnboarding else {
+        let screens = IosModeGraphKt.iosModeGraph.screens
+        guard !screens.needsOnboarding else {
+            screens.intentRan(listen: true, outcome: "SetupNotDone")
             return .result(dialog: "Open Mode and finish setting it up first.")
         }
+        screens.intentRan(listen: true, outcome: "Listening")
         AppLinks.shared.pending = .listen
         return .result(dialog: "Listening.")
     }

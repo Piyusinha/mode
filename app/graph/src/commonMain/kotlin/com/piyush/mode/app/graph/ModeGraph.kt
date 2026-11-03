@@ -160,6 +160,7 @@ class ModeGraph(platform: PlatformServices) {
         openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
         claudeModels = claudeModels,
         voices = voices,
+        telemetry = telemetry,
     )
 
     /**

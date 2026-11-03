@@ -24,11 +24,21 @@ enum class Operation(val wireName: String) {
     Reflection("mode.memory.reflect"), VoiceSpeak("mode.voice.speak"),
     VoiceTurn("mode.voice.turn"), VoiceHear("mode.voice.hear"), VoiceRecord("mode.voice.record"),
     VoiceTranscribe("mode.voice.transcribe"), VoiceSynthesize("mode.voice.synthesize"),
+    /** One talking-mode screen, from how it opened (Field.Entry) to how it ended (Field.Outcome). */
+    VoiceSession("mode.voice.session"),
 }
 
 enum class Event(val wireName: String) {
     FirstAction("mode.task.first_action"), AppStarted("mode.app.started"),
     Foreground("mode.app.foreground"), Background("mode.app.background"),
+    /** Siri or Shortcuts ran "Start Mode" (listen) or "Ask Mode" (a task in words); Field.Outcome says what Mode did. */
+    IntentStartListening("mode.intent.start_listening"), IntentAsk("mode.intent.ask"),
+    /** The app followed a link: Siri's listen, a mic, a Live Activity tap (Field.Entry). */
+    LinkOpened("mode.app.link_opened"),
+    /** In a voice session: the microphone is listening (each turn's end is on mode.voice.record), a task was sent. */
+    ListenStarted("mode.voice.listen_started"), TaskSent("mode.voice.task_sent"),
+    /** In a voice session: no microphone or speech access; nothing understood after every try. */
+    MicBlocked("mode.voice.mic_blocked"), NothingHeard("mode.voice.nothing_heard"),
 }
 
 /** Only these fields may cross the telemetry boundary. No arbitrary attribute keys or log bodies. */
@@ -39,6 +49,12 @@ enum class Field(val wireName: String) {
     Outcome("mode.outcome"), ErrorType("error.type"), Cancelled("mode.cancelled"),
     Operation("mode.phone.operation"), TaskId("mode.task.id"), Source("mode.task.source"),
     BuiltInVpn("mode.vpn.built_in"), DurationMs("mode.duration_ms"),
+    /** How talking mode opened: siri, ask_mic, chat_mic, question, link. */
+    Entry("mode.voice.entry"),
+    /** Why listening stopped: quiet, settled, limit, done, cancelled, failed. */
+    EndReason("mode.voice.end_reason"),
+    /** How many words were heard (never the words themselves). */
+    Words("mode.voice.words"),
 }
 
 typealias Fields = Map<Field, String>
@@ -119,7 +135,7 @@ suspend fun <T> Telemetry.withLock(mutex: Mutex, operation: Operation, block: su
 internal fun Field.safe(value: String): String? {
     if (value.length > 160 || value.contains("bearer", ignoreCase = true) || value.startsWith("sk-")) return null
     return when (this) {
-        Field.InputTokens, Field.OutputTokens, Field.CachedTokens, Field.CacheWriteTokens, Field.DurationMs ->
+        Field.InputTokens, Field.OutputTokens, Field.CachedTokens, Field.CacheWriteTokens, Field.DurationMs, Field.Words ->
             value.toLongOrNull()?.takeIf { it >= 0 }?.toString()
         Field.Cancelled, Field.BuiltInVpn -> value.takeIf { it == "true" || it == "false" }
         Field.Effort -> value.takeIf { it in setOf("none", "minimal", "low", "medium", "high", "xhigh", "max", "auto") }

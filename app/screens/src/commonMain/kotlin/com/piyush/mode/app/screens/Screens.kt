@@ -62,6 +62,7 @@ public class Screens(
     /** The Claude account's model list (null: Mode's two defaults). */
     private val claudeModels: com.piyush.mode.feature.settings.data.ClaudeModels? = null,
     private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
+    private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -77,12 +78,30 @@ public class Screens(
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
-    public fun listen(conversationId: String?): com.piyush.mode.app.screens.settings.ListenPresenter =
-        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, conversationId = conversationId)
+    public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(
+            scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
+        )
+
+    /** Records that the app followed a link (Siri's listen, a mic, a Live Activity), for the trace. */
+    public fun linkOpened(entry: String) {
+        runCatching { telemetry.event(com.piyush.mode.core.telemetry.Event.LinkOpened, fields = mapOf(com.piyush.mode.core.telemetry.Field.Entry to entry)) }
+    }
+
+    /** Records that Siri or Shortcuts ran one of Mode's intents, and what Mode did ([outcome]). */
+    public fun intentRan(listen: Boolean, outcome: String) {
+        runCatching {
+            telemetry.event(
+                if (listen) com.piyush.mode.core.telemetry.Event.IntentStartListening else com.piyush.mode.core.telemetry.Event.IntentAsk,
+                fields = mapOf(com.piyush.mode.core.telemetry.Field.Outcome to outcome),
+            )
+        }
+    }
 
     /** Talking mode for a question in a spoken task: Mode came forward to ask it out loud. */
     public fun talkQuestion(): com.piyush.mode.app.screens.settings.ListenPresenter =
-        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, forQuestion = true)
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, forQuestion = true,
+            telemetry = telemetry, entry = "question")
 
     public fun access(): com.piyush.mode.app.screens.settings.AccessPresenter =
         com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)

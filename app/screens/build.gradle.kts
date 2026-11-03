@@ -16,6 +16,7 @@ kotlin {
             api(projects.feature.diagnostics)
             api(projects.feature.connection)
             implementation(projects.core.common)
+            implementation(projects.core.telemetry)
         }
         commonTest.dependencies {
             implementation(projects.testing)

@@ -23,7 +23,7 @@ public object DeviceVoice {
      * transcribes as it goes: partial gets the words so far. Done gets the recording's path (null: nobody spoke, or
      * cancelled) and Apple's final text (null when not live or nothing was heard).
      */
-    public var listen: ((Long, Long, Boolean, (String) -> Unit, (String?, String?) -> Unit) -> Unit)? = null
+    public var listen: ((Long, Long, Boolean, (String) -> Unit, (String?, String?, String) -> Unit) -> Unit)? = null
     /** A file path, or null when nobody spoke or the user cancelled. */
     public var record: ((Long, Long, (String?) -> Unit) -> Unit)? = null
     public var transcribe: ((String, (String?) -> Unit) -> Unit)? = null
@@ -45,7 +45,7 @@ public object DeviceVoice {
         deleteRecording: (String) -> Unit,
         cancel: () -> Unit,
         prepare: () -> Unit,
-        listen: (Long, Long, Boolean, (String) -> Unit, (String?, String?) -> Unit) -> Unit,
+        listen: (Long, Long, Boolean, (String) -> Unit, (String?, String?, String) -> Unit) -> Unit,
     ) {
         this.speechReady = speechReady
         this.hearingState = hearingState
@@ -61,14 +61,17 @@ public object DeviceVoice {
         this.listen = listen
     }
 
-    /** What one listen gave: the recording (for a cloud hearer) and Apple's live transcription. */
-    public class Listened(public val path: String?, public val text: String?)
+    /**
+     * What one listen gave: the recording (for a cloud hearer), Apple's live transcription, and why it stopped
+     * (quiet, settled, limit, done, cancelled, failed).
+     */
+    public class Listened(public val path: String?, public val text: String?, public val reason: String? = null)
 
     public suspend fun listenOnce(maxMs: Long, silenceMs: Long, live: Boolean, onPartial: (String) -> Unit): Listened {
         val start = listen ?: return Listened(recordOnce(maxMs, silenceMs), null)
         return suspendCancellableCoroutine { cont ->
             cont.invokeOnCancellation { cancel() }
-            start(maxMs, silenceMs, live, onPartial) { path, text -> if (cont.isActive) cont.resume(Listened(path, text)) }
+            start(maxMs, silenceMs, live, onPartial) { path, text, reason -> if (cont.isActive) cont.resume(Listened(path, text, reason)) }
         }
     }
 

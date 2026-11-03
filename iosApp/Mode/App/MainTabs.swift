@@ -17,6 +17,8 @@ struct MainTabs: View {
     @State private var talkConversation: String?
     /// A mic in the Ask sheet: talking mode opens once the sheet has closed.
     @State private var talkAfterAsk = false
+    /// How talking mode opened, for its trace: siri, ask_mic, chat_mic.
+    @State private var talkEntry = "siri"
     #if DEBUG && targetEnvironment(simulator)
     @State private var previewActivity: ModeActivityAttributes.ContentState.Phase?
     @State private var previewQuestion: RunStatusViewModel.PendingQuestion?
@@ -64,7 +66,7 @@ struct MainTabs: View {
         // Talking mode: "Start Mode", and a question in a spoken task (Mode came forward to ask it out loud).
         .fullScreenCover(isPresented: Binding(get: { showingListen || run.state.talking },
                                               set: { if !$0 { showingListen = false } })) {
-            TalkRoute(app: app, forQuestion: !showingListen, conversationId: talkConversation,
+            TalkRoute(app: app, forQuestion: !showingListen, conversationId: talkConversation, entry: talkEntry,
                       onClose: { showingListen = false; talkConversation = nil }, onVoiceSettings: openVoiceSettings)
         }
         .sheet(isPresented: $showingAsk, onDismiss: {
@@ -101,6 +103,7 @@ struct MainTabs: View {
     }
 
     private func open(_ link: DeepLink) {
+        app.screens.linkOpened(entry: link.traceName)
         switch link {
         case let .conversation(id):
             showingLive = false
@@ -108,9 +111,10 @@ struct MainTabs: View {
             paths[.home] = [.conversation(id: id)]
         case .ask: showingAsk = true
         case .open: break
-        case .listen: talkConversation = nil; showingListen = true
+        case .listen: talkConversation = nil; talkEntry = "siri"; showingListen = true
         case let .talk(id):
             talkConversation = id
+            talkEntry = id == nil ? "ask_mic" : "chat_mic"
             // One full-screen view at a time: from the Ask sheet, talking mode waits for it to close.
             if showingAsk { talkAfterAsk = true; showingAsk = false } else { showingListen = true }
         }

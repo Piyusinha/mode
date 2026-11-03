@@ -138,13 +138,18 @@ public class Voices(
         else -> null
     }
 
-    public suspend fun speak(text: String): Unit = telemetry.trace(Operation.VoiceSpeak) { speakLine(text) }
+    /** Says [text] with the chosen voice; the span records the provider and whether sound played (Spoke, Blocked, Failed). */
+    public suspend fun speak(text: String): Unit = telemetry.trace(Operation.VoiceSpeak) { span -> speakLine(text, span) }
 
-    private suspend fun speakLine(text: String) {
+    private suspend fun speakLine(text: String, span: com.piyush.mode.core.telemetry.TraceSpan) {
         val line = text.trim()
-        if (line.isEmpty()) return
+        if (line.isEmpty()) return span.fields(mapOf(Field.Outcome to "Empty"))
         val kind = chosen(hearing = false)
-        block(kind, hearing = false)?.let { failed(kind, hearing = false, blockTrouble(it)); return }
+        span.fields(mapOf(Field.Provider to kind.id))
+        block(kind, hearing = false)?.let {
+            span.fields(mapOf(Field.Outcome to "Blocked"))
+            failed(kind, hearing = false, blockTrouble(it)); return
+        }
         val result = try {
             telemetry.trace(Operation.VoiceSynthesize, mapOf(Field.Provider to kind.id)) { span ->
                 say(kind, settings.settings.value.voices[kind.id]?.id, line).also {
@@ -158,8 +163,8 @@ public class Voices(
             Said.Failed(VoiceTrouble.Unreachable)
         }
         when (result) {
-            Said.Started -> worked(hearing = false)
-            is Said.Failed -> failed(kind, hearing = false, result.trouble)
+            Said.Started -> { span.fields(mapOf(Field.Outcome to "Spoke")); worked(hearing = false) }
+            is Said.Failed -> { span.fields(mapOf(Field.Outcome to "Failed", Field.ErrorType to result.trouble.toString())); failed(kind, hearing = false, result.trouble) }
         }
     }
 
@@ -181,8 +186,15 @@ public class Voices(
         block(kind, hearing = true)?.let { failed(kind, hearing = true, blockTrouble(it)); return Heard.Nothing }
         // Apple's live words show while the user speaks, whichever provider writes the final text.
         val appleLive = block(VoiceKind.Apple, hearing = true) == null
-        val heard = telemetry.trace(Operation.VoiceRecord) {
-            device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = appleLive, onPartial)
+        val heard = telemetry.trace(Operation.VoiceRecord, mapOf(Field.Provider to kind.id)) { span ->
+            device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = appleLive, onPartial).also { got ->
+                val words = got.text?.trim()?.split(Regex("\\s+"))?.count { it.isNotEmpty() } ?: 0
+                span.fields(buildMap {
+                    got.reason?.let { put(Field.EndReason, it) }
+                    put(Field.Words, words.toString())
+                    put(Field.Outcome, if (got.path == null && words == 0) "Silence" else "Heard")
+                })
+            }
         }
         if (kind == VoiceKind.Apple && heard.path == null) {
             return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim()).also { worked(hearing = true) }

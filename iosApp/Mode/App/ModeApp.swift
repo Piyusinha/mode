@@ -71,7 +71,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
             prepare: { [weak self] in _Concurrency.Task { await self?.prepareHearing(ask: true) } },
             listen: { maxMs, silenceMs, live, partial, done in
                 LiveListener.shared.start(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value, live: live.boolValue,
-                                          partial: { _ = partial($0) }, done: { _ = done($0, $1) })
+                                          partial: { _ = partial($0) }, done: { _ = done($0, $1, $2) })
             }
         )
         // Only reads where things stand: the microphone prompt waits until the user turns Apple hearing on.

@@ -1,6 +1,7 @@
 package com.piyush.mode.app.screens.settings
 
 import com.piyush.mode.app.screens.common.Presenter
+import com.piyush.mode.core.telemetry.withParent
 import com.piyush.mode.app.screens.common.ScreenClock
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.voice.DeviceVoice
@@ -78,12 +79,41 @@ public class ListenPresenter(
     private val forQuestion: Boolean = false,
     /** The chat whose mic opened this: the spoken task goes there (null: a new chat). */
     private val conversationId: String? = null,
+    private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
+    /** How this opened, for the trace: siri, ask_mic, chat_mic, question. */
+    private val entry: String = "app",
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
+    /** One trace per talking-mode screen: how it opened, each speak and listen inside it, how it ended. */
+    private var session: com.piyush.mode.core.telemetry.TraceSpan? = null
+    private var outcome = "Closed"
+
+    private fun session(): com.piyush.mode.core.telemetry.TraceSpan = session ?: runCatching {
+        telemetry.start(com.piyush.mode.core.telemetry.Operation.VoiceSession,
+            fields = mapOf(com.piyush.mode.core.telemetry.Field.Entry to entry))
+    }.getOrDefault(com.piyush.mode.core.telemetry.TraceSpan.None).also { session = it }
+
+    private fun mark(event: com.piyush.mode.core.telemetry.Event, fields: com.piyush.mode.core.telemetry.Fields = emptyMap()) {
+        runCatching { session().event(event, fields) }
+    }
+
+    /** Runs [block] inside this session's trace, so its speak and listen spans nest under it. */
+    private suspend fun inSession(block: suspend () -> Unit) {
+        val context = session().context
+        if (context == null) block() else telemetry.withParent(context) { block() }
+    }
+
+    private fun endSession() {
+        val span = session ?: return
+        session = null
+        runCatching { span.fields(mapOf(com.piyush.mode.core.telemetry.Field.Outcome to outcome)); span.end() }
+    }
     private val own = MutableStateFlow(ListenUiState(sent = forQuestion, phase = if (forQuestion) TalkPhase.Asking else TalkPhase.Greeting))
     private var job: Job? = null
     private var taskId: String? = null
 
     init {
+        if (forQuestion) session()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.invokeOnCompletion { endSession() }
         // A spoken question in the task takes over the screen while it lasts.
         scope.launch {
             combine(own, runner.state, voices.problem) { mine, task, problem ->
@@ -116,8 +146,11 @@ public class ListenPresenter(
         val speaker = voices.speaker()
         val listener = voices.listener()
         val base = ListenUiState(listener = listener?.id, speaker = speaker?.first?.id, voiceName = speaker?.second?.name)
+        session()
         if (listener == null) {
             val apple = DeviceVoice.hearingState()
+            outcome = "MicBlocked"
+            mark(com.piyush.mode.core.telemetry.Event.MicBlocked, mapOf(com.piyush.mode.core.telemetry.Field.ErrorType to apple))
             own.value = base.copy(
                 phase = if (apple == "permission" || apple == "asset" || apple == "denied") TalkPhase.NeedsMic else TalkPhase.Typing,
                 micDenied = apple == "denied",
@@ -127,16 +160,21 @@ public class ListenPresenter(
         val greeting = greetingLine(settings.settings.value.userName, hour())
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = greeting)
         job = scope.launch {
-            voices.speak(greeting)
-            own.value = own.value.copy(phase = TalkPhase.Listening)
-            repeat(MAX_SILENT_LISTENS) {
-                when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
-                    Heard.Silence -> Unit
-                    is Heard.Words -> { start(heard.text, TaskSource.Voice); return@launch }
-                    Heard.Nothing -> { own.value = own.value.copy(phase = TalkPhase.Typing); return@launch }
+            inSession {
+                voices.speak(greeting)
+                own.value = own.value.copy(phase = TalkPhase.Listening)
+                mark(com.piyush.mode.core.telemetry.Event.ListenStarted)
+                repeat(MAX_SILENT_LISTENS) {
+                    when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
+                        Heard.Silence -> Unit
+                        is Heard.Words -> { start(heard.text, TaskSource.Voice); return@inSession }
+                        Heard.Nothing -> { outcome = "HearingFailed"; own.value = own.value.copy(phase = TalkPhase.Typing); return@inSession }
+                    }
                 }
+                outcome = "NothingHeard"
+                mark(com.piyush.mode.core.telemetry.Event.NothingHeard)
+                own.value = own.value.copy(phase = TalkPhase.Typing)
             }
-            own.value = own.value.copy(phase = TalkPhase.Typing)
         }
     }
 
@@ -171,7 +209,7 @@ public class ListenPresenter(
         val task = text.trim()
         if (task.isEmpty()) return
         job?.cancel()
-        job = scope.launch { start(task, TaskSource.App) }
+        job = scope.launch { inSession { start(task, TaskSource.App) } }
     }
 
     /** A tapped option answers Mode's spoken question. */
@@ -182,6 +220,7 @@ public class ListenPresenter(
 
     /** Stops listening and speaking, and the task if it was sent from here. */
     public fun stop() {
+        if (!own.value.sent) outcome = "Stopped"
         job?.cancel()
         job = null
         voices.stop()
@@ -190,6 +229,7 @@ public class ListenPresenter(
 
     /** Closes the screen: anything still being said or heard stops; a task already sent carries on. */
     public fun dismiss() {
+        endSession()
         if (!own.value.sent) stop() else { job?.cancel(); voices.stop() }
     }
 
@@ -198,6 +238,8 @@ public class ListenPresenter(
         own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = reply, partial = "")
         voices.speak(reply)
         taskId = queue.submit(task, source, conversationId, false)?.id
+        outcome = if (source == TaskSource.Voice) "TaskSent" else "TaskTyped"
+        mark(com.piyush.mode.core.telemetry.Event.TaskSent, mapOf(com.piyush.mode.core.telemetry.Field.Source to source.name))
         own.value = own.value.copy(sent = true)
     }
 

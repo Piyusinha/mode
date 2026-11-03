@@ -35,6 +35,17 @@ enum DeepLink: Equatable {
     /// A mic in the app: talking mode, adding to [conversationId]'s chat (nil: a new chat).
     case talk(conversationId: String?)
 
+    /// For the trace: which kind of link (never the conversation's id).
+    var traceName: String {
+        switch self {
+        case .conversation: "conversation"
+        case .ask: "ask"
+        case .open: "open"
+        case .listen: "siri"
+        case let .talk(id): id == nil ? "ask_mic" : "chat_mic"
+        }
+    }
+
     init?(_ url: URL) {
         guard url.scheme == ModeLinks.scheme else { return nil }
         switch url.host() {

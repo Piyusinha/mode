@@ -93,7 +93,8 @@ final class LiveListener {
     private var feed: AnalyzerFeed?
     private var analyzer: SpeechAnalyzer?
     private var transcript: _Concurrency.Task<String, Never>?
-    private var done: ((String?, String?) -> Void)?
+    /// The recording, Apple's words, and why listening stopped (for the trace).
+    private var done: ((String?, String?, String) -> Void)?
     private var poll: Timer?
     private var heardSpeech = false
     private var silenceSince: Date?
@@ -105,16 +106,16 @@ final class LiveListener {
 
     var active: Bool { done != nil }
 
-    func start(maxMs: Int64, silenceMs: Int64, live: Bool, partial: @escaping (String) -> Void, done: @escaping (String?, String?) -> Void) {
-        if active { finish(keep: false) }
+    func start(maxMs: Int64, silenceMs: Int64, live: Bool, partial: @escaping (String) -> Void, done: @escaping (String?, String?, String) -> Void) {
+        if active { finish(keep: false, reason: "replaced") }
         self.done = done
         _Concurrency.Task { await self.begin(maxMs: maxMs, silenceMs: silenceMs, live: live, partial: partial) }
     }
 
     /// Done: what was said so far is kept.
-    func finishNow() { if active { finish(keep: true) } }
+    func finishNow() { if active { finish(keep: true, reason: "done") } }
 
-    func cancel() { if active { finish(keep: false) } }
+    func cancel() { if active { finish(keep: false, reason: "cancelled") } }
 
     private func begin(maxMs: Int64, silenceMs: Int64, live: Bool, partial: @escaping (String) -> Void) async {
         VoiceAudio.shared.forRecording()
@@ -175,9 +176,9 @@ final class LiveListener {
                     // Apple's words have stopped changing: the user has finished, even in a noisy room.
                     let settle = TimeInterval(TurnEnd.shared.settleMs(words: self.words)) / 1000
                     let settled = !self.words.isEmpty && Date().timeIntervalSince(self.wordsChangedAt) >= settle
-                    if quiet || settled { self.finish(keep: true); return }
+                    if quiet || settled { self.finish(keep: true, reason: quiet ? "quiet" : "settled"); return }
                 }
-                if Date() > limit { self.finish(keep: true) }
+                if Date() > limit { self.finish(keep: true, reason: "limit") }
             }
         }
 
@@ -233,7 +234,7 @@ final class LiveListener {
         return status == .error || error != nil || out.frameLength == 0 ? nil : out
     }
 
-    private func finish(keep: Bool) {
+    private func finish(keep: Bool, reason: String) {
         poll?.invalidate()
         poll = nil
         engine?.inputNode.removeTap(onBus: 0)
@@ -257,7 +258,7 @@ final class LiveListener {
             let text = keep ? await transcript?.value : nil
             transcript?.cancel()
             let heard = (text?.isEmpty == false) ? text : nil
-            callback?(keep && (spoke || heard != nil) ? url?.path : nil, heard)
+            callback?(keep && (spoke || heard != nil) ? url?.path : nil, heard, reason)
         }
     }
 
@@ -265,6 +266,6 @@ final class LiveListener {
         VoiceAudio.shared.done()
         let callback = done
         done = nil
-        callback?(nil, nil)
+        callback?(nil, nil, "failed")
     }
 }
