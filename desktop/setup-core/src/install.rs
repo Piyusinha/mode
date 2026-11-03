@@ -17,7 +17,7 @@ use isideload::{
         keyring_storage::KeyringStorage,
     },
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{APP_NAME, Result, SetupError, account::{Session, Team}, apps::MODE_BUNDLE, device, error::from_report};
 
@@ -57,7 +57,7 @@ pub enum Stage {
 pub type Progress = Arc<dyn Fn(Stage, f32) + Send + Sync>;
 
 /// What was installed, as the Ready and This iPhone screens show it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Installed {
     /// e.g. "com.piyush.mode.ABCDE12345": the team is part of it, like every app signed this way.

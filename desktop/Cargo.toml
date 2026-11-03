@@ -2,9 +2,7 @@
 # idevice pin never moves native/modecore's (docs/mac-windows-setup-plan.md).
 [workspace]
 resolver = "3"
-members = ["setup-core", "setup-cli"]
-# setup-app (the window app) joins the members once it builds.
-exclude = ["setup-app"]
+members = ["setup-core", "setup-cli", "setup-app"]
 
 [workspace.package]
 edition = "2024"

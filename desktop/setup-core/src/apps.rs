@@ -1,19 +1,23 @@
 //! What is installed on the phone: Mode, SideStore, LocalDevVPN.
 
 use idevice::{IdeviceService, installation_proxy::InstallationProxyClient};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{Result, device};
 
 /// Mode's bundle ID before signing; signed copies add the team: "com.piyush.mode.ABCDE12345".
 pub const MODE_BUNDLE: &str = "com.piyush.mode";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppOnPhone {
     pub bundle_id: String,
     pub name: String,
     pub version: String,
+    /// Signed with a developer certificate (this app, SideStore, Xcode…), so it uses one of a free
+    /// account's 3 app slots; App Store apps don't.
+    #[serde(default)]
+    pub sideloaded: bool,
 }
 
 /// The apps the person installed (App Store and signed ones).
@@ -30,7 +34,9 @@ pub async fn installed(udid: &str) -> Result<Vec<AppOnPhone>> {
             if name.is_empty() {
                 name = text("CFBundleName");
             }
-            AppOnPhone { bundle_id, name, version: text("CFBundleShortVersionString") }
+            let signer = text("SignerIdentity");
+            let sideloaded = signer.contains("Development") || signer.contains("Developer");
+            AppOnPhone { bundle_id, name, version: text("CFBundleShortVersionString"), sideloaded }
         })
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
