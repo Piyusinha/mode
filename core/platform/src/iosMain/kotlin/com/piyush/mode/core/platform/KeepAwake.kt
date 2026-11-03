@@ -23,7 +23,16 @@ import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
 import platform.AVFAudio.AVAudioSessionInterruptionTypeKey
 import platform.AVFAudio.AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
 import platform.AVFAudio.setActive
+import platform.AVFAudio.inputAvailable
+import platform.AVFAudio.currentRoute
+import platform.AVFAudio.sampleRate
 import platform.Foundation.NSData
+import platform.Foundation.NSError
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.create
 import platform.Foundation.NSNumber
@@ -121,15 +130,39 @@ public object VoiceAudio {
         session.setActive(true, null)
     }
 
-    /** Before the microphone opens: record and play, through the speaker, other apps ducked. */
+    /**
+     * Before the microphone opens: record and play, through the speaker, other apps ducked. Switching from
+     * playback can fail while another player still holds the session, so a failure deactivates and tries once
+     * more; what happened is logged (the microphone stayed off with no sign before).
+     */
     public fun forRecording() {
         val session = AVAudioSession.sharedInstance()
-        session.setCategory(
-            AVAudioSessionCategoryPlayAndRecord, AVAudioSessionModeDefault,
-            AVAudioSessionCategoryOptionDuckOthers or AVAudioSessionCategoryOptionDefaultToSpeaker, null,
+        fun attempt(): String? = memScoped {
+            val error = alloc<ObjCObjectVar<NSError?>>()
+            val category = session.setCategory(
+                AVAudioSessionCategoryPlayAndRecord, AVAudioSessionModeDefault,
+                AVAudioSessionCategoryOptionDuckOthers or AVAudioSessionCategoryOptionDefaultToSpeaker, error.ptr,
+            )
+            if (!category) return@memScoped "category: " + (error.value?.localizedDescription ?: "failed")
+            error.value = null
+            if (!session.setActive(true, error.ptr)) return@memScoped "activate: " + (error.value?.localizedDescription ?: "failed")
+            null
+        }
+        var problem = attempt()
+        if (problem != null) {
+            AppLog.log("voice", "mic session failed ($problem), trying again")
+            session.setActive(false, AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation, null)
+            problem = attempt()
+        }
+        AppLog.log(
+            "voice",
+            "mic session " + (problem?.let { "FAILED: $it" } ?: "ready") + ": category ${session.category}, input available " +
+                "${session.inputAvailable}, inputs ${session.currentRoute.inputs.size}, rate ${session.sampleRate.toInt()}",
         )
-        session.setActive(true, null)
     }
+
+    /** A line in Mode's log from the iPhone's audio code (Swift). */
+    public fun note(message: String) { AppLog.log("voice", message) }
 
     /** After speaking or recording: KeepAwake's silent, mixable playback while a task runs; otherwise off. */
     public fun done() {

@@ -16,10 +16,15 @@ final class VoiceLevel {
 private final class TapMeter: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Double = 0
+    private var top: Double = 0
+    private var count = 0
     var level: Double {
         get { lock.lock(); defer { lock.unlock() }; return value }
-        set { lock.lock(); value = newValue; lock.unlock() }
+        set { lock.lock(); value = newValue; top = max(top, newValue); count += 1; lock.unlock() }
     }
+    /** The loudest level and how many microphone buffers arrived, since [reset] (for the log). */
+    var report: (peak: Double, buffers: Int) { lock.lock(); defer { lock.unlock() }; return (top, count) }
+    func reset() { lock.lock(); value = 0; top = 0; count = 0; lock.unlock() }
 }
 
 /// Audio for Apple's live transcription. The microphone starts before the analyzer is ready, so its first
@@ -145,8 +150,13 @@ final class LiveListener {
             }
             feed?.push(buffer)
         }
+        meter.reset()
         engine.prepare()
-        do { try engine.start() } catch { engine.inputNode.removeTap(onBus: 0); fail(); return }
+        do { try engine.start() } catch {
+            VoiceAudio.shared.note(message: "mic engine did not start: \(error.localizedDescription)")
+            engine.inputNode.removeTap(onBus: 0); fail(); return
+        }
+        VoiceAudio.shared.note(message: "mic listening: \(Int(format.sampleRate)) Hz, \(format.channelCount) ch, running \(engine.isRunning)")
         self.engine = engine
         self.file = file
         self.url = url
@@ -249,6 +259,8 @@ final class LiveListener {
         self.transcript = nil
         let url = self.url
         let spoke = heardSpeech
+        let (peak, buffers) = meter.report
+        VoiceAudio.shared.note(message: "mic stopped (\(reason)): \(buffers) buffers, peak level \(String(format: "%.2f", peak)), speech \(spoke)")
         let callback = done
         done = nil
         VoiceLevel.shared.level = 0
