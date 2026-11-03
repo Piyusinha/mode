@@ -441,20 +441,24 @@ public class TaskRunner(
             if (s.voice != null || s.question != null || s.paused) continue
             val done = s.plan.filter { it.done }.map { it.text }
             val next = s.plan.firstOrNull { !it.done }?.text
-            val progress = "${done.size}|${next ?: s.status}"
+            // Progress is the status line moving on ("Searching flights…" → "Reading the results…"), not only a
+            // finished plan step: a long search stays on one plan step for a minute.
+            val progress = "${done.size}|${s.status}"
             val elapsed = started.elapsedNow().inWholeMilliseconds
             if (!pacing.due(elapsed, progress)) continue
             pacing.said(elapsed, progress)
+            val recent = s.steps.takeLast(RECENT_STEPS).map { it.reason }.filter { it.isNotBlank() }
             telemetry.trace(Operation.VoiceUpdate) { span ->
-                val line = narrator.line(task, done, next ?: s.status, said, settings.settings.value.userName)
+                val line = narrator.line(task, done, listOfNotNull(next, s.status.ifBlank { null }).joinToString(" · "), said,
+                    settings.settings.value.userName, recent)
                 val stillQuiet = state.value.running && state.value.voice == null && state.value.question == null
-                if (line == null || !stillQuiet) {
-                    span.fields(mapOf(Field.Outcome to if (line == null) "Skipped" else "Overtaken"))
-                } else {
-                    said += line
-                    voices?.speak(line)
-                    span.fields(mapOf(Field.Outcome to "Spoke"))
+                val result = when {
+                    line == null -> "Skipped"
+                    !stillQuiet -> "Overtaken"
+                    else -> { said += line; voices?.speak(line); "Spoke" }
                 }
+                span.fields(mapOf(Field.Outcome to result))
+                AppLog.log("voice", "update at ${elapsed / 1000} s: $result" + (line?.let { " (${it.length} chars)" } ?: ""))
             }
         }
     }
@@ -611,6 +615,8 @@ public class TaskRunner(
 /** What Mode says when it heard a spoken answer, before it goes back to the app. */
 /** How often a spoken task checks whether an update is worth saying. */
 private const val NARRATE_TICK_MS = 1_000L
+/** How many of the latest steps an update is written from. */
+private const val RECENT_STEPS = 3
 private const val GOT_IT = "Got it. Going back."
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */

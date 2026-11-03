@@ -39,10 +39,12 @@ class NarratorTest {
     fun theLineIsTheModelsOwnWithWhatIsDoneAndWhatWasAlreadySaid() = runTest {
         val seen = mutableListOf<String>()
         val line = Narrator(model("Found your usual, adding it now.", seen), quick)
-            .line("Order my usual from Swiggy", listOf("Open Swiggy"), "Add the usual to the cart", listOf("On it, Piyush."), "Piyush")
+            .line("Order my usual from Swiggy", listOf("Open Swiggy"), "Add the usual to the cart", listOf("On it, Piyush."), "Piyush",
+                recent = listOf("search for Paneer Tikka Bowl"))
         assertEquals("Found your usual, adding it now.", line)
         assertTrue("DONE SO FAR:\n- Open Swiggy" in seen.single())
         assertTrue("YOU ALREADY SAID:\n- On it, Piyush." in seen.single())
+        assertTrue("LAST STEPS:\n- search for Paneer Tikka Bowl" in seen.single())
     }
 
     @Test

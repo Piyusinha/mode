@@ -25,13 +25,19 @@ public class Narrator(
     private val model: () -> Pair<String, ModelProvider>?,
 ) {
     /** One short update, or null (nothing new worth saying, slow, or failed). */
-    public suspend fun line(task: String, done: List<String>, now: String?, said: List<String>, name: String?, budgetMs: Long = BUDGET_MS): String? {
+    public suspend fun line(
+        task: String, done: List<String>, now: String?, said: List<String>, name: String?,
+        /** What the last few steps were for ("search for IndiGo flights"), so there is something real to say. */
+        recent: List<String> = emptyList(),
+        budgetMs: Long = BUDGET_MS,
+    ): String? {
         val (id, provider) = model() ?: return null
         val user = buildString {
             append("THEIR NAME: ").append(name?.trim()?.split(' ')?.firstOrNull()?.ifBlank { null } ?: "(not known)").append('\n')
             append("THE TASK: ").append(task).append('\n')
             if (done.isNotEmpty()) append("DONE SO FAR:\n").append(done.joinToString("\n") { "- $it" }).append('\n')
             now?.takeIf { it.isNotBlank() }?.let { append("DOING NOW: ").append(it).append('\n') }
+            if (recent.isNotEmpty()) append("LAST STEPS:\n").append(recent.joinToString("\n") { "- $it" }).append('\n')
             if (said.isNotEmpty()) append("YOU ALREADY SAID:\n").append(said.joinToString("\n") { "- $it" }).append('\n')
         }
         return try {
@@ -76,10 +82,11 @@ public class Narrator(
     }
 
     public companion object {
-        public const val BUDGET_MS: Long = 3_000
+        /** The agent never waits for an update, so it may take a while to write. */
+        public const val BUDGET_MS: Long = 6_000
         public const val FIRST_AFTER_MS: Long = 8_000
         public const val GAP_MS: Long = 15_000
-        public const val MAX_UPDATES: Int = 4
+        public const val MAX_UPDATES: Int = 6
         private const val MAX_WORDS = 18
         private const val TOOL = "say"
         /** The model's way of saying there is nothing new: stay quiet. */
