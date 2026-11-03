@@ -495,7 +495,7 @@ public class Voices(
             else -> "$n uses"
         }
         private val MAX_RECORD_MS = 20.seconds.inWholeMilliseconds
-        private val SILENCE_MS = 900L
+        private val SILENCE_MS = TurnEnd.PAUSE_MS
         private val PER_HEAR = 8.seconds
         private val TOTAL_HEAR = 20.seconds
     }

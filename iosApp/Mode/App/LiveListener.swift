@@ -169,9 +169,12 @@ final class LiveListener {
                 else if self.heardSpeech {
                     let since = self.silenceSince ?? Date()
                     self.silenceSince = since
-                    let quiet = Date().timeIntervalSince(since) >= TimeInterval(silenceMs) / 1000
+                    // A thinking pause doesn't end the turn; words that stop mid-sentence wait longer (TurnEnd).
+                    let pause = max(TimeInterval(silenceMs), TimeInterval(TurnEnd.shared.pauseMs(words: self.words))) / 1000
+                    let quiet = Date().timeIntervalSince(since) >= pause
                     // Apple's words have stopped changing: the user has finished, even in a noisy room.
-                    let settled = !self.words.isEmpty && Date().timeIntervalSince(self.wordsChangedAt) >= LiveListener.wordsSettle
+                    let settle = TimeInterval(TurnEnd.shared.settleMs(words: self.words)) / 1000
+                    let settled = !self.words.isEmpty && Date().timeIntervalSince(self.wordsChangedAt) >= settle
                     if quiet || settled { self.finish(keep: true); return }
                 }
                 if Date() > limit { self.finish(keep: true) }
@@ -214,8 +217,6 @@ final class LiveListener {
         feed.attach(continuation, converter: converter, format: best)
     }
 
-    /// How long Apple's live words must stand still, after speech, to mean the user has finished.
-    private static let wordsSettle: TimeInterval = 1.0
 
     nonisolated static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
         let ratio = format.sampleRate / buffer.format.sampleRate
