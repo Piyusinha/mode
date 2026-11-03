@@ -68,9 +68,34 @@ public sealed interface Heard {
     public data object Nothing : Heard
 }
 
+/** Why the chosen provider could not speak or hear. The app says so, with a button to fix it in Settings. */
+public enum class VoiceTrouble {
+    /** No key saved for it. */
+    NoKey,
+    /** The provider refused the key (401). */
+    KeyRejected,
+    /** The provider's plan doesn't allow it, or its allowance ran out (402, 403, 429). */
+    PlanLimit,
+    /** No answer from the provider (no internet, a time-out, a server error). */
+    Unreachable,
+    /** Apple can't speak or listen on this iPhone yet (microphone off, speech model missing). */
+    NotReady,
+}
+
+/** The chosen [kind] failed to speak ([hearing] false) or to hear. */
+public data class VoiceProblem(val kind: VoiceKind, val hearing: Boolean, val trouble: VoiceTrouble)
+
+/** Whether a pasted key works, asked of the provider before it is saved. */
+public sealed interface KeyCheck {
+    public data object Valid : KeyCheck
+    public data class Rejected(val trouble: VoiceTrouble) : KeyCheck
+    public data object Unreachable : KeyCheck
+}
+
 /**
- * Speaks and hears in the user's order. A cloud failure before any sound, or an empty
- * transcript, tries the next ready choice. Apple is skipped when it is not ready.
+ * Speaks and hears with the one provider the user chose for each (the first in the saved order). No
+ * quiet fallback: when the chosen provider fails, [problem] says why and the line is not said by another
+ * voice, so the user always hears the voice they picked or is told what to fix.
  */
 public class Voices(
     private val settings: SettingsRepository,
@@ -78,6 +103,25 @@ public class Voices(
     private val device: DeviceVoice = DeviceVoice,
     private val telemetry: Telemetry = Telemetry.None,
 ) {
+    private val troubles = kotlinx.coroutines.flow.MutableStateFlow<VoiceProblem?>(null)
+
+    /** The last time the chosen speaking or listening provider failed; cleared when it next works. */
+    public val problem: kotlinx.coroutines.flow.StateFlow<VoiceProblem?> = troubles
+
+    private fun failed(kind: VoiceKind, hearing: Boolean, trouble: VoiceTrouble) {
+        troubles.value = VoiceProblem(kind, hearing, trouble)
+        AppLog.log("voice", "${kind.id} ${if (hearing) "hearing" else "speaking"} failed: $trouble")
+    }
+
+    private fun worked(hearing: Boolean) {
+        if (troubles.value?.hearing == hearing) troubles.value = null
+    }
+
+    /** The provider chosen for speaking or hearing. */
+    public fun chosen(hearing: Boolean): VoiceKind = order(hearing).firstOrNull() ?: VoiceKind.Apple
+
+    private fun blockTrouble(b: VoiceBlock): VoiceTrouble = if (b == VoiceBlock.NoKey) VoiceTrouble.NoKey else VoiceTrouble.NotReady
+
     public fun block(kind: VoiceKind, hearing: Boolean): VoiceBlock? = when {
         kind.needsKey && settings.voiceKey(kind).isNullOrBlank() -> VoiceBlock.NoKey
         kind == VoiceKind.Apple && !hearing && !device.speechReady() -> VoiceBlock.Unsupported
@@ -96,22 +140,29 @@ public class Voices(
     private suspend fun speakLine(text: String) {
         val line = text.trim()
         if (line.isEmpty()) return
-        for (kind in order(hearing = false)) {
-            if (block(kind, hearing = false) != null) continue
-            val spoken = try {
-                telemetry.trace(Operation.VoiceSynthesize, mapOf(Field.Provider to kind.id)) { span ->
-                    say(kind, settings.settings.value.voices[kind.id]?.id, line).also {
-                        if (it == Spoken.NotStarted) span.failed("SpeechNotStarted")
-                    }
+        val kind = chosen(hearing = false)
+        block(kind, hearing = false)?.let { failed(kind, hearing = false, blockTrouble(it)); return }
+        val result = try {
+            telemetry.trace(Operation.VoiceSynthesize, mapOf(Field.Provider to kind.id)) { span ->
+                say(kind, settings.settings.value.voices[kind.id]?.id, line).also {
+                    if (it !is Said.Started) span.failed("SpeechNotStarted")
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                AppLog.log("voice", "${kind.id} speech failed before sound: ${e.message}")
-                Spoken.NotStarted
             }
-            if (spoken == Spoken.Started) return
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.log("voice", "${kind.id} speech failed before sound: ${e.message}")
+            Said.Failed(VoiceTrouble.Unreachable)
         }
+        when (result) {
+            Said.Started -> worked(hearing = false)
+            is Said.Failed -> failed(kind, hearing = false, result.trouble)
+        }
+    }
+
+    private sealed interface Said {
+        data object Started : Said
+        data class Failed(val trouble: VoiceTrouble) : Said
     }
 
     /**
@@ -123,52 +174,95 @@ public class Voices(
         telemetry.trace(Operation.VoiceHear) { listen(onPartial) }
 
     private suspend fun listen(onPartial: (String) -> Unit): Heard {
-        val ready = order(hearing = true).filter { block(it, hearing = true) == null }
-        if (ready.isEmpty()) return Heard.Nothing
+        val kind = chosen(hearing = true)
+        block(kind, hearing = true)?.let { failed(kind, hearing = true, blockTrouble(it)); return Heard.Nothing }
+        // Apple's live words show while the user speaks, whichever provider writes the final text.
+        val appleLive = block(VoiceKind.Apple, hearing = true) == null
         val heard = telemetry.trace(Operation.VoiceRecord) {
-            device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = VoiceKind.Apple in ready, onPartial)
+            device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = appleLive, onPartial)
         }
-        val path = heard.path ?: return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim())
+        if (kind == VoiceKind.Apple && heard.path == null) {
+            return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim()).also { worked(hearing = true) }
+        }
+        val path = heard.path ?: return Heard.Silence
         return try {
-            val deadline = TimeSource.Monotonic.markNow() + TOTAL_HEAR
-            for (kind in ready) {
-                if (deadline.hasPassedNow()) break
-                val text = telemetry.trace(Operation.VoiceTranscribe, mapOf(Field.Provider to kind.id)) { span ->
-                    withTimeoutOrNull(PER_HEAR) {
-                        when (kind) {
-                            VoiceKind.Apple -> heard.text ?: device.transcribeApple(path)
-                            VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
-                            VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
-                            else -> null
-                        }
-                    }.also { span.fields(mapOf(Field.Outcome to if (it.isNullOrBlank()) "Empty" else "Words")) }
+            val result = telemetry.trace(Operation.VoiceTranscribe, mapOf(Field.Provider to kind.id)) { span ->
+                (withTimeoutOrNull(PER_HEAR) {
+                    when (kind) {
+                        VoiceKind.Apple -> Transcript.Text(heard.text ?: device.transcribeApple(path))
+                        VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
+                        VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
+                        else -> Transcript.Text(null)
+                    }
+                } ?: Transcript.Failed(VoiceTrouble.Unreachable)).also {
+                    span.fields(mapOf(Field.Outcome to when (it) { is Transcript.Failed -> "Failed"; is Transcript.Text -> if (it.text.isNullOrBlank()) "Empty" else "Words" }))
                 }
-                if (!text.isNullOrBlank()) return Heard.Words(text.trim())
-                AppLog.log("voice", "${kind.id} heard nothing")
             }
+            when (result) {
+                is Transcript.Failed -> { failed(kind, hearing = true, result.trouble); Heard.Nothing }
+                is Transcript.Text -> {
+                    worked(hearing = true)
+                    if (result.text.isNullOrBlank()) Heard.Silence else Heard.Words(result.text.trim())
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.log("voice", "${kind.id} transcription failed: ${e.message}")
+            failed(kind, hearing = true, VoiceTrouble.Unreachable)
             Heard.Nothing
         } finally {
             device.deleteRecording(path)
         }
     }
 
-    /** [line] in [voiceId] (null: the provider's default), at the user's speed. */
-    private suspend fun say(kind: VoiceKind, voiceId: String?, line: String): Spoken {
-        val speed = settings.settings.value.speechSpeed.factor
-        return when (kind) {
-            VoiceKind.Apple -> if (device.speakLine(line, voiceId, speed)) Spoken.Started else Spoken.NotStarted
-            VoiceKind.Fish -> cloudSpeak(FISH_TTS, settings.voiceKey(kind)!!, fish = true, line, voiceId, speed)
-            VoiceKind.ElevenLabs -> cloudSpeak(elevenUrl(voiceId), settings.voiceKey(kind)!!, fish = false, line, voiceId, speed)
-            else -> Spoken.NotStarted
+    private sealed interface Transcript {
+        data class Text(val text: String?) : Transcript
+        data class Failed(val trouble: VoiceTrouble) : Transcript
+    }
+
+    /**
+     * Asks [kind]'s provider whether [key] works, before it is saved: a cheap read that needs a valid key
+     * (ElevenLabs' voices, Fish Audio's credit, Deepgram's projects, Soniox's models).
+     */
+    public suspend fun checkKey(kind: VoiceKind, key: String): KeyCheck {
+        val k = key.trim()
+        if (k.isEmpty()) return KeyCheck.Rejected(VoiceTrouble.NoKey)
+        return try {
+            val response = when (kind) {
+                VoiceKind.ElevenLabs -> http.get("https://api.elevenlabs.io/v2/voices?page_size=1") { header("xi-api-key", k) }
+                VoiceKind.Fish -> http.get("https://api.fish.audio/wallet/self/api-credit") { header("Authorization", "Bearer $k") }
+                VoiceKind.Deepgram -> http.get("https://api.deepgram.com/v1/projects") { header("Authorization", "Token $k") }
+                VoiceKind.Soniox -> http.get("https://api.soniox.com/v1/models") { header("Authorization", "Bearer $k") }
+                VoiceKind.Apple -> return KeyCheck.Valid
+            }
+            when {
+                response.status.isSuccess() -> KeyCheck.Valid
+                else -> troubleFor(response.status.value)?.let { KeyCheck.Rejected(it) } ?: KeyCheck.Unreachable
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            KeyCheck.Unreachable
         }
     }
 
-    /** The speech provider that would speak now (the first ready one), and the voice picked there. */
-    public fun speaker(): Pair<VoiceKind, VoiceChoice?>? =
-        order(hearing = false).firstOrNull { block(it, hearing = false) == null }?.let { it to settings.settings.value.voices[it.id] }
+    /** [line] in [voiceId] (null: the provider's default), at the user's speed. */
+    private suspend fun say(kind: VoiceKind, voiceId: String?, line: String): Said {
+        val speed = settings.settings.value.speechSpeed.factor
+        return when (kind) {
+            VoiceKind.Apple -> if (device.speakLine(line, voiceId, speed)) Said.Started else Said.Failed(VoiceTrouble.NotReady)
+            VoiceKind.Fish -> cloudSpeak(FISH_TTS, settings.voiceKey(kind)!!, fish = true, line, voiceId, speed)
+            VoiceKind.ElevenLabs -> cloudSpeak(elevenUrl(voiceId), settings.voiceKey(kind)!!, fish = false, line, voiceId, speed)
+            else -> Said.Failed(VoiceTrouble.NotReady)
+        }
+    }
 
-    /** The hearing provider that would listen now (the first ready one). */
-    public fun listener(): VoiceKind? = order(hearing = true).firstOrNull { block(it, hearing = true) == null }
+    /** The provider chosen for speaking, and the voice picked there. */
+    public fun speaker(): Pair<VoiceKind, VoiceChoice?>? = chosen(hearing = false).let { it to settings.settings.value.voices[it.id] }
+
+    /** The provider chosen for hearing. */
+    public fun listener(): VoiceKind? = chosen(hearing = true)
 
     /** The voices [kind] offers: Apple's on this iPhone; ElevenLabs' library and Fish Audio's public voices with a key. */
     public suspend fun options(kind: VoiceKind): VoiceList {
@@ -189,7 +283,7 @@ public class Voices(
         // A sample that never reports its end still ends: the play button must not stay on "playing".
         withTimeoutOrNull(MAX_PREVIEW) {
             val clip = option.preview?.let { url -> http.get(url).takeIf { it.status.isSuccess() }?.bodyAsBytes()?.takeIf { it.isNotEmpty() } }
-            if (clip != null) device.playClip(clip) else say(kind, option.id.ifEmpty { null }, SAMPLE) == Spoken.Started
+            if (clip != null) device.playClip(clip) else say(kind, option.id.ifEmpty { null }, SAMPLE) == Said.Started
         } ?: run { device.cancel(); false }
     } catch (e: CancellationException) {
         throw e
@@ -247,7 +341,7 @@ public class Voices(
         return ids.mapNotNull(VoiceKind::fromId)
     }
 
-    private suspend fun cloudSpeak(url: String, key: String, fish: Boolean, text: String, voiceId: String?, speed: Double): Spoken {
+    private suspend fun cloudSpeak(url: String, key: String, fish: Boolean, text: String, voiceId: String?, speed: Double): Said {
         val response = http.post(url) {
             if (fish) {
                 header("Authorization", "Bearer $key")
@@ -259,11 +353,11 @@ public class Voices(
         }
         if (!response.status.isSuccess()) {
             AppLog.log("voice", "speech ${response.status.value}")
-            return Spoken.NotStarted
+            return Said.Failed(troubleFor(response.status.value) ?: VoiceTrouble.Unreachable)
         }
         val bytes = response.bodyAsBytes()
-        if (bytes.isEmpty()) return Spoken.NotStarted
-        return if (device.playClip(bytes)) Spoken.Started else Spoken.NotStarted
+        if (bytes.isEmpty()) return Said.Failed(VoiceTrouble.Unreachable)
+        return if (device.playClip(bytes)) Said.Started else Said.Failed(VoiceTrouble.NotReady)
     }
 
     private fun speechBody(fish: Boolean, text: String, voiceId: String?, speed: Double): String = buildJsonObject {
@@ -278,22 +372,22 @@ public class Voices(
         }
     }.toString()
 
-    private suspend fun deepgram(key: String, path: String): String? {
-        val bytes = readFile(path) ?: return null
+    private suspend fun deepgram(key: String, path: String): Transcript {
+        val bytes = readFile(path) ?: return Transcript.Text(null)
         val response = http.post("https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true") {
             header("Authorization", "Token $key")
             header(HttpHeaders.ContentType, "audio/wav")
             setBody(bytes)
         }
-        if (!response.status.isSuccess()) return null
+        if (!response.status.isSuccess()) return Transcript.Failed(troubleFor(response.status.value) ?: VoiceTrouble.Unreachable)
         val channels = json(response.bodyAsText())?.get("results")?.jsonObject?.get("channels")
-            as? kotlinx.serialization.json.JsonArray ?: return null
+            as? kotlinx.serialization.json.JsonArray ?: return Transcript.Text(null)
         val alternatives = channels.firstOrNull()?.jsonObject?.get("alternatives") as? kotlinx.serialization.json.JsonArray
-        return alternatives?.firstOrNull()?.jsonObject?.get("transcript")?.jsonPrimitive?.contentOrNull
+        return Transcript.Text(alternatives?.firstOrNull()?.jsonObject?.get("transcript")?.jsonPrimitive?.contentOrNull)
     }
 
-    private suspend fun soniox(key: String, path: String): String? {
-        val bytes = readFile(path) ?: return null
+    private suspend fun soniox(key: String, path: String): Transcript {
+        val bytes = readFile(path) ?: return Transcript.Text(null)
         var fileId: String? = null
         var jobId: String? = null
         try {
@@ -305,8 +399,8 @@ public class Voices(
             }) {
                 header("Authorization", "Bearer $key")
             }
-            if (!uploaded.status.isSuccess()) return null
-            fileId = json(uploaded.bodyAsText())?.get("id")?.jsonPrimitive?.contentOrNull ?: return null
+            if (!uploaded.status.isSuccess()) return Transcript.Failed(troubleFor(uploaded.status.value) ?: VoiceTrouble.Unreachable)
+            fileId = json(uploaded.bodyAsText())?.get("id")?.jsonPrimitive?.contentOrNull ?: return Transcript.Failed(VoiceTrouble.Unreachable)
             val created = http.post("https://api.soniox.com/v1/transcriptions") {
                 header("Authorization", "Bearer $key")
                 setBody(TextContent(buildJsonObject {
@@ -314,8 +408,8 @@ public class Voices(
                     put("file_id", fileId)
                 }.toString(), ContentType.Application.Json))
             }
-            if (!created.status.isSuccess()) return null
-            jobId = json(created.bodyAsText())?.get("id")?.jsonPrimitive?.contentOrNull ?: return null
+            if (!created.status.isSuccess()) return Transcript.Failed(troubleFor(created.status.value) ?: VoiceTrouble.Unreachable)
+            jobId = json(created.bodyAsText())?.get("id")?.jsonPrimitive?.contentOrNull ?: return Transcript.Failed(VoiceTrouble.Unreachable)
             repeat(12) {
                 delay(500)
                 val job = http.get("https://api.soniox.com/v1/transcriptions/$jobId") {
@@ -323,15 +417,15 @@ public class Voices(
                 }
                 val body = json(job.bodyAsText()) ?: return@repeat
                 val status = body["status"]?.jsonPrimitive?.contentOrNull
-                if (status == "error") return null
+                if (status == "error") return Transcript.Failed(VoiceTrouble.Unreachable)
                 if (status == "completed") {
-                    return body["text"]?.jsonPrimitive?.contentOrNull
+                    return Transcript.Text(body["text"]?.jsonPrimitive?.contentOrNull
                         ?: http.get("https://api.soniox.com/v1/transcriptions/$jobId/transcript") {
                             header("Authorization", "Bearer $key")
-                        }.let { json(it.bodyAsText())?.get("text")?.jsonPrimitive?.contentOrNull }
+                        }.let { json(it.bodyAsText())?.get("text")?.jsonPrimitive?.contentOrNull })
                 }
             }
-            return null
+            return Transcript.Failed(VoiceTrouble.Unreachable)
         } finally {
             fileId?.let { id ->
                 runCatching {
@@ -389,10 +483,17 @@ public class Voices(
             else -> "$n uses"
         }
         private val MAX_RECORD_MS = 20.seconds.inWholeMilliseconds
-        private val SILENCE_MS = 1200L
+        private val SILENCE_MS = 900L
         private val PER_HEAR = 8.seconds
         private val TOTAL_HEAR = 20.seconds
     }
 }
 
 private fun json(text: String): JsonObject? = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()
+
+/** What an HTTP refusal means for the user: a bad key, or a plan that doesn't allow it. Others: unreachable. */
+internal fun troubleFor(status: Int): VoiceTrouble? = when (status) {
+    401 -> VoiceTrouble.KeyRejected
+    402, 403, 429 -> VoiceTrouble.PlanLimit
+    else -> null
+}

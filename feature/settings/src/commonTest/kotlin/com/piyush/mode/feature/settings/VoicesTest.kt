@@ -8,6 +8,9 @@ import com.piyush.mode.feature.settings.voice.DeviceVoice
 import com.piyush.mode.feature.settings.voice.Heard
 import com.piyush.mode.feature.settings.voice.Voices
 import com.piyush.mode.feature.settings.voice.VoiceOption
+import com.piyush.mode.feature.settings.voice.VoiceProblem
+import com.piyush.mode.feature.settings.voice.VoiceTrouble
+import com.piyush.mode.feature.settings.voice.KeyCheck
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -19,29 +22,46 @@ import kotlin.test.assertIs
 
 class VoicesTest {
     @Test
-    fun aRefusalBeforeSoundTriesTheNextVoiceOnce() = runTest {
+    fun theChosenVoiceFailingSaysWhyAndNoOtherVoiceSpeaks() = runTest {
         val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
         settings.setVoiceKey(VoiceKind.Fish, "fish-key-12345678")
         settings.setVoiceKey(VoiceKind.ElevenLabs, "eleven-key-12345678")
-        DeviceVoice.speechReady = { false }
+        settings.update { it.copy(speechOrder = listOf("elevenlabs", "fish", "apple")) }
+        DeviceVoice.speechReady = { true }
         var plays = 0
         var posts = 0
         DeviceVoice.play = { _, done -> plays++; done(true) }
-        val http = HttpClient(MockEngine { request ->
-            posts++
-            if (request.url.host.contains("fish")) respond("no", status = HttpStatusCode.Unauthorized)
-            else respond(byteArrayOf(1, 2, 3))
-        })
-        Voices(settings, http).speak("Do you want to order this?")
-        assertEquals(2, posts)
-        assertEquals(1, plays)
+        // ElevenLabs refuses: the plan doesn't include this voice.
+        val http = HttpClient(MockEngine { posts++; respond("no", status = HttpStatusCode.PaymentRequired) })
+        val voices = Voices(settings, http)
+        voices.speak("Do you want to order this?")
+        assertEquals(1, posts)
+        assertEquals(0, plays)
+        assertEquals(VoiceProblem(VoiceKind.ElevenLabs, hearing = false, VoiceTrouble.PlanLimit), voices.problem.value)
         DeviceVoice.play = null
+    }
+
+    @Test
+    fun aKeyIsCheckedWithTheProviderBeforeItIsSaved() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        val http = HttpClient(MockEngine { request ->
+            when (request.headers["Authorization"] ?: request.headers["xi-api-key"]) {
+                "Token good-key-1234", "good-key-1234" -> respond("{}")
+                else -> respond("no", status = HttpStatusCode.Unauthorized)
+            }
+        })
+        val voices = Voices(settings, http)
+        assertEquals(KeyCheck.Valid, voices.checkKey(VoiceKind.Deepgram, "good-key-1234"))
+        assertEquals(KeyCheck.Valid, voices.checkKey(VoiceKind.ElevenLabs, " good-key-1234 "))
+        assertEquals(KeyCheck.Rejected(VoiceTrouble.KeyRejected), voices.checkKey(VoiceKind.Deepgram, "bad-key-1234"))
+        assertEquals(KeyCheck.Rejected(VoiceTrouble.NoKey), voices.checkKey(VoiceKind.Soniox, "  "))
     }
 
     @Test
     fun silenceDoesNotUpload() = runTest {
         val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
         settings.setVoiceKey(VoiceKind.Deepgram, "dg-key-12345678")
+        settings.update { it.copy(hearingOrder = listOf("deepgram", "apple", "soniox")) }
         DeviceVoice.hearingState = { "unsupported" }
         DeviceVoice.record = { _, _, done -> done(null) }
         var posts = 0

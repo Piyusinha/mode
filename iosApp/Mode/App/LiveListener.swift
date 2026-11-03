@@ -22,9 +22,67 @@ private final class TapMeter: @unchecked Sendable {
     }
 }
 
+/// Audio for Apple's live transcription. The microphone starts before the analyzer is ready, so its first
+/// buffers wait here (up to about 8 s) and are handed over the moment it is; nothing said early is lost.
+/// The tap (audio thread) pushes; the main thread attaches and closes.
+private final class AnalyzerFeed: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: [AVAudioPCMBuffer] = []
+    private var stream: AsyncStream<AnalyzerInput>.Continuation?
+    private var converter: AVAudioConverter?
+    private var format: AVAudioFormat?
+    private var closed = false
+
+    func push(_ buffer: AVAudioPCMBuffer) {
+        lock.lock(); defer { lock.unlock() }
+        if closed { return }
+        if let stream, let converter, let format {
+            if let out = LiveListener.convert(buffer, with: converter, to: format) { stream.yield(AnalyzerInput(buffer: out)) }
+        } else if pending.count < 400, let copy = AnalyzerFeed.copy(buffer) {
+            pending.append(copy)
+        }
+    }
+
+    func attach(_ stream: AsyncStream<AnalyzerInput>.Continuation, converter: AVAudioConverter, format: AVAudioFormat) {
+        lock.lock(); defer { lock.unlock() }
+        if closed { stream.finish(); return }
+        for buffer in pending {
+            if let out = LiveListener.convert(buffer, with: converter, to: format) { stream.yield(AnalyzerInput(buffer: out)) }
+        }
+        pending = []
+        self.stream = stream
+        self.converter = converter
+        self.format = format
+    }
+
+    func close() {
+        lock.lock(); defer { lock.unlock() }
+        closed = true
+        stream?.finish()
+        stream = nil
+        pending = []
+    }
+
+    private static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let out = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength) else { return nil }
+        out.frameLength = buffer.frameLength
+        let channels = Int(buffer.format.channelCount)
+        if let src = buffer.floatChannelData, let dst = out.floatChannelData {
+            for c in 0..<channels { dst[c].update(from: src[c], count: Int(buffer.frameLength)) }
+        } else if let src = buffer.int16ChannelData, let dst = out.int16ChannelData {
+            for c in 0..<channels { dst[c].update(from: src[c], count: Int(buffer.frameLength)) }
+        } else {
+            return nil
+        }
+        return out
+    }
+}
+
 /// One listen from the microphone: Apple transcribes live while the user speaks (partial words for the screen),
-/// the same audio is written to a file (for Soniox or Deepgram if Apple hears nothing), and the loudness drives the
-/// orb and the bars. It stops on a pause after speech, at the limit, on Done or on cancel.
+/// the same audio is written to a small 16 kHz mono file (what Deepgram or Soniox transcribe when chosen), and the
+/// loudness drives the orb and the bars. The microphone opens first; Apple's analyzer catches up with what was said.
+/// It stops when the user has finished: a pause against the room's own noise level, or Apple's words standing
+/// still for a moment, at the limit, on Done or on cancel.
 @MainActor
 final class LiveListener {
     static let shared = LiveListener()
@@ -32,13 +90,17 @@ final class LiveListener {
     private var engine: AVAudioEngine?
     private var file: AVAudioFile?
     private var url: URL?
-    private var input: AsyncStream<AnalyzerInput>.Continuation?
+    private var feed: AnalyzerFeed?
     private var analyzer: SpeechAnalyzer?
     private var transcript: _Concurrency.Task<String, Never>?
     private var done: ((String?, String?) -> Void)?
     private var poll: Timer?
     private var heardSpeech = false
     private var silenceSince: Date?
+    /// The room's loudness without speech, learned as the listen goes.
+    private var floor: Double = 0.2
+    private var words = ""
+    private var wordsChangedAt = Date()
     private let meter = TapMeter()
 
     var active: Bool { done != nil }
@@ -59,60 +121,20 @@ final class LiveListener {
         let engine = AVAudioEngine()
         let format = engine.inputNode.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { fail(); return }
+
+        // The file: 16 kHz mono 16-bit, a third of the microphone's size, so a cloud upload is quick.
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("mode-listen.wav")
         try? FileManager.default.removeItem(at: url)
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: format.sampleRate, AVNumberOfChannelsKey: format.channelCount,
-            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false, AVLinearPCMIsBigEndianKey: false,
-        ]
-        let file = try? AVAudioFile(forWriting: url, settings: settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved)
+        let fileFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)
+        let fileConverter = fileFormat.flatMap { AVAudioConverter(from: format, to: $0) }
+        let file = fileFormat.flatMap { try? AVAudioFile(forWriting: url, settings: $0.settings, commonFormat: .pcmFormatInt16, interleaved: true) }
 
-        // Apple, live: the analyzer takes audio in its own format, so each buffer is converted first
-        // (handing it the microphone's buffers as they are crashes the app).
-        var stream: AsyncStream<AnalyzerInput>.Continuation?
-        var converter: AVAudioConverter?
-        var analyzerFormat: AVAudioFormat?
-        if live {
-            let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? .current
-            let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: [])
-            let analyzer = SpeechAnalyzer(modules: [transcriber])
-            if let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]),
-               let conv = AVAudioConverter(from: format, to: best) {
-                let (inputs, continuation) = AsyncStream<AnalyzerInput>.makeStream()
-                do {
-                    try await analyzer.start(inputSequence: inputs)
-                    stream = continuation
-                    converter = conv
-                    analyzerFormat = best
-                    self.analyzer = analyzer
-                    transcript = _Concurrency.Task {
-                        var settled = ""
-                        var forming = ""
-                        do {
-                            for try await result in transcriber.results {
-                                let words = String(result.text.characters).trimmingCharacters(in: .whitespaces)
-                                if result.isFinal {
-                                    if !words.isEmpty { settled += (settled.isEmpty ? "" : " ") + words }
-                                    forming = ""
-                                } else {
-                                    forming = words
-                                }
-                                let now = [settled, forming].filter { !$0.isEmpty }.joined(separator: " ")
-                                await MainActor.run { partial(now) }
-                            }
-                        } catch {}
-                        return [settled, forming].filter { !$0.isEmpty }.joined(separator: " ")
-                    }
-                } catch {
-                    continuation.finish()
-                }
-            }
-        }
-        input = stream
-
+        let feed = live ? AnalyzerFeed() : nil
         let meter = self.meter
         engine.inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-            try? file?.write(from: buffer)
+            if let file, let fileConverter, let fileFormat, let small = LiveListener.convert(buffer, with: fileConverter, to: fileFormat) {
+                try? file.write(from: small)
+            }
             if let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 {
                 var sum: Float = 0
                 for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
@@ -120,18 +142,19 @@ final class LiveListener {
                 let db = 20 * log10(max(rms, 0.000_01))
                 meter.level = Double(min(max((db + 50) / 40, 0), 1))
             }
-            if let stream, let converter, let analyzerFormat,
-               let converted = LiveListener.convert(buffer, with: converter, to: analyzerFormat) {
-                stream.yield(AnalyzerInput(buffer: converted))
-            }
+            feed?.push(buffer)
         }
         engine.prepare()
         do { try engine.start() } catch { engine.inputNode.removeTap(onBus: 0); fail(); return }
         self.engine = engine
         self.file = file
         self.url = url
+        self.feed = feed
         heardSpeech = false
         silenceSince = nil
+        floor = 0.2
+        words = ""
+        wordsChangedAt = Date()
 
         let limit = Date().addingTimeInterval(TimeInterval(maxMs) / 1000)
         poll = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
@@ -139,19 +162,62 @@ final class LiveListener {
                 guard let self, self.active else { return }
                 let level = self.meter.level
                 VoiceLevel.shared.level = level
-                // About -40 dB: speech. A pause after it ends the listen.
-                if level > 0.25 { self.heardSpeech = true; self.silenceSince = nil }
+                // The room's floor: falls at once, rises slowly, so speech never becomes the floor.
+                self.floor = level < self.floor ? level : self.floor * 0.995 + level * 0.005
+                let speaking = level > max(0.25, self.floor + 0.18)
+                if speaking { self.heardSpeech = true; self.silenceSince = nil }
                 else if self.heardSpeech {
                     let since = self.silenceSince ?? Date()
                     self.silenceSince = since
-                    if Date().timeIntervalSince(since) >= TimeInterval(silenceMs) / 1000 { self.finish(keep: true) }
+                    let quiet = Date().timeIntervalSince(since) >= TimeInterval(silenceMs) / 1000
+                    // Apple's words have stopped changing: the user has finished, even in a noisy room.
+                    let settled = !self.words.isEmpty && Date().timeIntervalSince(self.wordsChangedAt) >= LiveListener.wordsSettle
+                    if quiet || settled { self.finish(keep: true); return }
                 }
                 if Date() > limit { self.finish(keep: true) }
             }
         }
+
+        // Apple, live, set up while the microphone already listens.
+        guard let feed else { return }
+        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? .current
+        let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: [])
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        guard active, self.feed === feed,
+              let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]),
+              let converter = AVAudioConverter(from: format, to: best) else { return }
+        let (inputs, continuation) = AsyncStream<AnalyzerInput>.makeStream()
+        do { try await analyzer.start(inputSequence: inputs) } catch { continuation.finish(); return }
+        guard active, self.feed === feed else { continuation.finish(); await analyzer.cancelAndFinishNow(); return }
+        self.analyzer = analyzer
+        transcript = _Concurrency.Task {
+            var settled = ""
+            var forming = ""
+            do {
+                for try await result in transcriber.results {
+                    let said = String(result.text.characters).trimmingCharacters(in: .whitespaces)
+                    if result.isFinal {
+                        if !said.isEmpty { settled += (settled.isEmpty ? "" : " ") + said }
+                        forming = ""
+                    } else {
+                        forming = said
+                    }
+                    let now = [settled, forming].filter { !$0.isEmpty }.joined(separator: " ")
+                    await MainActor.run {
+                        if now != self.words { self.words = now; self.wordsChangedAt = Date() }
+                        partial(now)
+                    }
+                }
+            } catch {}
+            return [settled, forming].filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        feed.attach(continuation, converter: converter, format: best)
     }
 
-    private nonisolated static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
+    /// How long Apple's live words must stand still, after speech, to mean the user has finished.
+    private static let wordsSettle: TimeInterval = 1.0
+
+    nonisolated static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
         let ratio = format.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 32
         guard let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
@@ -173,8 +239,8 @@ final class LiveListener {
         engine?.stop()
         engine = nil
         file = nil
-        input?.finish()
-        input = nil
+        feed?.close()
+        feed = nil
         let analyzer = self.analyzer
         let transcript = self.transcript
         self.analyzer = nil
