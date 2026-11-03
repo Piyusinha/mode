@@ -159,6 +159,14 @@ public class ListenPresenter(
             )
             return
         }
+        // Every listener needs the microphone: without it iOS records silence (Soniox and Deepgram included).
+        val mic = DeviceVoice.hearingState()
+        if (mic == "permission" || mic == "denied") {
+            outcome = "MicBlocked"
+            mark(com.piyush.mode.core.telemetry.Event.MicBlocked, mapOf(com.piyush.mode.core.telemetry.Field.ErrorType to mic))
+            own.value = base.copy(phase = TalkPhase.NeedsMic, micDenied = mic == "denied")
+            return
+        }
         val greeting = greetingLine(settings.settings.value.userName, hour())
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = greeting)
         job = scope.launch {
@@ -186,7 +194,11 @@ public class ListenPresenter(
         scope.launch {
             repeat(PREPARE_CHECKS) {
                 delay(1_000)
-                when (DeviceVoice.hearingState()) {
+                val state = DeviceVoice.hearingState()
+                // Soniox and Deepgram need only the microphone; Apple also needs its speech model.
+                val cloud = voices.listener()?.let { it != com.piyush.mode.feature.settings.domain.VoiceKind.Apple } == true
+                if (cloud && state != "permission" && state != "denied") { begin(); return@launch }
+                when (state) {
                     "ready" -> { begin(); return@launch }
                     "denied" -> { own.value = own.value.copy(micDenied = true); return@launch }
                     "unsupported" -> { own.value = own.value.copy(phase = TalkPhase.Typing); return@launch }

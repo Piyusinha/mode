@@ -52,7 +52,14 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         }
         DeviceVoice.shared.install(
             speechReady: { true },
-            hearingState: { [weak self] in self?.hearing ?? "unsupported" },
+            // The microphone permission is read live (it can change in Settings); Apple's speech model state is cached.
+            hearingState: { [weak self] in
+                switch AVAudioApplication.shared.recordPermission {
+                case .denied: "denied"
+                case .undetermined: "permission"
+                default: self?.hearing ?? "unsupported"
+                }
+            },
             // Kotlin's Boolean and Long arrive boxed (KotlinBoolean, KotlinLong).
             speak: { [weak self] text, voiceId, speed, done in
                 self?.speak(text, voiceId: voiceId, speed: speed.doubleValue) { done(KotlinBoolean(bool: $0)) }

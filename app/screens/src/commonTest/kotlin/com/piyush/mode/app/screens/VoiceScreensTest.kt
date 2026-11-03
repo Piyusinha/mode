@@ -135,4 +135,24 @@ class VoiceScreensTest {
         assertTrue(com.piyush.mode.core.telemetry.Event.TaskSent in traces.events)
         assertTrue(traces.ended >= 1)
     }
+
+    @Test
+    fun withoutTheMicrophoneTalkingModeAsksForItInsteadOfRecordingSilence() = runTest {
+        val f = Fixture(backgroundScope)
+        f.settings.setVoiceKey(VoiceKind.Soniox, "soniox-key")
+        f.settings.update { it.copy(hearingOrder = listOf("soniox", "apple")) }
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "permission" }
+        try {
+            val traces = Recorded()
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                telemetry = traces, entry = "siri")
+            talk.begin()
+            val s = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.NeedsMic }
+            assertEquals(false, s.micDenied)
+            assertTrue(com.piyush.mode.core.telemetry.Event.MicBlocked in traces.events)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
 }

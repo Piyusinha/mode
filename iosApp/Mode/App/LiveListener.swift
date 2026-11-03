@@ -258,7 +258,8 @@ final class LiveListener {
             let text = keep ? await transcript?.value : nil
             transcript?.cancel()
             let heard = (text?.isEmpty == false) ? text : nil
-            callback?(keep && (spoke || heard != nil) ? url?.path : nil, heard, reason)
+            // Done means the person spoke: the recording goes to the listener even if the level never crossed the bar.
+            callback?(keep && (spoke || heard != nil || reason == "done") ? url?.path : nil, heard, reason)
         }
     }
 
