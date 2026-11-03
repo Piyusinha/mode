@@ -28,6 +28,9 @@ struct OnboardingRoute: View {
             .sheet(isPresented: $model.showingSearch) {
                 ModelSearchSheet(results: model.state.results, query: $model.query) { model.send(.chooseModel($0)) }
             }
+            .sheet(item: $model.picking) { role in
+                RolePickerSheet(role: role, state: model.state, onEvent: model.send)
+            }
             .sheet(isPresented: $model.showingStuck) {
                 StuckSheet(choices: model.state.stuckChoices) { model.send(.chooseStuck($0)) }
             }
@@ -69,6 +72,49 @@ private struct StuckSheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { ModeToolbarButton(.close, label: L10n.Common.cancel) { dismiss() } } }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// Board SetupModelPicker: how hard the role thinks (plan providers), then its model.
+private struct RolePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let role: OnboardingViewModel.PickerRole
+    let state: OnboardingViewModel.State
+    let onEvent: (OnboardingViewModel.Event) -> Void
+
+    private var brain: Bool { role == .brain }
+    private var recommended: String { role.recommendedEffort }
+    private var effort: Binding<String> {
+        Binding(get: { (brain ? state.brainEffort : state.phoneEffort) ?? recommended },
+                set: { onEvent(.chooseEffort(role, $0)) })
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !state.efforts.isEmpty && (!brain || state.brainCard != nil) {
+                    Section {
+                        ModeSegmented(state.efforts.map { ($0, LocalizedStringResource(stringLiteral: PlanModelsViewModel.effortName($0))) }, selection: effort)
+                        Text(L10n.Setup.effortHint(PlanModelsViewModel.effortName(recommended))).modeText(.footnote, color: ModeColor.textSecondary)
+                    } header: { Text(L10n.Setup.howHard) }
+                }
+                Section {
+                    ForEach(brain ? state.stuckChoices : state.phoneChoices) { choice in
+                        ChoiceRow(choice: choice) { onEvent(brain ? .chooseStuck(choice.id) : .chooseModel(choice.id)) }
+                    }
+                    if brain {
+                        ModeRow(String(localized: L10n.Setup.stuckOff), action: { onEvent(.chooseStuck(nil)) }) { ModeRadio(selected: state.brainCard == nil) }
+                    }
+                    if !state.onPlan {
+                        ModeRow(String(localized: L10n.Setup.allModels), action: { dismiss(); onEvent(.openSearch) }) { ModeChevron() }
+                    }
+                } header: { Text(L10n.Setup.modelSection) }
+            }
+            .navigationTitle(Text(brain ? L10n.Setup.whenStuck : L10n.Setup.phoneControl))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { ModeToolbarButton(.done, label: L10n.Common.done) { dismiss() } } }
+        }
+        .presentationDetents([.large])
     }
 }
 

@@ -86,6 +86,40 @@ class OnboardingTest {
     }
 
     @Test
+    fun setupRecommendsHowHardEachRoleThinksAndKeepsTheChoice() = runTest {
+        val f = Fixture(this)
+        val secrets = com.piyush.mode.testing.InMemorySecretStore(com.piyush.mode.feature.settings.data.ChatGptAccount.CONNECTED_KEY to "refresh")
+        val settings = com.piyush.mode.feature.settings.data.SettingsRepository(secrets, com.piyush.mode.testing.InMemoryKeyValueStore())
+        settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
+        val p = OnboardingPresenter(backgroundScope, settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth, lifecycle)
+        p.next(); p.setNameFromCard("Piyush", ""); p.next(); p.next()
+        assertEquals(OnboardingStep.Model, p.state.value.step)
+
+        // Mode's picks: phone control on Medium, the brain on High, both marked recommended.
+        var st = p.state.awaitState { it.phoneEffort != null }
+        assertEquals(OnboardingPresenter.PHONE_EFFORT, st.phoneEffort)
+        assertEquals(OnboardingPresenter.BRAIN_EFFORT, st.brainEffort)
+        assertTrue(st.phoneRecommended && st.brainRecommended && st.onPlan)
+        assertEquals(listOf("low", "medium", "high"), st.efforts)
+
+        // Thinking harder on every step is allowed, just no longer the recommendation.
+        p.chooseEffort(brain = false, effort = "high")
+        st = p.state.value
+        assertEquals("high", st.phoneEffort)
+        assertFalse(st.phoneRecommended)
+
+        // Another model keeps the effort picked.
+        val other = st.stuckChoices.first { !it.isMain }.id
+        p.chooseModel(other)
+        assertEquals("high", p.state.value.phoneEffort)
+
+        p.next()
+        val saved = settings.settings.value
+        assertEquals(com.piyush.mode.feature.settings.domain.ProviderModels.withEffort(other, "high"), saved.model)
+        assertEquals("high", com.piyush.mode.feature.settings.domain.ProviderModels.effort(saved.strongModel!!))
+    }
+
+    @Test
     fun connectOpenRouterSavesTheKeyWithoutCopying() = runTest {
         val f = Fixture(this)
         f.settings.apiKey = ""

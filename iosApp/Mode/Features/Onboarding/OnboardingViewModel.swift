@@ -25,6 +25,30 @@ final class OnboardingViewModel {
         static func == (a: Choice, b: Choice) -> Bool { a.id == b.id && a.selected == b.selected && a.detail == b.detail && a.name == b.name }
     }
 
+    /// A role's pick on "Pick how Mode thinks": the model, how hard it thinks, and why.
+    struct RoleCard: Equatable {
+        let name: String
+        let leading: ModeRowLeading?
+        /// "Medium"; nil for providers without efforts.
+        let effort: String?
+        let recommended: Bool
+        let why: String
+
+        static func == (a: RoleCard, b: RoleCard) -> Bool {
+            a.name == b.name && a.effort == b.effort && a.recommended == b.recommended && a.why == b.why
+        }
+    }
+
+    /// Which role's picker is open.
+    enum PickerRole: String, Identifiable {
+        case phone, brain
+        var id: String { rawValue }
+        /// Mode's recommended effort for this role.
+        var recommendedEffort: String {
+            self == .brain ? OnboardingPresenter.companion.BRAIN_EFFORT : OnboardingPresenter.companion.PHONE_EFFORT
+        }
+    }
+
     struct Tag: Equatable {
         let text: String
         let background: Color
@@ -79,6 +103,15 @@ final class OnboardingViewModel {
         var keyHint: String?
         // Model
         var models: [Choice] = []
+        var phoneChoices: [Choice] = []
+        var phoneCard: RoleCard?
+        /// Nil: the brain is off.
+        var brainCard: RoleCard?
+        /// The efforts offered ("low", "medium", "high"); empty for OpenRouter.
+        var efforts: [String] = []
+        var phoneEffort: String?
+        var brainEffort: String?
+        var onPlan = false
         var stuck: Choice?
         var stuckChoices: [Choice] = []
         var results: [Choice] = []
@@ -106,7 +139,8 @@ final class OnboardingViewModel {
         static func == (a: State, b: State) -> Bool {
             a.step == b.step && a.stepNumber == b.stepNumber && a.paired == b.paired && a.initials == b.initials && a.cardName == b.cardName
                 && a.connected == b.connected && a.signingIn == b.signingIn && a.signInError == b.signInError && a.hasSavedKey == b.hasSavedKey
-                && a.keyHint == b.keyHint && a.models == b.models && a.stuck == b.stuck && a.stuckChoices == b.stuckChoices && a.results == b.results && a.permissions == b.permissions
+                && a.keyHint == b.keyHint && a.models == b.models && a.phoneChoices == b.phoneChoices && a.phoneCard == b.phoneCard && a.brainCard == b.brainCard
+                && a.efforts == b.efforts && a.phoneEffort == b.phoneEffort && a.brainEffort == b.brainEffort && a.onPlan == b.onPlan && a.stuck == b.stuck && a.stuckChoices == b.stuckChoices && a.results == b.results && a.permissions == b.permissions
                 && a.testPhases == b.testPhases && a.testRunning == b.testRunning && a.testPassed == b.testPassed && a.did == b.did
                 && (a.shot == nil) == (b.shot == nil) && a.summary == b.summary && a.checks == b.checks && a.checking == b.checking
                 && a.canContinue == b.canContinue && a.voices == b.voices && a.voice == b.voice && a.voicePlaying == b.voicePlaying
@@ -116,6 +150,7 @@ final class OnboardingViewModel {
 
     enum Event: Equatable {
         case next, back, chooseCard, connect, paste, chooseModel(String), openStuck, chooseStuck(String?), openSearch, allow(PermissionKind)
+        case openPicker(PickerRole), chooseEffort(PickerRole, String)
         case runTest, worked(Bool), checkAgain, sendReport, finish, openCode
         case chooseVoice(String), playVoice(String), allowMic, skipVoice
     }
@@ -127,6 +162,8 @@ final class OnboardingViewModel {
     var showingContactPicker = false
     var showingSearch = false
     var showingStuck = false
+    /// The role whose model and effort are being picked.
+    var picking: PickerRole?
     /// The OpenRouter page to sign in on; the screen opens it in a web sign-in sheet.
     var signInURL: URL?
     /// A link the screen should open, or the report to share.
@@ -188,6 +225,8 @@ final class OnboardingViewModel {
             presenter.chooseStuck(id: id)
             showingStuck = false
         case .openSearch: showingSearch = true
+        case let .openPicker(role): picking = role
+        case let .chooseEffort(role, effort): presenter.chooseEffort(brain: role == .brain, effort: effort)
         case let .allow(kind): presenter.allow(kind: kind)
         case .runTest: presenter.runTest()
         case let .worked(yes): presenter.confirmTest(worked: yes)
@@ -245,6 +284,20 @@ final class OnboardingViewModel {
         st.hasSavedKey = s.hasSavedKey && !s.connected
         st.keyHint = s.key.isEmpty || s.keyLooksRight ? nil : String(localized: L10n.Setup.keyLooksWrong)
         st.models = s.models.map { choice($0, selected: $0.isMain) }
+        st.phoneChoices = s.stuckChoices.map { choice($0, selected: $0.isMain) }
+        st.efforts = s.efforts
+        st.phoneEffort = s.phoneEffort
+        st.brainEffort = s.brainEffort
+        st.onPlan = s.onPlan
+        let phone = (s.models + s.stuckChoices).first { $0.isMain }
+        st.phoneCard = phone.map { m in
+            RoleCard(name: m.name, leading: maker(m.id), effort: s.phoneEffort.map(PlanModelsViewModel.effortName), recommended: s.phoneRecommended,
+                     why: s.phoneRecommended ? String(localized: L10n.Setup.phoneWhy) : m.note)
+        }
+        st.brainCard = s.stuckModel.flatMap { m in
+            m.isStuck ? RoleCard(name: m.name, leading: maker(m.id), effort: s.brainEffort.map(PlanModelsViewModel.effortName), recommended: s.brainRecommended,
+                                 why: s.brainRecommended ? String(localized: L10n.Setup.brainWhy) : m.note) : nil
+        }
         st.stuck = s.stuckModel.map { m in
             Choice(id: m.id, name: m.name, tag: nil,
                    detail: m.isStuck ? [tagText(m.tag), String(localized: L10n.Setup.stuckDetail)].compactMap { $0 }.joined(separator: " · ") : String(localized: L10n.Setup.stuckOff),

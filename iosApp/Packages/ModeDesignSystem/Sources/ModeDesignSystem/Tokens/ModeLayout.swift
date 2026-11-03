@@ -104,7 +104,7 @@ public enum ModeSize {
     public static let waveHeight: CGFloat = 18
     public static let orb: CGFloat = 104
     public static let orbRing: CGFloat = 26
-    public static let setupOrb: CGFloat = 88
+    public static let setupOrb: CGFloat = 72
     public static let dragHandle: CGFloat = 16
     /// Talking mode: the orb, the voice's bars, the big mic and the round buttons beside it.
     public static let talkOrb: CGFloat = 180

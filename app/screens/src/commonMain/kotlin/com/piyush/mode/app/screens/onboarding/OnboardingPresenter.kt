@@ -66,6 +66,16 @@ public data class OnboardingUiState(
     val connected: Boolean = false,
     val signInError: String? = null,
     val models: List<ModelChoice> = emptyList(),
+    /** "Pick how Mode thinks": how hard phone control and the brain think (null: the provider has no effort). */
+    val phoneEffort: String? = null,
+    val brainEffort: String? = null,
+    /** The efforts offered (Low, Medium, High); empty for providers without them (OpenRouter). */
+    val efforts: List<String> = emptyList(),
+    /** Each role is on Mode's recommended model and effort. */
+    val phoneRecommended: Boolean = false,
+    val brainRecommended: Boolean = false,
+    /** The models run on the person's plan (ChatGPT, Claude): no cost per task. */
+    val onPlan: Boolean = false,
     /** The model used when Mode gets stuck (the strongest pick by default), on or off. */
     val stuckModel: ModelChoice? = null,
     /** What can be picked for when Mode gets stuck. */
@@ -209,14 +219,28 @@ public class OnboardingPresenter(
     // Model
 
     public fun chooseModel(id: String) {
-        selected = id
+        selected = keepEffort(id, selected, PHONE_EFFORT)
         refreshModels()
     }
 
-    /** Picks the model used when Mode gets stuck; null turns stepping up off. */
+    /** Picks the brain's model, keeping its effort; null turns the brain off. */
     public fun chooseStuck(id: String?) {
-        stuck = id
+        stuck = id?.let { keepEffort(it, stuck, BRAIN_EFFORT) }
         refreshModels()
+    }
+
+    /** How hard phone control ([brain] false) or the brain thinks: "low", "medium" or "high". */
+    public fun chooseEffort(brain: Boolean, effort: String) {
+        if (!ProviderModels.supportsEffort(settings.settings.value.provider)) return
+        if (brain) stuck = stuck?.let { ProviderModels.withEffort(it, effort) }
+        else selected = selected?.let { ProviderModels.withEffort(it, effort) }
+        refreshModels()
+    }
+
+    /** [id] with the effort [current] had, or [usual] when it had none (plan providers only). */
+    private fun keepEffort(id: String, current: String?, usual: String): String {
+        if (!ProviderModels.supportsEffort(settings.settings.value.provider)) return id
+        return ProviderModels.withEffort(id, current?.let(ProviderModels::effort) ?: ProviderModels.effort(id) ?: usual)
     }
 
     /** Turns the when-stuck model on or off. */
@@ -479,14 +503,29 @@ public class OnboardingPresenter(
         // A choice made for another provider does not carry over: that provider's own models come back.
         if (selected?.let { ProviderModels.accepts(provider, it) } != true) selected = s.model
         if (stuck != null && !ProviderModels.accepts(provider, stuck!!)) stuck = s.strongModel
+        // Plan providers think at a set effort: Mode's recommendation until the person picks another.
+        val withEfforts = ProviderModels.supportsEffort(provider)
+        if (withEfforts) {
+            selected = selected?.let { if (ProviderModels.effort(it) == null) ProviderModels.withEffort(it, PHONE_EFFORT) else it }
+            stuck = stuck?.let { if (ProviderModels.effort(it) == null) ProviderModels.withEffort(it, BRAIN_EFFORT) else it }
+        }
         val recommended = pickList()
         val all = if (provider == com.piyush.mode.llm.ModelProvider.OpenRouter) catalog.state.value.all else recommended
-        fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, o.id == selected, o.id == stuck)
+        fun same(a: String?, b: String?) = a != null && b != null && ProviderModels.base(a) == ProviderModels.base(b)
+        fun choice(o: ModelOption) = ModelChoice(o.id, o.name, o.costPerTaskUsd, o.tag, o.note, same(o.id, selected), same(o.id, stuck))
         val strongest = strongest()
+        val phoneEffort = selected?.takeIf { withEfforts }?.let(ProviderModels::effortUsed)
+        val brainEffort = stuck?.takeIf { withEfforts }?.let(ProviderModels::effortUsed)
         set { st ->
             st.copy(
+                phoneEffort = phoneEffort,
+                brainEffort = brainEffort,
+                efforts = if (withEfforts) ProviderModels.efforts(provider, recommended.firstOrNull { same(it.id, selected) }) else emptyList(),
+                phoneRecommended = same(selected, ProviderModels.main(provider)) && (!withEfforts || phoneEffort == PHONE_EFFORT),
+                brainRecommended = same(stuck, ProviderModels.strong(provider)) && (!withEfforts || brainEffort == BRAIN_EFFORT),
+                onPlan = provider != com.piyush.mode.llm.ModelProvider.OpenRouter,
                 models = recommended.filter { it.tag != ModelTag.Strongest }.ifEmpty { recommended }.map(::choice),
-                stuckModel = (stuck?.let { id -> (recommended + all).firstOrNull { it.id == id } } ?: strongest)?.let(::choice),
+                stuckModel = (stuck?.let { id -> (recommended + all).firstOrNull { same(it.id, id) } } ?: strongest)?.let(::choice),
                 stuckChoices = recommended.map(::choice),
                 results = if (st.query.isBlank()) emptyList()
                     else (if (all === recommended) ModelSearch.search(all, st.query) else catalog.search(st.query)).take(MAX_RESULTS).map(::choice),
@@ -529,6 +568,9 @@ public class OnboardingPresenter(
     private fun looksLikeKey(key: String) = key.trim().startsWith(KEY_PREFIX) && key.trim().length > MIN_KEY
 
     public companion object {
+        /** Mode's recommended efforts: phone control quick and careful, the brain thorough. */
+        public const val PHONE_EFFORT: String = "medium"
+        public const val BRAIN_EFFORT: String = "high"
         public const val TEST_TASK: String = "Open Settings, tap Wi-Fi, then come back to Mode."
         public const val TEST_TAG: String = "setup-test"
         /** Where OpenRouter sends the user back after signing in. */

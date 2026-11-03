@@ -162,28 +162,59 @@ private struct KeyStep: View {
     }
 }
 
+/// "Pick how Mode thinks" (boards SetupModel, SetupModelClaude): phone control and the brain, each with
+/// its model, how hard it thinks, and Mode's recommendation.
 private struct ModelStep: View {
     let state: OnboardingViewModel.State
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
         StepHeader(title: L10n.Setup.modelTitle, message: L10n.Setup.modelMessage)
+        RoleCardView(label: L10n.Setup.phoneControl, detail: L10n.Setup.phoneDetail, card: state.phoneCard) { onEvent(.openPicker(.phone)) }
+        RoleCardView(label: L10n.Setup.whenStuck, detail: L10n.Setup.stuckDetail, card: state.brainCard) { onEvent(.openPicker(.brain)) }
+        if state.onPlan { ModeInfoCard(icon: .info, L10n.Setup.whyThese) }
+        Text(state.onPlan ? L10n.Setup.onPlanNote : L10n.Setup.pricesNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+    }
+}
+
+/// One role on "Pick how Mode thinks": what it does, then its pick; tapping opens the picker.
+private struct RoleCardView: View {
+    let label: LocalizedStringResource
+    let detail: LocalizedStringResource
+    let card: OnboardingViewModel.RoleCard?
+    let action: () -> Void
+
+    var body: some View {
         ModeCard {
-            ForEach(state.models) { model in ChoiceRow(choice: model) { onEvent(.chooseModel(model.id)) } }
-        }
-        ModeSectionHeader(L10n.Setup.whenStuck)
-        ModeCard {
-            if let stuck = state.stuck {
-                ModeRow(stuck.name, subtitle: stuck.detail, leading: stuck.leading, emphasis: .prominent, onTap: { onEvent(.openStuck) })
+            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                Text(label).textCase(.uppercase).modeText(.captionEmphasis, color: ModeColor.textSecondary)
+                Text(detail).modeText(.caption, color: ModeColor.textSecondary)
             }
-            ModeRow(String(localized: L10n.Setup.allModels), action: { onEvent(.openSearch) }) {
-                HStack(spacing: ModeSpacing.s) {
-                    Text(L10n.Setup.search).modeText(.body, color: ModeColor.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, ModeSpacing.s)
+            Button(action: action) {
+                HStack(spacing: ModeSpacing.m) {
+                    if let leading = card?.leading { ModeLeadingView(leading) }
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        Text(card?.name ?? String(localized: L10n.Setup.stuckOff)).modeText(.headline)
+                        if let card {
+                            HStack(spacing: ModeSpacing.s) {
+                                if let effort = card.effort { ModeTag(effort, background: ModeColor.fill, foreground: ModeColor.textSecondary) }
+                                if card.recommended {
+                                    ModeTag(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                                }
+                            }
+                            if !card.why.isEmpty { Text(card.why).modeText(.subheadline, color: ModeColor.textSecondary) }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     ModeChevron()
                 }
+                .padding(.vertical, ModeSpacing.m)
+                .contentShape(.rect)
             }
+            .buttonStyle(.plain)
         }
-        Text(L10n.Setup.pricesNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
     }
 }
 
@@ -237,8 +268,9 @@ private struct VoiceStep: View {
 
     var body: some View {
         VStack(spacing: ModeSpacing.l) {
-            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb).padding(.vertical, ModeSpacing.xxl)
-            Text(L10n.Voice.setupTitle).modeText(.largeTitle).multilineTextAlignment(.center)
+            // Sized so the Listening card ends above the pinned Continue on a 6.1" iPhone (board SetupVoice).
+            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb).padding(.vertical, ModeSpacing.m)
+            Text(L10n.Voice.setupTitle).modeText(.title).multilineTextAlignment(.center)
             Text(L10n.Voice.setupMessage).modeText(.callout, color: ModeColor.textSecondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
