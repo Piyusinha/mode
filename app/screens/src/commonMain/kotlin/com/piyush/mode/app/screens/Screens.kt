@@ -76,8 +76,9 @@ public class Screens(
             com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple,
         )
 
-    public fun listen(): com.piyush.mode.app.screens.settings.ListenPresenter =
-        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock)
+    /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
+    public fun listen(conversationId: String?): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, conversationId = conversationId)
 
     /** Talking mode for a question in a spoken task: Mode came forward to ask it out loud. */
     public fun talkQuestion(): com.piyush.mode.app.screens.settings.ListenPresenter =

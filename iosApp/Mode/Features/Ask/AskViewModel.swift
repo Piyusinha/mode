@@ -22,8 +22,6 @@ final class AskViewModel {
     private(set) var state = State()
     var draft = ""
     var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    /// Speaking a task isn't built yet; the sheet says so.
-    var showingVoiceNote = false
     private let presenter: HomePresenter
     private let onSent: (String) -> Void
     private var updates: Updates?
@@ -45,7 +43,7 @@ final class AskViewModel {
             onSent(conversation)
         case let .suggestion(text): draft = text
         case .togglePrivate: state.isPrivate.toggle()
-        case .speak: showingVoiceNote = true
+        case .speak: AppLinks.shared.pending = .talk(conversationId: nil)
         }
     }
 

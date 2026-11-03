@@ -32,6 +32,8 @@ enum DeepLink: Equatable {
     case ask
     case open
     case listen
+    /// A mic in the app: talking mode, adding to [conversationId]'s chat (nil: a new chat).
+    case talk(conversationId: String?)
 
     init?(_ url: URL) {
         guard url.scheme == ModeLinks.scheme else { return nil }

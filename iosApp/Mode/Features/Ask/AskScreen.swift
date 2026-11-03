@@ -6,14 +6,12 @@ struct AskScreen: View {
     let state: AskViewModel.State
     @Binding var draft: String
     let canSend: Bool
-    let showingVoiceNote: Bool
     let onEvent: (AskViewModel.Event) -> Void
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                    if showingVoiceNote { ModeInfoCard(icon: .info, L10n.Ask.voiceSoon) }
                     ForEach(state.suggestions) { s in
                         ModeChip(s.title, icon: s.icon, actionTitle: L10n.Common.continue) { onEvent(.suggestion(s.title)) }
                     }
@@ -50,6 +48,6 @@ struct AskRoute: View {
     }
 
     var body: some View {
-        AskScreen(state: model.state, draft: $model.draft, canSend: model.canSend, showingVoiceNote: model.showingVoiceNote, onEvent: model.send)
+        AskScreen(state: model.state, draft: $model.draft, canSend: model.canSend, onEvent: model.send)
     }
 }

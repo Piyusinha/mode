@@ -115,7 +115,6 @@ enum L10n {
         static let add = LocalizedStringResource("ask.add", defaultValue: "More")
         static let privateOn = LocalizedStringResource("ask.privateOn", defaultValue: "Private: nothing is remembered")
         static let privateOff = LocalizedStringResource("ask.privateOff", defaultValue: "Make this private")
-        static let voiceSoon = LocalizedStringResource("ask.voiceSoon", defaultValue: "Speaking a task is coming soon. Type it for now.")
     }
 
     enum Conversation {

@@ -9,6 +9,7 @@ import com.piyush.mode.feature.settings.voice.Voices
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -84,5 +85,19 @@ class VoiceScreensTest {
         p.remove("deepgram")
         val after = p.state.awaitState { s -> s.rows.firstOrNull { it.id == "apple" }?.first == true }
         assertEquals(null, after.rows.first { it.id == "deepgram" }.masked)
+    }
+
+    @Test
+    fun aTaskSpokenFromAChatsMicGoesIntoThatChat() = runTest {
+        val f = Fixture(backgroundScope)
+        val chat = f.conversations.create("Dark Mode")
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            conversationId = chat.id)
+
+        talk.submitTyped("Turn it back on")
+        talk.state.awaitState { it.sent }
+
+        val task = f.tasks.recent(10).first().first { t -> t.text == "Turn it back on" }
+        assertEquals(chat.id, task.conversationId)
     }
 }

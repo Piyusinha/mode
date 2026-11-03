@@ -40,9 +40,9 @@ final class TalkModel {
     private let forQuestion: Bool
     private var updates: Updates?
 
-    init(screens: Screens, forQuestion: Bool) {
+    init(screens: Screens, forQuestion: Bool, conversationId: String? = nil) {
         self.forQuestion = forQuestion
-        presenter = forQuestion ? screens.talkQuestion() : screens.listen()
+        presenter = forQuestion ? screens.talkQuestion() : screens.listen(conversationId: conversationId)
         updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
     }
 
@@ -386,8 +386,8 @@ struct TalkRoute: View {
     private let onVoiceSettings: (Bool) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    init(app: AppModel, forQuestion: Bool, onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in }) {
-        _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion))
+    init(app: AppModel, forQuestion: Bool, conversationId: String? = nil, onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in }) {
+        _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId))
         self.onClose = onClose
         self.onVoiceSettings = onVoiceSettings
     }

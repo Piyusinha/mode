@@ -83,6 +83,7 @@ final class ConversationViewModel {
     private(set) var thumbnails: [String: [Image]] = [:]
 
     private let screens: Screens
+    private let conversationId: String
     private let presenter: ConversationPresenter
     private let navigate: (Route) -> Void
     private let close: () -> Void
@@ -90,6 +91,7 @@ final class ConversationViewModel {
 
     init(screens: Screens, conversationId: String, navigate: @escaping (Route) -> Void, close: @escaping () -> Void) {
         self.screens = screens
+        self.conversationId = conversationId
         presenter = screens.conversation(conversationId: conversationId)
         self.navigate = navigate
         self.close = close
@@ -99,7 +101,7 @@ final class ConversationViewModel {
     func send(_ event: Event) {
         switch event {
         case .send: if presenter.send(text: draft) { draft = "" }
-        case .speak: break
+        case .speak: AppLinks.shared.pending = .talk(conversationId: conversationId)
         case .togglePrivate: presenter.setPrivate(on: !state.isPrivate)
         case let .undo(id): presenter.undoRemembered(itemId: id)
         case let .openScreens(taskId): navigate(.runScreens(taskId: taskId))

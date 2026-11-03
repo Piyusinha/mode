@@ -76,6 +76,8 @@ public class ListenPresenter(
     private val clock: ScreenClock = ScreenClock(),
     /** Opened for a question in a spoken task (Mode came forward): no greeting, no listening of its own. */
     private val forQuestion: Boolean = false,
+    /** The chat whose mic opened this: the spoken task goes there (null: a new chat). */
+    private val conversationId: String? = null,
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     private val own = MutableStateFlow(ListenUiState(sent = forQuestion, phase = if (forQuestion) TalkPhase.Asking else TalkPhase.Greeting))
     private var job: Job? = null
@@ -195,7 +197,7 @@ public class ListenPresenter(
         val reply = replyLine(task)
         own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = reply, partial = "")
         voices.speak(reply)
-        taskId = queue.submit(task, source, null, false)?.id
+        taskId = queue.submit(task, source, conversationId, false)?.id
         own.value = own.value.copy(sent = true)
     }
 
