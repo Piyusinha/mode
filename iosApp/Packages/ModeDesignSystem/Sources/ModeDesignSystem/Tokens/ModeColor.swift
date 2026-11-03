@@ -26,6 +26,19 @@ public enum ModeColor {
     /// The two soft glows at the top of the page.
     public static let glowViolet = named("GlowViolet")
     public static let glowPink = named("GlowPink")
+    /// Talking mode's orb: a light violet core, Mode's accent, a pink light, the same in both themes.
+    public static let orbLight = Color(red: 0.557, green: 0.549, blue: 1.0)
+    public static let orbDeep = Color(red: 0.247, green: 0.239, blue: 0.722)
+    public static let orbPink = Color(red: 1.0, green: 0.494, blue: 0.714)
+    /// Voice avatars: strong gradient pairs that keep a white initial readable in both themes.
+    public static let avatarPairs: [(Color, Color)] = [
+        (Color(red: 1.0, green: 0.56, blue: 0.72), Color(red: 0.70, green: 0.42, blue: 1.0)),
+        (Color(red: 1.0, green: 0.72, blue: 0.42), Color(red: 1.0, green: 0.42, blue: 0.42)),
+        (Color(red: 0.42, green: 0.84, blue: 1.0), Color(red: 0.42, green: 0.48, blue: 1.0)),
+        (Color(red: 0.48, green: 0.88, blue: 0.63), Color(red: 0.17, green: 0.69, blue: 0.63)),
+        (Color(red: 0.63, green: 0.66, blue: 1.0), Color(red: 0.37, green: 0.36, blue: 0.90)),
+        (Color(red: 1.0, green: 0.83, blue: 0.42), Color(red: 1.0, green: 0.62, blue: 0.26)),
+    ]
     /// Tags and tiles from the boards.
     public static let tagGreen = named("TagGreen")
     public static let tagGreenText = named("TagGreenText")

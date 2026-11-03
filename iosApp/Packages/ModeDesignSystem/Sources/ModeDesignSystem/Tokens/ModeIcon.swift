@@ -68,6 +68,11 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case external = "arrow.up.right"
     case router = "arrow.triangle.branch"
     case copy = "doc.on.doc"
+    /// Voice.
+    case speaker = "speaker.wave.2.fill"
+    case keyboard = "keyboard"
+    case dragHandle = "line.3.horizontal"
+    case personalVoice = "person.wave.2"
 
     public var image: Image { Image(systemName: rawValue) }
 }

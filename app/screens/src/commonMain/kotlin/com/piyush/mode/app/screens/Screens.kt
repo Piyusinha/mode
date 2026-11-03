@@ -61,9 +61,28 @@ public class Screens(
     private val openRouterApi: com.piyush.mode.llm.OpenRouterAccountApi? = null,
     /** The Claude account's model list (null: Mode's two defaults). */
     private val claudeModels: com.piyush.mode.feature.settings.data.ClaudeModels? = null,
+    private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
+    /** [hearing] is the transcription list; otherwise the speech list. */
+    public fun voice(hearing: Boolean): com.piyush.mode.app.screens.settings.VoicePresenter =
+        com.piyush.mode.app.screens.settings.VoicePresenter(scope, settings, voices!!, hearing)
+
+    /** Choose a voice, starting on [provider] (Apple, ElevenLabs, Fish Audio). */
+    public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
+        com.piyush.mode.app.screens.settings.VoicePickerPresenter(
+            scope, settings, voices!!,
+            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple,
+        )
+
+    public fun listen(): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock)
+
+    /** Talking mode for a question in a spoken task: Mode came forward to ask it out loud. */
+    public fun talkQuestion(): com.piyush.mode.app.screens.settings.ListenPresenter =
+        com.piyush.mode.app.screens.settings.ListenPresenter(scope, voices!!, queue, settings, runner, clock, forQuestion = true)
+
     public fun access(): com.piyush.mode.app.screens.settings.AccessPresenter =
         com.piyush.mode.app.screens.settings.AccessPresenter(scope, settings)
 
@@ -81,18 +100,31 @@ public class Screens(
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)
 
     public fun conversation(conversationId: String): ConversationPresenter =
-        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock)
+        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock, teacher, memory)
+
+    /** Turns what the user teaches into tips, written by the brain's model. */
+    private val teacher: com.piyush.mode.feature.memory.data.Teacher? by lazy {
+        providers?.let { llm ->
+            com.piyush.mode.feature.memory.data.Teacher(llm, memory) {
+                val s = settings.settings.value
+                (s.strongModel ?: s.model) to s.provider
+            }
+        }
+    }
 
     public fun liveRun(): LiveRunPresenter = LiveRunPresenter(scope, runner, tasks)
 
     /** The Live Activity: one for the app's lifetime. */
     public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks)
 
-    public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks)
+    public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks, runner, queue, teacher)
 
     public fun memory(): MemoryPresenter = MemoryPresenter(scope, memory, settings, clock)
 
-    public fun settings(): SettingsPresenter = SettingsPresenter(scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
+    public fun settings(): SettingsPresenter = SettingsPresenter(
+        scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() },
+        chatGptModels = { chatGpt.knownModels.value }, voices = voices,
+    )
 
     /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
     public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =
@@ -103,7 +135,10 @@ public class Screens(
             settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         }
 
-    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle, claudeModels = { claudeModels?.known?.value.orEmpty() }) { chatGpt.knownModels.value }
+    public fun onboarding(): OnboardingPresenter = OnboardingPresenter(
+        scope, settings, catalog, session, runner, permissions, phoneChecks, auth, lifecycle,
+        claudeModels = { claudeModels?.known?.value.orEmpty() }, chatGptModels = { chatGpt.knownModels.value }, voices = voices,
+    )
 
     /** Whether first-run setup still has to be shown. */
     public val needsOnboarding: Boolean get() = !settings.settings.value.onboardingDone

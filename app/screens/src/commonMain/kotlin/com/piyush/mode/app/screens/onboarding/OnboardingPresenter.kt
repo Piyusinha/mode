@@ -27,9 +27,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** The setup boards, in order. Name to Test are "Step 1 of 5" to "Step 5 of 5". */
+/** The setup boards, in order. Name to Test are "Step 1 of 6" to "Step 6 of 6". */
 public enum class OnboardingStep(public val number: Int?) {
-    Welcome(null), Name(1), Key(2), Model(3), Permissions(4), Test(5), Result(null), Diagnose(null), Finished(null)
+    Welcome(null), Name(1), Key(2), Model(3), Permissions(4), Voice(5), Test(6), Result(null), Diagnose(null), Finished(null)
 }
 
 public enum class PermissionKind { Vpn, Notifications, Siri, Microphone }
@@ -84,9 +84,17 @@ public data class OnboardingUiState(
     val checks: List<PhoneCheckResult> = emptyList(),
     val checking: Boolean = false,
     val canContinue: Boolean = true,
+    /** Talk to Mode: a few of Apple's voices on this iPhone to pick from, the one picked, the one playing. */
+    val voiceOptions: List<com.piyush.mode.feature.settings.voice.VoiceOption> = emptyList(),
+    val voice: String? = null,
+    val voicePlaying: String? = null,
+    /** Apple listening: "ready", "permission", "denied", "asset" or "unsupported". */
+    val hearing: String = "unsupported",
 ) {
     public companion object {
-        public const val STEPS: Int = 5
+        public const val STEPS: Int = 6
+        /** Voices offered in setup; the rest are in Settings → Voice. */
+        public const val SETUP_VOICES: Int = 3
     }
 }
 
@@ -110,7 +118,10 @@ public class OnboardingPresenter(
     private val claudeModels: () -> List<com.piyush.mode.llm.PlanModel> = { emptyList() },
     /** The models on the user's ChatGPT plan, as last asked. */
     private val chatGptModels: () -> List<String> = { emptyList() },
+    /** Speaking and listening (null: the voice step only shows what Apple offers). */
+    private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
 ) : Presenter<OnboardingUiState>(parent, OnboardingUiState()) {
+    private var sample: kotlinx.coroutines.Job? = null
     private var verifier: String? = null
     private var signInKeyRevision = 0L
     private var signInAttempt = 0
@@ -350,7 +361,8 @@ public class OnboardingPresenter(
             OnboardingStep.Name -> go(OnboardingStep.Key)
             OnboardingStep.Key -> go(OnboardingStep.Model)
             OnboardingStep.Model -> go(OnboardingStep.Permissions)
-            OnboardingStep.Permissions -> go(OnboardingStep.Test)
+            OnboardingStep.Permissions -> { go(OnboardingStep.Voice); loadVoices() }
+            OnboardingStep.Voice -> { keepVoice(); go(OnboardingStep.Test) }
             OnboardingStep.Test -> runTest()
             OnboardingStep.Result, OnboardingStep.Diagnose -> finish()
             OnboardingStep.Finished -> Unit
@@ -363,11 +375,73 @@ public class OnboardingPresenter(
             OnboardingStep.Key -> OnboardingStep.Name
             OnboardingStep.Model -> OnboardingStep.Key
             OnboardingStep.Permissions -> OnboardingStep.Model
-            OnboardingStep.Test -> OnboardingStep.Permissions
+            OnboardingStep.Voice -> OnboardingStep.Permissions
+            OnboardingStep.Test -> OnboardingStep.Voice
             OnboardingStep.Diagnose -> OnboardingStep.Result
             else -> return
         }
         go(previous)
+    }
+
+    /** Not now: no voice is kept and the microphone is not asked for; Settings → Voice has it later. */
+    public fun skipVoice() {
+        stopVoice()
+        go(OnboardingStep.Test)
+    }
+
+    public fun chooseVoice(id: String) { set { it.copy(voice = id) } }
+
+    /** Plays [id] saying the sample; again stops it. */
+    public fun playVoice(id: String) {
+        val v = voices ?: return
+        if (state.value.voicePlaying == id) { stopVoice(); return }
+        stopVoice()
+        val option = state.value.voiceOptions.firstOrNull { it.id == id } ?: return
+        set { it.copy(voicePlaying = id) }
+        sample = scope.launch {
+            try {
+                v.preview(com.piyush.mode.feature.settings.domain.VoiceKind.Apple, option)
+            } finally {
+                set { st -> if (st.voicePlaying == id) st.copy(voicePlaying = null) else st }
+            }
+        }
+    }
+
+    /** Allow mic: the microphone prompt and Apple's speech model; the row follows until it settles. */
+    public fun allowMic() {
+        com.piyush.mode.feature.settings.voice.DeviceVoice.prepare()
+        scope.launch {
+            repeat(60) {
+                kotlinx.coroutines.delay(1_000)
+                val now = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState()
+                set { it.copy(hearing = now) }
+                if (now in setOf("ready", "denied", "unsupported")) return@launch
+            }
+        }
+    }
+
+    private fun stopVoice() {
+        sample?.cancel()
+        voices?.stop()
+        set { it.copy(voicePlaying = null) }
+    }
+
+    private fun loadVoices() {
+        val v = voices ?: return
+        set { it.copy(hearing = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState()) }
+        scope.launch {
+            // Apple lists the best voices for this iPhone's language first.
+            val options = v.options(com.piyush.mode.feature.settings.domain.VoiceKind.Apple).options.take(OnboardingUiState.SETUP_VOICES)
+            val kept = settings.settings.value.voices[com.piyush.mode.feature.settings.domain.VoiceKind.Apple.id]?.id
+            set { it.copy(voiceOptions = options, voice = it.voice ?: kept?.takeIf { k -> options.any { o -> o.id == k } } ?: options.firstOrNull()?.id) }
+        }
+    }
+
+    private fun keepVoice() {
+        stopVoice()
+        val apple = com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+        val option = state.value.voiceOptions.firstOrNull { it.id == state.value.voice } ?: return
+        settings.update { s -> s.copy(voices = s.voices + (apple.id to com.piyush.mode.feature.settings.domain.VoiceChoice(option.id, option.name))) }
     }
 
     /** Ends setup; the app opens on Home from now on. */

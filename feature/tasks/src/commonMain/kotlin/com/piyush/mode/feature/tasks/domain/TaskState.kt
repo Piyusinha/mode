@@ -55,4 +55,21 @@ public data class TaskState(
     val startedAtMs: Long? = null,
     /** Facts about the user this task taught Mode, for "Remembered · Undo". Arrives a moment after the task ends. */
     val remembered: List<MemoryItem> = emptyList(),
+    /** A spoken question in a task the user spoke: Mode came forward to ask it out loud and listen. */
+    val voice: VoiceTurn? = null,
+)
+
+/** Where a spoken question is: Mode saying it, listening for the answer, or saying it heard it before going back. */
+public enum class VoiceTurnPhase { Asking, Listening, Answered }
+
+public data class VoiceTurn(
+    val phase: VoiceTurnPhase,
+    val question: String,
+    val options: List<String> = emptyList(),
+    /** The task, for context ("Order my usual from Swiggy"). */
+    val task: String = "",
+    /** The answer as heard so far, then as given (said or tapped). */
+    val heard: String = "",
+    /** What Mode says back before it goes back to work. */
+    val reply: String = "",
 )

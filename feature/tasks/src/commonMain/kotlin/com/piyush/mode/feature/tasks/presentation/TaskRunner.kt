@@ -24,6 +24,8 @@ import com.piyush.mode.feature.connection.presentation.PhoneSession
 import com.piyush.mode.feature.runs.data.RunRecorder
 import com.piyush.mode.feature.runs.data.RunRepository
 import com.piyush.mode.feature.settings.data.SettingsRepository
+import com.piyush.mode.feature.settings.voice.Heard
+import com.piyush.mode.feature.settings.voice.Voices
 import com.piyush.mode.feature.conversations.data.ConversationRepository
 import com.piyush.mode.feature.conversations.domain.TurnRole
 import com.piyush.mode.feature.tasks.data.TaskMemory
@@ -33,6 +35,8 @@ import com.piyush.mode.feature.tasks.domain.Task
 import com.piyush.mode.feature.tasks.domain.TaskSource
 import com.piyush.mode.feature.tasks.domain.TaskState
 import com.piyush.mode.feature.tasks.domain.TaskStatus
+import com.piyush.mode.feature.tasks.domain.VoiceTurn
+import com.piyush.mode.feature.tasks.domain.VoiceTurnPhase
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
@@ -44,8 +48,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -74,7 +81,17 @@ public class TaskRunner(
     private val memory: TaskMemory? = null,
     /** Midnight today, for the daily spend cap. */
     private val startOfToday: () -> Long = ::startOfTodayMillis,
+    /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
+    private val voices: Voices? = null,
 ) {
+    /** Messages for the running task, taken by the agent at its next step. */
+    private val steers = MutableStateFlow<List<String>>(emptyList())
+
+    /** The spoken question being asked now (Later cancels it). */
+    private var voiceJob: kotlinx.coroutines.Job? = null
+
+    /** The running task was spoken to Mode: its questions and summary are spoken and heard. */
+    @kotlin.concurrent.Volatile private var spoken = false
     private val mutableState = MutableStateFlow(TaskState())
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
 
@@ -138,8 +155,9 @@ public class TaskRunner(
     }
 
     public fun answer(text: String?) {
-        state.value.question?.answer?.complete(text)
-        mutableState.update { it.copy(question = null) }
+        val question = state.value.question ?: return
+        if (!question.answer.complete(text)) return
+        mutableState.update { if (it.question?.id == question.id) it.copy(question = null) else it }
     }
 
     /**
@@ -194,6 +212,8 @@ public class TaskRunner(
 
     private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
         val task = saved.text
+        // Only a task the user spoke is answered by voice: others keep the quiet notification and Live Activity.
+        spoken = saved.source == TaskSource.Voice && settings.settings.value.talkBack
         val private = saved.private
         val conversation = saved.conversationId
         // A follow-up sees how the earlier tasks in its conversation went (not this task's own turn).
@@ -267,6 +287,10 @@ public class TaskRunner(
             reply = replyFor(finished.outcome)
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
+            // Spoken while the microphone is off. The stream stays up.
+            if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
+                runCatching { voices?.speak(PlainText.fromMarkdown(reply, oneLine = true)) }
+            }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
             // Come back so the user sees how it went.
@@ -374,6 +398,8 @@ public class TaskRunner(
         /** "Yes, and don't ask again" was tapped in this task: the rest of it asks no more. */
         var alwaysYes = false
 
+        override fun steering(): List<String> = steers.getAndUpdate { emptyList() }
+
         override suspend fun confirm(question: String): Boolean {
             if (alwaysYes) return true
             val answer = askUser(phone, question, yesNo = true, allowAlways = true)
@@ -418,17 +444,79 @@ public class TaskRunner(
         }
         notifier.ask(pending.id, text, kind, options)
         // A PIN or password screen must stay in front: Mode never comes forward for the user's turn.
-        askedInMode = !yourTurn && !notifier.canAskInPlace()
-        if (askedInMode) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+        val voice = if (yourTurn || voices == null || !spoken) null else scope.launch { hearQuestion(phone, pending) }.also { voiceJob = it }
+        askedInMode = !yourTurn && (!notifier.canAskInPlace() || voice != null)
+        if (askedInMode && voice == null) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
         try {
             return pending.answer.await().also { AppLog.log("agent", "user answered: ${it ?: "(stopped)"}") }
         } finally {
+            // Stopped (or the task ended) while asking: the voice turn ends too. Answered: it finishes on its own,
+            // saying it heard the answer, and holds the phone until then.
+            if (!pending.answer.isCompleted || pending.answer.getCompletedOrNull() == null) voice?.cancel()
             // Also when the agent moved on by itself (the PIN screen went away): the question is gone.
             notifier.withdraw(pending.id)
             mutableState.update { state -> if (state.question?.id == pending.id) state.copy(question = null) else state }
             state.value.taskId?.let { id -> tasks.setStatus(id, TaskStatus.Running) }
         }
     }
+
+    /**
+     * Speaks [pending], then listens, on the session the agent already holds.
+     * Agent ops wait. A notification answer for the same id wins once and this
+     * does not record. The stream is restored even if this is cancelled.
+     */
+    private suspend fun hearQuestion(phone: PhoneBackend, pending: PendingQuestion) {
+        val task = state.value.taskId?.let { tasks.get(it)?.text }.orEmpty()
+        fun turn(change: (VoiceTurn) -> VoiceTurn) = mutableState.update { s -> s.voice?.let { s.copy(voice = change(it)) } ?: s }
+        session.duringVoice { live ->
+            val hands = live ?: return@duringVoice
+            mutableState.update { it.copy(voice = VoiceTurn(VoiceTurnPhase.Asking, pending.text, pending.options, task)) }
+            runCatching { hands.send(Op.LaunchApp(appInfo.bundleId)) }
+            hands.pauseStream()
+            // A tap on an option, or an answer from the notification, closes the microphone at once.
+            val stopListening = pending.answer.invokeOnCompletion { voices?.stop() }
+            try {
+                voices?.speak(pending.text)
+                if (!pending.answer.isCompleted) {
+                    turn { it.copy(phase = VoiceTurnPhase.Listening) }
+                    val heard = voices?.hear { words -> turn { it.copy(heard = words) } }
+                    if (heard is Heard.Words) answer(pending.id, heard.text)
+                }
+                val given = pending.answer.getCompletedOrNull()
+                if (given != null) {
+                    turn { it.copy(phase = VoiceTurnPhase.Answered, heard = given, reply = GOT_IT) }
+                    voices?.speak(GOT_IT)
+                    delay(ANSWERED_PAUSE_MS)
+                }
+            } finally {
+                stopListening.dispose()
+                mutableState.update { it.copy(voice = null) }
+                withContext(NonCancellable) { runCatching { hands.resumeStream() } }
+            }
+        }
+    }
+
+    /**
+     * A message for the running task from its conversation ("It's not there, search for Dark Mode"): the agent takes
+     * it at its next step and does it that way. False when no task runs.
+     */
+    public fun steer(text: String): Boolean {
+        val said = text.trim()
+        if (said.isEmpty() || !state.value.running) return false
+        steers.update { it + said }
+        AppLog.log("agent", "steered while working")
+        return true
+    }
+
+    /** Later: the spoken question stops listening and waits on the notification and Live Activity instead. */
+    public fun voiceLater() {
+        voiceJob?.cancel()
+        voices?.stop()
+        mutableState.update { it.copy(voice = null) }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private fun <T> kotlinx.coroutines.CompletableDeferred<T>.getCompletedOrNull(): T? = if (isCompleted) runCatching { getCompleted() }.getOrNull() else null
 
     private fun statusOf(outcome: AgentOutcome): TaskStatus = when (outcome) {
         is AgentOutcome.Done -> if (outcome.success) TaskStatus.Done else TaskStatus.GaveUp
@@ -443,3 +531,9 @@ public class TaskRunner(
         is AgentOutcome.Failed -> outcome.why
     }
 }
+
+/** What Mode says when it heard a spoken answer, before it goes back to the app. */
+private const val GOT_IT = "Got it. Going back."
+
+/** How long "Got it" stays on screen after it is said, before Mode leaves. */
+private const val ANSWERED_PAUSE_MS = 900L

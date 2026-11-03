@@ -12,6 +12,10 @@ enum Route: Hashable {
     case modelPicker(stuck: Bool)
     case planModels(brain: Bool)
     case access
+    /// Settings → Voice: Mode's voice, Listening, and choosing a voice from a provider.
+    case voice
+    case listening
+    case voicePicker(provider: String)
     case providerDetail(id: String)
     case developer
     case memoryAboutYou
@@ -27,6 +31,7 @@ enum DeepLink: Equatable {
     case conversation(id: String)
     case ask
     case open
+    case listen
 
     init?(_ url: URL) {
         guard url.scheme == ModeLinks.scheme else { return nil }

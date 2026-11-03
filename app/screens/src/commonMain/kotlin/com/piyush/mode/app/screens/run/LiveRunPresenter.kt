@@ -89,9 +89,12 @@ public class LiveRunPresenter(
 /** Every screen the agent saw for one task, to look back through. */
 public class RunScreensPresenter(
     parent: CoroutineScope,
-    taskId: String,
+    private val taskId: String,
     private val runs: RunRepository,
-    tasks: TaskRepository,
+    private val tasks: TaskRepository,
+    private val runner: TaskRunner? = null,
+    private val inbox: com.piyush.mode.feature.tasks.domain.TaskInbox? = null,
+    private val teacher: com.piyush.mode.feature.memory.data.Teacher? = null,
 ) : Presenter<RunScreensUiState>(parent, RunScreensUiState()) {
     private val runId = tasks.get(taskId)?.runId
 
@@ -99,8 +102,44 @@ public class RunScreensPresenter(
         mutableState.value = RunScreensUiState(tasks.get(taskId)?.text.orEmpty(), runId?.let { runs.shots(it) }.orEmpty())
     }
 
+    /**
+     * The user marked [step] as wrong and said what Mode should have done. Every time: kept as a tip for next time.
+     * Just this time: the running task does it that way now, or the task runs again that way.
+     */
+    public fun fixStep(step: Int, label: String, said: String, everyTime: Boolean) {
+        val words = said.trim()
+        if (words.isEmpty()) return
+        val task = tasks.get(taskId)
+        mutableState.value = state.value.copy(fixing = true, fixed = null)
+        scope.launch {
+            val reply = if (everyTime) {
+                teacher?.teach(words, task?.text.orEmpty(), "step $step: $label")?.reply ?: NOT_SAVED
+            } else {
+                val run = runner?.state?.value
+                when {
+                    run?.running == true && run.taskId == taskId && runner.steer(words) -> NOW
+                    task != null && inbox?.submit("${task.text}. $words", com.piyush.mode.feature.tasks.domain.TaskSource.App, task.conversationId, false) != null -> AGAIN
+                    else -> NOT_SAVED
+                }
+            }
+            mutableState.value = state.value.copy(fixing = false, fixed = reply)
+        }
+    }
+
+    public fun fixedSeen() { mutableState.value = state.value.copy(fixed = null) }
+
     /** The JPEG of one screen. */
     public fun image(shot: RunShot): ByteArray? = runId?.let { runs.image(it, shot.image) }
 }
 
-public data class RunScreensUiState(val task: String = "", val shots: List<RunShot> = emptyList())
+public data class RunScreensUiState(
+    val task: String = "",
+    val shots: List<RunShot> = emptyList(),
+    /** A wrong step is being taught (the model writes the tip), then what Mode says back. */
+    val fixing: Boolean = false,
+    val fixed: String? = null,
+)
+
+private const val NOW = "Okay, I'll do it that way now."
+private const val AGAIN = "Okay, I'm doing it again that way."
+private const val NOT_SAVED = "I couldn't keep that one. Try saying it another way."

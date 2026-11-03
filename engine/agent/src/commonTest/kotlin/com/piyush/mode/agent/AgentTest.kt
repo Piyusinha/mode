@@ -87,6 +87,34 @@ class AgentTest {
     }
 
     @Test
+    fun whatTheUserSaysWhileModeWorksReachesTheNextStepAndStays() = runTest {
+        val phone = FakePhone(List(4) { listOf("Display & Brightness" to (200.0 to 90.0), "Brightness" to (60.0 to 160.0)) })
+        var said = listOf("It's not there any more. Search for Dark Mode.")
+        val gate = object : UserGate {
+            override suspend fun confirm(question: String) = true
+            override suspend fun ask(question: String): String? = "yes"
+            override fun steering(): List<String> = said.also { said = emptyList() }
+        }
+        val up = call("scroll", "direction" to "up", "reason" to "Finding Appearance")
+        val model = ScriptedModel(up, up, call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, gate, noSettle).run("turn off dark mode")
+        assertTrue("Search for Dark Mode" in model.lastUserText, model.lastUserText)
+        assertTrue(Agent.STEERED in model.lastUserText, "shown with the user's answers, every step")
+    }
+
+    @Test
+    fun scrollingUpAtTheTopSaysItIsNotOnThisPage() = runTest {
+        // Seen on the phone: Light/Dark had moved out of Display & Brightness; the agent scrolled up at the top again and again.
+        val page = listOf("Display & Brightness" to (200.0 to 90.0), "Brightness" to (60.0 to 160.0), "True Tone" to (60.0 to 240.0), "Night Shift" to (60.0 to 320.0))
+        val phone = FakePhone(listOf(page, page.map { (t, p) -> t to (p.first to p.second + 1) }, page))
+        val up = call("scroll", "direction" to "up", "reason" to "Finding Appearance")
+        val model = ScriptedModel(up, call("done", "evidence" to "x", "summary" to "x"))
+        Agent(phone, model, Gate(), noSettle).run("turn off dark mode")
+        assertTrue("top of the page: nothing is above" in model.lastUserText, model.lastUserText)
+        assertTrue("not on this page" in model.lastUserText)
+    }
+
+    @Test
     fun aScrollThatShowsNothingNewIsTheEndOfTheList() = runTest {
         val top = List(8) { "meal $it" to (100.0 to 120.0 + it * 80) }
         val bottom = List(8) { "meal ${it + 4}" to (100.0 to 120.0 + it * 80) }

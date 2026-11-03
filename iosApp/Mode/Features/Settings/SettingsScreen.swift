@@ -1,4 +1,5 @@
 import ModeDesignSystem
+import ModeKit
 import SwiftUI
 
 /// Settings, as on its board: You, AI (the provider in use and its models), Limits, Memory. Draws state, sends events.
@@ -25,6 +26,24 @@ struct SettingsScreen: View {
                             .onSubmit { onEvent(.saveName) }
                     }
                 }
+
+                ModeSectionHeader(L10n.Voice.section)
+                ModeCard {
+                    ModeRow(String(localized: L10n.Voice.modesVoice), leading: (VoiceService(id: state.speaker) ?? .apple).tile, action: { onEvent(.openVoice) }) {
+                        HStack(spacing: ModeSpacing.s) {
+                            Text(state.voiceName).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
+                            ModeChevron()
+                        }
+                    }
+                    ModeRow(String(localized: L10n.Voice.listeningRow), leading: (VoiceService(id: state.listener) ?? .apple).tile, action: { onEvent(.openListening) }) {
+                        HStack(spacing: ModeSpacing.s) {
+                            Text(state.listenerLabel).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
+                            ModeChevron()
+                        }
+                    }
+                    ModeToggleRow(L10n.Voice.talkBack, subtitle: L10n.Voice.talkBackDetail, isOn: Binding(get: { state.talkBack }, set: { onEvent(.talkBack($0)) }))
+                }
+                Text(L10n.Voice.sectionNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
 
                 ModeSectionHeader(L10n.Settings.ai)
                 ModeCard {

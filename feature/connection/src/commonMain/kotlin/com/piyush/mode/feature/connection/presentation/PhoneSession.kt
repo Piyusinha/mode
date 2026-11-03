@@ -88,6 +88,18 @@ public class PhoneSession(
         AppLog.log("phone", "closed (Mode is ending)")
     }
 
+    /**
+     * Pauses the open session for voice and runs [block] with that same connection.
+     * Agent ops wait until [block] returns. Nothing here calls [disconnect]: the VPN
+     * and the session stay owned by this object. When no session is open, [block]
+     * gets null and no connection is started.
+     */
+    public suspend fun <T> duringVoice(block: suspend (PhoneBackend?) -> T): T {
+        val held = lock.withLock { current as? ResilientBackend }
+        if (held == null) return block(null)
+        return held.hold(block)
+    }
+
     /** Drops the current session and connects again now. */
     public suspend fun reconnect(): PhoneBackend {
         lock.withLock {

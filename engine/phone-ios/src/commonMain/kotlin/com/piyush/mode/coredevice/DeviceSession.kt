@@ -30,6 +30,12 @@ interface DeviceSession : AutoCloseable {
     fun launch(bundleId: String, fresh: Boolean = false)
 
     fun listApps(): List<InstalledApp>
+
+    /** Stops the screen stream and keeps this connection. */
+    fun pauseStream() {}
+
+    /** Starts the screen stream again on this connection. */
+    fun resumeStream() {}
 }
 
 enum class HardwareButton { Home, Lock, VolumeUp, VolumeDown }

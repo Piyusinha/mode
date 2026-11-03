@@ -1,6 +1,9 @@
 package com.piyush.mode.ops
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -26,6 +29,28 @@ class ResilientBackendTest {
     private val phones = mutableListOf<FlakyPhone>()
     private val breaks = mutableSetOf<String>()
     private fun backend() = ResilientBackend({ FlakyPhone(phones.size + 1, breaks).also { phones += it } })
+
+    @Test
+    fun holdBlocksOpsAndDoesNotOpenAnotherConnection() = runTest {
+        val b = backend()
+        b.send(Op.Home)
+        val release = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        launch {
+            b.hold {
+                entered.complete(Unit)
+                release.await()
+            }
+        }
+        entered.await()
+        val send = launch { b.send(Op.Home) }
+        yield()
+        assertTrue(!send.isCompleted)
+        release.complete(Unit)
+        send.join()
+        assertEquals(1, phones.size)
+        assertEquals(listOf("nav.home", "nav.home"), phones[0].sent)
+    }
 
     @Test
     fun aDroppedLookIsRetriedOnANewConnection() = runTest {

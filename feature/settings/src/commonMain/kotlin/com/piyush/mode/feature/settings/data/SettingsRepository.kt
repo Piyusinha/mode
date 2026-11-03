@@ -7,6 +7,9 @@ import com.piyush.mode.core.storage.KeyValueStore
 import com.piyush.mode.core.storage.SecretStore
 import com.piyush.mode.feature.settings.domain.ModeSettings
 import com.piyush.mode.feature.settings.domain.RiskConfirmation
+import com.piyush.mode.feature.settings.domain.SpeechSpeed
+import com.piyush.mode.feature.settings.domain.VoiceChoice
+import com.piyush.mode.feature.settings.domain.VoiceKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,8 +109,26 @@ public class SettingsRepository(
         prefs.putString(ASK_ABOVE, next.askAboveAmount?.toString().orEmpty())
         prefs.putString(USER_NAME, next.userName.orEmpty())
         prefs.putString(ONBOARDING_DONE, next.onboardingDone.toString())
+        prefs.putString(SPEECH_ORDER, next.speechOrder.joinToString(","))
+        prefs.putString(HEARING_ORDER, next.hearingOrder.joinToString(","))
+        prefs.putString(TALK_BACK, next.talkBack.toString())
+        prefs.putString(SPEAK_RESULT, next.speakResult.toString())
+        prefs.putString(SPEECH_SPEED, next.speechSpeed.id)
+        prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
+
+    /** The pasted key for Fish, ElevenLabs, Soniox, or Deepgram. Null removes it. */
+    public fun voiceKey(kind: VoiceKind): String? = secrets.get(voiceSecret(kind))?.takeIf { it.isNotBlank() }
+
+    public fun setVoiceKey(kind: VoiceKind, key: String?) {
+        if (!kind.needsKey) return
+        secrets.set(voiceSecret(kind), key?.trim()?.ifBlank { null })
+        state.value = read()
+    }
+
+    /** Last four characters, for the row. Null when there is no key. */
+    public fun voiceKeyEnding(kind: VoiceKind): String? = voiceKey(kind)?.takeIf { it.length > 8 }?.takeLast(4)
 
     /** What the agent runs with now. */
     public fun agentConfig(): AgentConfig = state.value.agentConfig()
@@ -144,6 +165,14 @@ public class SettingsRepository(
             askAboveAmount = prefs.getString(ASK_ABOVE)?.toDoubleOrNull(),
             userName = prefs.getString(USER_NAME)?.ifBlank { null },
             onboardingDone = prefs.getString(ONBOARDING_DONE)?.toBooleanStrictOrNull() ?: defaults.onboardingDone,
+            speechOrder = prefs.getString(SPEECH_ORDER)?.split(',')?.filter { it.isNotBlank() } ?: defaults.speechOrder,
+            hearingOrder = prefs.getString(HEARING_ORDER)?.split(',')?.filter { it.isNotBlank() } ?: defaults.hearingOrder,
+            talkBack = prefs.getString(TALK_BACK)?.toBooleanStrictOrNull() ?: defaults.talkBack,
+            speakResult = prefs.getString(SPEAK_RESULT)?.toBooleanStrictOrNull() ?: defaults.speakResult,
+            speechSpeed = SpeechSpeed.fromId(prefs.getString(SPEECH_SPEED)),
+            voices = prefs.getString(VOICES)?.let {
+                runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
+            } ?: defaults.voices,
             hasApiKey = !secrets.get(API_KEY).isNullOrBlank(),
             provider = ModelProvider.fromId(prefs.getString(PROVIDER)),
             hasClaudeAccount = claudeCredentials.connected.value,
@@ -171,5 +200,13 @@ public class SettingsRepository(
         const val ASK_ABOVE = "full_access_ask_above"
         const val USER_NAME = "user_name"
         const val ONBOARDING_DONE = "onboarding_done"
+        const val SPEECH_ORDER = "speech_order"
+        const val HEARING_ORDER = "hearing_order"
+        const val TALK_BACK = "voice_talk_back"
+        const val SPEAK_RESULT = "voice_speak_result"
+        const val SPEECH_SPEED = "voice_speech_speed"
+        const val VOICES = "voice_choices"
+
+        fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"
     }
 }

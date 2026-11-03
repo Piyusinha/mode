@@ -42,6 +42,18 @@ public data class ModeSettings(
     val readCodes: Boolean = true,
     /** With full access, still ask before paying more than this; null: never ask. */
     val askAboveAmount: Double? = null,
+    /** Try order for speaking. Unknown ids are dropped. */
+    val speechOrder: List<String> = VoiceKind.speechDefault(),
+    /** Try order for hearing. Unknown ids are dropped. */
+    val hearingOrder: List<String> = VoiceKind.hearingDefault(),
+    /** Tasks the user spoke get spoken questions and a spoken result. */
+    val talkBack: Boolean = true,
+    /** Say a short summary when a spoken task is done (the full answer stays in the chat). */
+    val speakResult: Boolean = true,
+    /** How fast Mode talks. */
+    val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
+    /** The voice picked for each speech provider (by [VoiceKind.id]); none: the provider's default. */
+    val voices: Map<String, VoiceChoice> = emptyMap(),
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey
@@ -59,7 +71,15 @@ public data class ModeSettings(
         userName = userName?.trim()?.ifBlank { null },
         triggerWords = triggerWords.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.distinct().take(MAX_TRIGGER_WORDS),
         askAboveAmount = askAboveAmount?.takeIf { it > 0 },
+        speechOrder = speechOrder.kept(VoiceKind.SPEECH),
+        hearingOrder = hearingOrder.kept(VoiceKind.HEARING),
     )
+
+    private fun List<String>.kept(allowed: List<VoiceKind>): List<String> {
+        val known = mapNotNull { VoiceKind.fromId(it) }.filter { it in allowed }.distinct()
+        val rest = allowed.filter { it !in known }
+        return (known + rest).map { it.id }
+    }
 
     /** What the agent runs with. */
     public fun agentConfig(): AgentConfig = AgentConfig(

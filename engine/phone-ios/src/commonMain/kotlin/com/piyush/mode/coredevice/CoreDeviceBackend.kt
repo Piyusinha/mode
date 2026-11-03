@@ -69,6 +69,14 @@ class CoreDeviceBackend(
 
     override fun close() = session.close()
 
+    override suspend fun pauseStream() {
+        lock.withLock { withContext(io) { session.pauseStream() } }
+    }
+
+    override suspend fun resumeStream() {
+        lock.withLock { withContext(io) { session.resumeStream() } }
+    }
+
     private fun run(op: Op): JsonElement = when (op) {
         is Op.Tap -> touch(op.x, op.y, op.x, op.y, holdMs = TAP_HOLD_MS, travelMs = 0)
         is Op.LongPress -> touch(op.x, op.y, op.x, op.y, holdMs = seconds(op.duration), travelMs = 0)

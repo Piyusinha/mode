@@ -54,6 +54,12 @@ public data class SettingsUiState(
     /** The effort picked for each role ("low"…), where the provider takes one. */
     val modelEffort: String? = null,
     val stuckEffort: String? = null,
+    /** Voice: who speaks ([com.piyush.mode.feature.settings.domain.VoiceKind.id]) and with which voice, who listens. */
+    val speaker: String? = null,
+    val voiceName: String? = null,
+    val listener: String? = null,
+    /** Spoken tasks get spoken questions and results. */
+    val talkBack: Boolean = true,
 )
 
 public data class ModelChoice(
@@ -77,6 +83,8 @@ public class SettingsPresenter(
     /** The models the user's Claude account offers, as last listed. */
     private val claudeModels: () -> List<com.piyush.mode.llm.PlanModel> = { emptyList() },
     private val chatGptModels: () -> List<String> = { emptyList() },
+    /** Who speaks and listens (null: no voice section). */
+    private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
 ) : Presenter<SettingsUiState>(parent, SettingsUiState()) {
     private val connection = claude?.let { account ->
         ClaudeConnectionPresenter(scope, account, claudeLlm) { settings.selectProvider(ModelProvider.ClaudeOAuth) }
@@ -85,6 +93,11 @@ public class SettingsPresenter(
     private val query = MutableStateFlow("" to (null as String?))
     /** The key lives in the Keychain, outside the settings flow: bumped when it changes. */
     private val keyChanges = MutableStateFlow(0)
+
+    public fun setTalkBack(on: Boolean) { settings.update { it.copy(talkBack = on) } }
+
+    /** Reads who speaks and listens again (Apple's microphone or model may have changed outside Settings). */
+    public fun refreshVoice() { keyChanges.value++ }
 
     init {
         scope.launch { catalog.refresh() }
@@ -117,6 +130,10 @@ public class SettingsPresenter(
                             .take(MAX_RESULTS).map(::choice),
                     modelCount = all.size,
                     modelEffort = ProviderModels.effortUsed(s.model),
+                    speaker = voices?.speaker()?.first?.id,
+                    voiceName = voices?.speaker()?.second?.name,
+                    listener = voices?.listener()?.id,
+                    talkBack = s.talkBack,
                     fullAccess = s.fullAccess,
                     stuckEffort = s.strongModel?.let(ProviderModels::effortUsed),
                     makers = if (s.provider == ModelProvider.OpenRouter) catalog.makers().take(MAX_MAKERS) else emptyList(),

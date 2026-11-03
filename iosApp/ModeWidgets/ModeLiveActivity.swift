@@ -69,14 +69,17 @@ private struct ModeIslandTrailing: View {
         case .working:
             if state.paused {
                 ModeIcon.pause.image.foregroundStyle(ModeColor.textSecondary)
-            } else {
-                // The step moves with each action: visible progress even when collapsed.
-                Text(ActivityL10n.stepShort(state.step))
+            } else if let start = state.startedAt {
+                // The time ticks on its own: visible progress even when collapsed, with no step count.
+                Text(timerInterval: start...Date.distantFuture, countsDown: false)
                     .modeText(.subheadline, color: ModeColor.tint)
                     .fontWeight(.semibold)
                     .monospacedDigit()
                     .lineLimit(1)
-                    .fixedSize()
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: ModeSize.islandTimer)
+            } else {
+                ModeIcon.running.image.foregroundStyle(ModeColor.tint)
             }
         case .waiting:
             (state.yourTurn ? ModeIcon.lock : ModeIcon.waiting).image.foregroundStyle(ModeColor.warning)

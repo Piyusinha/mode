@@ -21,6 +21,20 @@ struct ConversationScreen: View {
                     ForEach(state.messages) { message in
                         MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? [], onEvent: onEvent)
                             .id(message.id)
+                        ForEach(state.lessons.filter { $0.afterTurnId == message.id }) { lesson in
+                            ModeLessonCard(heading: L10n.Conversation.savedForNextTime, context: lesson.context, text: lesson.text,
+                                           editTitle: L10n.Conversation.edit, undoTitle: L10n.Common.undo,
+                                           onEdit: { onEvent(.editLesson(lesson.id)) }, onUndo: { onEvent(.undoLesson(lesson.id)) })
+                        }
+                    }
+                    if state.offerRemember {
+                        ModeChip(String(localized: L10n.Conversation.alsoNextTime), icon: .memory, actionTitle: L10n.Conversation.remember) { onEvent(.remember) }
+                    }
+                    if state.teaching {
+                        HStack(spacing: ModeSpacing.s) {
+                            ProgressView().tint(ModeColor.tint)
+                            Text(L10n.Conversation.saving).modeText(.subheadline, color: ModeColor.textSecondary)
+                        }
                     }
                     if let working = state.working {
                         ModeWorkingLine(status: working, stopLabel: L10n.Common.stop, onOpen: { onEvent(.openLive) }, onStop: { onEvent(.stop) })
@@ -53,7 +67,7 @@ struct ConversationScreen: View {
         .safeAreaInset(edge: .bottom) {
             ModeMessageBar(
                 text: $draft, isPrivate: state.isPrivate, canSend: canSend,
-                labels: .init(prompt: L10n.Ask.followUpPrompt, add: L10n.Ask.add, send: L10n.Ask.send, speak: L10n.Tab.ask,
+                labels: .init(prompt: state.running ? L10n.Conversation.steerPrompt : L10n.Conversation.teachPrompt, add: L10n.Ask.add, send: L10n.Ask.send, speak: L10n.Tab.ask,
                               privateOn: L10n.Ask.privateOn, privateOff: L10n.Ask.privateOff),
                 onTogglePrivate: { onEvent(.togglePrivate) }, onSend: { onEvent(.send) }, onSpeak: { onEvent(.speak) }
             ) {
@@ -119,8 +133,33 @@ private struct ConversationContent: View {
         ConversationScreen(state: model.state, thumbnails: model.thumbnails, draft: $model.draft, canSend: model.canSend, onEvent: model.send)
             .sheet(item: $model.sharing) { ShareSheet(text: $0.text) }
             .sheet(item: $model.repeating) { RepeatRoute(app: app, text: $0.text) }
+            .sheet(item: $model.editing) { lesson in LessonEditor(text: lesson.text) { model.send(.saveLesson($0)) } }
             .confirmationDialog(Text(L10n.Conversation.deleteConfirm), isPresented: $model.confirmingDelete, titleVisibility: .visible) {
                 Button(role: .destructive) { model.send(.confirmDelete) } label: { Text(L10n.Conversation.delete) }
             }
+    }
+}
+
+/// Edit a tip taught in this chat, in the user's own words.
+private struct LessonEditor: View {
+    @State var text: String
+    let save: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.l) {
+            Text(L10n.Conversation.editLesson).modeText(.title2)
+            TextField(text: $text, axis: .vertical) { Text(L10n.Conversation.editLessonPrompt) }
+                .modeText(.body)
+                .lineLimit(3...8)
+                .padding(ModeSpacing.l)
+                .background(ModeColor.field, in: .rect(cornerRadius: ModeRadius.field))
+            ModeButton(L10n.Common.save, fullWidth: true) { save(text); dismiss() }
+                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(ModeSpacing.screenEdge)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .modeScreen()
+        .presentationDetents([.medium])
     }
 }

@@ -326,6 +326,29 @@ impl Session {
         })
     }
 
+    /// Stops the screen stream and keeps the tunnel, pairing, and HID clients.
+    /// Touch is not sent until [`Session::resume_stream`].
+    pub fn pause_stream(&self) -> Result<()> {
+        self.run(async |live| {
+            let _ = live.display.stop_media_stream().await;
+            live.drains.iter().for_each(|d| d.abort());
+            live.drains.clear();
+            Ok(())
+        })
+    }
+
+    /// Starts the screen stream again on this same session.
+    pub fn resume_stream(&self) -> Result<()> {
+        self.run(async |live| {
+            let (display, drains, video) = open_screen_stream(&mut live.adapter, &mut live.handshake).await?;
+            live.display = display;
+            live.drains = drains;
+            live.video = video;
+            tokio::time::sleep(STREAM_SETTLE).await;
+            Ok(())
+        })
+    }
+
     /// Stops the stream and drops the tunnel. Later calls fail.
     pub fn close(&self) {
         self.rt.block_on(async {

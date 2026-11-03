@@ -2,7 +2,9 @@ package com.piyush.mode.feature.tasks.domain
 
 /** Where a task came from. */
 public enum class TaskSource(internal val stored: String) {
-    App("app"), Siri("siri"), Watch("watch"), Shortcut("shortcut"), Schedule("schedule");
+    App("app"), Siri("siri"), Watch("watch"), Shortcut("shortcut"), Schedule("schedule"),
+    /** Spoken to Mode ("Start Mode"): its questions and summary are spoken too. */
+    Voice("voice");
 
     internal companion object {
         fun of(stored: String): TaskSource = entries.firstOrNull { it.stored == stored } ?: App

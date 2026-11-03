@@ -19,6 +19,15 @@ interface PhoneBackend {
 
     /** Run one op and return the phone's answer. */
     suspend fun send(op: Op): JsonElement
+
+    /**
+     * Stops the screen stream and keeps this connection. Touch is refused until
+     * [resumeStream]. The default does nothing, for phones that have no stream.
+     */
+    suspend fun pauseStream() {}
+
+    /** Starts the screen stream again on this same connection. */
+    suspend fun resumeStream() {}
 }
 
 suspend fun PhoneBackend.supports(op: Op): Boolean = op.wireName in ops()

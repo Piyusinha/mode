@@ -1,5 +1,6 @@
 package com.piyush.mode.ops
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
@@ -20,10 +21,32 @@ class ResilientBackend(
 ) : PhoneBackend, AutoCloseable {
     private val lock = Mutex()
     private var current: PhoneBackend? = null
+    /** Set while voice work owns the phone. Ops wait on it. It is not a dropped connection. */
+    private var held: CompletableDeferred<Unit>? = null
 
     override val name: String get() = current?.name ?: "phone"
 
     override suspend fun ops(): Set<String> = backend().ops()
+
+    /**
+     * Blocks [send] for the whole of [block]. [block] receives the live connection and may
+     * pause and resume its stream. This does not close the connection or open a new one.
+     */
+    suspend fun <T> hold(block: suspend (PhoneBackend) -> T): T {
+        val phone = lock.withLock {
+            check(held == null) { "the phone is already held" }
+            held = CompletableDeferred()
+            backendLocked()
+        }
+        try {
+            return block(phone)
+        } finally {
+            lock.withLock {
+                held?.complete(Unit)
+                held = null
+            }
+        }
+    }
 
     override suspend fun send(op: Op): JsonElement {
         val phone = backend()
@@ -47,7 +70,19 @@ class ResilientBackend(
         current = null
     }
 
-    private suspend fun backend(): PhoneBackend = lock.withLock { current ?: connect().also { current = it } }
+    private suspend fun backend(): PhoneBackend {
+        while (true) {
+            val waiting = lock.withLock { held }
+            if (waiting == null) break
+            waiting.await()
+        }
+        return lock.withLock {
+            if (held != null) null else backendLocked()
+        } ?: backend()
+    }
+
+    /** Caller holds [lock]. */
+    private suspend fun backendLocked(): PhoneBackend = current ?: connect().also { current = it }
 
     private suspend fun reconnect(broken: PhoneBackend, cause: Exception) = lock.withLock {
         if (current === broken) {

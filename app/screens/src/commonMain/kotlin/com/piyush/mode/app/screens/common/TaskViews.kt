@@ -18,6 +18,8 @@ public data class RunningTask(
     val paused: Boolean = false,
     /** When it started, epoch ms, for the elapsed time. */
     val startedAtMs: Long? = null,
+    /** Mode came forward to ask out loud (talking mode is on screen until it goes back). */
+    val talking: Boolean = false,
 )
 
 /** The agent's question: a yes/no, a choice of [options] (the [recommended] one marked), or a free answer. */
@@ -30,6 +32,8 @@ public data class Question(
     val allowAlways: Boolean = false,
     /** Something only the user can do on the phone: "I've entered it" instead of an answer. */
     val yourTurn: Boolean = false,
+    /** Asked out loud in talking mode (a task the user spoke): that screen answers it, not the question sheet. */
+    val spoken: Boolean = false,
 )
 
 /** How a finished task ended, for its badge. */
@@ -53,9 +57,10 @@ internal fun TaskState.running(tasks: TaskRepository): RunningTask? {
         conversationId = conversationId,
         steps = steps.size,
         status = now(),
-        question = question?.let { Question(it.text, it.yesNo, it.options, it.recommended, it.allowAlways, it.yourTurn) },
+        question = question?.let { Question(it.text, it.yesNo, it.options, it.recommended, it.allowAlways, it.yourTurn, spoken = voice != null) },
         paused = paused,
         startedAtMs = startedAtMs,
+        talking = voice != null,
     )
 }
 
