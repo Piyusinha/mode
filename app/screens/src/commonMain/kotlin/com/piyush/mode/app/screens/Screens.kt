@@ -81,7 +81,18 @@ public class Screens(
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
+            acknowledger = acknowledger,
         )
+
+    /** What Mode says when handed a spoken task, written by the fast model (phone control's). */
+    private val acknowledger: com.piyush.mode.feature.memory.data.Acknowledger? by lazy {
+        providers?.let { llm ->
+            com.piyush.mode.feature.memory.data.Acknowledger(llm, memory) {
+                val s = settings.settings.value
+                s.model?.let { it to s.provider }
+            }
+        }
+    }
 
     /** Records that the app followed a link (Siri's listen, a mic, a Live Activity), for the trace. */
     public fun linkOpened(entry: String) {

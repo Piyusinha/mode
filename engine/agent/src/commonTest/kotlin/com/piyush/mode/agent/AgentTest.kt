@@ -1126,4 +1126,15 @@ class AgentTest {
         assertIs<AgentOutcome.Done>(result!!.outcome)
         assertEquals(2, screens.size)
     }
+
+    @Test
+    fun theFinalReplyComesWithAVersionToSayOutLoud() = runTest {
+        val phone = FakePhone(listOf(listOf("Dark Mode" to (99.0 to 300.0))))
+        val model = ScriptedModel(call("done", "evidence" to "switch is on", "summary" to "**Dark Mode** is now on.",
+            "spoken" to "Done, Piyush. Dark Mode is on."))
+        val outcome = Agent(phone, model, Gate(), noSettle).run("Turn on dark mode").outcome
+        val done = outcome as AgentOutcome.Done
+        assertEquals("**Dark Mode** is now on.", done.summary)
+        assertEquals("Done, Piyush. Dark Mode is on.", done.spoken)
+    }
 }

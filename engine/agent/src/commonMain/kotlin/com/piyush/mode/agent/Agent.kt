@@ -117,7 +117,8 @@ class StepRecord(
 )
 
 sealed interface AgentOutcome {
-    class Done(val summary: String, val success: Boolean) : AgentOutcome
+    /** [spoken]: the reply as one or two sentences to say out loud (null: the model gave none). */
+    class Done(val summary: String, val success: Boolean, val spoken: String? = null) : AgentOutcome
     class Stopped(val why: String) : AgentOutcome
     class Failed(val why: String) : AgentOutcome
 }
@@ -481,7 +482,8 @@ class Agent(
                         continue
                     }
                     record("done", summary, (if (success) "finished" else "gave up") + evidence.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
-                    return result(AgentOutcome.Done(summary, success), step)
+                    val spoken = call.arguments.string("spoken")?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)
+                    return result(AgentOutcome.Done(summary, success, spoken), step)
                 }
                 "ask_user" -> {
                     val question = call.arguments.string("question").orEmpty()

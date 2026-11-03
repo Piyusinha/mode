@@ -82,6 +82,8 @@ public class ListenPresenter(
     private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
     /** How this opened, for the trace: siri, ask_mic, chat_mic, question. */
     private val entry: String = "app",
+    /** Writes what Mode says when handed a task, like a personal assistant (null: Mode's own short lines). */
+    private val acknowledger: com.piyush.mode.feature.memory.data.Acknowledger? = null,
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     /** One trace per talking-mode screen: how it opened, each speak and listen inside it, how it ended. */
     private var session: com.piyush.mode.core.telemetry.TraceSpan? = null
@@ -234,7 +236,9 @@ public class ListenPresenter(
     }
 
     private suspend fun start(task: String, source: TaskSource) {
-        val reply = replyLine(task)
+        own.value = own.value.copy(phase = TalkPhase.Starting, task = task, partial = "")
+        // The AI's own words, about a second at most; Mode's short line if it is slower.
+        val reply = acknowledger?.line(task, settings.settings.value.userName, hour()) ?: replyLine(task)
         own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = reply, partial = "")
         voices.speak(reply)
         taskId = queue.submit(task, source, conversationId, false)?.id

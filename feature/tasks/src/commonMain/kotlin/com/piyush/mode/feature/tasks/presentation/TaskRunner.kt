@@ -316,7 +316,9 @@ public class TaskRunner(
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // Spoken while the microphone is off. The stream stays up.
             if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
-                runCatching { voices?.speak(PlainText.fromMarkdown(reply, oneLine = true)) }
+                // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
+                val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
+                runCatching { voices?.speak(said) }
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))

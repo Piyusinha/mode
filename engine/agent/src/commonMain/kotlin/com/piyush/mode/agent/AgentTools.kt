@@ -199,8 +199,14 @@ object AgentTools {
             listOf(
                 Param(
                     "summary", "string",
-                    "Your reply to the user, in Markdown, like a helpful chat answer: the answer first, then any " +
-                        "details they asked to know (from your notes). Not your steps or notes.",
+                    "Your reply to the user, in Markdown, as their personal assistant: warm and first person, the answer " +
+                        "first, then any details they asked to know (from your notes). Not your steps or notes.",
+                ),
+                Param(
+                    "spoken", "string",
+                    "The same reply said out loud: one or two short, natural sentences, as a personal assistant would " +
+                        "say it to them (\"Done, Dark Mode is off.\", \"You've got three things today; the first is standup at ten.\"). " +
+                        "No lists, tables, links or Markdown.",
                 ),
                 Param("success", "boolean", "Whether the task was achieved."),
                 Param(
