@@ -6,7 +6,12 @@
 //!   mode-setup apps                         Mode, SideStore and LocalDevVPN on the phone
 //!   mode-setup helpers                      whether the sign-in helpers answer
 //!   mode-setup latest                       the newest Mode release
-//!   mode-setup install <ipa> [--sidestore]  sign in, sign, install, give Mode phone control
+//!   mode-setup install <ipa> [--paid <paid-ipa>] [--sidestore] [--localdevvpn]
+//!                                           sign in, sign, install, give Mode phone control.
+//!                                           A paid team gets the paid build with Mode's own VPN
+//!                                           (Network Extensions switched on through Apple's API,
+//!                                           or by you, with steps); --localdevvpn skips that.
+//!   mode-setup vpn                          whether Mode's own VPN is allowed for your team
 //!   mode-setup pair                         a new phone-control file for Mode (and SideStore)
 //!
 //! Sign-in asks for the Apple Account, password and code in this terminal; nothing is echoed.
@@ -32,9 +37,10 @@ async fn main() {
         Some("helpers") => helpers().await,
         Some("latest") => latest().await,
         Some("install") => install(&args[1..]).await,
-        Some("pair") => pair().await,
+        Some("pair") => pair(false).await,
+        Some("vpn") => vpn().await,
         _ => {
-            eprintln!("usage: mode-setup phones|trust|apps|helpers|latest|install <ipa> [--sidestore]|pair");
+            eprintln!("usage: mode-setup phones|trust|apps|helpers|latest|install <ipa> [--paid <ipa>] [--sidestore] [--localdevvpn]|pair|vpn");
             std::process::exit(2);
         }
     };
@@ -196,18 +202,37 @@ fn progress(label: &'static str) -> mode_setup_core::install::Progress {
     })
 }
 
+fn flag_value(args: &[String], flag: &str) -> Option<PathBuf> {
+    args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1)).map(PathBuf::from)
+}
+
 async fn install(args: &[String]) -> Result<()> {
     let ipa = PathBuf::from(args.first().ok_or_else(|| SetupError::Install("give the path to Mode’s .ipa".into()))?);
+    let paid_ipa = flag_value(args, "--paid");
     let with_sidestore = args.iter().any(|a| a == "--sidestore");
+    let force_local_vpn = args.iter().any(|a| a == "--localdevvpn");
     let p = phone().await?;
     if device::trust(&p.udid).await? != Readiness::Ready {
         return Err(SetupError::Phone("Run `mode-setup trust` first.".into()));
     }
     let (mut signer, team) = signer().await?;
 
-    let mode = signer.install(&p.udid, &p.name, &team, &ipa, progress("Mode")).await?;
-    eprintln!();
-    println!("✓ {} {} installed as {} · signed until {}", mode.name, mode.version, mode.bundle_id, mode.expires.as_deref().unwrap_or("?"));
+    let mut own_vpn = false;
+    if team.kind == TeamKind::Paid && !force_local_vpn {
+        if let Some(paid) = &paid_ipa {
+            own_vpn = mode_vpn_on(&mut signer, &team).await?;
+            if own_vpn {
+                let mode = signer.install(&p.udid, &p.name, &team, paid, progress("Mode")).await?;
+                eprintln!();
+                println!("✓ {} {} with its own VPN installed as {} · signed until {}", mode.name, mode.version, mode.bundle_id, mode.expires.as_deref().unwrap_or("?"));
+            }
+        }
+    }
+    if !own_vpn {
+        let mode = signer.install(&p.udid, &p.name, &team, &ipa, progress("Mode")).await?;
+        eprintln!();
+        println!("✓ {} {} installed as {} · signed until {}", mode.name, mode.version, mode.bundle_id, mode.expires.as_deref().unwrap_or("?"));
+    }
 
     if with_sidestore && team.kind != TeamKind::Paid {
         let dest = std::env::temp_dir().join("ModeSetup").join("SideStore.ipa");
@@ -216,10 +241,54 @@ async fn install(args: &[String]) -> Result<()> {
         eprintln!();
         println!("✓ SideStore {} installed · signed until {}", ss.version, ss.expires.as_deref().unwrap_or("?"));
     }
-    pair().await
+    pair(own_vpn).await
 }
 
-async fn pair() -> Result<()> {
+/// Switches on Network Extensions through Apple's API; if Apple refuses, shows the steps and
+/// checks every few seconds until it is on, or until Enter (use LocalDevVPN instead).
+async fn mode_vpn_on(signer: &mut Signer, team: &account::Team) -> Result<bool> {
+    eprintln!("Turning on Mode’s own VPN…");
+    let status = signer.turn_on_mode_vpn(team).await?;
+    if status.on() {
+        println!("✓ Mode’s own VPN is on for {} and its tunnel.", status.app_id);
+        return Ok(true);
+    }
+    println!("Apple didn’t let us switch it on ({}).", status.refused.as_deref().unwrap_or("no reason given"));
+    println!("Turn it on yourself — this keeps checking:");
+    println!("  1. Open https://developer.apple.com/account");
+    println!("  2. Certificates, IDs & Profiles → Identifiers → {}", status.app_id);
+    println!("  3. Tick Network Extensions, then Save");
+    println!("  4. Do the same for {}", status.tunnel_id);
+    println!("Or press Enter to use LocalDevVPN instead.");
+    let mut enter = tokio::task::spawn_blocking(|| {
+        let mut s = String::new();
+        let _ = std::io::stdin().read_line(&mut s);
+    });
+    loop {
+        tokio::select! {
+            _ = &mut enter => return Ok(false),
+            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                let s = signer.mode_vpn_status(team).await?;
+                eprint!("\r  Mode {} · Mode Tunnel {}   ", if s.app_on { "on" } else { "off" }, if s.tunnel_on { "on" } else { "off" });
+                if s.on() {
+                    eprintln!();
+                    println!("✓ Found it — Mode’s own VPN is on.");
+                    return Ok(true);
+                }
+            }
+        }
+    }
+}
+
+async fn vpn() -> Result<()> {
+    let (mut signer, team) = signer().await?;
+    let s = signer.mode_vpn_status(&team).await?;
+    println!("{}: Network Extensions {}", s.app_id, if s.app_on { "on" } else { "off" });
+    println!("{}: Network Extensions {}", s.tunnel_id, if s.tunnel_on { "on" } else { "off" });
+    Ok(())
+}
+
+async fn pair(own_vpn: bool) -> Result<()> {
     let p = phone().await?;
     let control = pairing::make(&p.udid).await?;
     let bundles = pairing::give_to_mode(&p.udid, &control).await?;
@@ -229,7 +298,7 @@ async fn pair() -> Result<()> {
         pairing::give_to_sidestore(&p.udid, &control).await?;
         println!("✓ And to SideStore.");
     }
-    if apps::local_dev_vpn(&a).is_none() {
+    if !own_vpn && apps::local_dev_vpn(&a).is_none() {
         println!("Next: get LocalDevVPN from the App Store and connect it, then open Mode.");
     }
     Ok(())

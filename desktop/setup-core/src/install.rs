@@ -6,7 +6,7 @@ use std::{
 };
 
 use isideload::{
-    dev::{devices::DevicesApi, teams::DeveloperTeam},
+    dev::{app_ids::AppIdsApi, devices::DevicesApi, teams::DeveloperTeam},
     sideload::{
         SideloaderBuilder,
         builder::MaxCertsBehavior,
@@ -19,7 +19,31 @@ use isideload::{
 };
 use serde::Serialize;
 
-use crate::{APP_NAME, Result, SetupError, account::{Session, Team}, device, error::from_report};
+use crate::{APP_NAME, Result, SetupError, account::{Session, Team}, apps::MODE_BUNDLE, device, error::from_report};
+
+/// Apple's developer-API key for the Network Extensions capability (fastlane's
+/// `Spaceship::Portal::App::Service::NetworkExtension`; App Groups is "APG3427HIY", as isideload uses).
+pub const NETWORK_EXTENSIONS: &str = "NWEXT04537";
+
+/// Whether Mode's own VPN may be signed for a team: Network Extensions on both of Mode's app IDs.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VpnStatus {
+    /// "com.piyush.mode.ABCDE12345"
+    pub app_id: String,
+    /// "com.piyush.mode.ABCDE12345.tunnel"
+    pub tunnel_id: String,
+    pub app_on: bool,
+    pub tunnel_on: bool,
+    /// Why Apple refused to switch it on, when it did.
+    pub refused: Option<String>,
+}
+
+impl VpnStatus {
+    pub fn on(&self) -> bool {
+        self.app_on && self.tunnel_on
+    }
+}
 
 /// The stages of one install, as the Installing screen lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -62,6 +86,69 @@ impl Signer {
             .machine_name(APP_NAME.to_string())
             .build();
         Self { inner }
+    }
+
+    fn dev_team(team: &Team) -> DeveloperTeam {
+        DeveloperTeam { name: Some(team.name.clone()), team_id: team.id.clone(), r#type: None, status: None }
+    }
+
+    /// Reads from Apple whether Network Extensions is on for Mode's app IDs in [team]. Cheap enough
+    /// to call every few seconds while the person switches it on at developer.apple.com.
+    pub async fn mode_vpn_status(&mut self, team: &Team) -> Result<VpnStatus> {
+        let app_id = format!("{MODE_BUNDLE}.{}", team.id);
+        let tunnel_id = format!("{app_id}.tunnel");
+        let list = self
+            .inner
+            .get_dev_session()
+            .list_app_ids(&Self::dev_team(team), None)
+            .await
+            .map_err(|e| from_report("reading your app IDs", e))?;
+        let on = |id: &str| {
+            list.app_ids
+                .iter()
+                .find(|a| a.identifier == id)
+                .and_then(|a| a.features.get(NETWORK_EXTENSIONS))
+                .and_then(|v| v.as_boolean())
+                .unwrap_or(false)
+        };
+        Ok(VpnStatus { app_on: on(&app_id), tunnel_on: on(&tunnel_id), app_id, tunnel_id, refused: None })
+    }
+
+    /// Registers Mode's two app IDs if they are new and switches on Network Extensions on both, so
+    /// the profiles Apple then issues let Mode run its own VPN. Paid teams only; when Apple refuses,
+    /// the answer says why and the person can switch it on at developer.apple.com.
+    pub async fn turn_on_mode_vpn(&mut self, team: &Team) -> Result<VpnStatus> {
+        let dev_team = Self::dev_team(team);
+        let app_id = format!("{MODE_BUNDLE}.{}", team.id);
+        let tunnel_id = format!("{app_id}.tunnel");
+        let session = self.inner.get_dev_session();
+        let list = session.list_app_ids(&dev_team, None).await.map_err(|e| from_report("reading your app IDs", e))?;
+        let mut refused = None;
+        for (id, name) in [(&app_id, "Mode"), (&tunnel_id, "Mode Tunnel")] {
+            let existing = match list.app_ids.iter().find(|a| &a.identifier == id) {
+                Some(a) => a.clone(),
+                None => match session.add_app_id(&dev_team, name, id, None).await {
+                    Ok(a) => a,
+                    Err(e) => {
+                        refused = Some(e.to_string());
+                        continue;
+                    }
+                },
+            };
+            let on = existing.features.get(NETWORK_EXTENSIONS).and_then(|v| v.as_boolean()).unwrap_or(false);
+            if !on {
+                let mut features = plist::Dictionary::new();
+                features.insert(NETWORK_EXTENSIONS.into(), true.into());
+                if let Err(e) = session.update_app_id(&dev_team, &existing, features, None).await {
+                    refused = Some(e.to_string());
+                }
+            }
+        }
+        let mut status = self.mode_vpn_status(team).await?;
+        if !status.on() {
+            status.refused = refused.or_else(|| Some("Apple kept it off".into()));
+        }
+        Ok(status)
     }
 
     /// Signs [ipa] with [team] for the phone [udid], then installs it, keeping the app's data when

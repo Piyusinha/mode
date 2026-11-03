@@ -18,7 +18,7 @@ path instead of building a new one.
 | Mode-hosted anisette-v3 server | **No Mode server.** A user-choosable public anisette server first; local anisette later | The server only supplies machine-identity headers; it never sees the Apple password or 2FA code. Nothing to run or police |
 | Signed release-manifest service | **GitHub Releases** for the IPA; Tauri's signed updater for the desktop app | What iLoader and SideStore use |
 | Desktop-written setup handshake (nonce file) | **Mode's own onboarding checks** on the phone | The checks already exist in Mode |
-| Paid build with Mode's VPN extension, signed by the desktop app | **Every account gets the free build + LocalDevVPN** (App Store) | Free build needs no special entitlements; isideload can sign it today |
+| Paid build with Mode's VPN extension, signed by the desktop app | **Paid accounts: Mode's own VPN, switched on through Apple's developer API; free accounts: free build + LocalDevVPN** | Free build needs no special entitlements; for paid, we switch on Network Extensions ourselves before isideload signs |
 | Free-account renewal only from the computer | **SideStore refreshes Mode on the phone** (optional); the computer still works | That is how StikDebug users stay signed |
 
 ## 2. How the open-source tools do it
@@ -79,8 +79,7 @@ Goal: anyone on Mac, Windows or Linux can set up Mode this week.
       iLoader (one button) and add Mode to it, so Mode renews on the phone
       every week without the computer. About SideStore: https://sidestore.io
 
-Paid accounts follow the same steps. The paid VPN build stays the developer
-path (Xcode) for now.
+Paid accounts follow the same steps for now; Phase 1 gives them Mode's own VPN.
 
 ### Phase 1 — Mode Setup app (2–3 weeks)
 
@@ -135,6 +134,21 @@ A small Tauri app, built the way iLoader is built, that only sets up Mode.
     SideStore").
   - Mode's own onboarding says the same in one line, with the same "About
     SideStore" link, for people who set up with iLoader (Phase 0).
+- **Paid accounts: Mode's own VPN, no LocalDevVPN** (boards 9c, 9d, 9e):
+  1. Mode Setup installs the paid build (`Mode-paid.ipa`: Mode, its widget and its VPN
+     extension `<bundle>.tunnel`).
+  2. Before signing, it registers Mode's two app IDs (`com.piyush.mode.<team>` and
+     `….tunnel`) and switches on **Network Extensions** on both, through the same developer
+     API isideload uses (`updateAppId` with feature `NWEXT04537`, the key fastlane also uses;
+     App Groups is `APG3427HIY`). The profiles Apple then issues carry the VPN entitlement.
+  3. **If Apple refuses**, the "Turn on Mode's own VPN" screen shows four steps at
+     developer.apple.com (Identifiers → Mode → tick Network Extensions → Save; same for Mode
+     Tunnel), with the two IDs to copy. It reads `listAppIds` every few seconds and carries on
+     by itself when both show the feature on. "Use LocalDevVPN instead" installs the free build.
+  4. Whether it is on is always read from Apple (`listAppIds` → `features["NWEXT04537"]`), so
+     Settings and This iPhone can show it.
+  Mode finds its extension as `<its own bundle ID>.tunnel`, so the team suffix needs no change
+  in Mode.
 - **Device page:** Update Mode, Refresh signing, Make a new pairing file,
   Copy diagnostics (no passwords, tokens, keys or pairing files), Forget
   account.
@@ -157,11 +171,7 @@ Pick these up only if Phase 1 shows the need.
   - **Windows:** read it from iCloud for Windows (AltServer does this), or run
     the anisette-v3 generator code inside the app.
   - The remote server stays as a fallback.
-- **Paid build with Mode's own VPN extension:** add the Network Extension
-  entitlement in our signing adapter for paid teams (isideload's `sign.rs`
-  already injects `keychain-access-groups`), or use the App Store Connect API
-  with the user's API key, which needs no password or anisette. Also upstream
-  the entitlement fix to isideload.
+- **Upstream the Network Extensions switch to isideload**, so other apps get it too.
 - **Mode refreshes itself on the phone** like SideStore (it already has the
   pairing file, the tunnel and developer services), so free users never need
   the computer again after setup.
