@@ -161,21 +161,36 @@ public struct ModeMessageBar: View {
         self.onSpeak = onSpeak
     }
 
+    /// Sends, then clears the field once more on the next update: the keyboard can write a pending
+    /// autocorrection back into the field just after it is cleared, so the sent text stayed visible.
+    /// (Sending only fails for an empty message, which can't be sent.)
+    private func send() {
+        onSend()
+        DispatchQueue.main.async { text = "" }
+    }
+
     public var body: some View {
         GlassEffectContainer(spacing: ModeSpacing.s) {
-            HStack(spacing: ModeSpacing.s) {
+            HStack(alignment: .bottom, spacing: ModeSpacing.s) {
                 Menu { addMenu } label: {
                     ModeIcon.add.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.textPrimary)
                         .frame(width: ModeSize.composerHeight, height: ModeSize.composerHeight)
                 }
                 .glassEffect(.regular.interactive(), in: .circle)
                 .accessibilityLabel(Text(labels.add))
-                HStack(spacing: ModeSpacing.xs) {
+                HStack(alignment: .bottom, spacing: ModeSpacing.xs) {
                     TextField(text: $text, axis: .vertical) { Text(labels.prompt) }
                         .modeText(.body)
                         .lineLimit(1...5)
                         .submitLabel(.send)
-                        .onSubmit(onSend)
+                        // A multi-line field gets a new line from the keyboard's Send key: it sends instead.
+                        .onChange(of: text) { _, now in
+                            guard now.hasSuffix("\n") else { return }
+                            text = String(now.dropLast())
+                            if canSend { send() }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, ModeSpacing.s)
                         .padding(.leading, ModeSpacing.l)
                     Button(action: onTogglePrivate) {
                         (isPrivate ? ModeIcon.privateOn : ModeIcon.privateOff).image
@@ -184,7 +199,7 @@ public struct ModeMessageBar: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(isPrivate ? labels.privateOn : labels.privateOff))
-                    Button(action: canSend ? onSend : onSpeak) {
+                    Button(action: canSend ? send : onSpeak) {
                         (canSend ? ModeIcon.send : ModeIcon.ask).image
                             .font(ModeTextStyle.bodyEmphasis.font)
                             .foregroundStyle(ModeColor.onAccent)
@@ -196,7 +211,8 @@ public struct ModeMessageBar: View {
                 }
                 .padding(ModeSpacing.xs)
                 .frame(minHeight: ModeSize.composerHeight)
-                .glassEffect(.regular.interactive(), in: .capsule)
+                // A capsule's ends grow with its height and cut into several lines of text; a fixed radius doesn't.
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: ModeSize.composerHeight / 2))
             }
         }
     }

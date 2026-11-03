@@ -22,6 +22,7 @@ struct ScreenSample: Identifiable {
                              providers: .init(), onProvider: { _ in }, onEvent: { _ in })
         case "plan": PlanModelsScreen(state: Self.plan, onEvent: { _ in })
         case "teach-steer": ConversationScreen(state: Self.teachSteer, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
+        case "chat-long": ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant("Next time when you search flights, open Flightradar first and check the status for my IndiGo flight on the fourth, then tell me the gate and the delay if there is one."), canSend: true, onEvent: { _ in })
         case "teach-learned": ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
         case "talk-mic": talk(.init(phase: .needsMic), level: 0, speaking: false)
         case "talk-canthear": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?"), level: 0, speaking: false, cantHear: true)
