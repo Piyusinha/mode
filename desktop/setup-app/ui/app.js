@@ -71,7 +71,10 @@ const S = {
 let timer = null;
 const stopPolling = () => { if (timer) { clearTimeout(timer); timer = null; } };
 const poll = (f, ms) => { stopPolling(); const tick = async () => { try { if (await f() === false) return; } catch (e) { console.warn(e); } timer = setTimeout(tick, ms); }; tick(); };
-const go = (screen, extra = {}) => { stopPolling(); Object.assign(S, extra, { screen }); render(); enter(screen); };
+const go = (screen, extra = {}) => {
+  if (!screens[screen]) { console.error('Mode Setup: no screen', screen); return; }
+  stopPolling(); Object.assign(S, extra, { screen }); render(); enter(screen);
+};
 const errText = e => String(e?.message ?? e);
 
 // ---- the window --------------------------------------------------------------------------------------
@@ -381,7 +384,7 @@ async function enter(screen) {
       let r;
       try { r = await call('trust', { udid: S.phone.udid }); } catch (e) { return; }
       if (r !== S.readiness) { S.readiness = r; }
-      if (r === 'ready') { go(S.after || 'signInScreen'); return false; }
+      if (r === 'ready') { go('signIn'); return false; }
       if (r === 'needsDeveloperMode') {
         if (!S.shownDevSwitch) { S.shownDevSwitch = true; call('show_developer_mode', { udid: S.phone.udid }).catch(() => {}); }
         if (S.screen !== 'devMode') { S.screen = 'devMode'; }
