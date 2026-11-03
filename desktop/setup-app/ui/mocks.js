@@ -38,6 +38,7 @@
     ready: { screen: 'ready', phone, readiness: 'ready', record: rec({}) },
     readyPaid: { screen: 'ready', phone, readiness: 'ready', record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },
+    deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     deviceOK: { screen: 'device', phone, phones: [], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({}) },
     settings: { screen: 'settings', phone, prefs: { email: 'piyush@icloud.com', phones: {} }, hasSaved: true, record: rec({}), helpers: [{ name: 'iLoader', url: 'https://ani.iloader.app', ms: 120 }, { name: 'SideStore', url: 'https://ani.sidestore.io', ms: 300 }] },
   };

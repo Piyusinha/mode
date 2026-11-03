@@ -312,7 +312,11 @@ const screens = {
     const updateButton = update?.available ? btn(`Update to ${update.version}`, 'updateNow', 'small primary', connected ? '' : 'disabled')
       : btn(update?.checking ? 'Checking…' : 'Check for updates', 'checkUpdates', 'small', update?.checking ? 'disabled' : '');
     const updateNote = update?.error ?? (update?.available ? `Version ${update.version} is available.` : update?.checked ? 'No newer release is available.' : 'Check for a newer release before updating.');
-    const soon = days != null && days <= (r.paid ? 30 : 2);
+    // What is on the phone now (checked while it's connected): the copy this computer installed may be gone.
+    const apps = connected && S.phoneAppsFor === S.phone?.udid ? S.phoneApps : null;
+    const missing = !!apps && !!r.mode?.bundleId && !(apps.modes ?? []).some(m => m.bundleId === r.mode.bundleId);
+    const others = missing ? (apps.modes ?? []) : [];
+    const soon = !missing && days != null && days <= (r.paid ? 30 : 2);
     const tc = (ic, kind, title, value, sub, action) => `<div class="tilecard"><div class="h">${tile(ic, kind, 30)}${esc(title)}</div><span class="v">${value}</span><span class="s">${sub}</span><span style="display:flex;gap:8px">${action}</span></div>`;
     return `<div class="drag"></div><nav class="side"><div class="brand">${mark(32)}<span><b>Mode Setup</b><small>for iPhone</small></span></div>
       <div style="display:flex;flex-direction:column;gap:4px"><span class="group-label">IPHONES</span>
@@ -322,11 +326,15 @@ const screens = {
       <main class="nofoot tight"><header style="display:flex;align-items:center;gap:14px">${tile('phone', 'grey', 52)}<span><h1 style="font-size:26px">${esc(r.phone ?? 'iPhone')}</h1><span style="font-size:14px;color:var(--sec)">${connected ? `${esc(model(S.phone?.model))} · iOS ${esc(S.phone?.ios)} · connected by cable` : 'Not connected · what’s below is from the last time'}</span></span></header>
       ${soon ? callout(`<b>Mode stops opening ${days <= 0 ? 'now' : `in ${days} day${days === 1 ? '' : 's'}`}</b> (${esc(fmtDate(r.mode?.expires))}). Renew it now — it takes a minute and keeps everything on your iPhone.`, 'orange', 'renew', connected ? btn('Renew now', 'renewNow', 'primary') : '') : ''}
       ${!connected ? callout('Connect your iPhone with a cable to renew, update or reconnect.', '', 'plug') : ''}
+      ${missing ? callout(`<b>Mode isn’t on this iPhone any more.</b> Install it again — you stay signed in, and it takes a minute.${others.length ? ' The copy built in Xcode on this iPhone isn’t changed.' : ''}`, 'orange', 'down', btn('Install Mode', 'reinstall', 'primary')) : ''}
       <div class="tiles">
+      ${missing ? tc('down', 'orange', 'Mode', 'Not installed', 'Removed from this iPhone.', '')
+        + tc('renew', '', 'Signed until', '—', 'Signed again when Mode is installed.', '')
+        + tc('shield', '', 'Phone control', '—', 'Set up again when Mode is installed.', '') : `
         ${tc('down', '', 'Mode', esc(r.mode?.version ?? '—'), esc(updateNote), updateButton)}
         ${tc('renew', soon ? 'orange' : 'green', 'Signed until', esc(fmtDate(r.mode?.expires)), r.paid ? 'Paid account · renews once a year.' : r.sidestore ? 'SideStore renews it every week on your iPhone.' : 'Renewed by this computer. Free accounts last 7 days.',
           btn('Renew signing', 'renewNow', 'small', connected ? '' : 'disabled') + (!r.paid && !r.sidestore ? btn('Install SideStore', 'addSidestore', 'small', connected ? '' : 'disabled') : ''))}
-        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN', S.reconnecting ? 'Keep your iPhone unlocked and connected. Stop any running task in Mode.' : 'Repair the pairing file if Mode can’t reach its tools.', btn(S.reconnecting ? 'Reconnecting…' : 'Reconnect', 'reconnect', 'small', connected && !S.reconnecting ? '' : 'disabled'))}
+        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN', S.reconnecting ? 'Keep your iPhone unlocked and connected. Stop any running task in Mode.' : 'Repair the pairing file if Mode can’t reach its tools.', btn(S.reconnecting ? 'Reconnecting…' : 'Reconnect', 'reconnect', 'small', connected && !S.reconnecting ? '' : 'disabled'))}`}
       </div>
       ${S.reconnecting ? `<div role="status">${callout('Reconnecting phone control… Keep your iPhone unlocked and connected.', '', 'renew')}</div>` : ''}
       ${S.reconnectResult ? `<div role="status">${callout(esc(S.reconnectResult), '', 'check')}</div>` : ''}
@@ -449,7 +457,18 @@ async function enter(screen) {
     }, 2500);
   }
   if (screen === 'device') {
-    poll(async () => { S.phones = (await call('phones')).filter(p => p.usb); if (!S.phone && S.phones.length) S.phone = S.phones.find(p => S.prefs.phones[p.udid]) ?? null; render(); }, 3000);
+    poll(async () => {
+      S.phones = (await call('phones')).filter(p => p.usb);
+      if (!S.phone && S.phones.length) S.phone = S.phones.find(p => S.prefs.phones[p.udid]) ?? null;
+      // Recheck what is installed, so removing Mode on the iPhone shows here.
+      const udid = S.phone?.udid;
+      if (udid && S.phones.some(p => p.udid === udid)) {
+        const apps = await call('apps_on_phone', { udid }).catch(() => null);
+        if (apps && S.phone?.udid === udid) { S.phoneApps = apps; S.phoneAppsFor = udid; }
+      }
+      if (S.screen !== 'device') return false;
+      render();
+    }, 3000);
   }
 }
 
@@ -685,6 +704,7 @@ document.addEventListener('click', async e => {
     case 'checkUpdates': await checkForUpdates(); break;
     case 'updateNow': if (S.update?.available) await beginDeviceAction('update'); break;
     case 'renewNow': await beginDeviceAction('renew'); break;
+    case 'reinstall': await beginDeviceAction('install'); break;
     case 'addSidestore': S.renewAddSidestore = true; await beginDeviceAction('renew'); break;
     case 'reconnect': await reconnectPhone(); break;
     case 'signOut': await call('sign_out', { email: S.prefs.email ?? S.email }); S.prefs.email = null; S.hasSaved = false; render(); break;

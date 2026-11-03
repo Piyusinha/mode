@@ -210,3 +210,27 @@ test('Reconnect refuses a disconnected phone without contacting pairing services
   assert.match(f.app.innerHTML, /Connect and unlock your iPhone/);
   assert.equal(f.calls.includes('phone_control'), false);
 });
+
+test('the dashboard notices Mode was removed from the iPhone and offers to install it again', async () => {
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  device(f);
+  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  assert.doesNotMatch(f.app.innerHTML, /Not installed/);
+  await f.run("enter('device')");
+  for (let i = 0; i < 5; i++) await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Mode isn’t on this iPhone any more/);
+  assert.match(f.app.innerHTML, /Not installed/);
+  assert.match(f.app.innerHTML, /data-act="reinstall"/);
+  assert.match(f.app.innerHTML, /copy built in Xcode/);
+  assert.doesNotMatch(f.app.innerHTML, /data-act="renewNow"/);
+});
+
+test('the dashboard stays as it was while this computer’s copy is still installed', async () => {
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode.TEAM', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  device(f);
+  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  await f.run("enter('device')");
+  for (let i = 0; i < 5; i++) await new Promise(setImmediate);
+  assert.doesNotMatch(f.app.innerHTML, /Not installed/);
+  assert.match(f.app.innerHTML, /data-act="renewNow"/);
+});
