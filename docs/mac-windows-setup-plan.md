@@ -75,7 +75,9 @@ Goal: anyone on Mac, Windows or Linux can set up Mode this week.
    2. Sign in, import Mode's IPA.
    3. Pairing → Mode.
    4. Install LocalDevVPN from the App Store and connect it.
-   5. Optional: install SideStore to refresh Mode on the phone every week.
+   5. Optional but recommended for free accounts: install SideStore with
+      iLoader (one button) and add Mode to it, so Mode renews on the phone
+      every week without the computer. About SideStore: https://sidestore.io
 
 Paid accounts follow the same steps. The paid VPN build stays the developer
 path (Xcode) for now.
@@ -102,8 +104,37 @@ A small Tauri app, built the way iLoader is built, that only sets up Mode.
      update; never uninstall to fix an error.
   6. Make the pairing file with host name `Mode` and copy it to
      `Documents/mode.rppairing`; read it back.
-  7. Point to LocalDevVPN, then "Open Mode on your iPhone". Mode's own
+  7. **Free accounts only: ask about SideStore** (see "SideStore choice"
+     below). If yes, install it in the same run.
+  8. Point to LocalDevVPN, then "Open Mode on your iPhone". Mode's own
      onboarding checks prove it works with the cable unplugged.
+- **SideStore choice** (free accounts; paid signing lasts a year, so skip it):
+  - **The question**, shown after the team is chosen:
+    - Title: "Renew Mode without your computer?"
+    - Body: "A free Apple account signs Mode for 7 days. SideStore, a free
+      open-source app, renews it on your iPhone every week, so you won't need
+      this computer again. It uses 2 of your 3 free app slots (SideStore and
+      Mode)."
+    - Link: "About SideStore" → https://sidestore.io (project:
+      https://github.com/SideStore/SideStore).
+    - Buttons: "Install SideStore too" (default) and "I'll use this computer
+      every week".
+  - **If yes**, the app does what iLoader does:
+    1. Downloads SideStore's latest release from its GitHub releases and
+       checks it.
+    2. Signs and installs it with the same Apple account and certificate.
+    3. Copies the signing certificate into SideStore, so its refresh reuses
+       the certificate instead of revoking it.
+    4. Copies the same pairing file into SideStore's Documents.
+    5. Shows the last step on the phone: open SideStore → My Apps, where
+       Mode shows with its expiry; refresh needs LocalDevVPN connected and
+       Wi-Fi.
+  - **If no**, the device page shows the expiry and reminds the user to
+    connect and press Refresh before it runs out.
+  - The choice can be changed later from the device page ("Install
+    SideStore").
+  - Mode's own onboarding says the same in one line, with the same "About
+    SideStore" link, for people who set up with iLoader (Phase 0).
 - **Device page:** Update Mode, Refresh signing, Make a new pairing file,
   Copy diagnostics (no passwords, tokens, keys or pairing files), Forget
   account.
