@@ -133,6 +133,15 @@ Design canvas: https://claude.ai/artifact/WJsncuq9ZYwGkYMDBeuS4d (private to the
 - Designs: the "From your Apple Watch" row on the design canvas.
 
 ### Launch
+7. **Start Mode from anywhere, locked or unlocked** (asked 2026-11-04).
+   - **A "Talk to Mode" control** (iOS Control widget) for Control Center, the Lock Screen's
+     two bottom buttons and the Action Button. One tap opens Mode listening; when the phone is
+     locked, iOS asks for Face ID first. The existing "Hey Siri, start Mode" stays.
+   - **Settings → Start Mode:** how to add it to Control Center, the Lock Screen, the Action
+     Button and Back Tap, with the steps for each. Boards first.
+   - **Phase 2, listening while locked:** an audio-recording App Intent starts the Live
+     Activity and listens on the Lock Screen; the task waits for "Unlock to start" and runs
+     on unlock. Prove on the phone first. Running the task while locked stays in "Last" 2.
 8. **Mac setup app: one click.** A small Mac app that does the whole first-time setup
    in one click: installs Mode on the phone, makes and pushes the pairing file over
    USB, checks Developer Mode and the disk image, and says when the phone is ready.
