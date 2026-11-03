@@ -96,6 +96,10 @@ public data class OnboardingUiState(
     val canContinue: Boolean = true,
     /** Talk to Mode: a few of Apple's voices on this iPhone to pick from, the one picked, the one playing. */
     val voiceOptions: List<com.piyush.mode.feature.settings.voice.VoiceOption> = emptyList(),
+    /** Who speaks ([com.piyush.mode.feature.settings.domain.VoiceKind.id]); the voice cards are its voices. */
+    val voiceProvider: String = "apple",
+    /** Who listens. */
+    val listener: String = "apple",
     val voice: String? = null,
     val voicePlaying: String? = null,
     /** Apple listening: "ready", "permission", "denied", "asset" or "unsupported". */
@@ -424,7 +428,7 @@ public class OnboardingPresenter(
         set { it.copy(voicePlaying = id) }
         sample = scope.launch {
             try {
-                v.preview(com.piyush.mode.feature.settings.domain.VoiceKind.Apple, option)
+                v.preview(speakingKind(), option)
             } finally {
                 set { st -> if (st.voicePlaying == id) st.copy(voicePlaying = null) else st }
             }
@@ -450,22 +454,34 @@ public class OnboardingPresenter(
         set { it.copy(voicePlaying = null) }
     }
 
+    /** Who speaks now: the first ready provider (Apple until another is connected and first). */
+    private fun speakingKind(): com.piyush.mode.feature.settings.domain.VoiceKind =
+        voices?.speaker()?.first ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+
+    /** Reads who speaks and listens again (after a picker sheet changed them) and that speaker's voices. */
+    public fun refreshVoices() { if (state.value.step == OnboardingStep.Voice) loadVoices() }
+
     private fun loadVoices() {
         val v = voices ?: return
-        set { it.copy(hearing = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState()) }
+        val kind = speakingKind()
+        val changed = state.value.voiceProvider != kind.id
+        set { it.copy(hearing = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState(), voiceProvider = kind.id,
+            listener = v.listener()?.id ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple.id,
+            voiceOptions = if (changed) emptyList() else it.voiceOptions, voice = if (changed) null else it.voice) }
         scope.launch {
-            // Apple lists the best voices for this iPhone's language first.
-            val options = v.options(com.piyush.mode.feature.settings.domain.VoiceKind.Apple).options.take(OnboardingUiState.SETUP_VOICES)
-            val kept = settings.settings.value.voices[com.piyush.mode.feature.settings.domain.VoiceKind.Apple.id]?.id
-            set { it.copy(voiceOptions = options, voice = it.voice ?: kept?.takeIf { k -> options.any { o -> o.id == k } } ?: options.firstOrNull()?.id) }
+            // Mode's pick first, then the provider's own order (Apple lists the best for this iPhone's language first).
+            val options = com.piyush.mode.feature.settings.voice.Voices.withOurPick(kind, v.options(kind).options).take(OnboardingUiState.SETUP_VOICES)
+            val kept = settings.settings.value.voices[kind.id]?.id
+            set { it.copy(voiceOptions = options, voice = it.voice?.takeIf { k -> options.any { o -> o.id == k } }
+                ?: kept?.takeIf { k -> options.any { o -> o.id == k } } ?: options.firstOrNull()?.id) }
         }
     }
 
     private fun keepVoice() {
         stopVoice()
-        val apple = com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+        val kind = speakingKind()
         val option = state.value.voiceOptions.firstOrNull { it.id == state.value.voice } ?: return
-        settings.update { s -> s.copy(voices = s.voices + (apple.id to com.piyush.mode.feature.settings.domain.VoiceChoice(option.id, option.name))) }
+        settings.update { s -> s.copy(voices = s.voices + (kind.id to com.piyush.mode.feature.settings.domain.VoiceChoice(option.id, option.name))) }
     }
 
     /** Ends setup; the app opens on Home from now on. */

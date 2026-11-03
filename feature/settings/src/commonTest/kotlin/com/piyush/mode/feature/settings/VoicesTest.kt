@@ -7,6 +7,7 @@ import com.piyush.mode.feature.settings.domain.VoiceKind
 import com.piyush.mode.feature.settings.voice.DeviceVoice
 import com.piyush.mode.feature.settings.voice.Heard
 import com.piyush.mode.feature.settings.voice.Voices
+import com.piyush.mode.feature.settings.voice.VoiceOption
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -110,5 +111,16 @@ class VoicesTest {
         kotlin.test.assertTrue("\"speed\":1.15" in body, body)
         // Kept across launches.
         assertEquals("Sarah", SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore()).let { settings.settings.value.voices["elevenlabs"]?.name })
+    }
+
+    @Test
+    fun modesPickComesFirstAndTaggedOnlyWhereItHasOne() {
+        val list = listOf(VoiceOption("a", "Adam"), VoiceOption("r", "Rachel"), VoiceOption("g", "George"))
+        val eleven = Voices.withOurPick(VoiceKind.ElevenLabs, list)
+        assertEquals(listOf("r", "a", "g"), eleven.map { it.id })
+        assertEquals(Voices.OUR_PICK, eleven.first().tag)
+        assertEquals(list, Voices.withOurPick(VoiceKind.Apple, list))
+        assertEquals(VoiceKind.ElevenLabs, VoiceKind.MOST_HUMAN)
+        assertEquals(VoiceKind.Deepgram, VoiceKind.MOST_ACCURATE)
     }
 }

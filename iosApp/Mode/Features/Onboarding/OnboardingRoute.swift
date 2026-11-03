@@ -28,6 +28,12 @@ struct OnboardingRoute: View {
             .sheet(isPresented: $model.showingSearch) {
                 ModelSearchSheet(results: model.state.results, query: $model.query) { model.send(.chooseModel($0)) }
             }
+            .sheet(item: $model.voiceSheet, onDismiss: { model.send(.voiceSheetClosed) }) { sheet in
+                switch sheet {
+                case .speak: SpeakPickerSheet(app: app, provider: model.state.speaker.id)
+                case .listen: ListenPickerSheet(app: app)
+                }
+            }
             .sheet(item: $model.picking) { role in
                 RolePickerSheet(role: role, state: model.state, onEvent: model.send)
             }

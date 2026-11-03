@@ -15,6 +15,16 @@ public enum class VoiceKind(public val id: String, public val needsKey: Boolean)
         public fun fromId(id: String): VoiceKind? = entries.firstOrNull { it.id == id }
         public fun speechDefault(): List<String> = SPEECH.map { it.id }
         public fun hearingDefault(): List<String> = HEARING.map { it.id }
+
+        /** Mode's recommendations: the most human voice, and the most accurate listening. */
+        public val MOST_HUMAN: VoiceKind = ElevenLabs
+        public val MOST_ACCURATE: VoiceKind = Deepgram
+
+        /** The voice Mode suggests on a provider, by its name there (null: none in particular). */
+        public fun ourPick(kind: VoiceKind): String? = when (kind) {
+            ElevenLabs -> "Rachel"
+            else -> null
+        }
     }
 }
 

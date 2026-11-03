@@ -39,6 +39,9 @@ final class OnboardingViewModel {
         }
     }
 
+    /// Which voice sheet is open in Talk to Mode.
+    enum VoiceSheet: String, Identifiable { case speak, listen; var id: String { rawValue } }
+
     /// Which role's picker is open.
     enum PickerRole: String, Identifiable {
         case phone, brain
@@ -122,6 +125,9 @@ final class OnboardingViewModel {
         var voice: String?
         var voicePlaying: String?
         /// Apple listening is ready; or it can be turned on here; or the microphone is off in iPhone Settings.
+        /// Who speaks and who listens now.
+        var speaker: VoiceService = .apple
+        var listener: VoiceService = .apple
         var hearingReady = false
         var hearingDenied = false
         // Test and result
@@ -144,13 +150,13 @@ final class OnboardingViewModel {
                 && a.testPhases == b.testPhases && a.testRunning == b.testRunning && a.testPassed == b.testPassed && a.did == b.did
                 && (a.shot == nil) == (b.shot == nil) && a.summary == b.summary && a.checks == b.checks && a.checking == b.checking
                 && a.canContinue == b.canContinue && a.voices == b.voices && a.voice == b.voice && a.voicePlaying == b.voicePlaying
-                && a.hearingReady == b.hearingReady && a.hearingDenied == b.hearingDenied
+                && a.hearingReady == b.hearingReady && a.hearingDenied == b.hearingDenied && a.speaker == b.speaker && a.listener == b.listener
         }
     }
 
     enum Event: Equatable {
         case next, back, chooseCard, connect, paste, chooseModel(String), openStuck, chooseStuck(String?), openSearch, allow(PermissionKind)
-        case openPicker(PickerRole), chooseEffort(PickerRole, String)
+        case openPicker(PickerRole), chooseEffort(PickerRole, String), openVoiceSheet(VoiceSheet), voiceSheetClosed
         case runTest, worked(Bool), checkAgain, sendReport, finish, openCode
         case chooseVoice(String), playVoice(String), allowMic, skipVoice
     }
@@ -164,6 +170,8 @@ final class OnboardingViewModel {
     var showingStuck = false
     /// The role whose model and effort are being picked.
     var picking: PickerRole?
+    /// Mode's voice or How Mode listens, open over Talk to Mode.
+    var voiceSheet: VoiceSheet?
     /// The OpenRouter page to sign in on; the screen opens it in a web sign-in sheet.
     var signInURL: URL?
     /// A link the screen should open, or the report to share.
@@ -238,6 +246,8 @@ final class OnboardingViewModel {
         case let .playVoice(id): presenter.playVoice(id: id)
         case .allowMic: presenter.allowMic()
         case .skipVoice: presenter.skipVoice()
+        case let .openVoiceSheet(sheet): voiceSheet = sheet
+        case .voiceSheetClosed: presenter.refreshVoices()
         }
     }
 
@@ -309,6 +319,8 @@ final class OnboardingViewModel {
         st.voices = s.voiceOptions.map { VoiceCard(id: $0.id, name: $0.name, traits: $0.traits) }
         st.voice = s.voice
         st.voicePlaying = s.voicePlaying
+        st.speaker = VoiceService(id: s.voiceProvider) ?? .apple
+        st.listener = VoiceService(id: s.listener) ?? .apple
         st.hearingReady = s.hearing == "ready"
         st.hearingDenied = s.hearing == "denied"
         st.testRunning = s.testRunning

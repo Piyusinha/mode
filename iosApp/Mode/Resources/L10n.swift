@@ -635,7 +635,7 @@ enum L10n {
         static let off = LocalizedStringResource("voice.off", defaultValue: "Off")
         static let talkBack = LocalizedStringResource("voice.talkBack", defaultValue: "Talk back")
         static let talkBackDetail = LocalizedStringResource("voice.talkBackDetail", defaultValue: "On tasks you start by voice")
-        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Say “Start Mode” or tap the mic. Mode says what it will do, asks its questions out loud and tells you when it’s done. Tasks you type stay quiet.")
+        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Mode picks the most human voice and the most accurate listening it can reach. Apple’s are free, private and always there to fall back on.")
         static let defaultVoice = LocalizedStringResource("voice.defaultVoice", defaultValue: "Default voice")
         // Mode's voice
         static let voiceSubtitle = LocalizedStringResource("voice.voiceSubtitle", defaultValue: "What Mode sounds like when it talks back.")
@@ -722,6 +722,24 @@ enum L10n {
         static let setupMore = LocalizedStringResource("voice.setupMore", defaultValue: "More voices, free with ElevenLabs or Fish Audio, in Settings → Voice.")
         static let listeningWithApple = LocalizedStringResource("voice.listeningWithApple", defaultValue: "Listening with Apple")
         static let freeAndPrivate = LocalizedStringResource("voice.freeAndPrivate", defaultValue: "On this iPhone, free and private")
+        // Who speaks and who listens, with Mode's recommendations (boards SetupVoiceProviders, SetupSpeakPicker, SetupListenPicker)
+        static let mostHuman = LocalizedStringResource("voice.mostHuman", defaultValue: "Most human")
+        static let freePrivate = LocalizedStringResource("voice.freePrivate", defaultValue: "Free and private")
+        static let mostAccurate = LocalizedStringResource("voice.mostAccurate", defaultValue: "Most accurate")
+        static let ourPick = LocalizedStringResource("voice.ourPick", defaultValue: "Our pick")
+        static let speakSubtitle = LocalizedStringResource("voice.speakSubtitle", defaultValue: "Who speaks when Mode talks back.")
+        static let listenTitle = LocalizedStringResource("voice.listenTitle", defaultValue: "How Mode listens")
+        static let listenSubtitle = LocalizedStringResource("voice.listenSubtitle", defaultValue: "Who turns what you say into words.")
+        static let connected = LocalizedStringResource("voice.connected", defaultValue: "Connected")
+        static let needsKey = LocalizedStringResource("voice.needsKey", defaultValue: "needs a key")
+        static let connectKey = LocalizedStringResource("voice.connectKey", defaultValue: "Connect")
+        static let suggestDeepgram = LocalizedStringResource("voice.suggestDeepgram", defaultValue: "Most accurate: Deepgram")
+        static let suggestDeepgramDetail = LocalizedStringResource("voice.suggestDeepgramDetail", defaultValue: "Free credit to start · Apple listens until then")
+        static let whyDeepgramTitle = LocalizedStringResource("voice.whyDeepgramTitle", defaultValue: "Why Deepgram")
+        static let whyDeepgram = LocalizedStringResource("voice.whyDeepgram", defaultValue: "Catches names, numbers and mixed languages best, even in a noisy room. Apple is private and free, and keeps listening if Deepgram can’t.")
+        static func voicesFrom(_ provider: String) -> String { String(localized: "voice.voicesFrom", defaultValue: "Voices from \(provider)") }
+        static func speakFallback(_ provider: String) -> String { String(localized: "voice.speakFallback", defaultValue: "If \(provider) can’t start, Apple speaks instead.") }
+        static func useVoice(_ name: String) -> String { String(localized: "voice.useVoice", defaultValue: "Use \(name)") }
         static let allowMic = LocalizedStringResource("voice.allowMic", defaultValue: "Allow mic")
         static let notNow = LocalizedStringResource("voice.notNow", defaultValue: "Not now")
         // Apple voice traits

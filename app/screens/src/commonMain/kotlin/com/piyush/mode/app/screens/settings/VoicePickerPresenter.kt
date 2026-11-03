@@ -115,7 +115,7 @@ public class VoicePickerPresenter(
     }
 
     private fun build(kind: VoiceKind, q: String, g: String?, list: VoiceList?, chosen: String?, p: String?): VoicePickerUiState {
-        val all = list?.options.orEmpty()
+        val all = Voices.withOurPick(kind, list?.options.orEmpty())
         val words = q.trim().lowercase().split(' ').filter { it.isNotEmpty() }
         val shown = all.filter { v ->
             (g == null || v.group == g) && words.all { w -> v.name.lowercase().contains(w) || v.traits.lowercase().contains(w) }

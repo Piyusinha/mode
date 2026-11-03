@@ -346,6 +346,15 @@ public class Voices(
         public const val SAMPLE: String = "I'll turn on Dark Mode."
         /** The tag on Fish Audio's most used voices; the app shows its own words for it. */
         public const val POPULAR: String = "popular"
+        /** The tag on the voice Mode suggests ([VoiceKind.ourPick]); the app shows its own words for it. */
+        public const val OUR_PICK: String = "our-pick"
+
+        /** [options] with Mode's suggested voice for [kind] first and tagged. */
+        public fun withOurPick(kind: VoiceKind, options: List<VoiceOption>): List<VoiceOption> {
+            val name = VoiceKind.ourPick(kind) ?: return options
+            val (pick, rest) = options.partition { it.name.equals(name, ignoreCase = true) || it.name.startsWith("$name ", ignoreCase = true) }
+            return pick.take(1).map { it.copy(tag = OUR_PICK) } + pick.drop(1) + rest
+        }
 
         /** "en" → "English", "hi" → "Hindi" (Fish Audio lists ISO codes); unknown codes as written. */
         internal fun languageName(code: String): String = LANGUAGES[code.lowercase().substringBefore('-')] ?: code

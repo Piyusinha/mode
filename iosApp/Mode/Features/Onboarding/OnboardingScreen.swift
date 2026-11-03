@@ -267,27 +267,37 @@ private struct VoiceStep: View {
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        VStack(spacing: ModeSpacing.l) {
-            // Sized so the Listening card ends above the pinned Continue on a 6.1" iPhone (board SetupVoice).
-            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb).padding(.vertical, ModeSpacing.m)
+        // Tighter than other steps so everything ends above the pinned Continue (board SetupVoiceProviders).
+        VStack(alignment: .leading, spacing: ModeSpacing.s) { content }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        VStack(spacing: ModeSpacing.s) {
+            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb, compact: true)
             Text(L10n.Voice.setupTitle).modeText(.title).multilineTextAlignment(.center)
-            Text(L10n.Voice.setupMessage).modeText(.callout, color: ModeColor.textSecondary).multilineTextAlignment(.center)
+            Text(L10n.Voice.setupMessage).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         ModeSectionHeader(L10n.Voice.modesVoice)
+        ModeCard {
+            VoiceChoiceRow(service: state.speaker,
+                           title: [state.speaker.title, state.voices.first { $0.id == state.voice }?.name].compactMap { $0 }.joined(separator: " · "),
+                           detail: state.speaker.plan(hearing: false), action: { onEvent(.openVoiceSheet(.speak)) }) { ModeChevron() }
+        }
         HStack(spacing: ModeSpacing.s) {
             ForEach(state.voices) { v in
                 Button { onEvent(.chooseVoice(v.id)) } label: {
                     VStack(alignment: .leading, spacing: ModeSpacing.s) {
                         HStack {
-                            ModeLeadingView(VoiceService.apple.tile).scaleEffect(0.7).frame(width: ModeSize.badge, height: ModeSize.badge)
+                            ModeLeadingView(state.speaker.tile).scaleEffect(0.7).frame(width: ModeSize.badge, height: ModeSize.badge)
                             Spacer(minLength: 0)
                             ModePlayButton(L10n.Voice.play(v.name), playing: state.voicePlaying == v.id, size: ModeSize.badge) { onEvent(.playVoice(v.id)) }
                         }
                         Text(v.name).modeText(.bodyEmphasis).lineLimit(1)
-                        Text(v.traits).modeText(.caption, color: ModeColor.textSecondary).lineLimit(2)
+                        Text(v.traits).modeText(.caption, color: ModeColor.textSecondary).lineLimit(1)
                     }
-                    .padding(ModeSpacing.m)
+                    .padding(ModeSpacing.s)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
                     .overlay(RoundedRectangle(cornerRadius: ModeRadius.field).strokeBorder(state.voice == v.id ? ModeColor.accent : .clear, lineWidth: ModeSize.separator * 2))
@@ -296,16 +306,19 @@ private struct VoiceStep: View {
                 .accessibilityAddTraits(state.voice == v.id ? .isSelected : [])
             }
         }
-        Text(L10n.Voice.setupMore).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
         ModeSectionHeader(L10n.Voice.listeningRow)
         ModeCard {
-            ModeRow(String(localized: L10n.Voice.listeningWithApple), subtitle: String(localized: state.hearingDenied ? L10n.Voice.micOff : L10n.Voice.freeAndPrivate),
-                    leading: VoiceService.apple.tile, emphasis: .prominent) {
-                if state.hearingReady {
-                    ModeStatusPill(String(localized: L10n.Voice.ready), tone: .success)
-                } else if !state.hearingDenied {
+            VoiceChoiceRow(service: state.listener, title: state.listener.title,
+                           detail: state.listener == .apple ? String(localized: state.hearingDenied ? L10n.Voice.micOff : L10n.Voice.freePrivate) : state.listener.plan(hearing: true),
+                           action: { onEvent(.openVoiceSheet(.listen)) }) {
+                if state.listener == .apple && !state.hearingReady && !state.hearingDenied {
                     ModeButton(L10n.Voice.allowMic) { onEvent(.allowMic) }
+                } else {
+                    ModeChevron()
                 }
+            }
+            if state.listener != .deepgram {
+                DeepgramSuggestion(compact: true) { onEvent(.openVoiceSheet(.listen)) }.padding(.bottom, ModeSpacing.m)
             }
         }
     }

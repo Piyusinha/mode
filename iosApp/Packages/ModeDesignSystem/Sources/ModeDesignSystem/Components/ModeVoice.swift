@@ -245,18 +245,23 @@ public struct ModeNowPlaying: View {
 public struct ModeVoiceOrb: View {
     private let speaking: Bool
     private let size: CGFloat
+    private let ring: CGFloat
+    private let rings: [Double]
 
-    public init(speaking: Bool, size: CGFloat = ModeSize.orb) {
+    /// [compact]: two thin rings, for screens that need the room (setup's Talk to Mode).
+    public init(speaking: Bool, size: CGFloat = ModeSize.orb, compact: Bool = false) {
         self.speaking = speaking
         self.size = size
+        ring = compact ? ModeSize.orbRingCompact : ModeSize.orbRing
+        rings = compact ? Array(ModeOpacity.orbRings.suffix(2)) : ModeOpacity.orbRings
     }
 
     public var body: some View {
         ZStack {
-            ForEach(Array(ModeOpacity.orbRings.enumerated()), id: \.offset) { i, opacity in
+            ForEach(Array(rings.enumerated()), id: \.offset) { i, opacity in
                 Circle().fill(ModeColor.accent.opacity(speaking ? opacity / 2 : opacity))
-                    .frame(width: size + ModeSize.orbRing * CGFloat(2 * (ModeOpacity.orbRings.count - i)),
-                           height: size + ModeSize.orbRing * CGFloat(2 * (ModeOpacity.orbRings.count - i)))
+                    .frame(width: size + ring * CGFloat(2 * (rings.count - i)),
+                           height: size + ring * CGFloat(2 * (rings.count - i)))
             }
             Circle().fill(ModeColor.accent).frame(width: size, height: size)
             if speaking {

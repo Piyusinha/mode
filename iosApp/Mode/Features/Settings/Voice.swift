@@ -59,6 +59,15 @@ enum VoiceService: String, CaseIterable, Identifiable {
     }
 
     var hearing: Bool { self == .soniox || self == .deepgram }
+
+    /// Mode's recommendation for this provider, if it is one: the most human voice, the most accurate listening.
+    var recommendation: String? {
+        switch self {
+        case .elevenlabs: String(localized: L10n.Voice.mostHuman)
+        case .deepgram: String(localized: L10n.Voice.mostAccurate)
+        default: nil
+        }
+    }
 }
 
 // MARK: - The provider lists (Mode's voice, Listening)
@@ -455,7 +464,8 @@ final class VoicePickerModel {
     private static func map(_ s: VoicePickerUiState) -> State {
         let voices = s.voices.map { v in
             Voice(id: v.id, name: v.name, traits: v.traits,
-                  tag: v.tag == Voices.companion.POPULAR ? String(localized: L10n.Voice.popular) : v.tag)
+                  tag: v.tag == Voices.companion.POPULAR ? String(localized: L10n.Voice.popular)
+                    : v.tag == Voices.companion.OUR_PICK ? String(localized: L10n.Voice.ourPick) : v.tag)
         }
         return State(
             service: VoiceService(id: s.provider) ?? .apple, groups: s.groups, group: s.group, voices: voices,
