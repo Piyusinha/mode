@@ -153,7 +153,12 @@ public class OnboardingPresenter(
         set { it.copy(paired = phoneChecks.hasPairingFile(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
         // "Come back here" ticks the moment Mode is in front again, not when the run ends:
         // the agent reads this screen to know it's finished.
-        lifecycle.onForeground { if (scope.isActive) cameBack() }
+        lifecycle.onForeground {
+            if (!scope.isActive) return@onForeground
+            // Paired from the Mac (Mode Setup) while setup was open: the Welcome row turns green on return.
+            set { it.copy(paired = phoneChecks.hasPairingFile()) }
+            cameBack()
+        }
         scope.launch { catalog.refresh() }
         scope.launch { catalog.state.collect { refreshModels() } }
         // Picking another provider brings its own models.
