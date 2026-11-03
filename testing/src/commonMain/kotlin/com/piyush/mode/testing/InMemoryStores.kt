@@ -10,6 +10,7 @@ class InMemorySecretStore(vararg initial: Pair<String, String>) : SecretStore {
     override fun set(name: String, value: String?) {
         if (value.isNullOrBlank()) values.remove(name) else values[name] = value
     }
+    override fun clear() = values.clear()
 }
 
 class InMemoryKeyValueStore : KeyValueStore {
@@ -18,6 +19,7 @@ class InMemoryKeyValueStore : KeyValueStore {
     override fun putString(name: String, value: String) {
         values[name] = value
     }
+    override fun clear() = values.clear()
 }
 
 /** Files in a map, with folders implied by "/" in the paths. */

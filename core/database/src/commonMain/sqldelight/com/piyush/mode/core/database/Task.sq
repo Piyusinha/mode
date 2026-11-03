@@ -55,3 +55,6 @@ WHERE status IN ('running', 'waiting');
 expireQueued:
 UPDATE task SET status = 'not_started', ended_at = ?, summary = 'Not run: it waited over an hour while Mode was closed.'
 WHERE status = 'queued' AND created_at < ?;
+
+deleteAll:
+DELETE FROM task;

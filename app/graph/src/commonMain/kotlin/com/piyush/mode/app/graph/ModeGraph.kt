@@ -48,6 +48,7 @@ import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** What each platform provides; everything else is built from these. */
@@ -81,6 +82,8 @@ class ModeGraph(platform: PlatformServices) {
     val telemetry: Telemetry = platform.telemetry
     val files: FileStore = platform.files
     val database: ModeDatabase = platform.database.create()
+    private val secrets: SecretStore = platform.secrets
+    private val prefs: com.piyush.mode.core.storage.KeyValueStore = platform.prefs
 
     val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
     /** Speaks and hears (one instance: the runner and the Settings lists share it). */
@@ -141,6 +144,8 @@ class ModeGraph(platform: PlatformServices) {
     /** Tasks that repeat; due ones go to the inbox, with a notification for when Mode is closed. */
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
 
+    private val claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() })
+
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     /** Each screen's presenter, for the native UI. */
     val screens: Screens = Screens(
@@ -153,9 +158,39 @@ class ModeGraph(platform: PlatformServices) {
         bench = com.piyush.mode.feature.settings.data.ModelBench(platform.prefs),
         claudeApi = com.piyush.mode.llm.ClaudeAccountApi(platform.http),
         openRouterApi = com.piyush.mode.llm.OpenRouterAccountApi(platform.http),
-        claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() }),
+        claudeModels = claudeModels,
         voices = voices,
     )
+
+    /**
+     * Settings → Reset Mode: stops what is running, then deletes everything Mode keeps on this iPhone (chats,
+     * tasks, runs and screenshots, memory, schedules, sign-ins and keys, settings, logs). Setup starts again.
+     * Phone control (the pairing file, outside these folders) and the VPN stay, so no Mac is needed.
+     */
+    suspend fun resetEverything() {
+        AppLog.log("app", "reset: deleting everything")
+        inbox.clear()
+        tasks.stop()
+        kotlinx.coroutines.withTimeoutOrNull(RESET_WAIT_MS) { tasks.state.first { !it.running } }
+        scheduler.deleteAll()
+        chatGpt.signOut()
+        claude.signOut()
+        database.transaction {
+            database.turnQueries.deleteAll()
+            database.runQueries.deleteAll()
+            database.taskQueries.deleteAll()
+            database.memoryQueries.deleteAll()
+            database.scheduleQueries.deleteAll()
+            database.conversationQueries.deleteAll()
+        }
+        files.delete("")
+        secrets.clear()
+        prefs.clear()
+        settings.reload()
+        claudeModels.clear()
+        voices.clearProblem()
+        AppLog.log("app", "reset: done, setup starts again")
+    }
 
     val compare: CompareRunner = CompareRunner(tasks, session, settings, platform.files, activity)
 
@@ -170,5 +205,10 @@ class ModeGraph(platform: PlatformServices) {
                 .onSuccess { if (it > 0) AppLog.log("runs", "listed $it earlier runs") }
                 .onFailure { AppLog.error("runs", "could not list earlier runs", it) }
         }
+    }
+
+    private companion object {
+        /** How long Reset waits for a stopped task to finish writing its last step. */
+        const val RESET_WAIT_MS = 5_000L
     }
 }

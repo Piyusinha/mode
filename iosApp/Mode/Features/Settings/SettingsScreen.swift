@@ -11,6 +11,7 @@ struct SettingsScreen: View {
     let costRange: ClosedRange<Double>
     let dailyCapStep: Double
     let dailyCapRange: ClosedRange<Double>
+    var resetting = false
     let onEvent: (SettingsViewModel.Event) -> Void
 
     var body: some View {
@@ -117,6 +118,12 @@ struct SettingsScreen: View {
                     ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }
                 }
                 .padding(.top, ModeSpacing.l)
+
+                ModeButton(resetting ? L10n.Settings.resetting : L10n.Settings.resetMode, role: .destructive, fullWidth: true) {
+                    onEvent(.askReset)
+                }
+                .disabled(resetting)
+                .padding(.top, ModeSpacing.l)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
@@ -199,20 +206,35 @@ struct SettingsRoute: View {
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
         self.app = app
-        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate))
+        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate, reset: { [app] in await app.resetEverything() }))
         _providers = State(initialValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
     }
 
     var body: some View {
         SettingsScreen(state: model.state, providers: providers.state, name: $model.name, costStep: model.costStep,
-                       costRange: model.costRange, dailyCapStep: model.dailyCapStep, dailyCapRange: model.dailyCapRange, onEvent: model.send)
+                       costRange: model.costRange, dailyCapStep: model.dailyCapStep, dailyCapRange: model.dailyCapRange,
+                       resetting: model.resetting, onEvent: model.send)
+            .alert(Text(L10n.Settings.resetConfirm), isPresented: $model.confirmingReset) {
+                Button(role: .cancel) {} label: { Text(L10n.Common.cancel) }
+                Button(role: .destructive) { model.send(.confirmReset) } label: { Text(L10n.Settings.resetMode) }
+            } message: {
+                Text(L10n.Settings.resetDetail)
+            }
             .sheet(isPresented: $model.showingProviders) {
                 ProvidersSheet(app: app, state: providers.state, onEvent: providers.send) { model.showingProviders = false }
                     .modifier(ProviderLinks(model: providers, app: app))
             }
             #if DEBUG && targetEnvironment(simulator)
-            // Simulator only: MODE_OPEN=settings:providers opens the providers sheet, for comparing with its board.
-            .task { if ProcessInfo.processInfo.environment["MODE_OPEN"] == "settings:providers" { model.send(.showProviders) } }
+            // Simulator only: MODE_OPEN=settings:providers opens the providers sheet, settings:reset the Reset
+            // confirmation and settings:resetnow resets, for comparing with boards and checking the reset.
+            .task {
+                switch ProcessInfo.processInfo.environment["MODE_OPEN"] {
+                case "settings:providers": model.send(.showProviders)
+                case "settings:reset": model.send(.askReset)
+                case "settings:resetnow": model.send(.confirmReset)
+                default: break
+                }
+            }
             #endif
     }
 }

@@ -71,6 +71,11 @@ public class Scheduler(
         if (enabled) schedules.get(id)?.let(::remind) else notifier.cancel(notificationId(id))
     }
 
+    /** Reset Mode: every schedule and its notification. */
+    public fun deleteAll() {
+        schedules.all().forEach { delete(it.id) }
+    }
+
     public fun delete(id: String) {
         schedules.delete(id)
         notifier.cancel(notificationId(id))

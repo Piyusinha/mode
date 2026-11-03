@@ -54,6 +54,12 @@ public class SettingsRepository(
     /** A sign-in or sign-out happened outside this repository (ChatGptAccount): readiness changes. */
     public fun accountsChanged() { refreshAccounts() }
 
+    /** After Reset Mode cleared the stores: every setting back to its default, setup not done. */
+    public fun reload() {
+        openRouterKeyRevision++
+        state.value = read()
+    }
+
     private fun hasChatGpt(): Boolean = !secrets.get(ChatGptAccount.CONNECTED_KEY).isNullOrBlank()
 
     /** [provider]'s phone-control and brain models: the live ones if it is in use, else the ones it keeps. */

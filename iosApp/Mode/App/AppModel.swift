@@ -26,4 +26,10 @@ final class AppModel {
     func onboardingFinished() {
         needsOnboarding = false
     }
+
+    /// Settings → Reset Mode: everything Mode keeps on this iPhone is deleted, and setup starts again.
+    func resetEverything() async {
+        do { try await graph.resetEverything() } catch { /* What could be deleted was; setup starts either way. */ }
+        needsOnboarding = true
+    }
 }

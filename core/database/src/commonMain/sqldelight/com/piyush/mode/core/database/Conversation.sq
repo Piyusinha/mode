@@ -25,3 +25,6 @@ SELECT * FROM conversation WHERE id = ?;
 
 recent:
 SELECT * FROM conversation ORDER BY updated_at DESC LIMIT ?;
+
+deleteAll:
+DELETE FROM conversation;

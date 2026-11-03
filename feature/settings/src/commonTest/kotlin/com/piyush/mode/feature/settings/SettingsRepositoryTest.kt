@@ -85,4 +85,23 @@ class SettingsRepositoryTest {
         val other = InMemoryKeyValueStore().also { it.putString("max_cost_per_task_usd", "0.2") }
         assertEquals(0.2, SettingsRepository(InMemorySecretStore(), other).settings.value.maxCostPerTaskUsd)
     }
+
+    @Test
+    fun afterTheStoresAreClearedReloadGoesBackToANewInstall() {
+        val secrets = InMemorySecretStore()
+        val prefs = InMemoryKeyValueStore()
+        val repo = SettingsRepository(secrets, prefs)
+        repo.apiKey = "sk-or-1"
+        repo.update { it.copy(onboardingDone = true, userName = "Piyush") }
+        assertTrue(repo.settings.value.onboardingDone)
+
+        secrets.clear()
+        prefs.clear()
+        repo.reload()
+
+        val s = repo.settings.value
+        assertFalse(s.onboardingDone)
+        assertNull(s.userName)
+        assertFalse(repo.hasApiKey)
+    }
 }

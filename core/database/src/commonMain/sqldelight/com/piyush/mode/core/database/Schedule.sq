@@ -34,3 +34,6 @@ SELECT * FROM schedule ORDER BY hour, minute;
 
 due:
 SELECT * FROM schedule WHERE enabled = 1 AND next_run_at <= ? ORDER BY next_run_at;
+
+deleteAll:
+DELETE FROM schedule;

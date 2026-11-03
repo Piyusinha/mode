@@ -70,6 +70,8 @@ final class SettingsViewModel {
         case openVoice
         case openListening
         case talkBack(Bool)
+        case askReset
+        case confirmReset
     }
 
     private(set) var state = State()
@@ -80,6 +82,9 @@ final class SettingsViewModel {
     private var syncingName = false
     var query = ""
     var showingProviders = false
+    var confirmingReset = false
+    private(set) var resetting = false
+    private let reset: (() async -> Void)?
     /// The provider in use (ModelProvider id), for its page.
     private var activeProvider: String { presenter.state.value.provider }
     private(set) var filter: Filter = .all
@@ -93,9 +98,10 @@ final class SettingsViewModel {
     let dailyCapStep = 0.1
     let dailyCapRange = 0.0...10.0
 
-    init(screens: Screens, navigate: @escaping (Route) -> Void) {
+    init(screens: Screens, navigate: @escaping (Route) -> Void, reset: (() async -> Void)? = nil) {
         presenter = screens.settings()
         self.navigate = navigate
+        self.reset = reset
         syncName(presenter.state.value.name)
         updates = observe(presenter.state) { [weak self] s in
             self?.state = Self.map(s)
@@ -139,6 +145,11 @@ final class SettingsViewModel {
         case .openVoice: navigate(.voice)
         case .openListening: navigate(.listening)
         case let .talkBack(on): presenter.setTalkBack(on: on)
+        case .askReset: confirmingReset = true
+        case .confirmReset:
+            guard !resetting, let reset else { return }
+            resetting = true
+            _Concurrency.Task { await reset() }
         }
     }
 

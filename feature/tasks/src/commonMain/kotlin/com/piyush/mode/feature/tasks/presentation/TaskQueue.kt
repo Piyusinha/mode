@@ -57,6 +57,13 @@ public class TaskQueue(
         refresh()
     }
 
+    /** Reset Mode: nothing more is started; the waiting list empties (their rows are deleted next). */
+    public fun clear() {
+        drain?.cancel()
+        drain = null
+        waiting.value = emptyList()
+    }
+
     /** At launch: tidy up after the last session, then run whatever is still waiting. */
     public fun recover() {
         tasks.tidyAfterRelaunch(MAX_WAIT_MS)

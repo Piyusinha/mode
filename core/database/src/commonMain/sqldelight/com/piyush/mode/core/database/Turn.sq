@@ -15,3 +15,6 @@ INSERT INTO turn(id, conversation_id, role, text, task_id, created_at) VALUES (?
 
 forConversation:
 SELECT * FROM turn WHERE conversation_id = ? ORDER BY created_at, rowid;
+
+deleteAll:
+DELETE FROM turn;

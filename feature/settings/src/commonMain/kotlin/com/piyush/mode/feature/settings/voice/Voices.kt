@@ -108,6 +108,9 @@ public class Voices(
     /** The last time the chosen speaking or listening provider failed; cleared when it next works. */
     public val problem: kotlinx.coroutines.flow.StateFlow<VoiceProblem?> = troubles
 
+    /** Reset Mode: no provider is chosen any more, so no failure stands. */
+    public fun clearProblem() { troubles.value = null }
+
     private fun failed(kind: VoiceKind, hearing: Boolean, trouble: VoiceTrouble) {
         troubles.value = VoiceProblem(kind, hearing, trouble)
         AppLog.log("voice", "${kind.id} ${if (hearing) "hearing" else "speaking"} failed: $trouble")

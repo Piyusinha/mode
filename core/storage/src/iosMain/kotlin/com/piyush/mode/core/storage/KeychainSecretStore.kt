@@ -88,6 +88,16 @@ public class KeychainSecretStore(private val service: String = "com.piyush.mode"
         check(status == errSecSuccess) { "Could not save a credential in Keychain ($status). Unlock this iPhone and try again." }
     }
 
+    /** Every item under Mode's service: keys, tokens and sign-ins. */
+    override fun clear() {
+        val dict = CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
+        CFDictionaryAddValue(dict, kSecClass, kSecClassGenericPassword)
+        CFDictionaryAddValue(dict, kSecAttrService, CFStringCreateWithCString(null, service, kCFStringEncodingUTF8))
+        val status = SecItemDelete(dict)
+        CFRelease(dict)
+        check(status == errSecSuccess || status == errSecItemNotFound) { "Could not remove Mode's credentials from Keychain ($status)." }
+    }
+
     private fun base(account: String): CFMutableDictionaryRef? {
         val dict = CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
         CFDictionaryAddValue(dict, kSecClass, kSecClassGenericPassword)

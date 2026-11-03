@@ -6,12 +6,18 @@ public interface SecretStore {
 
     /** Stores [value], or removes the entry when it is null or blank. */
     public fun set(name: String, value: String?)
+
+    /** Removes every secret Mode keeps (Settings → Reset Mode). */
+    public fun clear()
 }
 
 /** Plain settings (UserDefaults on iOS). */
 public interface KeyValueStore {
     public fun getString(name: String): String?
     public fun putString(name: String, value: String)
+
+    /** Removes every setting (Settings → Reset Mode). */
+    public fun clear()
 }
 
 /**

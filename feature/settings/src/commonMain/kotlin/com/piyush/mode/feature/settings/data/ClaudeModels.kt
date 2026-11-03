@@ -24,6 +24,9 @@ public class ClaudeModels @OptIn(ExperimentalTime::class) constructor(
     )
     public val known: StateFlow<List<PlanModel>> = mutable.asStateFlow()
 
+    /** Reset Mode: forget the list kept (the account is gone). */
+    public fun clear() { mutable.value = emptyList() }
+
     /** Asks Anthropic only when the list kept is missing or a day old: models change rarely. */
     public suspend fun refreshIfOld(): List<PlanModel> {
         val at = prefs.getString(AT_KEY)?.toLongOrNull()

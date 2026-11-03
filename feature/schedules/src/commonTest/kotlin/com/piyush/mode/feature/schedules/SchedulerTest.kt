@@ -127,4 +127,17 @@ class SchedulerTest {
         assertEquals(2, inbox.submitted.size)
         coroutineContext.cancelChildren()
     }
+
+    @Test
+    fun resetDeletesEveryScheduleAndItsNotification() = runTest {
+        val s = scheduler(this)
+        s.add("Send good morning to Sonali", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))
+        s.add("Read my calendar", ScheduleRule(9, 0, ScheduleRule.EVERY_DAY))
+        assertEquals(2, reminders.pending.size)
+
+        s.deleteAll()
+
+        assertTrue(repo.all().isEmpty())
+        assertTrue(reminders.pending.isEmpty())
+    }
 }

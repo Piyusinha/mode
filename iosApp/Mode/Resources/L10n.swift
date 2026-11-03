@@ -639,7 +639,7 @@ enum L10n {
         static let off = LocalizedStringResource("voice.off", defaultValue: "Off")
         static let talkBack = LocalizedStringResource("voice.talkBack", defaultValue: "Talk back")
         static let talkBackDetail = LocalizedStringResource("voice.talkBackDetail", defaultValue: "On tasks you start by voice")
-        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Mode picks the most human voice and the most accurate listening it can reach. Apple’s are free, private and always there to fall back on.")
+        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Mode speaks and listens with the ones you choose. Apple’s are free, private and work offline.")
         static let defaultVoice = LocalizedStringResource("voice.defaultVoice", defaultValue: "Default voice")
         // Mode's voice
         static let voiceSubtitle = LocalizedStringResource("voice.voiceSubtitle", defaultValue: "What Mode sounds like when it talks back.")
@@ -804,6 +804,13 @@ enum L10n {
     }
 
     enum Settings {
+        static let resetMode = LocalizedStringResource("settings.resetMode", defaultValue: "Reset Mode")
+        static let resetting = LocalizedStringResource("settings.resetting", defaultValue: "Resetting…")
+        static let resetConfirm = LocalizedStringResource("settings.resetConfirm", defaultValue: "Reset Mode and delete everything?")
+        static let resetDetail = LocalizedStringResource(
+            "settings.resetDetail",
+            defaultValue: "Your chats, tasks, routines, memory, connected accounts and keys, and settings are deleted from this iPhone, and setup starts again. Phone control stays. This can't be undone."
+        )
         static let you = LocalizedStringResource("settings.you", defaultValue: "You")
         static let name = LocalizedStringResource("settings.name", defaultValue: "Your name")
         static let namePrompt = LocalizedStringResource("settings.namePrompt", defaultValue: "What should Mode call you?")
