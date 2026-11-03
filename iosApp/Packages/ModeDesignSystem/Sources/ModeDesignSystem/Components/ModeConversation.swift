@@ -4,16 +4,19 @@ import SwiftUI
 public struct ModeUserBubble: View {
     private let text: String
     private let tag: LocalizedStringResource?
+    private let icon: ModeIcon
 
-    public init(_ text: String, tag: LocalizedStringResource? = nil) {
+    /// [tag]: how it was sent ("Spoken", "Typed", "You, while Mode worked") with its [icon].
+    public init(_ text: String, tag: LocalizedStringResource? = nil, icon: ModeIcon = .microphone) {
         self.text = text
         self.tag = tag
+        self.icon = icon
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.xs) {
             if let tag {
-                Label { Text(tag) } icon: { ModeIcon.microphone.image }
+                Label { Text(tag) } icon: { icon.image }
                     .modeText(.footnote, color: ModeColor.onAccent.opacity(0.85))
             }
             Text(text).modeText(.body, color: ModeColor.onAccent)

@@ -323,6 +323,63 @@ public struct ModeWorkingLine: View {
     }
 }
 
+/// The running task in its chat (board TeachSteer): Mode's mark, "Working · 0:42" counting up, what it is
+/// doing now, and a red Stop. Tapping it opens the live run.
+public struct ModeWorkingCard: View {
+    private let title: LocalizedStringResource
+    private let status: String
+    private let since: Date?
+    private let stopLabel: LocalizedStringResource
+    private let onOpen: () -> Void
+    private let onStop: () -> Void
+
+    public init(title: LocalizedStringResource, status: String, since: Date?, stopLabel: LocalizedStringResource,
+                onOpen: @escaping () -> Void, onStop: @escaping () -> Void) {
+        self.title = title
+        self.status = status
+        self.since = since
+        self.stopLabel = stopLabel
+        self.onOpen = onOpen
+        self.onStop = onStop
+    }
+
+    public var body: some View {
+        HStack(spacing: ModeSpacing.m) {
+            Button(action: onOpen) {
+                HStack(spacing: ModeSpacing.m) {
+                    ModeMark(size: ModeSize.badge)
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text(elapsedLine(at: context.date)).modeText(.footnote, color: ModeColor.textSecondary).monospacedDigit()
+                        }
+                        Text(status).modeText(.bodyEmphasis).lineLimit(2).modeShimmer()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            Button(action: onStop) {
+                ModeIcon.stop.image.font(ModeTextStyle.caption.font).foregroundStyle(ModeColor.stopRed)
+                    .frame(width: ModeSize.replyAction, height: ModeSize.replyAction)
+                    .background(ModeColor.stopDisc, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(stopLabel))
+        }
+        .padding(ModeSpacing.m)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        .animation(ModeMotion.standard, value: status)
+    }
+
+    private func elapsedLine(at now: Date) -> String {
+        let head = String(localized: title)
+        guard let since else { return head }
+        let seconds = max(0, Int(now.timeIntervalSince(since)))
+        return "\(head) · \(seconds / 60):" + String(format: "%02d", seconds % 60)
+    }
+}
+
 public extension View {
     /// A light sweeping across text, for "working on it" lines.
     func modeShimmer() -> some View {

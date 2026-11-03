@@ -18,8 +18,10 @@ struct ConversationScreen: View {
                         Text(state.title).modeText(.title).lineLimit(2).minimumScaleFactor(ModeTextScale.title)
                         Text(state.when).modeText(.subheadline, color: ModeColor.textSecondary)
                     }
-                    ForEach(state.messages) { message in
-                        MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? [], onEvent: onEvent)
+                    ForEach(Array(state.messages.enumerated()), id: \.element.id) { index, message in
+                        // Mode's quick acknowledgements (to a steer, or a lesson saved) have no Copy / Try again / Share.
+                        let acknowledgement = (index > 0 && state.messages[index - 1].steered) || state.lessons.contains { $0.afterTurnId == message.id }
+                        MessageView(message: message, thumbnails: message.screens.flatMap { thumbnails[$0.taskId] } ?? [], actions: !acknowledgement, onEvent: onEvent)
                             .id(message.id)
                         ForEach(state.lessons.filter { $0.afterTurnId == message.id }) { lesson in
                             ModeLessonCard(heading: L10n.Conversation.savedForNextTime, context: lesson.context, text: lesson.text,
@@ -41,7 +43,8 @@ struct ConversationScreen: View {
                         }
                     }
                     if let working = state.working {
-                        ModeWorkingLine(status: working, stopLabel: L10n.Common.stop, onOpen: { onEvent(.openLive) }, onStop: { onEvent(.stop) })
+                        ModeWorkingCard(title: L10n.Conversation.workingTitle, status: working, since: state.workingSince, stopLabel: L10n.Common.stop,
+                                        onOpen: { onEvent(.openLive) }, onStop: { onEvent(.stop) })
                             .transition(.opacity)
                     }
                     ForEach(state.remembered) { item in
@@ -69,6 +72,10 @@ struct ConversationScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
+          VStack(spacing: ModeSpacing.s) {
+            if state.running {
+                ModeTag(String(localized: L10n.Conversation.modeIsWorking), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+            }
             ModeMessageBar(
                 text: $draft, isPrivate: state.isPrivate, canSend: canSend,
                 labels: .init(prompt: state.running ? L10n.Conversation.steerPrompt : L10n.Conversation.teachPrompt, add: L10n.Ask.add, send: L10n.Ask.send, speak: L10n.Tab.ask,
@@ -80,6 +87,7 @@ struct ConversationScreen: View {
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.s)
+          }
         }
     }
 }
@@ -89,11 +97,18 @@ struct ConversationScreen: View {
 private struct MessageView: View {
     let message: ConversationViewModel.Message
     let thumbnails: [Image]
+    var actions = true
     let onEvent: (ConversationViewModel.Event) -> Void
 
     var body: some View {
         if message.fromUser {
-            ModeUserBubble(message.text, tag: message.spoken ? L10n.Conversation.spoken : nil)
+            if message.steered {
+                ModeUserBubble(message.text, tag: L10n.Conversation.whileWorking, icon: .arrowRight)
+            } else if message.spoken {
+                ModeUserBubble(message.text, tag: L10n.Conversation.spoken, icon: .microphone)
+            } else {
+                ModeUserBubble(message.text, tag: L10n.Conversation.typed, icon: .keyboard)
+            }
         } else {
             VStack(alignment: .leading, spacing: ModeSpacing.m) {
                 if let status = message.status { ModeBadge(status.text, icon: status.icon, tone: status.tone) }
@@ -101,11 +116,11 @@ private struct MessageView: View {
                 if let screens = message.screens {
                     ModeScreensLink(title: screens.label, thumbnails: thumbnails) { onEvent(.openScreens(screens.taskId)) }
                 }
-                ModeReplyActions([
+                if actions { ModeReplyActions([
                     .init(.copy, label: L10n.Conversation.copy) { onEvent(.copy(message)) },
                     .init(.runAgain, label: L10n.Conversation.tryAgain) { onEvent(.retry(message)) },
                     .init(.share, label: L10n.Conversation.shareReply) { onEvent(.shareReply(message)) },
-                ])
+                ]) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

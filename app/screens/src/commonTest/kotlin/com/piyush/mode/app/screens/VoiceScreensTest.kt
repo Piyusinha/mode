@@ -8,6 +8,7 @@ import com.piyush.mode.feature.settings.voice.VoiceOption
 import com.piyush.mode.feature.settings.voice.Voices
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,5 +50,29 @@ class VoiceScreensTest {
         assertEquals("Hey Piyush, good morning. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 8))
         assertEquals("Hey, good afternoon. What do you want me to do?", ListenPresenter.greetingLine(null, 14))
         assertEquals("Hey Piyush. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 1), "late at night: no greeting for the hour")
+    }
+
+    @Test
+    fun aKeyIsSavedOnlyOnceItsProviderAcceptsItAndRemovingItHandsBackToApple() = runTest {
+        val f = Fixture(this)
+        val http = HttpClient(MockEngine { request ->
+            if (request.headers["Authorization"] == "Token good-deepgram-key") respond("{}")
+            else respond("no", io.ktor.http.HttpStatusCode.Unauthorized)
+        })
+        val p = com.piyush.mode.app.screens.settings.VoicePresenter(backgroundScope, f.settings, Voices(f.settings, http), hearing = true)
+
+        p.checkAndSaveKey("deepgram", "bad-key-1234")
+        p.state.awaitState { it.keyCheck?.state == "failed" }
+        assertEquals("KeyRejected", p.state.value.keyCheck?.trouble)
+        assertEquals(null, f.settings.voiceKey(VoiceKind.Deepgram))
+
+        p.checkAndSaveKey("deepgram", "good-deepgram-key")
+        val saved = p.state.awaitState { it.keyCheck?.state == "saved" }
+        assertEquals("go•••••ey", saved.rows.first { it.id == "deepgram" }.masked)
+        assertTrue(saved.rows.first { it.id == "deepgram" }.first)
+
+        p.remove("deepgram")
+        val after = p.state.awaitState { s -> s.rows.firstOrNull { it.id == "apple" }?.first == true }
+        assertEquals(null, after.rows.first { it.id == "deepgram" }.masked)
     }
 }

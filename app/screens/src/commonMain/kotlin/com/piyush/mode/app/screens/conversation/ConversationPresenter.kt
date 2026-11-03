@@ -59,6 +59,8 @@ public data class TurnItem(
     /** On your messages: where the task came from (Siri and the Watch show as spoken). */
     val source: TaskSource?,
     val atMs: Long,
+    /** On your messages: said while Mode worked, to change how it does the running task (board TeachSteer). */
+    val steered: Boolean = false,
 )
 
 /** Part of a message: a paragraph, or consecutive "HH:MM thing" lines shown as a timetable. */
@@ -96,7 +98,7 @@ public class ConversationPresenter(
             combine(conversations.turns(conversationId), runner.state, tasks.recent(TASKS), privateNext, extras) { turns, run, _, private, (taught, offered, busy, problem) ->
                 ConversationUiState(
                     title = conversations.get(conversationId)?.title.orEmpty(),
-                    turns = turns.map { t ->
+                    turns = turns.mapIndexed { i, t ->
                         val task = t.taskId?.let(tasks::get)
                         val reply = t.role == TurnRole.Mode
                         TurnItem(
@@ -110,6 +112,7 @@ public class ConversationPresenter(
                             parts = if (reply) replyParts(withoutOldPrefix(t.text)) else listOf(ReplyPart.Paragraph(t.text)),
                             source = if (reply) null else task?.source,
                             atMs = t.createdAt,
+                            steered = !reply && turns.getOrNull(i + 1)?.let { n -> n.role == TurnRole.Mode && n.text == STEERED } == true,
                         )
                     },
                     running = run.running(tasks)?.takeIf { it.conversationId == conversationId },

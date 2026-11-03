@@ -13,6 +13,8 @@ final class ConversationViewModel {
         let id: String
         let fromUser: Bool
         let spoken: Bool
+        /// Sent while Mode worked, to change the running task ("You, while Mode worked").
+        let steered: Bool
         /// The raw text, for Copy.
         let text: String
         /// Mode's reply, drawn block by block.
@@ -32,8 +34,9 @@ final class ConversationViewModel {
         var title = ""
         var when = ""
         var messages: [Message] = []
-        /// What Mode is doing now, while this conversation's task runs.
+        /// What Mode is doing now, while this conversation's task runs, and since when.
         var working: String?
+        var workingSince: Date?
         var remembered: [Remembered] = []
         var isPrivate = false
         /// Tips taught in this chat, each under the reply it came with.
@@ -152,6 +155,7 @@ final class ConversationViewModel {
                     id: t.id,
                     fromUser: t.fromUser,
                     spoken: t.source == .siri || t.source == .watch || t.source == .voice,
+                    steered: t.steered,
                     text: t.text,
                     blocks: t.parts.map(ModeReplyBlock.init),
                     status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
@@ -159,6 +163,7 @@ final class ConversationViewModel {
                 )
             },
             working: s.running.map { $0.paused ? String(localized: L10n.Run.paused) : $0.status },
+            workingSince: s.running?.startedAtMs.map { Date(timeIntervalSince1970: TimeInterval(truncating: $0) / 1000) },
             remembered: s.remembered.map { Remembered(id: $0.itemId, text: L10n.Conversation.remembered($0.text)) },
             isPrivate: s.privateNext,
             lessons: s.lessons.map { l in

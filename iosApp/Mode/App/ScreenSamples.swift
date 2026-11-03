@@ -17,6 +17,8 @@ struct ScreenSample: Identifiable {
     @ViewBuilder var screen: some View {
         switch id.replacingOccurrences(of: "-bottom", with: "") {
         case "plan": PlanModelsScreen(state: Self.plan, onEvent: { _ in })
+        case "teach-steer": ConversationScreen(state: Self.teachSteer, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
+        case "teach-learned": ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
         case "talk-mic": talk(.init(phase: .needsMic), level: 0, speaking: false)
         case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
                                  level: 0.7, speaking: false)
@@ -45,6 +47,33 @@ struct ScreenSample: Identifiable {
     private static func effort(_ label: String, _ speed: String, _ right: String, _ selected: Bool = false) -> ModeEffortTable.Row {
         .init(label: label, speed: speed, accuracy: right, selected: selected)
     }
+
+    private static func said(_ id: String, _ text: String, spoken: Bool = false, steered: Bool = false) -> ConversationViewModel.Message {
+        .init(id: id, fromUser: true, spoken: spoken, steered: steered, text: text, blocks: [], status: nil, screens: nil)
+    }
+    private static func reply(_ id: String, _ text: String) -> ConversationViewModel.Message {
+        .init(id: id, fromUser: false, spoken: false, steered: false, text: text, blocks: [.paragraph(text)], status: nil, screens: nil)
+    }
+
+    /// Board TeachSteer: the user changes how the running task is done.
+    static let teachSteer = ConversationViewModel.State(
+        title: "Turn off Dark Mode", when: "Today 20:39",
+        messages: [said("1", "Open the Settings app and turn off Dark Mode", spoken: true),
+                   said("2", "It’s not there any more. Search for Dark Mode.", steered: true),
+                   reply("3", "Okay, I’ll do it that way.")],
+        working: "Looking for Appearance in Display & Brightness", workingSince: Date().addingTimeInterval(-42),
+        offerRemember: true, running: true
+    )
+
+    /// Board TeachLearned: a lesson saved for next time.
+    static let teachLearned = ConversationViewModel.State(
+        title: "Turn off Dark Mode", when: "Today 20:39",
+        messages: [said("1", "Open the Settings app and turn off Dark Mode", spoken: true),
+                   reply("2", "Done. Dark Mode is off; Light is on."),
+                   said("3", "Next time use Control Center for this, it’s faster."),
+                   reply("4", "Got it. Next time I’ll switch Dark Mode from Control Center.")],
+        lessons: [.init(id: "l1", context: "Settings · Dark Mode", text: "Dark Mode: open Control Center and tap its Dark Mode switch. Don’t go through Display & Brightness.", afterTurnId: "4")]
+    )
 
     static let plan = PlanModelsViewModel.State(
         chip: "ChatGPT Plus · 4 models on your plan",
