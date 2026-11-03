@@ -40,12 +40,19 @@ fn client() -> Result<reqwest::Client> {
     reqwest::Client::builder()
         .user_agent(concat!("ModeSetup/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(60))
         .build()
         .map_err(|e| SetupError::Download(e.to_string()))
 }
 
 /// The newest Mode release.
 pub async fn latest_mode() -> Result<Release> {
+    latest_mode_variant(false).await
+}
+
+/// Select the matching artifact; a paid update must never download the free IPA.
+pub async fn latest_mode_variant(paid: bool) -> Result<Release> {
+    let asset = if paid { "Mode-paid.ipa" } else { MODE_ASSET };
     let url = format!("https://api.github.com/repos/{MODE_REPO}/releases/latest");
     let rel: GhRelease = client()?
         .get(&url)
@@ -56,8 +63,8 @@ pub async fn latest_mode() -> Result<Release> {
         .json()
         .await
         .map_err(|e| SetupError::Download(format!("Mode’s release list ({e})")))?;
-    let ipa = rel.assets.iter().find(|a| a.name == MODE_ASSET).ok_or_else(|| SetupError::Download(format!("{MODE_ASSET} in {}", rel.tag_name)))?;
-    let sha = match rel.assets.iter().find(|a| a.name == format!("{MODE_ASSET}.sha256")) {
+    let ipa = rel.assets.iter().find(|a| a.name == asset).ok_or_else(|| SetupError::Download(format!("{asset} in {}", rel.tag_name)))?;
+    let sha = match rel.assets.iter().find(|a| a.name == format!("{asset}.sha256")) {
         Some(a) => Some(fetch_text(&a.browser_download_url).await?.split_whitespace().next().unwrap_or_default().to_lowercase()),
         None => None,
     };

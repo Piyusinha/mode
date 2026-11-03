@@ -33,6 +33,8 @@
     vpn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.BH9TWW5HPR', tunnelId: 'com.piyush.mode.BH9TWW5HPR.tunnel', appOn: false, tunnelOn: false } },
     vpnOn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.BH9TWW5HPR', tunnelId: 'com.piyush.mode.BH9TWW5HPR.tunnel', appOn: true, tunnelOn: true } },
     onPhone: { screen: 'onPhone', phone, readiness: 'ready', installedSidestore: true, phoneApps: { localDevVpn: null } },
+    onPhonePaid: { screen: 'onPhone', phone, ownVpn: true, readiness: 'ready' },
+    onPhoneConfirmed: { screen: 'onPhone', phone, ownVpn: true, phoneTestConfirmed: true, phonePresenceKnown: true, cableDisconnected: true },
     ready: { screen: 'ready', phone, readiness: 'ready', record: rec({}) },
     readyPaid: { screen: 'ready', phone, readiness: 'ready', record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },

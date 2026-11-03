@@ -62,9 +62,11 @@ const daysLeft = iso => iso ? Math.ceil((new Date(iso) - new Date()) / 86400000)
 // ---- state ------------------------------------------------------------------------------------------
 const STEPS = ['Connect your iPhone', 'Apple account', 'Install Mode', 'On your iPhone', 'Ready'];
 const S = {
+  operation: 'install', authAttempt: 0, update: null, reconnecting: false, reconnectResult: null,
   screen: 'welcome', phones: [], phone: null, readiness: null, shownDevSwitch: false,
   email: '', remember: true, signingIn: false, signInError: null, codeReq: null, code: '', codeError: null,
   helper: 'https://ani.iloader.app', helpers: [], teams: [], team: null, renew: 'sidestore',
+  phoneTestConfirmed: false, cableDisconnected: false, phonePresenceKnown: false,
   ownVpn: false, vpn: null, stages: [], progress: {}, installed: null, failure: null, phoneApps: null,
   prefs: { phones: {} }, record: null, busy: false, copied: false, customHelper: '',
 };
@@ -161,12 +163,12 @@ const screens = {
     body: head('Sign in with your Apple account', 'Mode is signed with your account so it can run on your iPhone. A free account is fine.')
       + `<form id="signin" style="display:flex;flex-direction:column;gap:14px;max-width:420px">
           <label class="field"><span>Apple Account</span><input id="email" type="email" autocomplete="username" value="${esc(S.email)}" required></label>
-          <label class="field${S.signInError ? ' error' : ''}"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="${S.hasSaved ? 'Saved on this computer' : ''}">${S.signInError ? `<em>${esc(S.signInError)}</em>` : ''}</label>
-          <button type="button" class="check ${S.remember ? 'on' : ''}" role="checkbox" aria-checked="${S.remember}" data-act="remember"><i>${S.remember ? svg('check', 12, 3.2) : ''}</i><span><b>Remember on this computer</b><small>Kept in this computer’s Keychain, so renewing Mode doesn’t ask again. Untick to sign in each time.</small></span></button>
+          <label class="field${S.signInError ? ' error' : ''}"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="${S.hasSaved ? 'Saved on this computer' : 'Leave blank to try a saved password'}">${S.signInError ? `<em>${esc(S.signInError)}</em>` : ''}</label>
+          <button type="button" class="check ${S.remember ? 'on' : ''}" role="checkbox" aria-checked="${S.remember}" data-act="remember"><i>${S.remember ? svg('check', 12, 3.2) : ''}</i><span><b>Remember on this computer</b><small>Save the password in this computer’s Keychain. Apple may still ask for verification when signing in again.</small></span></button>
         </form>`
       + `<p class="note">${svg('lock', 16, 2)}<span>Your password goes only to Apple. Mode and its makers never see it.</span></p>`,
     left: link('Create an Apple Account', 'https://account.apple.com/account'),
-    right: btn('Back', 'welcome') + (S.signingIn ? `<span class="wait">${spinner(18)}Signing in…</span>` : btn('Sign in', 'signIn', 'primary')),
+    right: btn('Back', 'cancelSignIn') + (S.signingIn ? `<span class="wait">${spinner(18)}Signing in…</span>` : btn('Sign in', 'signIn', 'primary')),
   }),
 
   code: () => {
@@ -270,14 +272,18 @@ const screens = {
     const needsVpnApp = !S.ownVpn;
     return page({
       nav: stepsNav(3), tight: true,
-      body: head('Finish on your iPhone', 'One thing at a time. This page ticks them off by itself.')
+      body: head('Finish on your iPhone', 'Please complete setup in Mode on your iPhone, then confirm that its phone-control test passed.')
         + `<div class="side-by-side"><div class="grow">` + box(row('done', S.installedSidestore ? 'Mode and SideStore installed' : 'Mode installed', S.ownVpn ? 'With Mode’s own VPN — no extra app needed' : '')
           + (needsVpnApp ? row(vpnApp ? 'done' : 'wait', 'Get LocalDevVPN from the App Store', vpnApp ? 'Installed. Open it and tap Connect.' : 'Free. Mode uses it to reach its tools on your iPhone without a computer. Scan the code with your iPhone.') : '')
-          + row(needsVpnApp && !vpnApp ? 'todo' : 'wait', 'Open Mode and follow its setup', 'Mode checks it can see and tap your screen', '', needsVpnApp && !vpnApp)
-          + row('todo', 'Unplug the cable', 'Mode runs its last check without this computer', '', true)) + '</div>'
-        + (needsVpnApp && !vpnApp ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span class="qr" role="img" aria-label="QR code for LocalDevVPN on the App Store">${S.qr ?? ''}</span><span style="font-size:12px;color:var(--sec)">LocalDevVPN · App Store</span></div>` : '') + '</div>',
-      left: link('Why LocalDevVPN?', 'https://github.com/Piyusinha/mode/blob/main/docs/mac-windows-setup-plan.md'),
-      right: btn('I’ve unplugged it', 'unplugged'),
+          + row(S.phoneTestConfirmed ? 'done' : 'todo', 'Complete setup and run the test in Mode', S.phoneTestConfirmed ? 'You confirmed the test passed on your iPhone.' : 'Open the Mode copy just installed. Finish setup and run its phone-control test.')
+          + row(S.cableDisconnected ? 'done' : 'todo', 'Unplug the cable', S.cableDisconnected ? 'Cable disconnected. Check Mode can still open Settings and tap.' : 'After the test passes, unplug and check Mode still works.', '', !S.phoneTestConfirmed)) + '</div>'
+        + (needsVpnApp && !vpnApp ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span class="qr" role="img" aria-label="QR code for LocalDevVPN on the App Store">${S.qr ?? ''}</span><span style="font-size:12px;color:var(--sec)">LocalDevVPN · App Store</span></div>` : '') + '</div>'
+        + callout('Already set up? Run a short task such as “Open Settings” in that copy of Mode. Confirm only if it can see and tap your screen. This computer cannot automatically detect the test result.', '', 'phone')
+        + (S.failure ? callout(esc(S.failure), 'orange', 'plug') : ''),
+      left: link(needsVpnApp ? 'Why LocalDevVPN?' : 'Setup help', 'https://github.com/Piyusinha/mode/blob/main/docs/mac-windows-setup-plan.md'),
+      right: S.phoneTestConfirmed
+        ? btn('Mode works unplugged — finish', 'finishPhoneSetup', 'primary', S.phonePresenceKnown && S.cableDisconnected ? '' : 'disabled')
+        : btn('Setup complete — test passed', 'confirmPhoneTest', 'primary'),
     });
   },
 
@@ -291,7 +297,7 @@ const screens = {
           + kv('Signed until', `${esc(fmtDate(r.mode?.expires))} · ${esc(r.teamName ?? '')}`)
           + kv('Renewing', paid ? 'Once a year, from this computer' : r.sidestore ? 'SideStore renews it every week on your iPhone' : 'Connect here once a week and press Renew',
             paid ? pill('No weekly renewal', 'green') : r.sidestore ? pill('No computer needed', 'green') : pill('Weekly', 'orange'))
-          + kv('Phone control', r.ownVpn ? 'Mode’s own VPN · checked by Mode on your iPhone' : 'LocalDevVPN · checked by Mode on your iPhone', pill(r.ownVpn ? 'No extra app' : 'Working', 'green')))
+          + kv('Phone control', r.ownVpn ? 'Mode’s own VPN · test confirmed by you' : 'LocalDevVPN · test confirmed by you', pill(r.ownVpn ? 'No extra app' : 'Working', 'green')))
         + (r.sidestore ? callout('Keep LocalDevVPN connected and your iPhone on Wi-Fi once a week, so SideStore can renew Mode.', '', 'wifi')
           : paid ? callout(`Renewing takes a minute with your iPhone connected. Due by ${esc(fmtDate(r.mode?.expires))}.`, '', 'renew') : ''),
       left: btn('See this iPhone', 'device'), right: btn('Done', 'device', 'primary'),
@@ -301,7 +307,11 @@ const screens = {
   device: () => {
     const r = S.record || {};
     const days = daysLeft(r.mode?.expires);
-    const connected = !!S.phone && S.phones.some(p => p.udid === S.phone.udid);
+    const connected = !!S.phone && S.phones.some(p => p.usb && p.udid === S.phone.udid);
+    const update = S.update;
+    const updateButton = update?.available ? btn(`Update to ${update.version}`, 'updateNow', 'small primary', connected ? '' : 'disabled')
+      : btn(update?.checking ? 'Checking…' : 'Check for updates', 'checkUpdates', 'small', update?.checking ? 'disabled' : '');
+    const updateNote = update?.error ?? (update?.available ? `Version ${update.version} is available.` : update?.checked ? 'No newer release is available.' : 'Check for a newer release before updating.');
     const soon = days != null && days <= (r.paid ? 30 : 2);
     const tc = (ic, kind, title, value, sub, action) => `<div class="tilecard"><div class="h">${tile(ic, kind, 30)}${esc(title)}</div><span class="v">${value}</span><span class="s">${sub}</span><span style="display:flex;gap:8px">${action}</span></div>`;
     return `<div class="drag"></div><nav class="side"><div class="brand">${mark(32)}<span><b>Mode Setup</b><small>for iPhone</small></span></div>
@@ -313,12 +323,14 @@ const screens = {
       ${soon ? callout(`<b>Mode stops opening ${days <= 0 ? 'now' : `in ${days} day${days === 1 ? '' : 's'}`}</b> (${esc(fmtDate(r.mode?.expires))}). Renew it now — it takes a minute and keeps everything on your iPhone.`, 'orange', 'renew', connected ? btn('Renew now', 'renewNow', 'primary') : '') : ''}
       ${!connected ? callout('Connect your iPhone with a cable to renew, update or reconnect.', '', 'plug') : ''}
       <div class="tiles">
-        ${tc('down', '', 'Mode', esc(r.mode?.version ?? '—'), 'Your chats, memory and sign-ins stay when you update.', btn('Update', 'renewNow', 'small primary', connected ? '' : 'disabled'))}
+        ${tc('down', '', 'Mode', esc(r.mode?.version ?? '—'), esc(updateNote), updateButton)}
         ${tc('renew', soon ? 'orange' : 'green', 'Signed until', esc(fmtDate(r.mode?.expires)), r.paid ? 'Paid account · renews once a year.' : r.sidestore ? 'SideStore renews it every week on your iPhone.' : 'Renewed by this computer. Free accounts last 7 days.',
-          r.paid || r.sidestore ? '' : btn('Install SideStore', 'addSidestore', 'small', connected ? '' : 'disabled'))}
-        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN', 'Make a new one if Mode can’t reach its tools.', btn('Reconnect', 'reconnect', 'small', connected ? '' : 'disabled'))}
+          btn('Renew signing', 'renewNow', 'small', connected ? '' : 'disabled') + (!r.paid && !r.sidestore ? btn('Install SideStore', 'addSidestore', 'small', connected ? '' : 'disabled') : ''))}
+        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN', S.reconnecting ? 'Keep your iPhone unlocked and connected. Stop any running task in Mode.' : 'Repair the pairing file if Mode can’t reach its tools.', btn(S.reconnecting ? 'Reconnecting…' : 'Reconnect', 'reconnect', 'small', connected && !S.reconnecting ? '' : 'disabled'))}
       </div>
-      ${S.failure ? callout(esc(S.failure), 'orange', 'plug') : ''}
+      ${S.reconnecting ? `<div role="status">${callout('Reconnecting phone control… Keep your iPhone unlocked and connected.', '', 'renew')}</div>` : ''}
+      ${S.reconnectResult ? `<div role="status">${callout(esc(S.reconnectResult), '', 'check')}</div>` : ''}
+      ${S.failure ? `<div role="alert">${callout(esc(S.failure), 'orange', 'plug')}</div>` : ''}
       ${box(kv('Apple account', `${esc(S.prefs.email ?? '')} · ${esc(r.teamName ?? '')}`, btnIcon('Sign out', 'out', 'signOut', 'small plain'))
         + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
       </main>`;
@@ -401,7 +413,7 @@ async function enter(screen) {
     }, 2000);
   }
   if (screen === 'signIn') {
-    S.hasSaved = S.email ? await call('has_remembered_password', { email: S.email }).catch(() => false) : false;
+    S.hasSaved = S.email === S.prefs.email && !!S.prefs.rememberedPassword;
     render();
     document.getElementById(S.email ? 'password' : 'email')?.focus();
   }
@@ -425,11 +437,14 @@ async function enter(screen) {
     }, 1500);
   }
   if (screen === 'onPhone') {
-    if (!S.qr) call('local_dev_vpn_qr').then(q => { S.qr = q; render(); }).catch(() => {});
+    if (!S.ownVpn && !S.qr) call('local_dev_vpn_qr').then(q => { S.qr = q; render(); }).catch(() => {});
     poll(async () => {
       const present = (await call('phones')).some(p => p.usb && p.udid === S.phone.udid);
-      if (!present) { await showReady(); return false; }
-      S.phoneApps = await call('apps_on_phone', { udid: S.phone.udid }).catch(() => S.phoneApps);
+      if (S.screen !== 'onPhone') return false;
+      S.cableDisconnected = !present;
+      S.phonePresenceKnown = true;
+      if (present) S.phoneApps = await call('apps_on_phone', { udid: S.phone.udid }).catch(() => S.phoneApps);
+      if (S.screen !== 'onPhone') return false;
       render();
     }, 2500);
   }
@@ -446,20 +461,25 @@ async function showReady() {
 
 // ---- signing in --------------------------------------------------------------------------------------
 async function signIn() {
+  if (S.signingIn) return;
+  const attempt = ++S.authAttempt;
   S.email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   if (!S.email) return;
   S.signingIn = true; S.signInError = null; render();
   try {
     S.teams = await call('sign_in', { email: S.email, password: password || null, remember: S.remember, helper: S.helper });
+    if (attempt !== S.authAttempt) return;
     S.signingIn = false;
     S.prefs = await call('prefs');
+    if (attempt !== S.authAttempt) return;
     const before = S.prefs.phones?.[S.phone?.udid];
     S.team = S.teams.find(t => t.id === before?.teamId) ?? S.teams[0] ?? null;
     if (!S.team) { S.signInError = 'This Apple account has no team that can sign apps.'; go('signIn'); return; }
     if (S.after === 'renew') { S.after = null; S.ownVpn = before?.ownVpn ?? false; S.vpnDecided = S.team.kind === 'paid' && !S.ownVpn; S.renew = S.renewAddSidestore || before?.sidestore ? 'sidestore' : 'computer'; S.renewAddSidestore = false; runInstall(); return; }
     if (S.teams.length > 1) go('team'); else afterTeam();
   } catch (e) {
+    if (attempt !== S.authAttempt) return;
     S.signingIn = false;
     const m = errText(e);
     if (/sign-in helper/i.test(m)) { go('helperDown'); return; }
@@ -467,11 +487,86 @@ async function signIn() {
     go('signIn');
   }
 }
-listen('code-needed', req => { S.codeReq = req; S.code = ''; S.codeError = !!req.lastFailed; go('code'); });
+listen('code-needed', req => { if (!S.signingIn) { call('submit_code', { answer: { kind: 'cancel' } }); return; } S.codeReq = req; S.code = ''; S.codeError = !!req.lastFailed; go('code'); });
 const answer = a => call('submit_code', { answer: a }).then(() => { if (S.screen === 'code') go('signIn', { signingIn: true }); });
 
 function afterTeam() {
   if (S.team.kind === 'paid') { S.renew = 'computer'; runInstall(); } else go('sidestore');
+}
+
+// Update checks never authenticate; renewing and installing intentionally do.
+function newerVersion(candidate, installed) {
+  const parse = v => /^v?\d+(?:\.\d+){0,3}$/.test(v ?? '') ? v.replace(/^v/, '').split('.').map(Number) : null;
+  const a = parse(candidate), b = parse(installed);
+  if (!a || !b) return null;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
+  }
+  return false;
+}
+async function checkForUpdates() {
+  if (S.update?.checking || !S.record) return;
+  const record = S.record;
+  S.update = { checking: true }; render();
+  try {
+    const release = await call('check_update', { ownVpn: record.ownVpn });
+    if (S.record !== record) return;
+    const newer = newerVersion(release.version, record.mode.version);
+    S.update = newer == null ? { error: 'Could not compare release versions. No update was started.' }
+      : { checked: true, available: newer, version: release.version };
+  } catch (e) {
+    if (S.record !== record) return;
+    S.update = { error: 'Could not check for a newer release. No update was started.' };
+  }
+  if (S.screen === 'device') render();
+}
+async function reconnectPhone() {
+  if (S.reconnecting || !S.phone) return;
+  const udid = S.phone.udid;
+  S.failure = null; S.reconnectResult = null;
+  if (!S.phones.some(p => p.usb && p.udid === udid)) {
+    S.failure = 'Connect and unlock your iPhone before reconnecting phone control.';
+    render(); return;
+  }
+  S.reconnecting = true; render();
+  try {
+    const copies = await call('phone_control', { udid });
+    if (S.phone?.udid !== udid) return;
+    S.reconnectResult = `Pairing repaired in ${copies.length === 1 ? 'Mode' : 'all copies of Mode'}. Open Mode on your iPhone and run a short task to check phone control.`;
+  } catch (e) {
+    if (S.phone?.udid === udid) S.failure = 'Phone control was not fully repaired. ' + errText(e);
+  } finally {
+    S.reconnecting = false;
+    if (S.screen === 'device') render();
+  }
+}
+
+async function beginDeviceAction(operation) {
+  if (!S.phone || !S.phones.some(p => p.usb && p.udid === S.phone.udid)) return;
+  S.operation = operation;
+  S.after = 'renew'; S.team = null; S.failure = null;
+  const active = await call('active_account').catch(() => null);
+  if (active?.email === S.prefs.email) {
+    const before = S.prefs.phones?.[S.phone.udid];
+    const team = active.teams.find(t => t.id === before?.teamId);
+    if (team) {
+      S.teams = active.teams; S.team = team; S.after = null;
+      S.ownVpn = before.ownVpn;
+      S.vpnDecided = team.kind === 'paid' && !S.ownVpn;
+      S.renew = S.renewAddSidestore || before.sidestore ? 'sidestore' : 'computer';
+      S.renewAddSidestore = false;
+      await runInstall(); return;
+    }
+  }
+  S.email = S.prefs.email ?? S.email;
+  go('signIn');
+}
+async function cancelSignIn() {
+  ++S.authAttempt;
+  S.signingIn = false; S.signInError = null; S.codeReq = null;
+  S.after = null; S.renewAddSidestore = false;
+  await call('cancel_sign_in').catch(() => {});
+  go(S.record ? 'device' : 'welcome');
 }
 
 // ---- installing ----------------------------------------------------------------------------------------
@@ -508,7 +603,7 @@ async function runInstall() {
     }
     if (paid) stage('vpn', S.ownVpn ? { state: 'done', title: 'Turned on Mode’s own VPN', sub: 'Network Extensions is on for Mode in your developer account' } : { state: 'done', title: 'Using LocalDevVPN', sub: 'Mode’s own VPN stays off' });
     stage('signing', { state: 'wait', fraction: 0 });
-    const installed = await call('install_mode', { udid, phoneName, teamId, ownVpn: S.ownVpn });
+    const installed = await call('install_mode', { udid, phoneName, teamId, ownVpn: S.ownVpn, update: S.operation === 'update' });
     stage('signing', { state: 'done', fraction: null, title: `Signed with ${S.team.name}`, sub: `Lasts until ${fmtDate(installed.expires)}` });
     stage('installing', { state: 'done', fraction: null, title: 'Installed Mode on your iPhone', sub: '' });
     if (!paid && S.renew === 'sidestore') {
@@ -523,7 +618,7 @@ async function runInstall() {
     S.prefs = await call('prefs');
     S.record = S.prefs.phones?.[udid];
     S.vpnDecided = false;
-    setTimeout(() => go('onPhone'), 700);
+    setTimeout(() => go('onPhone', { phoneTestConfirmed: false, cableDisconnected: false, phonePresenceKnown: false }), 700);
   } catch (e) {
     const m = errText(e);
     S.stages.forEach(s => { if (s.state === 'wait') s.state = 'fail'; });
@@ -543,7 +638,7 @@ document.addEventListener('click', async e => {
   if (!el || el.disabled) return;
   const [act, arg] = el.dataset.act.split(':');
   switch (act) {
-    case 'start': case 'welcomeConnect': S.failure = null; S.after = null; go('connect'); break;
+    case 'start': case 'welcomeConnect': S.operation = 'install'; S.failure = null; S.after = null; go('connect'); break;
     case 'welcome': go('welcome', { readiness: null, shownDevSwitch: false, record: null }); break;
     case 'pick': S.phone = S.phones[+arg]; render(); break;
     case 'pickContinue': go('trust'); break;
@@ -554,7 +649,7 @@ document.addEventListener('click', async e => {
     case 'text': answer({ kind: 'text', value: +arg }); break;
     case 'resend': answer({ kind: 'resend' }); break;
     case 'devices': answer({ kind: 'sendToDevices' }); break;
-    case 'cancelCode': answer({ kind: 'cancel' }); break;
+    case 'cancelCode': case 'cancelSignIn': await cancelSignIn(); break;
     case 'submitCode': answer({ kind: 'code', value: S.code }); break;
     case 'team': S.team = S.teams[+arg]; render(); break;
     case 'teamContinue': afterTeam(); break;
@@ -563,19 +658,35 @@ document.addEventListener('click', async e => {
     case 'noSidestore': S.renew = 'computer'; runInstall(); break;
     case 'localDevVpn': S.ownVpn = false; S.vpnDecided = true; runInstall(); break;
     case 'vpnCheck': go('vpn'); break;
-    case 'unplugged': showReady(); break;
+    case 'confirmPhoneTest':
+      if (S.screen === 'onPhone') { S.phoneTestConfirmed = true; render(); }
+      break;
+    case 'finishPhoneSetup':
+      if (S.screen !== 'onPhone' || !S.phoneTestConfirmed) break;
+      try {
+        // Recheck at the click: the cable may have been reconnected since the last poll.
+        const phones = await call('phones');
+        if (S.screen !== 'onPhone') break;
+        S.cableDisconnected = !phones.some(p => p.usb && p.udid === S.phone.udid);
+        S.phonePresenceKnown = true;
+        if (S.cableDisconnected) await showReady(); else render();
+      } catch (e) {
+        S.phonePresenceKnown = false;
+        S.failure = 'Could not check the cable connection. Please try again. ' + errText(e);
+        render();
+      }
+      break;
     case 'device': S.prefs = await call('prefs'); go('device'); break;
     case 'settings': S.returnTo = S.screen; go('settings'); break;
     case 'back': go(S.returnTo && S.returnTo !== 'settings' ? S.returnTo : S.record ? 'device' : 'welcome'); break;
     case 'helper': { const h = (S.helpers.length ? S.helpers : [{ url: 'https://ani.iloader.app' }, { url: 'https://ani.sidestore.io' }])[+arg]; S.helper = h.url; S.editingHelper = false; call('set_helper', { url: h.url }); render(); break; }
     case 'helperCustom': S.editingHelper = true; render(); document.getElementById('customHelper')?.focus(); break;
     case 'saveHelper': { const v = document.getElementById('customHelper').value.trim(); if (/^https:\/\//.test(v)) { S.helper = v; S.editingHelper = false; call('set_helper', { url: v }); render(); } break; }
-    case 'renewNow': S.after = 'renew'; S.team = null; go('signIn'); break;
-    case 'addSidestore': S.after = 'renew'; S.renewAddSidestore = true; go('signIn'); break;
-    case 'reconnect':
-      try { await call('phone_control', { udid: S.phone.udid }); S.failure = null; S.copied = false; render(); }
-      catch (err) { S.failure = errText(err); render(); }
-      break;
+    case 'checkUpdates': await checkForUpdates(); break;
+    case 'updateNow': if (S.update?.available) await beginDeviceAction('update'); break;
+    case 'renewNow': await beginDeviceAction('renew'); break;
+    case 'addSidestore': S.renewAddSidestore = true; await beginDeviceAction('renew'); break;
+    case 'reconnect': await reconnectPhone(); break;
     case 'signOut': await call('sign_out', { email: S.prefs.email ?? S.email }); S.prefs.email = null; S.hasSaved = false; render(); break;
     case 'copyReport': { const r = await call('diagnostics'); navigator.clipboard?.writeText(r).catch(() => {}); S.copied = true; render(); setTimeout(() => { S.copied = false; render(); }, 2000); break; }
   }

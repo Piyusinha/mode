@@ -14,7 +14,6 @@ use isideload::{
     },
     util::{
         callbacks::{ExtensionsBehaviorCallbackBox, MaxCertsCallbackBox},
-        keyring_storage::KeyringStorage,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -82,7 +81,7 @@ impl Signer {
     pub fn new(session: Session) -> Self {
         let inner = SideloaderBuilder::<MaxCertsCallbackBox, ExtensionsBehaviorCallbackBox>::new(session.dev, session.email)
             .max_certs_behavior(MaxCertsBehavior::Error)
-            .storage(Box::new(KeyringStorage::new(APP_NAME.to_string())))
+            .storage(crate::secure_storage::storage())
             .machine_name(APP_NAME.to_string())
             .build();
         Self { inner }

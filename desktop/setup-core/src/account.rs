@@ -9,7 +9,6 @@ use isideload::{
     anisette::remote_v3::RemoteV3AnisetteProvider,
     auth::apple_account::{AppleAccount, TwoFactorCallbackParams, TwoFactorCallbackResponse},
     dev::{developer_session::DeveloperSession, device_type::{DeveloperDeviceType, dev_url}},
-    util::keyring_storage::KeyringStorage,
 };
 use serde::{Deserialize, Serialize};
 
@@ -118,7 +117,7 @@ where
     let helper = RemoteV3AnisetteProvider::default()
         .map_err(|e| SetupError::HelperDown(e.to_string()))?
         .set_url(helper_url)
-        .set_storage(Box::new(KeyringStorage::new(APP_NAME.to_string())));
+        .set_storage(crate::secure_storage::storage());
     let mut account: AppleAccount = AppleAccount::builder(email)
         .anisette_provider(helper)
         .login(password, callback)

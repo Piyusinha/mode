@@ -34,3 +34,24 @@ Windows needs Apple's iTunes (from apple.com, not the Microsoft Store) for its i
 - [iLoader](https://github.com/nab138/iloader) (MIT code, nab138): the flow this follows, and the pairing-file
   layout SideStore reads. iLoader's name and logo are its own and are not used here.
 - Sign-in helpers (anisette servers) run by the iLoader and SideStore projects; they never see the password.
+
+## Desktop checks and local build
+
+```sh
+node --test desktop/setup-app/tests/phone-setup.test.cjs
+cd desktop && cargo test -p mode-setup-core
+# From the repository root:
+tools/build-setup.sh
+```
+
+On macOS the build script signs the debug executable with a stable Apple Development
+identity when exactly one is available. Set `MODE_SETUP_SIGN_IDENTITY` to select an
+identity explicitly. This preserves the executable's signing identity across rebuilds;
+it does not change Keychain access permissions. macOS may still ask permission when
+an existing item is first accessed by this identity.
+
+The device page checks GitHub Releases before offering an update. Checking does not
+sign in or access the Keychain. Renew signing is a separate, explicit action; it reuses
+an active account session when available. Back/Cancel returns to the device page.
+Setup completion is confirmed by the user after testing Mode on the iPhone and again
+with the cable unplugged; the desktop does not automatically read the phone's test result.

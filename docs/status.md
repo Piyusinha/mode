@@ -36,6 +36,22 @@ As of 2026-11-01.
 
 ## Roadmap
 
+### Telemetry, diagnostics, and backup (planned 2026-11-03)
+
+- [ ] **Cross-platform OpenTelemetry:** shared Kotlin instrumentation, correlated
+  traces/logs, offline persistence, and Rust metric aggregation. Reuse on Android;
+  add platform adapters rather than duplicating flow instrumentation.
+- [ ] **Desktop diagnostics:** fetch phone and desktop traces, export reports,
+  explain bottlenecks/failures with deterministic rules (no AI), and offer
+  explicit repair actions.
+- [ ] **Encrypted settings backup/restore:** include preferences and AI-provider
+  credentials, protected by a separate backup password; exclude chats, memory,
+  signing identities, and pairing records.
+
+Implementation and acceptance criteria:
+[OpenTelemetry, diagnostics, and backup plan](telemetry-diagnostics-backup-plan.md).
+These are planned features, not part of the desktop fixes already implemented.
+
 ### Focus now (set 2026-11-01)
 In this order; everything else below waits until these are done.
 1. ~~**H2, the context builder:**~~ done 2026-11-01: sectioned prompt with budgets, notes,

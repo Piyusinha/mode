@@ -14,6 +14,7 @@ pub mod error;
 pub mod install;
 pub mod pairing;
 pub mod release;
+pub mod secure_storage;
 
 pub use error::{Result, SetupError};
 

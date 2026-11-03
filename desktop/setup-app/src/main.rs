@@ -29,6 +29,10 @@ struct App {
     signer: Mutex<Option<Signer>>,
     teams: StdMutex<Vec<Team>>,
     code: CodeSlot,
+    email: StdMutex<Option<String>>,
+    auth_epoch: Arc<std::sync::atomic::AtomicU64>,
+    signing_in: Mutex<()>,
+    pairing: Mutex<()>,
 }
 
 type Res<T> = Result<T, String>;
@@ -99,28 +103,36 @@ async fn helpers() -> Vec<HelperStatus> {
 /// Signs in; Apple's code is asked with the "code-needed" event. Answers the teams, paid first.
 #[tauri::command]
 async fn sign_in(app: AppHandle, state: State<'_, App>, email: String, password: Option<String>, remember: bool, helper: String) -> Res<Vec<Team>> {
+    use std::sync::atomic::Ordering;
+    let _login = state.signing_in.try_lock().map_err(|_| "Sign-in is already in progress.")?;
+    let epoch = state.auth_epoch.fetch_add(1, Ordering::SeqCst) + 1;
     let password = match password.filter(|p| !p.is_empty()) {
         Some(p) => p,
         None => account::remembered_password(&email).ok_or("Enter your password.")?,
     };
     let slot = state.code.clone();
     let handle = app.clone();
+    let epochs = state.auth_epoch.clone();
     let ask = move |req: CodeRequest| {
+        let cancelled = epochs.load(Ordering::SeqCst) != epoch;
         let (tx, rx) = oneshot::channel();
         *slot.lock().unwrap() = Some(tx);
-        let _ = handle.emit("code-needed", req);
-        async move { rx.await.unwrap_or(CodeAnswer::Cancel) }
+        if !cancelled { let _ = handle.emit("code-needed", req); }
+        async move { if cancelled { CodeAnswer::Cancel } else { rx.await.unwrap_or(CodeAnswer::Cancel) } }
     };
     let mut session = account::sign_in(&email, &password, &helper, ask).await.map_err(err)?;
+    if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }
+    let teams = account::teams(&mut session).await.map_err(err)?;
+    if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }
     if remember {
         account::remember_password(&email, &password).map_err(err)?;
     } else {
         account::forget_password(&email);
     }
-    let teams = account::teams(&mut session).await.map_err(err)?;
     *state.teams.lock().unwrap() = teams.clone();
     *state.signer.lock().await = Some(Signer::new(session));
-    save_prefs(&app, |p| p.email = Some(email.clone()));
+    *state.email.lock().unwrap() = Some(email.clone());
+    save_prefs(&app, |p| { p.email = Some(email.clone()); p.remembered_password = remember; });
     Ok(teams)
 }
 
@@ -131,15 +143,29 @@ fn submit_code(state: State<'_, App>, answer: CodeAnswer) {
     }
 }
 
+/// No Keychain access: the UI can reuse this process's authenticated session.
 #[tauri::command]
-fn has_remembered_password(email: String) -> bool {
-    account::remembered_password(&email).is_some()
+fn active_account(state: State<'_, App>) -> Option<serde_json::Value> {
+    let email = state.email.lock().unwrap().clone()?;
+    Some(serde_json::json!({ "email": email, "teams": state.teams.lock().unwrap().clone() }))
 }
 
 #[tauri::command]
-fn sign_out(app: AppHandle, email: String) {
+fn cancel_sign_in(state: State<'_, App>) {
+    state.auth_epoch.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    if let Some(tx) = state.code.lock().unwrap().take() { let _ = tx.send(CodeAnswer::Cancel); }
+}
+
+#[tauri::command]
+async fn sign_out(app: AppHandle, state: State<'_, App>, email: String) -> Res<()> {
+    cancel_sign_in(state.clone());
+    *state.signer.lock().await = None;
+    *state.email.lock().unwrap() = None;
+    state.teams.lock().unwrap().clear();
     account::forget_password(&email);
-    save_prefs(&app, |p| p.email = None);
+    mode_setup_core::secure_storage::clear_cache();
+    save_prefs(&app, |p| { p.email = None; p.remembered_password = false; });
+    Ok(())
 }
 
 fn team(state: &State<'_, App>, id: &str) -> Res<Team> {
@@ -185,19 +211,17 @@ fn progress(app: &AppHandle, what: &str) -> mode_setup_core::install::Progress {
 
 /// The Mode app file to install: bundled with this app, else the one built in this repo, else the
 /// latest release (checked against its published SHA-256).
-async fn mode_ipa(app: &AppHandle, paid: bool) -> Res<PathBuf> {
+async fn mode_ipa(app: &AppHandle, paid: bool, update: bool) -> Res<PathBuf> {
     let name = if paid { "Mode-paid.ipa" } else { "Mode.ipa" };
-    if let Ok(dir) = app.path().resource_dir() {
-        let p = dir.join(name);
-        if p.exists() {
-            return Ok(p);
+    if !update {
+        if let Ok(dir) = app.path().resource_dir() {
+            let p = dir.join(name);
+            if p.exists() { return Ok(p); }
         }
+        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/release").join(name);
+        if dev.exists() { return Ok(dev); }
     }
-    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/release").join(name);
-    if dev.exists() {
-        return Ok(dev);
-    }
-    let rel = release::latest_mode().await.map_err(err)?;
+    let rel = release::latest_mode_variant(paid).await.map_err(err)?;
     let dest = std::env::temp_dir().join("ModeSetup").join(name);
     let handle = app.clone();
     release::download(&rel.ipa_url, &dest, rel.sha256.as_deref(), move |f| {
@@ -207,10 +231,16 @@ async fn mode_ipa(app: &AppHandle, paid: bool) -> Res<PathBuf> {
     .map_err(err)
 }
 
+/// A read-only update check; it does not authenticate or access the Keychain.
 #[tauri::command]
-async fn install_mode(app: AppHandle, state: State<'_, App>, udid: String, phone_name: String, team_id: String, own_vpn: bool) -> Res<Installed> {
+async fn check_update(own_vpn: bool) -> Res<release::Release> {
+    release::latest_mode_variant(own_vpn).await.map_err(err)
+}
+
+#[tauri::command]
+async fn install_mode(app: AppHandle, state: State<'_, App>, udid: String, phone_name: String, team_id: String, own_vpn: bool, update: Option<bool>) -> Res<Installed> {
     let t = team(&state, &team_id)?;
-    let ipa = mode_ipa(&app, own_vpn).await?;
+    let ipa = mode_ipa(&app, own_vpn, update.unwrap_or(false)).await?;
     let mut s = state.signer.lock().await;
     let installed = s.as_mut().ok_or("Sign in again.")?.install(&udid, &phone_name, &t, &ipa, progress(&app, "mode")).await.map_err(err)?;
     let record = Record { phone: phone_name, team_id: t.id.clone(), team_name: t.name.clone(), paid: t.kind == TeamKind::Paid, own_vpn,
@@ -245,14 +275,24 @@ async fn install_sidestore(app: AppHandle, state: State<'_, App>, udid: String, 
 
 /// Phone control: a fresh pairing for Mode (every copy) and SideStore when it is there.
 #[tauri::command]
-async fn phone_control(udid: String) -> Res<Vec<String>> {
-    let control = pairing::make(&udid).await.map_err(err)?;
-    let given = pairing::give_to_mode(&udid, &control).await.map_err(err)?;
-    let all = apps::installed(&udid).await.map_err(err)?;
-    if apps::sidestore(&all).is_some() {
-        pairing::give_to_sidestore(&udid, &control).await.map_err(err)?;
-    }
-    Ok(given)
+async fn phone_control(state: State<'_, App>, udid: String) -> Res<Vec<String>> {
+    let _pairing = state.pairing.try_lock().map_err(|_| "Phone control is already being reconnected. Please wait.")?;
+    tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        match device::trust(&udid).await.map_err(err)? {
+            Readiness::Ready => {},
+            Readiness::Locked => return Err("Unlock your iPhone and try again.".into()),
+            Readiness::NeedsTrust => return Err("Tap Trust on your iPhone, then try again.".into()),
+            Readiness::Denied => return Err("Reconnect the cable and tap Trust on your iPhone.".into()),
+            Readiness::NeedsDeveloperMode => return Err("Enable Developer Mode on your iPhone, then try again.".into()),
+        }
+        let control = pairing::make(&udid).await.map_err(err)?;
+        let given = pairing::give_to_mode(&udid, &control).await.map_err(err)?;
+        let all = apps::installed(&udid).await.map_err(err)?;
+        if apps::sidestore(&all).is_some() {
+            pairing::give_to_sidestore(&udid, &control).await.map_err(err)?;
+        }
+        Ok(given)
+    }).await.map_err(|_| "Reconnecting timed out after 60 seconds. Unlock your iPhone, stop any running task in Mode, reconnect the cable and try again.".to_string())?
 }
 
 // ---- What this computer remembers (no secrets: those are in the keychain) -------------------------
@@ -273,6 +313,8 @@ struct Record {
 #[serde(rename_all = "camelCase")]
 struct Prefs {
     email: Option<String>,
+    #[serde(default)]
+    remembered_password: bool,
     helper: Option<String>,
     #[serde(default)]
     phones: HashMap<String, Record>,
@@ -355,7 +397,7 @@ fn main() {
     tauri::Builder::default()
         .manage(App::default())
         .invoke_handler(tauri::generate_handler![
-            phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, has_remembered_password, sign_out,
+            phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
             mode_vpn_turn_on, mode_vpn_status, install_mode, install_sidestore, phone_control, prefs, set_helper, open_url, diagnostics,
             local_dev_vpn_qr, debug_start
         ])
