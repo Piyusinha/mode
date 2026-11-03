@@ -1,316 +1,171 @@
-# Mode Setup for macOS and Windows
-
-Implementation proposal. This document records the agreed desktop setup plan;
-it does not mean the companion applications have been implemented.
-
-## 1. Product and research conclusions
-
-Build a desktop companion that installs the latest compatible Mode release,
-signs it with the user's Apple developer identity, prepares the iPhone for phone
-control, and verifies that Mode works independently of the computer.
-
-### Decisions confirmed
-
-- Launch macOS and Windows together.
-- Native SwiftUI on Mac; native WinUI 3 on Windows.
-- Shared Rust setup engine.
-- Support free and paid Apple developer accounts.
-- Bundle tested IPAs and offer verified downloads of newer releases.
-- Free-account renewal happens through the desktop companion.
-- Operate a Mode-hosted anisette-v3 service.
-- Remember Apple login credentials only when the user explicitly opts in.
-
-### Important constraints
-
-- Free Personal Teams have seven-day provisioning, device/App-ID limits, and a
-  three-app installation limit. Show the actual expiry returned by Apple.
-  [Apple account limits](https://developer.apple.com/help/account/basics/about-your-developer-account)
-- Computer trust, Developer Mode, developer-app trust where required, and VPN
-  authorization need actions on the iPhone. Developer Mode includes a restart and
-  confirmation; the app must guide and resume around these steps.
-  [Apple Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device)
-- The provisioning profile belongs **inside the signed app**. Mode's
-  `mode.rppairing` file and the VPN configuration are separate setup items.
-- Being signed into iCloud does not automatically authorize developer signing.
-  Provide Apple-account authentication and 2FA inside the companion; do not
-  extract credentials from iCloud or Xcode.
-- Mode's current paid build includes its VPN extension; its free build uses
-  LocalDevVPN. Preserve those two supported variants.
-
-### Open-source foundation
-
-| Project | Planned use |
-|---|---|
-| [iLoader](https://github.com/nab138/iloader) | Reference for account login, provisioning, installation progress, and recovery UX. |
-| [isideload](https://github.com/nab138/isideload) | Authentication, certificates, developer teams, provisioning, and signing primitives behind our adapter. |
-| [idevice](https://github.com/jkcoxson/idevice) | USB discovery, device services, installation, file transfer, remote pairing, and developer-service access. |
-| [idevice_pair](https://github.com/jkcoxson/idevice_pair) | Reference for pairing validation, wireless debugging, and copying pairing records into app containers. |
-| [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server) | Candidate for the isolated Mode-hosted authentication-support service. |
-| [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) | Protocol and diagnostics reference for Developer Mode and personalized developer disk images. |
-
-Do not fork an entire desktop application. Pin dependencies, retain notices,
-audit transitive licenses, and keep Mode branding separate. `isideload` explicitly
-identifies entitlement handling as unfinished, so Mode-specific extension signing
-is a required integration task.
-[Upstream limitation](https://github.com/nab138/isideload#todo)
-
-## 2. Architecture and interfaces
-
-```mermaid
-flowchart TD
-    M[macOS SwiftUI] --> W[Bundled Rust worker]
-    N[Windows WinUI 3] --> W
-    W --> R[Verified Mode releases]
-    W --> A[Apple authentication and developer services]
-    W --> S[Mode anisette service]
-    W --> U[Apple USB transport]
-    U --> I[iPhone]
-    I --> P[Mode setup checks]
-```
-
-### Desktop separation
-
-- Add `desktop/macos`, `desktop/windows`, and `native/mode-setup`.
-- The Rust worker owns setup state, signing, downloads, device operations, and
-  recovery. UI layers render its state and collect user input.
-- Run the worker as a bundled child process over private stdin/stdout pipes. Use
-  a versioned JSON command/event protocol, keeping credentials out of command-line
-  arguments and logs.
-- Keep the existing iPhone `modecore` dependency pin isolated. Do not globally
-  upgrade its private-protocol implementation merely to satisfy desktop
-  dependencies.
-
-### Worker interface
-
-Commands cover device discovery, preflight, Apple login, 2FA response, team
-selection, install, refresh, update, repair, verification, cancellation, and
-diagnostics export.
-
-Events expose:
-
-- Operation ID, selected device and installation identity.
-- Current stage and progress.
-- Required user action.
-- Structured error with a recovery action.
-- Installed version, signing expiry, and verification results.
-
-Use one active mutating operation per device. Cancellation stops at safe
-boundaries; never interrupt a device installation halfway through its final
-commit.
-
-### Storage
-
-- Store passwords, session material, certificates/private keys, and pairing
-  records through macOS Keychain or Windows protected credential storage.
-- Temporary credentials remain in memory unless "Remember on this computer" is
-  selected.
-- Store only non-secret operation checkpoints and installation metadata in
-  ordinary app storage.
-- Scope records by Apple account, developer team, device, and effective bundle ID.
-- Never automatically revoke certificates used by other tools.
-
-### Hosted services
-
-- Serve signed release manifests and immutable artifacts.
-- Run anisette-v3 separately behind TLS with abuse controls and operational
-  monitoring.
-- Apple passwords, verification codes, certificates, and pairing records never
-  pass through Mode's servers.
-- Verify the chosen anisette implementation's license and operational behavior
-  before deployment; repository availability alone is insufficient.
-
-## 3. Installation, signing, and verification flow
-
-### A. Detect and prepare
-
-1. Discover connected iPhones; require explicit selection when several are
-   connected.
-2. Detect USB transport, lock state, computer trust, iOS compatibility, free
-   storage, and Developer Mode.
-3. On Windows, detect Apple Mobile Device transport/service availability. Use the
-   Apple iTunes dependency path documented by iLoader for the initial supported
-   configuration; validate Apple Devices installations separately before
-   advertising compatibility.
-   [iLoader prerequisites](https://github.com/nab138/iloader#how-to-use)
-4. Guide trust and Developer Mode actions, then reconnect to the same device after
-   restart.
-5. Recheck actual state before resuming; a saved checkpoint never implies a device
-   action succeeded.
-
-### B. Authenticate and select the installation
-
-1. Authenticate directly with Apple using anisette support and interactive 2FA.
-2. List developer teams and identify free versus paid membership.
-3. Show the selected Mode version, signing team, capabilities, expiry
-   implications, and required phone actions.
-4. Choose the free or paid IPA from the verified manifest.
-5. Inspect the existing installation before making changes.
-
-Keep bundle identifiers stable across refreshes. For new users, allocate a
-deterministic team-scoped identifier and preserve extension suffixes. Existing
-compatible installations retain their established identifiers.
-
-Changing teams or identifiers is a separate migration: warn about data/Keychain
-implications and require an explicit migration flow. Never silently uninstall an
-existing Mode installation.
-
-### C. Provision and sign
-
-- Reuse a valid locally held certificate/private-key pair; otherwise create one
-  with Apple.
-- Register the device and required App IDs.
-- Request profiles for the main app and each extension.
-- Rewrite bundle identifiers and identity-dependent entitlements consistently.
-- Sign nested executable bundles before the containing application, embedding the
-  correct profiles.
-- Validate signed entitlements against profile permissions before installation.
-- Preserve the widget and paid VPN capabilities; never silently strip
-  functionality to make signing pass.
-- If a paid team cannot authorize the VPN capability, report the restriction and
-  offer the free/external-VPN variant explicitly.
-
-### D. Install and configure phone control
-
-- Install or update over USB without deleting application data.
-- Confirm the installed app's effective identifier and version through device
-  services.
-- Create or validate the remote-pairing record using Mode's expected host
-  identity.
-- Transfer `mode.rppairing` through House Arrest/AFC to the effective Mode
-  container; read it back to verify transfer.
-- Enable wireless debugging where supported and verify it.
-- Prepare and personalize the compatible developer disk image.
-
-Developer disk-image delivery is a release gate: establish a supported
-acquisition path and applicable distribution rights before bundling or hosting
-Apple assets. Support a user-selected lawful local image as a diagnostic
-fallback. Do not ship an unverified public mirror as the production dependency.
-
-Extend Mode to read prepared developer-image assets from its protected
-application storage, allowing later repair without rebuilding the IPA.
-
-### E. Verify readiness inside Mode
-
-Installation success and phone-control readiness are separate results.
-
-Add a narrowly scoped setup handshake: the desktop writes a versioned request
-with an operation nonce into Mode's Documents; the foreground app consumes it and
-writes a correlated result. It can request only setup diagnostics—not arbitrary
-tasks.
-
-Checks include:
-
-- Pairing record parses and authenticates.
-- Developer services and disk image are available.
-- Required VPN route works from the iPhone.
-- A screenshot can be captured.
-- The existing hands check opens Settings, performs its test, and returns to Mode.
-
-Paid users approve Mode's VPN configuration. Free users receive a guided
-LocalDevVPN installation/opening flow; do not attempt to sign that third-party
-app with Mode's certificate.
-
-The desktop must release its developer-control session before the phone test.
-Complete physical validation with the cable unplugged, so a successful USB
-connection cannot conceal a broken on-phone route.
-
-## 4. Native UI, updates, and renewal
-
-### Design system
-
-Extend the existing SwiftUI `ModeDesignSystem` for macOS, separating UIKit-specific
-typography and appearance code behind platform implementations.
-
-Create a shared token source for colors, typography, spacing, radii, and semantic
-states. Generate Swift and WinUI resources from it; preserve existing mobile
-values. Windows reproduces the same Mode component hierarchy and styling using
-native controls.
-
-### Screens
-
-1. **Welcome:** install Mode, connect your iPhone.
-2. **Device:** detected device, trust/unlock instructions, prerequisite checks.
-3. **Apple account:** login, 2FA, team selection, optional remember checkbox.
-4. **Install:** version summary and a stage list covering signing, installation,
-   pairing, developer services, and verification.
-5. **On your iPhone:** one clear action at a time, with automatic progress
-   detection where possible.
-6. **Ready:** installed version, verification status, signing expiry, Open Mode.
-7. **Device dashboard:** Update, Refresh signing, Repair setup, Diagnostics,
-   Forget account.
-
-Use the mobile app's cards, step rows, status treatments, typography, and
-light/dark styling. Include keyboard navigation and accessible progress
-announcements.
-
-### Release and refresh behavior
-
-- Bundle tested free and paid IPAs with every desktop release.
-- Check a signed manifest for newer compatible artifacts; verify signatures and
-  hashes before unpacking or signing.
-- Keep the selected release fixed throughout an operation.
-- Treat app updates and signing refresh as separate operations.
-- Refresh preserves the app's identifier, team, data, and valid pairing record.
-- Display expiry from the actual provisioning profile; provide reminders before
-  expiry.
-- V1 refresh is user-triggered with the phone connected. No on-phone signer or
-  unattended background refresh daemon.
-- A failed refresh leaves the existing installation in place; never uninstall as
-  a recovery shortcut.
-
-## 5. Delivery gates and acceptance tests
-
-### Milestone 1 — Signing and device proof
-
-Before building the full UI, prove the Rust engine on macOS and Windows:
-
-- Apple login and 2FA.
-- Free-account installation including the widget.
-- Paid-account installation including widget and VPN extension.
-- Profile/entitlement validation and installed identity discovery.
-- Pairing transfer, developer-image preparation, and independent phone control.
-
-Failure of a gate produces a specific adapter fix or documented compatibility
-restriction before proceeding.
-
-### Milestone 2 — Native companions
-
-Implement both shells against the same command/event fixtures, the design-system
-adapters, resumable setup, and the device dashboard.
-
-### Milestone 3 — Releases and repair
-
-Add verified artifact delivery, refresh, expiry reminders, diagnostic export, and
-platform installers. Sign/notarize the Mac app and sign the Windows installer and
-worker.
-
-### Required scenarios
-
-- Fresh free and paid accounts on both operating systems.
-- Existing Mode update and signing refresh without losing conversations, memory,
-  settings, or provider credentials.
-- Wrong password, invalid/expired 2FA, missing agreements, team restrictions, and
-  certificate/App-ID exhaustion.
-- Locked device, rejected trust, missing Windows transport, unplug/replug, and
-  Developer Mode restart.
-- Expired/revoked profiles, invalid pairing, missing/incompatible disk images, VPN
-  denial, and mobile-data connection failure.
-- Interrupted download/signing/install, app restart, stale verification reports,
-  corrupt artifacts, and multiple connected phones.
-- Physical test after unplugging, after rebooting, and after the free profile
-  expires.
-- Diagnostic exports contain no credentials, pairing records, private keys, or
-  raw authentication responses.
-
-### Defaults and boundaries
-
-- Develop in `codex-changes`; do not merge unrelated feature branches as part of
-  implementing this proposal.
-- Initial desktop targets: macOS 26+ on supported Intel/Apple Silicon machines,
-  and Windows 11 x64.
-- Derive supported iPhone/iOS combinations from physical validation and publish
-  them in the compatibility manifest.
-- Desktop users need no Xcode, Rust, Python, or command-line setup.
-- "Ready" requires the on-phone check; "Installed" alone is not sufficient.
-- The computer is unnecessary for ordinary Mode tasks after setup, but
-  free-account renewal still requires it.
+# Mode Setup for macOS, Windows and Linux
+
+Implementation plan, revised 2026-11-03. It replaces the first proposal
+(two native desktop apps, a Mode-hosted anisette service, a signed release
+service). Nothing here is built yet.
+
+## 1. What changed and why
+
+The first proposal rebuilt, by hand and twice, what the open-source sideloading
+tools already ship. Mode's free build is the same kind of app those tools serve
+every day: an app that needs a remote-pairing file and a loopback VPN to reach
+its own phone's developer services (like StikDebug). So this plan follows their
+path instead of building a new one.
+
+| First proposal | This plan | Why |
+|---|---|---|
+| SwiftUI app on Mac + WinUI 3 app on Windows | **One Tauri app** (Rust + web UI) for Mac, Windows and Linux | iLoader already does exactly this; one UI to build, Linux for free |
+| Mode-hosted anisette-v3 server | **No Mode server.** A user-choosable public anisette server first; local anisette later | The server only supplies machine-identity headers; it never sees the Apple password or 2FA code. Nothing to run or police |
+| Signed release-manifest service | **GitHub Releases** for the IPA; Tauri's signed updater for the desktop app | What iLoader and SideStore use |
+| Desktop-written setup handshake (nonce file) | **Mode's own onboarding checks** on the phone | The checks already exist in Mode |
+| Paid build with Mode's VPN extension, signed by the desktop app | **Every account gets the free build + LocalDevVPN** (App Store) | Free build needs no special entitlements; isideload can sign it today |
+| Free-account renewal only from the computer | **SideStore refreshes Mode on the phone** (optional); the computer still works | That is how StikDebug users stay signed |
+
+## 2. How the open-source tools do it
+
+| Piece | Who does it today | What Mode reuses |
+|---|---|---|
+| Apple sign-in, 2FA, certificates, App IDs, profiles, signing | [isideload](https://github.com/nab138/isideload) (Rust, MIT) | The library as-is |
+| USB, install, House Arrest file copy, remote pairing | [idevice](https://github.com/jkcoxson/idevice) (Rust, MIT) | Already in Mode's `native/modecore` |
+| Desktop app around both, Mac/Windows/Linux | [iLoader](https://github.com/nab138/iloader) (Tauri, MIT code; its name and logo are reserved) | Its structure and flow as reference; no branding |
+| Anisette | isideload's `RemoteV3AnisetteProvider` (default `ani.iloader.app`); SideStore's public servers; [anisette-v3-server](https://github.com/Dadoum/anisette-v3-server) | isideload's `AnisetteProvider` trait, so a local provider can be added later |
+| Loopback VPN | [LocalDevVPN](https://github.com/StephenDev0/StikDebug) on the App Store | Mode's free build already uses it |
+| On-phone refresh every 7 days | SideStore | Recommend it; no Mode code |
+| Credentials | iLoader: `keyring` crate (macOS Keychain, Windows Credential Manager, Linux Secret Service) | Same crate |
+
+What iLoader already does, from its source (`src-tauri/src/pairing.rs`):
+
+- Makes the remote-pairing file over USB and copies it into an app's
+  `Documents` through House Arrest, for a fixed list of apps (`PAIRING_APPS`:
+  SideStore, StikDebug, Protokolle, …).
+- The file is the same `RpPairingFile` plist that Mode reads
+  (`engine/phone-ios/.../PairingFile.kt`, `Documents/mode.rppairing`).
+- Pair-verify signs the file's `identifier`; the host name is only a label
+  (`idevice/src/remote_pairing/mod.rs`). So a file made by iLoader should work
+  in Mode. **To confirm on the phone (step 0.1).**
+
+Mode's free build (`iosApp/project.yml`) is the Mode app plus the widget
+extension, with no app groups and no special entitlements: the easiest case
+for isideload. Only the paid build adds the Network Extension entitlement,
+which isideload does not handle yet ("Proper entitlement handling" is on its
+TODO list).
+
+## 3. Phases
+
+### Phase 0 — Works with existing tools (days, little code)
+
+Goal: anyone on Mac, Windows or Linux can set up Mode this week.
+
+1. **Spike on the phone** (half a day):
+   1. Install Mode's free IPA with iLoader's "Import IPA".
+   2. Make a pairing file with iLoader and copy it into Mode as
+      `Documents/mode.rppairing` (Files app or iLoader's pairing manager).
+   3. Check: the widget and Live Activity work, the tunnel opens with
+      LocalDevVPN, and a task runs unplugged.
+   If the iLoader pairing file is refused, Mode must accept the host name the
+   file was made with; record that and fix it in Mode before step 3.
+2. **Release the free IPA on GitHub Releases** from CI on every tag
+   (unsigned `.ipa` plus SHA-256). No server.
+3. **Mode finds the pairing file** under `mode.rppairing` or
+   `pairingFile.plist` (the name most apps in iLoader's list use).
+4. **Upstream a one-line PR to iLoader** adding `("Mode", "mode.rppairing")`
+   to `PAIRING_APPS`, so its pairing manager offers Mode by name.
+5. **Setup guide in Mode's onboarding "Phone control" step and in the README:**
+   1. Install iLoader (Windows: iTunes from Apple, not the Microsoft Store).
+   2. Sign in, import Mode's IPA.
+   3. Pairing → Mode.
+   4. Install LocalDevVPN from the App Store and connect it.
+   5. Optional: install SideStore to refresh Mode on the phone every week.
+
+Paid accounts follow the same steps. The paid VPN build stays the developer
+path (Xcode) for now.
+
+### Phase 1 — Mode Setup app (2–3 weeks)
+
+A small Tauri app, built the way iLoader is built, that only sets up Mode.
+
+- **Stack:** Tauri 2, `isideload` + `idevice` (pinned), `keyring`,
+  `tauri-plugin-updater`. One codebase; CI builds `.dmg`, `.msi` and
+  `.AppImage`/`.deb`.
+- **Location:** `desktop/setup` in this repo. Keep it separate from
+  `native/modecore`'s `idevice` pin; never upgrade modecore's pin to suit the
+  desktop app.
+- **One flow, one button:**
+  1. Find the iPhone; ask the user to unlock it, tap Trust, and turn on
+     Developer Mode (with the restart), then reconnect.
+  2. Apple sign-in and 2FA. Keep the password only if the user ticks
+     "Remember on this computer" (OS keychain).
+  3. Choose the team; show free or paid and the real expiry.
+  4. Download the latest free IPA from GitHub Releases and check its SHA-256
+     (or use the copy bundled with the app).
+  5. Sign and install with isideload. Keep the existing bundle ID on an
+     update; never uninstall to fix an error.
+  6. Make the pairing file with host name `Mode` and copy it to
+     `Documents/mode.rppairing`; read it back.
+  7. Point to LocalDevVPN, then "Open Mode on your iPhone". Mode's own
+     onboarding checks prove it works with the cable unplugged.
+- **Device page:** Update Mode, Refresh signing, Make a new pairing file,
+  Copy diagnostics (no passwords, tokens, keys or pairing files), Forget
+  account.
+- **Anisette:** isideload's remote v3 provider. Default to a public server,
+  let the user change it in Settings, and show a clear error when it is down.
+  No Mode server.
+- **UI:** HTML/CSS in Mode's colours, type and spacing (the same values the
+  design boards use), light and dark, keyboard navigation, progress announced
+  to screen readers. Boards first, as for the iPhone app.
+- **Code signing:** notarize the Mac build; sign the Windows installer.
+  Linux ships unsigned packages as iLoader does.
+
+### Phase 2 — Less dependence on others (when needed)
+
+Pick these up only if Phase 1 shows the need.
+
+- **Local anisette, no server at all:**
+  - **Mac:** a local `AnisetteProvider` that asks macOS itself (AltServer
+    does this).
+  - **Windows:** read it from iCloud for Windows (AltServer does this), or run
+    the anisette-v3 generator code inside the app.
+  - The remote server stays as a fallback.
+- **Paid build with Mode's own VPN extension:** add the Network Extension
+  entitlement in our signing adapter for paid teams (isideload's `sign.rs`
+  already injects `keychain-access-groups`), or use the App Store Connect API
+  with the user's API key, which needs no password or anisette. Also upstream
+  the entitlement fix to isideload.
+- **Mode refreshes itself on the phone** like SideStore (it already has the
+  pairing file, the tunnel and developer services), so free users never need
+  the computer again after setup.
+
+## 4. Rules that still hold
+
+- Apple passwords, 2FA codes, certificates, private keys and pairing files
+  never leave the user's computer and phone. They live in the OS keychain;
+  nothing secret in logs or diagnostics.
+- Never revoke certificates other tools use. Never uninstall Mode as a
+  recovery step. Keep its bundle ID, data and pairing file across updates and
+  refreshes.
+- Free accounts: 7-day signing, 3 apps, 10 App IDs a week. Show Apple's real
+  expiry. With SideStore and Mode that is 2 of the 3 apps; LocalDevVPN comes
+  from the App Store and does not count.
+- The developer disk image stays bundled in Mode (decision D18). Settle the
+  right to distribute it before a public release; StikDebug's alternative is
+  downloading it on the phone.
+- "Ready" means Mode's on-phone check passed with the cable unplugged, not
+  that the install finished.
+- Retain upstream licence notices (MIT). Do not use iLoader's name or logo.
+
+## 5. Tests before calling a phase done
+
+- Fresh free account on Mac, Windows and Linux; a paid account on one of them.
+- Update Mode over an existing install: conversations, memory, settings and
+  provider sign-ins survive.
+- Wrong password, wrong or expired 2FA code, anisette server down, App ID
+  limit reached, certificate limit reached.
+- Locked phone, Trust refused, Windows without Apple's iTunes, unplug during
+  install, Developer Mode restart.
+- Expired profile (day 8), a refresh through SideStore, a refresh through the
+  desktop app.
+- Pairing file missing, made for another phone, or invalidated by a Developer
+  Mode reset.
+- A task runs with the cable unplugged, and again after a reboot.
+- Diagnostics contain no credentials, pairing files, keys or raw Apple
+  responses.
