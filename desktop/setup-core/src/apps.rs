@@ -42,6 +42,11 @@ pub fn mode(apps: &[AppOnPhone]) -> Option<&AppOnPhone> {
     apps.iter().find(|a| is_mode(&a.bundle_id))
 }
 
+/// Every copy of Mode (an Xcode build and signed ones can sit side by side).
+pub fn modes(apps: &[AppOnPhone]) -> impl Iterator<Item = &AppOnPhone> {
+    apps.iter().filter(|a| is_mode(&a.bundle_id))
+}
+
 pub fn is_mode(bundle_id: &str) -> bool {
     bundle_id == MODE_BUNDLE
         || bundle_id.strip_prefix(MODE_BUNDLE).and_then(|rest| rest.strip_prefix('.')).is_some_and(|team| !team.contains('.'))

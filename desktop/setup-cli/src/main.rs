@@ -105,7 +105,8 @@ async fn trust() -> Result<()> {
 async fn list_apps() -> Result<()> {
     let p = phone().await?;
     let a = apps::installed(&p.udid).await?;
-    println!("Mode:        {}", apps::mode(&a).map(|m| format!("{} {}", m.bundle_id, m.version)).unwrap_or("not installed".into()));
+    let modes: Vec<String> = apps::modes(&a).map(|m| format!("{} {}", m.bundle_id, m.version)).collect();
+    println!("Mode:        {}", if modes.is_empty() { "not installed".into() } else { modes.join(", ") });
     println!("SideStore:   {}", apps::sidestore(&a).map(|m| format!("{} {}", m.bundle_id, m.version)).unwrap_or("not installed".into()));
     println!("LocalDevVPN: {}", apps::local_dev_vpn(&a).map(|m| m.version.clone()).unwrap_or("not installed".into()));
     Ok(())
@@ -221,8 +222,8 @@ async fn install(args: &[String]) -> Result<()> {
 async fn pair() -> Result<()> {
     let p = phone().await?;
     let control = pairing::make(&p.udid).await?;
-    let bundle = pairing::give_to_mode(&p.udid, &control).await?;
-    println!("✓ Phone control given to Mode ({bundle}).");
+    let bundles = pairing::give_to_mode(&p.udid, &control).await?;
+    println!("✓ Phone control given to Mode ({}).", bundles.join(", "));
     let a = apps::installed(&p.udid).await?;
     if apps::sidestore(&a).is_some() {
         pairing::give_to_sidestore(&p.udid, &control).await?;

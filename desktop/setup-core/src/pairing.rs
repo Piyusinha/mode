@@ -75,12 +75,18 @@ pub async fn place(udid: &str, bundle_id: &str, names: &[&str], bytes: &[u8]) ->
     Ok(())
 }
 
-/// Gives Mode its phone-control file. Mode must be installed.
-pub async fn give_to_mode(udid: &str, control: &PhoneControl) -> Result<String> {
+/// Gives every copy of Mode on the phone its phone-control file (an Xcode build and a signed one
+/// can sit side by side). Answers their bundle IDs. Mode must be installed.
+pub async fn give_to_mode(udid: &str, control: &PhoneControl) -> Result<Vec<String>> {
     let apps = apps::installed(udid).await?;
-    let mode = apps::mode(&apps).ok_or(SetupError::ModeMissing)?;
-    place(udid, &mode.bundle_id, &[MODE_FILE], &control.remote).await?;
-    Ok(mode.bundle_id.clone())
+    let modes: Vec<String> = apps::modes(&apps).map(|a| a.bundle_id.clone()).collect();
+    if modes.is_empty() {
+        return Err(SetupError::ModeMissing);
+    }
+    for bundle in &modes {
+        place(udid, bundle, &[MODE_FILE], &control.remote).await?;
+    }
+    Ok(modes)
 }
 
 /// Gives SideStore the same pairing, so it can renew apps on the phone.
