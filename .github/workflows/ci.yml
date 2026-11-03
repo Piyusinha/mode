@@ -1,12 +1,12 @@
-# Tests on every push and pull request: the shared Kotlin (agent, memory, tasks, screens) and
-# Mode Setup (Rust engine and the window app's screens). The iPhone app itself builds on a Mac
-# with Xcode 27 (see docs/setup.md).
+# Tests for pull requests, or run by hand (Actions → Tests → Run workflow): the shared Kotlin
+# (agent, memory, tasks, screens) and Mode Setup (Rust engine and the window app's screens). Not on
+# every push, to save Actions minutes; run them locally before pushing. The iPhone app builds on a
+# Mac with Xcode 27 (see docs/setup.md).
 name: Tests
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   kotlin:
