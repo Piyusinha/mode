@@ -16,6 +16,9 @@ struct ScreenSample: Identifiable {
 
     @ViewBuilder var screen: some View {
         switch id.replacingOccurrences(of: "-bottom", with: "") {
+        case "setup-voice-apple", "setup-voice-eleven":
+            OnboardingScreen(state: Self.voiceSetup(eleven: id == "setup-voice-eleven"), callName: .constant(""),
+                             providers: .init(), onProvider: { _ in }, onEvent: { _ in })
         case "plan": PlanModelsScreen(state: Self.plan, onEvent: { _ in })
         case "teach-steer": ConversationScreen(state: Self.teachSteer, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
         case "teach-learned": ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
@@ -42,6 +45,25 @@ struct ScreenSample: Identifiable {
         ]
         let signOut: LocalizedStringResource = s.kind == .chatGPT ? L10n.Account.signOutChatGPT : s.kind == .claude ? L10n.Account.signOutClaude : L10n.Account.removeKey
         return ProviderDetailScreen(state: s, link: links[s.kind].map { (title: $0.0, url: $0.1) }, signOutTitle: signOut, onEvent: { _ in }, openLink: { _ in })
+    }
+
+    private static func voiceSetup(eleven: Bool) -> OnboardingViewModel.State {
+        var state = OnboardingViewModel.State()
+        state.step = .voice; state.stepNumber = 5; state.stepLabel = "Step 5 of 6"
+        state.speaker = eleven ? .elevenlabs : .apple
+        state.microphoneAllowed = true
+        state.speakerStatus = eleven ? L10n.Voice.connectedKey("sk•••••9f") : String(localized: L10n.Voice.setupAppleSpeech)
+        state.voices = eleven ? [
+            .init(id: "rachel", name: "Rachel", traits: "Calm, clear · American", tag: String(localized: L10n.Voice.ourPick)),
+            .init(id: "adam", name: "Adam", traits: "Deep, steady · American"),
+            .init(id: "aria", name: "Aria", traits: "Warm, friendly · American")
+        ] : [
+            .init(id: "aaron", name: "Aaron", traits: "Clear · American"),
+            .init(id: "eddy", name: "Eddy", traits: "Bright · American"),
+            .init(id: "flo", name: "Flo", traits: "Warm · American")
+        ]
+        state.voice = state.voices.first?.id
+        return state
     }
 
     private static func effort(_ label: String, _ speed: String, _ right: String, _ selected: Bool = false) -> ModeEffortTable.Row {

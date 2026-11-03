@@ -707,13 +707,10 @@ struct VoicePickerScreen: View {
                 Text(L10n.Voice.noMatch).modeText(.callout, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
             } else {
                 ModeCard {
-                    VStack(spacing: ModeSpacing.xxs) {
-                        ForEach(state.voices) { v in
-                            ModeVoiceRow(name: v.name, traits: v.traits, tag: v.tag, selected: v.id == state.selected, playing: state.playing == v.id,
-                                         playLabel: L10n.Voice.play(v.name), onSelect: { onEvent(.select(v.id)) }, onPlay: { onEvent(.play(v.id)) })
-                        }
+                    ForEach(state.voices) { v in
+                        ModeVoiceChoiceRow(name: v.name, traits: v.traits, tag: v.tag, selected: v.id == state.selected, playing: state.playing == v.id,
+                                           playLabel: L10n.Voice.play(v.name), onSelect: { onEvent(.select(v.id)) }, onPlay: { onEvent(.play(v.id)) })
                     }
-                    .padding(.vertical, ModeSpacing.s)
                 }
                 Text(L10n.Voice.pickerNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
             }

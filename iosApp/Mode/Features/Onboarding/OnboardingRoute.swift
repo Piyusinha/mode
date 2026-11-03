@@ -30,8 +30,10 @@ struct OnboardingRoute: View {
             }
             .sheet(item: $model.voiceSheet, onDismiss: { model.send(.voiceSheetClosed) }) { sheet in
                 switch sheet {
-                case .speak: SpeakPickerSheet(app: app, provider: model.state.speaker.id)
-                case .listen: ListenPickerSheet(app: app)
+                case .speak: VoiceSettingsSheet(app: app, hearing: false)
+                case .listen: VoiceSettingsSheet(app: app, hearing: true)
+                case .voices: AllVoicesSheet(app: app, provider: model.state.speaker.id)
+                case .elevenLabs: ConnectVoiceSheet(app: app, service: .elevenlabs)
                 }
             }
             .sheet(item: $model.picking) { role in

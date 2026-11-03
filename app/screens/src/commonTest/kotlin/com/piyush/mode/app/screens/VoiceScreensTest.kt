@@ -36,6 +36,16 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun previewKeepsAVoiceFromTheFullCatalogWithoutLosingTheRecommendation() {
+        val all = listOf(VoiceOption("a", "Adam"), VoiceOption("b", "Aria"), VoiceOption("r", "Rachel"), VoiceOption("n", "Nova"))
+        val previews = Voices.previewVoices(VoiceKind.ElevenLabs, all, "n")
+        assertEquals(listOf("r", "a", "n"), previews.map { it.id })
+        assertEquals(Voices.OUR_PICK, previews.first().tag)
+        assertEquals(listOf("a", "b", "r", "n"), all.map { it.id }, "previewing never truncates or changes the full catalog")
+        assertEquals(listOf("n"), Voices.previewVoices(VoiceKind.ElevenLabs, all, "n", limit = 1).map { it.id })
+    }
+
+    @Test
     fun modeAnswersLikeAnAssistantWithoutReadingTheTaskBack() {
         val line = ListenPresenter.replyLine("can you turn on dark mode please")
         assertTrue(line in listOf("Sure, let me do that for you.", "On it.", "Sure, I'll take care of it.", "Got it, doing it now."), line)

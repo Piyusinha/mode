@@ -19,13 +19,15 @@ struct OnboardingScreen: View {
                 .padding(.bottom, ModeSpacing.xxl)
             }
             .scrollEdgeEffectStyle(.soft, for: .all)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(state.step == .voice ? .hidden : .visible, for: .navigationBar)
             .modeScreen()
-            .safeAreaInset(edge: .bottom) { buttons }
+            .safeAreaInset(edge: .bottom) { buttons.background(ModeColor.page) }
             .toolbar {
-                if state.step != .welcome && state.step != .result {
+                if state.step != .welcome && state.step != .result && state.step != .voice {
                     ToolbarItem(placement: .topBarLeading) { ModeToolbarButton(.back, label: L10n.Common.back) { onEvent(.back) } }
                 }
-                if let number = state.stepNumber {
+                if let number = state.stepNumber, state.step != .voice {
                     ToolbarItem(placement: .principal) { ModeStepDots(current: number, total: state.stepTotal, label: state.stepLabel) }
                 }
             }
@@ -261,63 +263,138 @@ private struct PermissionsStep: View {
     }
 }
 
-/// Talk to Mode (board "Setup · Talk to Mode"): pick one of Apple's voices, and let Apple listen.
+/// Setup's Talk to Mode board: compact provider headers and the same voice rows as Settings.
 private struct VoiceStep: View {
     let state: OnboardingViewModel.State
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        // Tighter than other steps so everything ends above the pinned Continue (board SetupVoiceProviders).
-        VStack(alignment: .leading, spacing: ModeSpacing.s) { content }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        VStack(spacing: ModeSpacing.s) {
-            ModeVoiceOrb(speaking: false, size: ModeSize.setupOrb, compact: true)
-            Text(L10n.Voice.setupTitle).modeText(.title).multilineTextAlignment(.center)
-            Text(L10n.Voice.setupMessage).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        ModeSectionHeader(L10n.Voice.modesVoice)
-        ModeCard {
-            VoiceChoiceRow(service: state.speaker,
-                           title: [state.speaker.title, state.voices.first { $0.id == state.voice }?.name].compactMap { $0 }.joined(separator: " · "),
-                           detail: state.speaker.plan(hearing: false), action: { onEvent(.openVoiceSheet(.speak)) }) { ModeChevron() }
-        }
-        HStack(spacing: ModeSpacing.s) {
-            ForEach(state.voices) { v in
-                Button { onEvent(.chooseVoice(v.id)) } label: {
-                    VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                        HStack {
-                            ModeLeadingView(state.speaker.tile).scaleEffect(0.7).frame(width: ModeSize.badge, height: ModeSize.badge)
-                            Spacer(minLength: 0)
-                            ModePlayButton(L10n.Voice.play(v.name), playing: state.voicePlaying == v.id, size: ModeSize.badge) { onEvent(.playVoice(v.id)) }
-                        }
-                        Text(v.name).modeText(.bodyEmphasis).lineLimit(1)
-                        Text(v.traits).modeText(.caption, color: ModeColor.textSecondary).lineLimit(1)
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: ModeSpacing.s) {
+                    ModeStepDots(current: state.stepNumber ?? 1, total: state.stepTotal, label: state.stepLabel)
+                        .padding(.top, ModeSpacing.l)
+                    ModeVoiceOrb(speaking: false, size: ModeSize.voiceLogo, compact: true, ringCount: 1)
+                    VStack(spacing: ModeSpacing.none) {
+                        Text(L10n.Voice.setupTitle).modeText(.title).multilineTextAlignment(.center)
+                        Text(L10n.Voice.setupPrompt).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center)
                     }
-                    .padding(ModeSpacing.s)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.field))
-                    .overlay(RoundedRectangle(cornerRadius: ModeRadius.field).strokeBorder(state.voice == v.id ? ModeColor.accent : .clear, lineWidth: ModeSize.separator * 2))
+                }
+                .frame(maxWidth: .infinity)
+                ModeIconButton(.back, label: L10n.Common.back, size: ModeSize.activityButton) { onEvent(.back) }
+            }
+
+            HStack {
+                Text(L10n.Voice.whoSpeaks).modeText(.headline).accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button { onEvent(.openVoiceSheet(.voices)) } label: {
+                    Text(L10n.Voice.viewMore).modeText(.footnote, color: ModeColor.tint).fontWeight(.semibold)
+                        .frame(minHeight: ModeSize.touch)
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(state.voice == v.id ? .isSelected : [])
             }
-        }
-        ModeSectionHeader(L10n.Voice.listeningRow)
-        ModeCard {
-            VoiceChoiceRow(service: state.listener, title: state.listener.title,
-                           detail: state.listener == .apple ? String(localized: state.hearingDenied ? L10n.Voice.micOff : L10n.Voice.freePrivate) : state.listener.plan(hearing: true),
-                           action: { onEvent(.openVoiceSheet(.listen)) }) {
-                if state.listener == .apple && !state.hearingReady && !state.hearingDenied {
-                    ModeButton(L10n.Voice.allowMic) { onEvent(.allowMic) }
-                } else {
-                    ModeChevron()
+            .padding(.horizontal, ModeSpacing.xs)
+            .frame(height: ModeSize.voiceSectionHeading)
+            ModeCard {
+                provider(state.speaker, hearing: false)
+                ForEach(state.voices) { voice in
+                    ModeVoiceChoiceRow(name: voice.name, traits: voice.traits, tag: voice.tag,
+                                       selected: state.voice == voice.id, playing: state.voicePlaying == voice.id,
+                                       playLabel: L10n.Voice.play(voice.name),
+                                       onSelect: { onEvent(.chooseVoice(voice.id)) }, onPlay: { onEvent(.playVoice(voice.id)) })
+                }
+                if state.speaker == .apple {
+                    Button { onEvent(.openVoiceSheet(.elevenLabs)) } label: {
+                        HStack(spacing: ModeSpacing.s) {
+                            ModeLeadingView(VoiceService.elevenlabs.tile).scaleEffect(0.7).frame(width: ModeSize.badge)
+                            Text(L10n.Voice.humanVoiceSuggestion).modeText(.footnote, color: ModeColor.tint).fontWeight(.semibold)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            ModeChevron()
+                        }
+                        .frame(minHeight: ModeSize.touch)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
+
+            ModeSectionHeader(L10n.Voice.whoListens)
+            ModeCard {
+                provider(state.listener, hearing: true)
+                microphone
+            }
         }
+    }
+
+    private var microphone: some View {
+        HStack(spacing: ModeSpacing.m) {
+            ModeIcon.microphone.image.modeText(.callout, color: ModeColor.tint)
+                .frame(width: ModeSize.voiceProviderLogo, height: ModeSize.voiceProviderLogo)
+                .background(ModeColor.tintSoft, in: .circle)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                Text(L10n.Setup.microphone).modeText(.callout)
+                Text(state.microphoneAllowed ? L10n.Voice.setupMicNote : L10n.Voice.setupMicRequestNote)
+                    .modeText(.footnote, color: ModeColor.textSecondary).fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if state.microphoneAllowed {
+                HStack(spacing: ModeSpacing.xs) {
+                    Circle().fill(ModeColor.success).frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
+                    Text(L10n.Setup.allowed).modeText(.footnote, color: ModeColor.success).fontWeight(.semibold)
+                }
+            } else {
+                Button { onEvent(state.microphoneDenied ? .openMicSettings : .allowMic) } label: {
+                    Text(state.microphoneDenied ? L10n.Voice.openSettings : L10n.Setup.allow)
+                        .modeText(.footnote, color: state.microphoneDenied ? ModeColor.tint : ModeColor.onAccent).fontWeight(.semibold)
+                        .padding(.horizontal, ModeSize.voiceChangePadding).frame(minHeight: ModeSize.voiceChangeHeight)
+                        .background(state.microphoneDenied ? ModeColor.fill : ModeColor.accent, in: .capsule)
+                        .frame(minHeight: ModeSize.touch).contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(minHeight: ModeSize.rowMin)
+    }
+
+    private func provider(_ service: VoiceService, hearing: Bool) -> some View {
+        HStack(spacing: ModeSpacing.m) {
+            ModeLeadingView(service.tile)
+                .scaleEffect(ModeSize.voiceProviderLogo / ModeSize.tile)
+                .frame(width: ModeSize.voiceProviderLogo, height: ModeSize.voiceProviderLogo)
+            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: ModeSpacing.s) { providerName(service).fixedSize(); recommendation(service) }
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) { providerName(service); recommendation(service) }
+                }
+                HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
+                    Circle().fill((hearing ? state.listenerConnected : state.speakerConnected) ? ModeColor.success : ModeColor.separator)
+                        .frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
+                    Text(hearing ? state.listenerStatus : state.speakerStatus)
+                        .modeText(.footnote, color: ModeColor.textSecondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button { onEvent(.openVoiceSheet(hearing ? .listen : .speak)) } label: {
+                Text(L10n.Providers.change).modeText(.footnote).fontWeight(.semibold)
+                    .padding(.horizontal, ModeSize.voiceChangePadding).frame(minHeight: ModeSize.voiceChangeHeight)
+                    .background(ModeColor.fill, in: .capsule)
+                    .frame(minHeight: ModeSize.touch)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .layoutPriority(1)
+            .accessibilityLabel(Text(hearing ? L10n.Voice.changeListener : L10n.Voice.changeSpeaker))
+            .accessibilityIdentifier(hearing ? "setup.voice.listening.provider" : "setup.voice.speaking.provider")
+        }
+        .padding(.vertical, ModeSpacing.s)
+        .frame(minHeight: ModeSize.voiceProviderRow)
+    }
+
+    private func providerName(_ service: VoiceService) -> some View { Text(service.title).modeText(.callout).fontWeight(.semibold) }
+    @ViewBuilder private func recommendation(_ service: VoiceService) -> some View {
+        if let tag = service.recommendation { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint).fixedSize() }
     }
 }
 

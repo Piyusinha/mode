@@ -75,12 +75,14 @@ public struct ModeIconButton: View {
     private let icon: ModeIcon
     private let label: LocalizedStringResource
     private let prominent: Bool
+    private let size: CGFloat
     private let action: () -> Void
 
-    public init(_ icon: ModeIcon, label: LocalizedStringResource, prominent: Bool = false, action: @escaping () -> Void) {
+    public init(_ icon: ModeIcon, label: LocalizedStringResource, prominent: Bool = false, size: CGFloat = ModeSize.touch, action: @escaping () -> Void) {
         self.icon = icon
         self.label = label
         self.prominent = prominent
+        self.size = size
         self.action = action
     }
 
@@ -88,7 +90,7 @@ public struct ModeIconButton: View {
         let button = Button(action: action) {
             icon.image
                 .font(ModeTextStyle.bodyEmphasis.font)
-                .frame(width: ModeSize.touch, height: ModeSize.touch)
+                .frame(width: size, height: size)
         }
         .buttonBorderShape(.circle)
         .accessibilityLabel(Text(label))

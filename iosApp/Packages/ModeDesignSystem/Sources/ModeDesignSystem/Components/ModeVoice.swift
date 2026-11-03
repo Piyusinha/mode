@@ -46,9 +46,62 @@ public struct ModePlayButton: View {
             }
             .frame(width: size, height: size)
             .background(playing ? ModeColor.accent : ModeColor.tintSoft, in: .circle)
+            .frame(minWidth: ModeSize.touch, minHeight: ModeSize.touch)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(label))
+    }
+}
+
+/// Compact voice choice used by setup and the full Settings picker. Previewing never selects a voice.
+public struct ModeVoiceChoiceRow: View {
+    private let name: String
+    private let traits: String
+    private let tag: String?
+    private let selected: Bool
+    private let playing: Bool
+    private let playLabel: String
+    private let onSelect: () -> Void
+    private let onPlay: () -> Void
+
+    public init(name: String, traits: String, tag: String? = nil, selected: Bool, playing: Bool,
+                playLabel: String, onSelect: @escaping () -> Void, onPlay: @escaping () -> Void) {
+        self.name = name; self.traits = traits; self.tag = tag
+        self.selected = selected; self.playing = playing; self.playLabel = playLabel
+        self.onSelect = onSelect; self.onPlay = onPlay
+    }
+
+    public var body: some View {
+        HStack(spacing: ModeSpacing.m) {
+            ModePlayButton(playLabel, playing: playing, action: onPlay)
+            Button(action: onSelect) {
+                HStack(spacing: ModeSpacing.s) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: ModeSpacing.s) { voiceName.fixedSize(); badge }
+                            VStack(alignment: .leading, spacing: ModeSpacing.xxs) { voiceName; badge }
+                        }
+                        if !traits.isEmpty {
+                            Text(traits).modeText(.footnote, color: ModeColor.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    ModeRadio(selected: selected)
+                }
+                .frame(minHeight: ModeSize.voiceChoiceRow)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
+        }
+        .frame(minHeight: ModeSize.voiceChoiceRow)
+    }
+
+    private var voiceName: some View { Text(name).modeText(.callout).fontWeight(.semibold).fixedSize(horizontal: false, vertical: true) }
+    @ViewBuilder private var badge: some View {
+        if let tag { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint).fixedSize() }
     }
 }
 
@@ -249,11 +302,12 @@ public struct ModeVoiceOrb: View {
     private let rings: [Double]
 
     /// [compact]: two thin rings, for screens that need the room (setup's Talk to Mode).
-    public init(speaking: Bool, size: CGFloat = ModeSize.orb, compact: Bool = false) {
+    public init(speaking: Bool, size: CGFloat = ModeSize.orb, compact: Bool = false, ringCount: Int? = nil) {
         self.speaking = speaking
         self.size = size
         ring = compact ? ModeSize.orbRingCompact : ModeSize.orbRing
-        rings = compact ? Array(ModeOpacity.orbRings.suffix(2)) : ModeOpacity.orbRings
+        let available = compact ? Array(ModeOpacity.orbRings.suffix(2)) : ModeOpacity.orbRings
+        rings = ringCount.map { Array(available.suffix(max(1, $0))) } ?? available
     }
 
     public var body: some View {

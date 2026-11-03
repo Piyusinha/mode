@@ -100,6 +100,8 @@ public data class OnboardingUiState(
     val voiceProvider: String = "apple",
     /** Who listens. */
     val listener: String = "apple",
+    val speakerKeyMasked: String? = null,
+    val listenerKeyMasked: String? = null,
     val voice: String? = null,
     val voicePlaying: String? = null,
     /** Apple listening: "ready", "permission", "denied", "asset" or "unsupported". */
@@ -143,6 +145,7 @@ public class OnboardingPresenter(
     /** When the test tapped Wi-Fi, and how long Mode then took to be back in front. */
     private var wifiTappedAt: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
     private var cameBackMs: Long? = null
+    private var voiceLoadGeneration: Long = 0
     private var selected: String? = settings.settings.value.model
     private var stuck: String? = settings.settings.value.strongModel
 
@@ -157,6 +160,8 @@ public class OnboardingPresenter(
             if (!scope.isActive) return@onForeground
             // Paired from the Mac (Mode Setup) while setup was open: the Welcome row turns green on return.
             set { it.copy(paired = phoneChecks.hasPairingFile()) }
+            scope.launch { runCatching { refreshPermissions() } }
+            if (state.value.step == OnboardingStep.Voice) loadVoices()
             cameBack()
         }
         scope.launch { catalog.refresh() }
@@ -422,7 +427,12 @@ public class OnboardingPresenter(
         go(OnboardingStep.Test)
     }
 
-    public fun chooseVoice(id: String) { set { it.copy(voice = id) } }
+    public fun chooseVoice(id: String) {
+        if (state.value.voiceOptions.any { it.id == id }) set { it.copy(voice = id) }
+    }
+
+    /** Keep the current selection and stop preview audio before opening Settings or the full list. */
+    public fun prepareVoicePicker() { keepVoice() }
 
     /** Plays [id] saying the sample; again stops it. */
     public fun playVoice(id: String) {
@@ -448,6 +458,7 @@ public class OnboardingPresenter(
                 kotlinx.coroutines.delay(1_000)
                 val now = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState()
                 set { it.copy(hearing = now) }
+                runCatching { refreshPermissions() }
                 if (now in setOf("ready", "denied", "unsupported")) return@launch
             }
         }
@@ -464,21 +475,31 @@ public class OnboardingPresenter(
         voices?.speaker()?.first ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple
 
     /** Reads who speaks and listens again (after a picker sheet changed them) and that speaker's voices. */
-    public fun refreshVoices() { if (state.value.step == OnboardingStep.Voice) loadVoices() }
+    public fun refreshVoices() {
+        if (state.value.step != OnboardingStep.Voice) return
+        loadVoices()
+        scope.launch { runCatching { refreshPermissions() } }
+    }
 
     private fun loadVoices() {
         val v = voices ?: return
         val kind = speakingKind()
+        val listener = v.listener() ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+        val generation = ++voiceLoadGeneration
         val changed = state.value.voiceProvider != kind.id
+        if (changed) stopVoice()
         set { it.copy(hearing = com.piyush.mode.feature.settings.voice.DeviceVoice.hearingState(), voiceProvider = kind.id,
-            listener = v.listener()?.id ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple.id,
+            listener = listener.id, speakerKeyMasked = settings.voiceKeyMasked(kind), listenerKeyMasked = settings.voiceKeyMasked(listener),
             voiceOptions = if (changed) emptyList() else it.voiceOptions, voice = if (changed) null else it.voice) }
         scope.launch {
-            // Mode's pick first, then the provider's own order (Apple lists the best for this iPhone's language first).
-            val options = com.piyush.mode.feature.settings.voice.Voices.withOurPick(kind, v.options(kind).options).take(OnboardingUiState.SETUP_VOICES)
-            val kept = settings.settings.value.voices[kind.id]?.id
-            set { it.copy(voiceOptions = options, voice = it.voice?.takeIf { k -> options.any { o -> o.id == k } }
-                ?: kept?.takeIf { k -> options.any { o -> o.id == k } } ?: options.firstOrNull()?.id) }
+            val all = com.piyush.mode.feature.settings.voice.Voices.withOurPick(kind, v.options(kind).options)
+            // A previous provider's slow request must not overwrite the currently selected provider.
+            if (generation != voiceLoadGeneration || speakingKind() != kind) return@launch
+            val saved = settings.settings.value.voices[kind.id]?.id
+            val selected = saved?.takeIf { id -> all.any { it.id == id } }
+                ?: state.value.voice?.takeIf { id -> all.any { it.id == id } } ?: all.firstOrNull()?.id
+            val options = com.piyush.mode.feature.settings.voice.Voices.previewVoices(kind, all, selected, OnboardingUiState.SETUP_VOICES)
+            set { it.copy(voiceOptions = options, voice = selected) }
         }
     }
 

@@ -471,6 +471,15 @@ public class Voices(
             return pick.take(1).map { it.copy(tag = OUR_PICK) } + pick.drop(1) + rest
         }
 
+        /** Three previews, preserving a voice chosen from the full catalog as the last row. */
+        public fun previewVoices(kind: VoiceKind, options: List<VoiceOption>, selected: String?, limit: Int = 3): List<VoiceOption> {
+            require(limit > 0)
+            val ranked = withOurPick(kind, options)
+            val first = ranked.take(limit)
+            val kept = ranked.firstOrNull { it.id == selected } ?: return first
+            return if (first.any { it.id == kept.id }) first else first.take(limit - 1) + kept
+        }
+
         /** "en" → "English", "hi" → "Hindi" (Fish Audio lists ISO codes); unknown codes as written. */
         internal fun languageName(code: String): String = LANGUAGES[code.lowercase().substringBefore('-')] ?: code
         private val LANGUAGES = mapOf(

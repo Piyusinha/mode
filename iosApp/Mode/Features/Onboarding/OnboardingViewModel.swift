@@ -12,7 +12,7 @@ final class OnboardingViewModel {
     enum Step: Equatable { case welcome, name, key, model, permissions, voice, test, result, diagnose }
 
     /// One of Apple's voices to pick in Talk to Mode.
-    struct VoiceCard: Identifiable, Equatable { let id: String; let name: String; let traits: String }
+    struct VoiceCard: Identifiable, Equatable { let id: String; let name: String; let traits: String; var tag: String? = nil }
 
     struct Choice: Identifiable, Equatable {
         let id: String
@@ -40,7 +40,7 @@ final class OnboardingViewModel {
     }
 
     /// Which voice sheet is open in Talk to Mode.
-    enum VoiceSheet: String, Identifiable { case speak, listen; var id: String { rawValue } }
+    enum VoiceSheet: String, Identifiable { case speak, listen, voices, elevenLabs; var id: String { rawValue } }
 
     /// Which role's picker is open.
     enum PickerRole: String, Identifiable {
@@ -128,8 +128,14 @@ final class OnboardingViewModel {
         /// Who speaks and who listens now.
         var speaker: VoiceService = .apple
         var listener: VoiceService = .apple
+        var speakerConnected = true
+        var listenerConnected = true
+        var speakerStatus = String(localized: L10n.Voice.setupAppleSpeech)
+        var listenerStatus = String(localized: L10n.Voice.setupAppleListening)
         var hearingReady = false
         var hearingDenied = false
+        var microphoneAllowed = false
+        var microphoneDenied = false
         // Test and result
         var testPhases: [ModeTestStrip.Phase] = [.pending, .pending, .pending]
         var testRunning = false
@@ -150,6 +156,9 @@ final class OnboardingViewModel {
                 && a.testPhases == b.testPhases && a.testRunning == b.testRunning && a.testPassed == b.testPassed && a.did == b.did
                 && (a.shot == nil) == (b.shot == nil) && a.summary == b.summary && a.checks == b.checks && a.checking == b.checking
                 && a.canContinue == b.canContinue && a.voices == b.voices && a.voice == b.voice && a.voicePlaying == b.voicePlaying
+                && a.speakerConnected == b.speakerConnected && a.listenerConnected == b.listenerConnected
+                && a.speakerStatus == b.speakerStatus && a.listenerStatus == b.listenerStatus
+                && a.microphoneAllowed == b.microphoneAllowed && a.microphoneDenied == b.microphoneDenied
                 && a.hearingReady == b.hearingReady && a.hearingDenied == b.hearingDenied && a.speaker == b.speaker && a.listener == b.listener
         }
     }
@@ -158,7 +167,7 @@ final class OnboardingViewModel {
         case next, back, chooseCard, connect, paste, chooseModel(String), openStuck, chooseStuck(String?), openSearch, allow(PermissionKind)
         case openPicker(PickerRole), chooseEffort(PickerRole, String), openVoiceSheet(VoiceSheet), voiceSheetClosed
         case runTest, worked(Bool), checkAgain, sendReport, finish, openCode
-        case chooseVoice(String), playVoice(String), allowMic, skipVoice
+        case chooseVoice(String), playVoice(String), allowMic, openMicSettings, skipVoice
     }
 
     private(set) var state = State()
@@ -209,6 +218,9 @@ final class OnboardingViewModel {
         if index >= 3 { key = "sk-or-v1-simulator-preview-0000"; presenter.next() }
         if index >= 4 { presenter.next() }
         if index >= 5 { presenter.next() }
+        if index >= 5, let raw = ProcessInfo.processInfo.environment["MODE_SETUP_PICKER"], let sheet = VoiceSheet(rawValue: raw) {
+            voiceSheet = sheet
+        }
         if index >= 6 { presenter.next() }
         if index >= 7 { presenter.next() }
         if index >= 8 {
@@ -244,9 +256,12 @@ final class OnboardingViewModel {
         case .openCode: openURL = codeURL
         case let .chooseVoice(id): presenter.chooseVoice(id: id)
         case let .playVoice(id): presenter.playVoice(id: id)
-        case .allowMic: presenter.allowMic()
+        case .allowMic:
+            if state.listener == .apple { presenter.allowMic() }
+            else { presenter.allow(kind: .microphone) }
+        case .openMicSettings: openURL = URL(string: UIApplication.openSettingsURLString)
         case .skipVoice: presenter.skipVoice()
-        case let .openVoiceSheet(sheet): voiceSheet = sheet
+        case let .openVoiceSheet(sheet): presenter.prepareVoicePicker(); voiceSheet = sheet
         case .voiceSheetClosed: presenter.refreshVoices()
         }
     }
@@ -316,11 +331,21 @@ final class OnboardingViewModel {
         st.results = s.results.map { choice($0, selected: $0.isMain) }
         st.stuckChoices = s.stuckChoices.map { choice($0, selected: $0.isStuck) }
         st.permissions = s.permissions.map(permission)
-        st.voices = s.voiceOptions.map { VoiceCard(id: $0.id, name: $0.name, traits: $0.traits) }
+        let microphone = s.permissions.first { $0.kind == .microphone }?.status
+        st.microphoneAllowed = microphone == .allowed
+        st.microphoneDenied = microphone == .denied
+        st.voices = s.voiceOptions.map { option in
+            VoiceCard(id: option.id, name: option.name, traits: option.traits,
+                      tag: option.tag == Voices.companion.OUR_PICK ? String(localized: L10n.Voice.ourPick) : nil)
+        }
         st.voice = s.voice
         st.voicePlaying = s.voicePlaying
         st.speaker = VoiceService(id: s.voiceProvider) ?? .apple
         st.listener = VoiceService(id: s.listener) ?? .apple
+        st.speakerConnected = st.speaker == .apple || s.speakerKeyMasked != nil
+        st.listenerConnected = st.listener == .apple || s.listenerKeyMasked != nil
+        st.speakerStatus = st.speaker == .apple ? String(localized: L10n.Voice.setupAppleSpeech) : s.speakerKeyMasked.map(L10n.Voice.connectedKey) ?? String(localized: L10n.Voice.noKey)
+        st.listenerStatus = st.listener == .apple ? String(localized: L10n.Voice.setupAppleListening) : s.listenerKeyMasked.map(L10n.Voice.connectedKey) ?? String(localized: L10n.Voice.noKey)
         st.hearingReady = s.hearing == "ready"
         st.hearingDenied = s.hearing == "denied"
         st.testRunning = s.testRunning

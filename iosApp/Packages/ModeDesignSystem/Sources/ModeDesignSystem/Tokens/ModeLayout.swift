@@ -97,6 +97,13 @@ public enum ModeSize {
     public static let previewIslandHeight: CGFloat = 37
 
     /// Voice: the play button on a voice, the voice card's logo, the wave's bar, the listening orb and its rings.
+    /// Talk to Mode v3: shared by setup previews and the full voice picker.
+    public static let voiceChoiceRow: CGFloat = 52
+    public static let voiceProviderRow: CGFloat = 60
+    public static let voiceProviderLogo: CGFloat = 36
+    public static let voiceChangeHeight: CGFloat = 34
+    public static let voiceChangePadding: CGFloat = 14
+    public static let voiceSectionHeading: CGFloat = 22
     public static let playButton: CGFloat = 40
     public static let voiceAvatar: CGFloat = 46
     public static let voiceLogo: CGFloat = 52

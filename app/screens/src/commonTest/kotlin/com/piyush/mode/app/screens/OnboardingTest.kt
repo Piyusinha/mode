@@ -171,6 +171,53 @@ class OnboardingTest {
     }
 
     @Test
+    fun microphonePermissionRefreshesWhenReturningFromSettings() = runTest {
+        val f = Fixture(this)
+        val p = onboarding(f)
+        p.state.awaitState { it.permissions.isNotEmpty() }
+        val mic = com.piyush.mode.core.platform.Permission.Microphone
+        f.permissions.granted += mic
+        lifecycle.comeToFront()
+        p.state.awaitState { it.permissions.single { row -> row.kind == PermissionKind.Microphone }.status == PermissionStatus.Allowed }
+        f.permissions.granted -= mic
+        lifecycle.comeToFront()
+        p.state.awaitState { it.permissions.single { row -> row.kind == PermissionKind.Microphone }.status == PermissionStatus.NotAsked }
+    }
+
+    @Test
+    fun aVoiceChosenInTheFullSettingsPickerSurvivesReturningToSetup() = runTest {
+        val f = Fixture(this)
+        val device = com.piyush.mode.feature.settings.voice.DeviceVoice
+        val old = device.voices
+        val options = (1..6).map { com.piyush.mode.feature.settings.voice.VoiceOption("voice-$it", "Voice $it") }
+        device.voices = { options }
+        val client = HttpClient(MockEngine { error("Apple voices need no network") })
+        try {
+            val voices = com.piyush.mode.feature.settings.voice.Voices(f.settings, client)
+            val p = OnboardingPresenter(backgroundScope, f.settings, f.catalog, f.session, f.runner,
+                f.permissions, f.checks, auth, lifecycle, voices = voices)
+            p.next(); p.setNameFromCard("Piyush", ""); p.next(); p.next(); p.next(); p.next()
+            assertEquals(OnboardingStep.Voice, p.state.value.step)
+            p.state.awaitState { it.voiceOptions.size == 3 }
+            p.chooseVoice("voice-2")
+            p.prepareVoicePicker()
+            assertEquals("voice-2", f.settings.settings.value.voices["apple"]?.id)
+            // Settings' full picker saves a voice beyond the initial three previews.
+            f.settings.update { it.copy(voices = it.voices + ("apple" to com.piyush.mode.feature.settings.domain.VoiceChoice("voice-6", "Voice 6"))) }
+            p.refreshVoices()
+            val updated = p.state.awaitState { it.voice == "voice-6" }
+            assertEquals(3, updated.voiceOptions.size)
+            assertTrue(updated.voiceOptions.any { it.id == "voice-6" })
+            p.next()
+            assertEquals("voice-6", f.settings.settings.value.voices["apple"]?.id)
+            p.close()
+        } finally {
+            device.voices = old
+            client.close()
+        }
+    }
+
+    @Test
     fun theTestTicksOffAndAFailureRunsTheChecks() = runTest {
         val f = Fixture(this, ScriptedModel(
             call("open_app", "name" to "Settings", "reason" to "open Settings"),
