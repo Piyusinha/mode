@@ -30,9 +30,13 @@
     "icon": [
       "icons/icon.png"
     ],
-    "resources": {
-      "../../build/release/Mode.ipa": "Mode.ipa",
-      "../../build/release/Mode-paid.ipa": "Mode-paid.ipa"
+    "publisher": "Piyush Sinha",
+    "copyright": "Copyright 2026 Piyush Sinha. Apache License 2.0.",
+    "category": "DeveloperTool",
+    "shortDescription": "Install Mode on your iPhone and pair it.",
+    "longDescription": "Mode Setup signs and installs Mode on your iPhone with your Apple account, turns on phone control, and keeps Mode signed.",
+    "macOS": {
+      "minimumSystemVersion": "13.0"
     }
   }
 }

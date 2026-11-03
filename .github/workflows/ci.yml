@@ -1,0 +1,42 @@
+# Tests on every push and pull request: the shared Kotlin (agent, memory, tasks, screens) and
+# Mode Setup (Rust engine and the window app's screens). The iPhone app itself builds on a Mac
+# with Xcode 27 (see docs/setup.md).
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kotlin:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Shared tests and module rules
+        run: ./gradlew jvmTest checkModuleRules
+
+  mode-setup:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libdbus-1-dev libudev-dev pkg-config
+      - name: Engine tests
+        working-directory: desktop
+        run: cargo test -p mode-setup-core
+      - name: Window app screens
+        working-directory: desktop/setup-app
+        run: node --test tests/

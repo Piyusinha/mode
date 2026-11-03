@@ -1,0 +1,53 @@
+# Mode Setup for Windows and Linux. tools/release.sh makes the draft release on a Mac (Mode's .ipa
+# files and the Mac .dmg need Xcode) and pushes the tag; this adds the Windows and Linux installers
+# to that draft. Run it by hand (Actions → Run workflow) to build without a release.
+name: Release · Mode Setup for Windows and Linux
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mode-setup:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libdbus-1-dev libudev-dev pkg-config patchelf
+      - name: Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+      - name: Build Mode Setup
+        working-directory: desktop/setup-app
+        run: cargo tauri build
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir out
+          find desktop/target/release/bundle \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) -exec cp {} out/ \;
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mode-setup-${{ runner.os }}
+          path: out/*
+      - name: Attach to the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" out/* --clobber

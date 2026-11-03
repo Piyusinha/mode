@@ -1,0 +1,84 @@
+#!/bin/sh
+# Makes a draft GitHub release of Mode: everything that needs a Mac and Xcode is built here, and the
+# tag starts GitHub Actions, which adds Mode Setup for Windows and Linux to the same release.
+#
+#   tools/release.sh 0.1.0          # → draft release v0.1.0
+#
+# The release holds, for Mode Setup to download (it checks each .ipa against its .sha256):
+#   Mode.ipa, Mode.ipa.sha256             the free build (LocalDevVPN)
+#   Mode-paid.ipa, Mode-paid.ipa.sha256   with Mode's own VPN, for paid Apple accounts
+#   Mode Setup for Mac (.dmg), then Windows (.msi, .exe) and Linux (.deb, .AppImage) from CI
+#
+# Signing the Mac app (optional until you have the certificate):
+#   MODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"   the identity to sign with
+#   MODE_NOTARY_PROFILE=mode-notary   a notarytool keychain profile, made once with
+#       xcrun notarytool store-credentials mode-notary --apple-id <you> --team-id <TEAMID>
+# Without them the .dmg is unsigned and macOS asks people to right-click → Open.
+#
+# Nothing is published: the release stays a draft until you publish it on GitHub.
+set -eu
+
+V=${1:?"usage: tools/release.sh <version>, e.g. 0.1.0"}
+TAG="v$V"
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+CARGO=${CARGO:-"$HOME/.cargo/bin/cargo"}
+cd "$ROOT"
+
+die() { echo "release: $*" >&2; exit 1; }
+
+# Releases come from main as pushed, so the tag and the files match.
+[ "$(git branch --show-current)" = main ] || die "switch to main first"
+git diff --quiet && git diff --cached --quiet || die "commit or stash your changes first"
+git fetch -q origin main
+[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || die "push main first (or pull): HEAD differs from origin/main"
+git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && die "tag $TAG already exists"
+
+# One version everywhere: Mode Setup's and Mode's.
+SETUP_V=$(sed -n 's/^ *"version": *"\(.*\)",*$/\1/p' desktop/setup-app/tauri.conf.json | head -1)
+[ "$SETUP_V" = "$V" ] || die "desktop/setup-app/tauri.conf.json says $SETUP_V; set it to $V"
+APP_V=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"$/\1/p' iosApp/project.yml | head -1)
+case "$V" in "$APP_V" | "$APP_V".0) ;; *) die "iosApp/project.yml MARKETING_VERSION is $APP_V; set it to $V";; esac
+
+echo "== Mode (.ipa, free and paid)"
+tools/build-ipa.sh both
+
+echo "== Mode Setup for Mac (.dmg)"
+if [ -n "${MODE_SIGN_IDENTITY:-}" ]; then export APPLE_SIGNING_IDENTITY="$MODE_SIGN_IDENTITY"; fi
+(cd desktop/setup-app && "$CARGO" tauri build --bundles dmg)
+DMG=$(ls desktop/target/release/bundle/dmg/*.dmg | head -1)
+[ -f "$DMG" ] || die "no .dmg was built"
+if [ -n "${MODE_NOTARY_PROFILE:-}" ]; then
+    echo "== Notarizing $DMG"
+    xcrun notarytool submit "$DMG" --keychain-profile "$MODE_NOTARY_PROFILE" --wait
+    xcrun stapler staple "$DMG"
+    spctl -a -t open --context context:primary-signature -v "$DMG"
+else
+    echo "   (unsigned: set MODE_SIGN_IDENTITY and MODE_NOTARY_PROFILE to sign and notarize)"
+fi
+MAC_DMG="build/release/Mode-Setup-$V-mac.dmg"
+cp "$DMG" "$MAC_DMG"
+
+echo "== Draft release $TAG"
+NOTES=$(mktemp)
+cat > "$NOTES" <<EOF
+## Install
+1. Download **Mode Setup** for your computer below (Mac: .dmg, Windows: .msi or .exe, Linux: .deb or .AppImage).
+2. Connect your iPhone with a cable and follow Mode Setup. It downloads Mode from this release and checks it.
+
+Mode needs an iPhone on iOS 27 or later with Developer Mode on. See the README.
+
+## Files
+- \`Mode.ipa\`, \`Mode-paid.ipa\`: Mode, unsigned. Mode Setup signs it with your Apple account.
+- \`*.sha256\`: their checksums.
+EOF
+gh release create "$TAG" --draft --target main --title "Mode $V" --notes-file "$NOTES" \
+    build/release/Mode.ipa build/release/Mode.ipa.sha256 \
+    build/release/Mode-paid.ipa build/release/Mode-paid.ipa.sha256 \
+    "$MAC_DMG"
+rm -f "$NOTES"
+
+# GitHub Actions (release.yml) builds Windows and Linux for this tag and adds them to the draft.
+git tag -a "$TAG" -m "Mode $V"
+git push -q origin "$TAG"
+echo "Draft $TAG made. Windows and Linux builds: gh run list --workflow release.yml"
+echo "When they are attached, check the files and publish it on GitHub."
