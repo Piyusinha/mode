@@ -93,6 +93,8 @@ public class TaskRunner(
     /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
     private val voices: Voices? = null,
     private val telemetry: Telemetry = Telemetry.None,
+    /** Spoken updates while a spoken task works (null: Mode stays quiet until the answer). */
+    private val narrator: Narrator? = null,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
@@ -306,8 +308,15 @@ public class TaskRunner(
                 pause = gate,
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
             )
+            // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
+            val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null
             // Started from Mode's own screen; the agent goes straight to the app it needs.
-            val finished = background.run { agent.run(agentTask, startsInMode = true, context = prepared?.context ?: base) }
+            val finished = try {
+                background.run { agent.run(agentTask, startsInMode = true, context = prepared?.context ?: base) }
+            } finally {
+                updates?.cancel()
+                if (updates != null) voices?.stop()
+            }
             result = finished
             if (useMemory && prepared != null) learnFrom(saved.id, task, finished, prepared.usedIds, budget)
             outcome = statusOf(finished.outcome)
@@ -416,6 +425,38 @@ public class TaskRunner(
         fun name(s: String) = s.lowercase().replaceFirstChar(Char::uppercaseChar)
         return "${name(now.dayOfWeek.name)} ${now.day} ${name(now.month.name)} ${now.year}, " +
             "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
+    }
+
+    /**
+     * Says a short update now and then while the task runs: when the plan moves on, paced by
+     * [Narrator.Pacing], never over a spoken question, never the same thing twice.
+     */
+    private suspend fun narrate(narrator: Narrator, task: String, started: kotlin.time.TimeMark) {
+        val pacing = Narrator.Pacing()
+        val said = mutableListOf<String>()
+        while (true) {
+            delay(NARRATE_TICK_MS)
+            val s = state.value
+            if (!s.running) return
+            if (s.voice != null || s.question != null || s.paused) continue
+            val done = s.plan.filter { it.done }.map { it.text }
+            val next = s.plan.firstOrNull { !it.done }?.text
+            val progress = "${done.size}|${next ?: s.status}"
+            val elapsed = started.elapsedNow().inWholeMilliseconds
+            if (!pacing.due(elapsed, progress)) continue
+            pacing.said(elapsed, progress)
+            telemetry.trace(Operation.VoiceUpdate) { span ->
+                val line = narrator.line(task, done, next ?: s.status, said, settings.settings.value.userName)
+                val stillQuiet = state.value.running && state.value.voice == null && state.value.question == null
+                if (line == null || !stillQuiet) {
+                    span.fields(mapOf(Field.Outcome to if (line == null) "Skipped" else "Overtaken"))
+                } else {
+                    said += line
+                    voices?.speak(line)
+                    span.fields(mapOf(Field.Outcome to "Spoke"))
+                }
+            }
+        }
     }
 
     private fun status(text: String) {
@@ -568,6 +609,8 @@ public class TaskRunner(
 }
 
 /** What Mode says when it heard a spoken answer, before it goes back to the app. */
+/** How often a spoken task checks whether an update is worth saying. */
+private const val NARRATE_TICK_MS = 1_000L
 private const val GOT_IT = "Got it. Going back."
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */

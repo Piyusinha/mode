@@ -28,6 +28,8 @@ enum class Operation(val wireName: String) {
     VoiceSession("mode.voice.session"),
     /** What Mode says when handed a task: written by the AI (Outcome AI) or Mode's own line (Fallback). */
     VoiceAcknowledge("mode.voice.acknowledge"),
+    /** A spoken update while a spoken task works (Outcome Spoke, Skipped, Failed). */
+    VoiceUpdate("mode.voice.update"),
 }
 
 enum class Event(val wireName: String) {

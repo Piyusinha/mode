@@ -89,14 +89,10 @@ public class Screens(
         providers?.let { llm ->
             com.piyush.mode.feature.memory.data.Acknowledger(llm, memory) {
                 val s = settings.settings.value
-                val id = s.model ?: return@Acknowledger null
                 // One spoken line needs no thinking: the model's lowest effort, so it comes back in time.
-                val effort = if (com.piyush.mode.feature.settings.domain.ProviderModels.supportsEffort(s.provider)) {
-                    val base = com.piyush.mode.feature.settings.domain.ProviderModels.base(id)
-                    val listed = (chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty()).firstOrNull { it.id == base }?.efforts
-                    listed?.let { com.piyush.mode.llm.PlanModel.ordered(it).firstOrNull() } ?: "low"
-                } else null
-                com.piyush.mode.feature.settings.domain.ProviderModels.withEffort(id, effort) to s.provider
+                com.piyush.mode.feature.settings.domain.ProviderModels.quick(
+                    s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
+                )
             }
         }
     }

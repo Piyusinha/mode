@@ -48,6 +48,19 @@ public object ProviderModels {
 
     public fun supportsEffort(provider: ModelProvider): Boolean = provider == ModelProvider.ChatGpt || provider == ModelProvider.ClaudeOAuth
 
+    /**
+     * The phone-control model at its lowest effort, for one quick spoken line (an acknowledgement, an update):
+     * no thinking needed, so it comes back fast and costs little. [known] lists the plan's models with their
+     * efforts; "low" when the plan doesn't say. Null when no model is chosen.
+     */
+    public fun quick(model: String?, provider: ModelProvider, known: List<com.piyush.mode.llm.PlanModel>): Pair<String, ModelProvider>? {
+        val id = model ?: return null
+        val effort = if (supportsEffort(provider)) {
+            known.firstOrNull { it.id == base(id) }?.efforts?.let { com.piyush.mode.llm.PlanModel.ordered(it).firstOrNull() } ?: "low"
+        } else null
+        return withEffort(id, effort) to provider
+    }
+
     /** The model without its effort: "gpt-6.1-terra@low" → "gpt-6.1-terra". */
     public fun base(id: String): String = id.substringBefore('@')
 

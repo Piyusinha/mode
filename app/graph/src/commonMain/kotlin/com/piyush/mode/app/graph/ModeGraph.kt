@@ -136,6 +136,12 @@ class ModeGraph(platform: PlatformServices) {
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
         voices = voices,
         telemetry = telemetry,
+        narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm) {
+            val s = settings.settings.value
+            com.piyush.mode.feature.settings.domain.ProviderModels.quick(
+                s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value,
+            )
+        },
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
