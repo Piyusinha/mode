@@ -10,10 +10,10 @@ public object TurnEnd {
     /** Quiet after speech that ends a finished-sounding sentence. */
     public const val PAUSE_MS: Long = 3_000
     /** Quiet after words that stop mid-sentence, or before any words were recognised. */
-    public const val UNFINISHED_PAUSE_MS: Long = 4_000
+    public const val UNFINISHED_PAUSE_MS: Long = 4_500
     /** In a noisy room the level never falls: the recognised words standing still this long end the turn. */
-    public const val SETTLE_MS: Long = 3_500
-    public const val UNFINISHED_SETTLE_MS: Long = 5_000
+    public const val SETTLE_MS: Long = 4_000
+    public const val UNFINISHED_SETTLE_MS: Long = 6_000
 
     /** How long a quiet pause must last to end the turn, after [words]. */
     public fun pauseMs(words: String): Long = if (looksUnfinished(words)) UNFINISHED_PAUSE_MS else PAUSE_MS
@@ -21,12 +21,15 @@ public object TurnEnd {
     /** How long [words] must stay the same to end the turn when the room is never quiet. */
     public fun settleMs(words: String): Long = if (looksUnfinished(words)) UNFINISHED_SETTLE_MS else SETTLE_MS
 
-    /** The words so far stop where a sentence can't end: a joining word, an article, a filler, a comma. */
+    /**
+     * The words so far stop where a sentence can't end: a joining word, an article, a filler, a comma.
+     * A full stop, question or exclamation mark proves nothing: Apple's live transcription adds them at
+     * every pause ("Can you find the flight status? Not all the like."), so only the last word counts.
+     */
     public fun looksUnfinished(words: String): Boolean {
-        val said = words.trim()
+        val said = words.trim().trimEnd('.', '?', '!', '…', ' ')
         if (said.isEmpty()) return true
         when (said.last()) {
-            '.', '?', '!' -> return false
             ',', ';', ':', '-', '–', '—' -> return true
         }
         val last = said.substringAfterLast(' ').trim { !it.isLetterOrDigit() && it != '\'' }.lowercase()
