@@ -186,7 +186,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     /// Plays a cloud clip to its end; true once sound started.
     private func play(_ bytes: KotlinByteArray, done: @escaping (Bool) -> Void) {
-        if let old = playDone { playDone = nil; player?.stop(); old(true) }
+        if let old = playDone { playDone = nil; player?.stop(); player = nil; old(true) }
         VoiceAudio.shared.forSpeech()
         player = try? AVAudioPlayer(data: bytes.toData())
         player?.delegate = self
@@ -205,6 +205,10 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     private func finishPlaying() {
         VoiceLevel.shared.speaking = false
+        // A finished player is released: one left alive kept the audio in playback, and the microphone
+        // that opened next got only silence (ElevenLabs and Fish Audio speak through it).
+        player?.stop()
+        player = nil
         guard let done = playDone else { return }
         playDone = nil
         VoiceAudio.shared.done()
