@@ -641,7 +641,7 @@ enum L10n {
         static let voiceSubtitle = LocalizedStringResource("voice.voiceSubtitle", defaultValue: "What Mode sounds like when it talks back.")
         static let sampleLine = LocalizedStringResource("voice.sampleLine", defaultValue: "“I’ll turn on Dark Mode.”")
         static let changeVoice = LocalizedStringResource("voice.changeVoice", defaultValue: "Change voice")
-        static let whoSpeaks = LocalizedStringResource("voice.whoSpeaks", defaultValue: "Who speaks first")
+        static let whoSpeaks = LocalizedStringResource("voice.whoSpeaks", defaultValue: "Who speaks")
         static let whoSpeaksNote = LocalizedStringResource("voice.whoSpeaksNote", defaultValue: "Mode speaks with the one you pick, and only that one. If it can’t, Mode tells you and shows how to fix it. Tap a connected one to edit or remove its key.")
         static let speaking = LocalizedStringResource("voice.speaking", defaultValue: "Speaking")
         static let speed = LocalizedStringResource("voice.speed", defaultValue: "Speed")
@@ -728,6 +728,8 @@ enum L10n {
         // One chosen provider, keys checked before saving, failures with a fix (boards Voice, VoiceListening, VoiceProviderPage, VoiceKey*, VoiceProviderFailed)
         static func connectedKey(_ masked: String) -> String { String(localized: "voice.connectedKey", defaultValue: "Connected · \(masked)") }
         static func notConnected(_ plan: String) -> String { String(localized: "voice.notConnected", defaultValue: "Not connected · \(plan)") }
+        static let freePlanShort = LocalizedStringResource("voice.freePlanShort", defaultValue: "free plan")
+        static let freeCreditShort = LocalizedStringResource("voice.freeCreditShort", defaultValue: "free credit to start")
         static let whoListens = LocalizedStringResource("voice.whoListens", defaultValue: "Who listens")
         static let keysNote = LocalizedStringResource("voice.keysNote", defaultValue: "Keys stay in this iPhone’s Keychain. They only go to that provider, never to us.")
         static let couldntSpeak = LocalizedStringResource("voice.couldntSpeak", defaultValue: "Couldn’t speak")

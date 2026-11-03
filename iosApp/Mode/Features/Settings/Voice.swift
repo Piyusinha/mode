@@ -148,8 +148,12 @@ final class VoiceListModel {
 
     private static func map(_ s: VoiceUiState, hearing: Bool) -> State {
         let speaker = VoiceService(id: s.speaker)
+        // Shown in a fixed order (Apple, then the others); which one is in use is the radio, not the position.
+        let order: [VoiceService] = hearing ? [.apple, .deepgram, .soniox] : [.apple, .elevenlabs, .fish]
         return State(
-            rows: s.rows.compactMap { row in
+            rows: s.rows.sorted { a, b in
+                (VoiceService(id: a.id).flatMap(order.firstIndex) ?? order.count) < (VoiceService(id: b.id).flatMap(order.firstIndex) ?? order.count)
+            }.compactMap { row in
                 guard let service = VoiceService(id: row.id) else { return nil }
                 let plan = service.plan(hearing: hearing)
                 let status: String = if let problem = row.problem, row.first {
@@ -159,7 +163,7 @@ final class VoiceListModel {
                 } else if service == .apple {
                     plan
                 } else {
-                    L10n.Voice.notConnected(plan)
+                    L10n.Voice.notConnected(String(localized: service.hearing ? L10n.Voice.freeCreditShort : L10n.Voice.freePlanShort))
                 }
                 return Row(service: service, status: status, ready: row.ready, chosen: row.first, connected: service == .apple || row.masked != nil,
                            masked: row.masked, problem: row.first ? row.problem : nil,
