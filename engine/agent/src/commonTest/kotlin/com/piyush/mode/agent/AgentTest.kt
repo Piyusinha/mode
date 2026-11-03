@@ -387,14 +387,14 @@ class AgentTest {
 
     @Test
     fun aRepeatQuestionIsNotPutToTheUserAgain() = runTest {
-        val phone = FakePhone(List(10) { listOf("Sonali" to (1.0 to 1.0)) })
+        val phone = FakePhone(List(10) { listOf("Asha" to (1.0 to 1.0)) })
         val gate = Gate(answer = "Sending via agent test")
         val model = ScriptedModel(
             call("ask_user", "question" to "What should the message say?"),
             call("ask_user", "question" to "Please confirm the exact text?"),
             call("done", "evidence" to "on screen", "summary" to "x"),
         )
-        Agent(phone, model, gate, noSettle).run("message Sonali")
+        Agent(phone, model, gate, noSettle).run("message Asha")
         assertEquals(listOf("What should the message say?"), gate.asked, "asked once")
         assertTrue("THE USER'S ANSWERS" in model.lastUserText && "Sending via agent test" in model.lastUserText, model.lastUserText)
         assertTrue("not asked" in model.lastUserText)
@@ -1080,15 +1080,15 @@ class AgentTest {
     @Test
     fun whatRecallFindsIsInTheNextStep() = runTest {
         val phone = FakePhone(List(5) { i -> listOf("s$i" to (1.0 to 1.0)) })
-        val memory = Remembers(mapOf("Sonali" to listOf("Sonali: message her on WhatsApp")))
+        val memory = Remembers(mapOf("Asha" to listOf("Asha: message her on WhatsApp")))
         val model = ScriptedModel(
-            call("recall", "query" to "Sonali"),
+            call("recall", "query" to "Asha"),
             call("recall", "query" to "Rahul"),
             call("done", "evidence" to "x", "summary" to "x"),
         )
-        Agent(phone, model, Gate(), noSettle, memory = memory).run("message Sonali")
-        assertEquals(listOf("Sonali", "Rahul"), memory.asked)
-        assertTrue("remembered:\nSonali: message her on WhatsApp" in model.lastUserText, model.lastUserText)
+        Agent(phone, model, Gate(), noSettle, memory = memory).run("message Asha")
+        assertEquals(listOf("Asha", "Rahul"), memory.asked)
+        assertTrue("remembered:\nAsha: message her on WhatsApp" in model.lastUserText, model.lastUserText)
         assertTrue("recall \"Rahul\" — nothing remembered about that" in model.lastUserText)
     }
 

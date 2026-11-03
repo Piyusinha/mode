@@ -1193,7 +1193,7 @@ class Agent(
             - What they hand you to decide is yours: "best", "highest rated", "cheapest". Break ties yourself
               (more ratings, then faster or nearer) and say why in your answer.
             Use what the task gives you: names, times, places and message text. In "send a message to
-            Sonali saying I'm late" or "message Sonali: sending this automatically", the words after the
+            Asha saying I'm late" or "message Asha: sending this automatically", the words after the
             name are the message: type them. If the task wants a message sent but gives no text, write a
             short, natural one that fits the task instead of asking.
 

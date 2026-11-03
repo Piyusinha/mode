@@ -26,10 +26,10 @@ import kotlin.test.assertTrue
 class BoardFeaturesTest {
     @Test
     fun timedLinesInAReplyBecomeATimetable() {
-        val parts = replyParts("Done. I sent \"Leaving in 10\" to Sonali.\nHere's your day:\n14:00 Biozyme with lunch\n21:00 – Shelcal, fish oil\n- 23.00 Softovac before bed\nThat's all.")
+        val parts = replyParts("Done. I sent \"Leaving in 10\" to Asha.\nHere's your day:\n14:00 Biozyme with lunch\n21:00 – Shelcal, fish oil\n- 23.00 Softovac before bed\nThat's all.")
         assertEquals(
             listOf(
-                ReplyPart.Paragraph("Done. I sent \"Leaving in 10\" to Sonali.\nHere's your day:"),
+                ReplyPart.Paragraph("Done. I sent \"Leaving in 10\" to Asha.\nHere's your day:"),
                 ReplyPart.Agenda(listOf(TimeRow("14:00", null, "Biozyme with lunch"), TimeRow("21:00", null, "Shelcal, fish oil"), TimeRow("23:00", null, "Softovac before bed"))),
                 ReplyPart.Paragraph("That's all."),
             ),
@@ -42,7 +42,7 @@ class BoardFeaturesTest {
     fun liveRunShowsTheScreenAndCanPause() = runTest {
         val f = Fixture(this, ScriptedModel(call("ask_user", "question" to "Which one?"), call("done", "evidence" to "x", "summary" to "ok")))
         val p = LiveRunPresenter(backgroundScope, f.runner, f.tasks)
-        f.queue.submit("Message Sonali", TaskSource.App)
+        f.queue.submit("Message Asha", TaskSource.App)
         testScheduler.advanceUntilIdle()
         val s = p.state.awaitState { it.running?.question != null }
         assertNotNull(s.screen)
@@ -95,14 +95,14 @@ class BoardFeaturesTest {
     @Test
     fun memoryCanBeEditedAndSeveralDeleted() = runTest {
         val f = Fixture(this)
-        f.memory.save(MemoryDraft(MemoryKind.Fact, "sonali", "Sonali", "Sonali: WhatsApp", "step 3"))
+        f.memory.save(MemoryDraft(MemoryKind.Fact, "asha", "Asha", "Asha: WhatsApp", "step 3"))
         f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home: Indiranagar", "you said"))
         val p = MemoryPresenter(backgroundScope, f.memory, f.settings, f.clock)
         val s = p.state.awaitState { it.aboutYou.size == 2 }
-        val sonali = s.aboutYou.first { it.title == "Sonali" }
-        assertEquals("step 3", sonali.evidence)
-        p.edit(sonali.id, "Sonali: message her on Telegram")
-        val edited = p.state.awaitState { st -> st.aboutYou.any { it.text.contains("Telegram") } }.aboutYou.first { it.title == "Sonali" }
+        val asha = s.aboutYou.first { it.title == "Asha" }
+        assertEquals("step 3", asha.evidence)
+        p.edit(asha.id, "Asha: message her on Telegram")
+        val edited = p.state.awaitState { st -> st.aboutYou.any { it.text.contains("Telegram") } }.aboutYou.first { it.title == "Asha" }
         assertEquals(MemoryPresenter.EDITED_BY_YOU, edited.evidence)
         p.deleteMany(s.aboutYou.map { it.id })
         assertFalse(p.state.awaitState { it.isEmpty }.isEmpty.not())

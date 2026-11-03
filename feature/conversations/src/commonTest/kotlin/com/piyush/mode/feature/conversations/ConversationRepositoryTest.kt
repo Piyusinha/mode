@@ -17,7 +17,7 @@ class ConversationRepositoryTest {
     @Test
     fun turnsComeBackInOrderAndTheLatestConversationListsFirst() = runTest {
         val first = repo.create("Turn off dark mode")
-        val second = repo.create("Text Sonali I'm leaving in 10")
+        val second = repo.create("Text Asha I'm leaving in 10")
         repo.addTurn(first.id, TurnRole.User, "Turn off dark mode", "k1")
         repo.addTurn(first.id, TurnRole.Mode, "Light mode is on.", "k1")
 
@@ -27,7 +27,7 @@ class ConversationRepositoryTest {
 
     @Test
     fun longTasksGetAShortTitle() {
-        val c = repo.create("Open WhatsApp, send message to Sonali sending this message automatically, then read my calendar")
+        val c = repo.create("Open WhatsApp, send message to Asha sending this message automatically, then read my calendar")
         assertTrue(c.title.length <= 60)
         assertTrue(c.title.endsWith("…"))
     }

@@ -16,21 +16,21 @@ class MemoryRepositoryTest {
     private var ids = 0
     private val repo = MemoryRepository(testDatabase(), now = { clock }, newId = { "m${++ids}" })
 
-    private fun fact(text: String, subject: String = "sonali") = MemoryDraft(MemoryKind.Fact, subject, "Sonali", text, "task said so")
+    private fun fact(text: String, subject: String = "asha") = MemoryDraft(MemoryKind.Fact, subject, "Asha", text, "task said so")
 
     @Test
     fun aNewFactIsAddedWithItsTask() {
-        val saved = assertIs<SaveResult.Added>(repo.save(fact("Sonali: message her on WhatsApp"), sourceTaskId = "k1"))
+        val saved = assertIs<SaveResult.Added>(repo.save(fact("Asha: message her on WhatsApp"), sourceTaskId = "k1"))
         assertEquals("k1", saved.item.sourceTaskId)
         assertEquals(listOf(saved.item.id), repo.changedByTask("k1").map { it.id })
     }
 
     @Test
     fun theSameFactAgainChangesNothingAndACloseOneUpdatesIt() {
-        repo.save(fact("Sonali: message her on WhatsApp"))
-        assertIs<SaveResult.Unchanged>(repo.save(fact("sonali: message her on whatsapp.")))
-        val updated = assertIs<SaveResult.Updated>(repo.save(fact("Sonali: message her on WhatsApp, in Hindi")))
-        assertEquals("Sonali: message her on WhatsApp", updated.item.previousText)
+        repo.save(fact("Asha: message her on WhatsApp"))
+        assertIs<SaveResult.Unchanged>(repo.save(fact("asha: message her on whatsapp.")))
+        val updated = assertIs<SaveResult.Updated>(repo.save(fact("Asha: message her on WhatsApp, in Hindi")))
+        assertEquals("Asha: message her on WhatsApp", updated.item.previousText)
         assertEquals(1, repo.all().size)
     }
 
@@ -47,23 +47,23 @@ class MemoryRepositoryTest {
         val r = assertIs<SaveResult.Rejected>(repo.save(fact("Bank OTP is 482913")))
         assertTrue("secret" in r.why)
         assertTrue(repo.all().isEmpty())
-        repo.save(fact("Sonali: message her on WhatsApp"))
+        repo.save(fact("Asha: message her on WhatsApp"))
         assertNull(repo.update(repo.all().single().id, "Her card 4111 1111 1111 1111", "screen"))
     }
 
     @Test
     fun undoRemovesAnAdditionAndRestoresAChange() {
-        val added = (repo.save(fact("Sonali: WhatsApp")) as SaveResult.Added).item
-        repo.update(added.id, "Sonali: Telegram", "she said")
+        val added = (repo.save(fact("Asha: WhatsApp")) as SaveResult.Added).item
+        repo.update(added.id, "Asha: Telegram", "she said")
         repo.undo(added.id)
-        assertEquals("Sonali: WhatsApp", repo.get(added.id)!!.text)
+        assertEquals("Asha: WhatsApp", repo.get(added.id)!!.text)
         repo.undo(added.id)
         assertNull(repo.get(added.id), "the addition itself is undone")
     }
 
     @Test
     fun useIsRecordedForRanking() {
-        val item = (repo.save(fact("Sonali: WhatsApp")) as SaveResult.Added).item
+        val item = (repo.save(fact("Asha: WhatsApp")) as SaveResult.Added).item
         clock = 5_000
         repo.recordUse(listOf(item.id), success = true)
         repo.recordUse(listOf(item.id), success = false)
@@ -76,7 +76,7 @@ class MemoryRepositoryTest {
 
     @Test
     fun forgetEverythingEmptiesIt() {
-        repo.save(fact("Sonali: WhatsApp"))
+        repo.save(fact("Asha: WhatsApp"))
         repo.forgetEverything()
         assertTrue(repo.all().isEmpty())
     }

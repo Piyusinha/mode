@@ -48,18 +48,18 @@ class ConversationAndRunTest {
     @Test
     fun liveRunShowsStepsTheQuestionAndHowItEnded() = runTest {
         val f = Fixture(this, ScriptedModel(
-            call("open_app", "name" to "WhatsApp", "reason" to "Open WhatsApp to message Sonali"),
-            call("ask_user", "question" to "Which Sonali?"),
+            call("open_app", "name" to "WhatsApp", "reason" to "Open WhatsApp to message Asha"),
+            call("ask_user", "question" to "Which Asha?"),
             call("done", "evidence" to "x", "summary" to "Sent."),
         ))
         val p = LiveRunPresenter(backgroundScope, f.runner, f.tasks)
-        f.queue.submit("Message Sonali", TaskSource.App)
+        f.queue.submit("Message Asha", TaskSource.App)
         testScheduler.advanceUntilIdle()
         val asking = p.state.awaitState { it.running?.question != null }
-        assertEquals("Open WhatsApp to message Sonali", asking.steps.first().reason)
+        assertEquals("Open WhatsApp to message Asha", asking.steps.first().reason)
         assertTrue(asking.steps.first().worked)
 
-        p.answer("Sonali Yadav")
+        p.answer("Asha Yadav")
         testScheduler.advanceUntilIdle()
         val done = p.state.awaitState { it.finished != null }.finished!!
         assertEquals(TaskBadge.Done, done.badge)

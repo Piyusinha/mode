@@ -12,22 +12,22 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BrainTest {
-    private val sonali = call(
+    private val asha = call(
         "brief",
-        "intent" to "Continue the WhatsApp chat with Sonali in Piyush's voice",
+        "intent" to "Continue the WhatsApp chat with Asha in Piyush's voice",
         "app" to "WhatsApp",
         "start" to "continue",
         "done_when" to "A reply to her latest message is sent",
         "gather" to listOf("Her last few messages and his replies: what is unanswered, his language mix and length"),
         "decide" to listOf("What to say, in his style"),
-        "steps" to listOf("Open Sonali's chat", "Read recent messages", "Write and send the reply"),
+        "steps" to listOf("Open Asha's chat", "Read recent messages", "Write and send the reply"),
         "report" to "What was sent",
     )
 
     @Test
     fun aBriefIsReadFromTheBrainsToolCall() = runTest {
-        val model = ScriptedModel(sonali)
-        val r = Brain(model, "strong").brief("talk with Sonali", TaskContext(userName = "Piyush", today = "Sunday 1 November 2026, 19:05"))
+        val model = ScriptedModel(asha)
+        val r = Brain(model, "strong").brief("talk with Asha", TaskContext(userName = "Piyush", today = "Sunday 1 November 2026, 19:05"))
         val b = assertNotNull(r.brief)
         assertEquals("WhatsApp", b.app)
         assertEquals(false, b.fresh, "continue keeps the chat where it is")
@@ -39,7 +39,7 @@ class BrainTest {
 
     @Test
     fun theBrainSeesWhatWasLearnedAboutTheApps() = runTest {
-        val model = ScriptedModel(sonali)
+        val model = ScriptedModel(asha)
         Brain(model, "strong").brief("ride to Bellandur", TaskContext(appNotes = listOf("Rapido: recent destinations are on the home screen")))
         assertTrue("TIPS FOR THESE APPS" in model.lastUserText && "recent destinations are on the home screen" in model.lastUserText, model.lastUserText)
     }

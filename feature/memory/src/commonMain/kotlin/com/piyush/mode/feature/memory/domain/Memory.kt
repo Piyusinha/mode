@@ -22,7 +22,7 @@ public data class MemoryItem(
     val kind: MemoryKind,
     /** Lower-case key: the person or topic for a fact, the intent for a skill, the app for a tip. */
     val subject: String,
-    /** A short name for lists: "Sonali", "Turn off Dark Mode", "Calendar". */
+    /** A short name for lists: "Asha", "Turn off Dark Mode", "Calendar". */
     val title: String,
     val text: String,
     /** Where it was learned: the step or answer it came from. */

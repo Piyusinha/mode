@@ -20,11 +20,11 @@ private struct ComponentGallery: View {
                 ModeHero(icon: .sparkle, title: "Mode", message: "Your phone, done for you.")
                 ModeSectionHeader("Rows")
                 ModeCard {
-                    ModeRow("Sonali", subtitle: "Message her on WhatsApp", leading: .initial("S")) {}
+                    ModeRow("Asha", subtitle: "Message her on WhatsApp", leading: .initial("A")) {}
                     ModeRow("Turn off Dark Mode", subtitle: "Worked 3 of 3 times", leading: .icon(.skill)) {}
                     ModeToggleRow("Learn from my tasks", isOn: $on)
                 }
-                ModeChip("Remembered: Sonali is on WhatsApp", icon: .sparkle, actionTitle: "Undo") {}
+                ModeChip("Remembered: Asha is on WhatsApp", icon: .sparkle, actionTitle: "Undo") {}
                 ModeBadge("Done", icon: .done, tone: .success)
                 ModeSegmented([(0, "Every day"), (1, "Weekdays"), (2, "Once")], selection: $segment)
                 ModeDayPicker(labels: ["M", "T", "W", "T", "F", "S", "S"], selected: [1, 2, 3, 4, 5]) { _ in }

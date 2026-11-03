@@ -18,9 +18,9 @@ class MigrationTest {
         val db = ModeDatabase(driver)
 
         assertEquals("Turn off dark mode", db.taskQueries.byId("k1").executeAsOne().text)
-        db.memoryQueries.insert("m1", "fact", "sonali", "Sonali", "Sonali: message on WhatsApp", "task k1", "", null, "k1", 2, 2)
+        db.memoryQueries.insert("m1", "fact", "asha", "Asha", "Asha: message on WhatsApp", "task k1", "", null, "k1", 2, 2)
         assertEquals(1, db.memoryQueries.all().executeAsList().size)
-        db.scheduleQueries.insert("s1", "Send good morning to Sonali", 8, 0, 0b0011111, 1, 100, 1)
+        db.scheduleQueries.insert("s1", "Send good morning to Asha", 8, 0, 0b0011111, 1, 100, 1)
         assertEquals(listOf("s1"), db.scheduleQueries.due(100).executeAsList().map { it.id })
     }
 

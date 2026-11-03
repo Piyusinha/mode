@@ -21,7 +21,7 @@ class MemoryRetrievalTest {
         repo.save(MemoryDraft(MemoryKind.Skill, title.lowercase(), title, text, "e", keywords, app))
 
     private fun seed() {
-        fact("sonali", "Sonali: message her on WhatsApp")
+        fact("asha", "Asha: message her on WhatsApp")
         fact("home", "Home is in Indiranagar, Bengaluru")
         skill("Turn off Dark Mode", "1. open Settings\n2. search \"Dark Mode\"\n3. Appearance → Light", listOf("dark", "mode", "appearance", "light", "turn", "off"), "Settings")
         skill("Message [Person] on WhatsApp", "1. open WhatsApp\n2. search [Person]\n3. type [Text], send", listOf("message", "text", "send", "whatsapp", "saying", "tell"), "WhatsApp")
@@ -47,7 +47,7 @@ class MemoryRetrievalTest {
     @Test
     fun aKnownPersonsNameDoesNotCountAgainstASkillAndTheirAppsTipsComeAlong() {
         seed()
-        val r = retrieval.forTask("message Sonali saying I'm late")
+        val r = retrieval.forTask("message Asha saying I'm late")
         assertTrue(r.skills.first().startsWith("SKILL: Message [Person] on WhatsApp"), r.skills.toString())
         assertEquals(listOf("whatsapp: the search bar is at the top of Chats"), r.tips)
         assertTrue(r.usedIds.size >= 4, "facts, the skill and the tip are all recorded as used")
@@ -91,16 +91,16 @@ class MemoryRetrievalTest {
     @Test
     fun overTheBudgetTheMatchingFactsWin() {
         repeat(30) { fact("topic$it", "Unrelated preference number $it") }
-        fact("sonali", "Sonali: message her on WhatsApp")
-        val r = retrieval.forTask("message Sonali")
+        fact("asha", "Asha: message her on WhatsApp")
+        val r = retrieval.forTask("message Asha")
         assertEquals(MemoryRetrieval.MAX_FACTS, r.aboutYou.size)
-        assertTrue("Sonali: message her on WhatsApp" in r.aboutYou)
+        assertTrue("Asha: message her on WhatsApp" in r.aboutYou)
     }
 
     @Test
     fun recallFindsAnyKind() {
         seed()
-        assertTrue(retrieval.recall("Sonali").first().contains("WhatsApp"))
+        assertTrue(retrieval.recall("Asha").first().contains("WhatsApp"))
         assertTrue(retrieval.recall("Message [Person] on WhatsApp").first().startsWith("SKILL: Message"))
         assertTrue(retrieval.recall("   ").isEmpty())
     }
@@ -121,7 +121,7 @@ class MemoryRetrievalTest {
         // On the phone: "order sushi on Zomato" matched a Swish skill on "order".
         assertTrue(retrieval.recall("order food").any { "Swish" in it })
         assertTrue(retrieval.recall("order food", apps = listOf("Zomato")).none { "Swish" in it })
-        assertTrue(retrieval.recall("Sonali", apps = listOf("Zomato")).first().contains("WhatsApp"), "facts about people stay")
+        assertTrue(retrieval.recall("Asha", apps = listOf("Zomato")).first().contains("WhatsApp"), "facts about people stay")
         assertTrue(retrieval.recall("message whatsapp", apps = listOf("WhatsApp")).any { it.startsWith("SKILL: Message") })
     }
 }

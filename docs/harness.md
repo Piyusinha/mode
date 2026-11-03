@@ -73,7 +73,7 @@ flowchart LR
      history is trimmed, and feed the final answer. Built as an optional
      field on every action rather than its own tool, so keeping a fact never
      costs a step (D28).
-   - `recall(query)`: look up memory mid-task ("Sonali's number"),
+   - `recall(query)`: look up memory mid-task ("Asha's number"),
      for things the first pull didn't foresee.
 5. **Verify.** Before `done` is accepted, the model must say what on the
    current screen shows the task is complete. If it can't, the harness gives
@@ -95,9 +95,9 @@ Three kinds, each with a different job:
 
 | Kind | What it holds | Example | Written by |
 |---|---|---|---|
-| **About you** | People, preferences, places, accounts in use | "Sonali: message on WhatsApp"; "messages short and casual"; "Home: [address]" | Reflection after tasks; you, in the Memory screen |
+| **About you** | People, preferences, places, accounts in use | "Asha: message on WhatsApp"; "messages short and casual"; "Home: [address]" | Reflection after tasks; you, in the Memory screen |
 | **How to do it** | Notes per app on what worked or failed (procedural memory, the biggest win in the research) | "Settings: search 'Dark Mode' goes straight there"; "Calendar: tap Today, then scroll; events may be below the fold" | Reflection, from successful runs and from failures |
-| **What happened** | The runs themselves: task, outcome, summary | "Sent Sonali 'Leaving in 10' (1 Nov)" | Already recorded; indexed for search |
+| **What happened** | The runs themselves: task, outcome, summary | "Sent Asha 'Leaving in 10' (1 Nov)" | Already recorded; indexed for search |
 
 **Writing (reflection):** after each task, the cheap model gets the task, the
 plan, the step lines (no screenshots) and the current memory items for those
@@ -110,7 +110,7 @@ each with **evidence** (the step or answer it came from). The harness then:
 - Merges duplicates, and marks an item "confirmed" when a later run uses it
   successfully.
 - Shows each new "about you" item once in the conversation ("Remembered:
-  Sonali is on WhatsApp · Undo"), as designed. App notes save quietly.
+  Asha is on WhatsApp · Undo"), as designed. App notes save quietly.
 - Lets an item expire when it stops helping. An app note that preceded a
   failure loses confidence; one the app's update made wrong is replaced.
 

@@ -2,9 +2,9 @@
 // Never loaded data: the real window talks to the engine.
 'use strict';
 (function () {
-  const phone = { udid: '00008150-001E20D41484401C', name: 'Piyush’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
+  const phone = { udid: '00008150-0012345678901234', name: 'Piyush’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
   const free = { id: 'ABCDE12345', name: 'Personal Team', kind: 'free' };
-  const paid = { id: 'BH9TWW5HPR', name: 'Acme Labs', kind: 'paid' };
+  const paid = { id: 'ABCDE12345', name: 'Acme Labs', kind: 'paid' };
   const mode = { bundleId: 'com.piyush.mode.ABCDE12345', name: 'Mode', version: '1.4', teamId: 'ABCDE12345', expires: '2026-11-10T08:20:00Z' };
   const rec = (o) => Object.assign({ phone: phone.name, teamId: free.id, teamName: free.name, paid: false, ownVpn: false, mode, sidestore: { version: '0.6' } }, o);
   const stages = (vpn) => [
@@ -30,8 +30,8 @@
     installPaid: { screen: 'install', phone, readiness: 'ready', team: paid, ownVpn: true, stages: stages(true) },
     unplugged: { screen: 'unplugged', phone, readiness: 'ready', team: free, renew: 'sidestore', stages: stages(false) },
     limit: { screen: 'limit', phone, readiness: 'ready', team: free, renew: 'sidestore', phoneApps: { sideloaded: [{ name: 'SideStore' }, { name: 'StikDebug' }, { name: 'Feather' }] } },
-    vpn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.BH9TWW5HPR', tunnelId: 'com.piyush.mode.BH9TWW5HPR.tunnel', appOn: false, tunnelOn: false } },
-    vpnOn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.BH9TWW5HPR', tunnelId: 'com.piyush.mode.BH9TWW5HPR.tunnel', appOn: true, tunnelOn: true } },
+    vpn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.ABCDE12345', tunnelId: 'com.piyush.mode.ABCDE12345.tunnel', appOn: false, tunnelOn: false } },
+    vpnOn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.ABCDE12345', tunnelId: 'com.piyush.mode.ABCDE12345.tunnel', appOn: true, tunnelOn: true } },
     onPhone: { screen: 'onPhone', phone, readiness: 'ready', installedSidestore: true, phoneApps: { localDevVpn: null } },
     onPhonePaid: { screen: 'onPhone', phone, ownVpn: true, readiness: 'ready' },
     onPhoneConfirmed: { screen: 'onPhone', phone, ownVpn: true, phoneTestConfirmed: true, phonePresenceKnown: true, cableDisconnected: true },

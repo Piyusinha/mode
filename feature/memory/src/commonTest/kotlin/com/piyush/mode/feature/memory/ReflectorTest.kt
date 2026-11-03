@@ -48,9 +48,9 @@ class ReflectorTest {
         put("changes", JsonArray(changes.toList()))
     }
 
-    private fun input(outcome: Reflector.Outcome = Reflector.Outcome.Done, task: String = "message Sonali saying testing Mode") = Reflector.Input(
+    private fun input(outcome: Reflector.Outcome = Reflector.Outcome.Done, task: String = "message Asha saying testing Mode") = Reflector.Input(
         taskId = "k1", task = task, outcome = outcome, summary = "Sent.",
-        transcript = listOf("1. open WhatsApp — ok → screen changed", "2. tap \"Sonali\" — ok → screen changed"),
+        transcript = listOf("1. open WhatsApp — ok → screen changed", "2. tap \"Asha\" — ok → screen changed"),
         notes = emptyList(), answers = emptyList(), appsOpened = listOf("WhatsApp"), finalScreen = byteArrayOf(1, 2),
     )
 
@@ -58,13 +58,13 @@ class ReflectorTest {
     fun aGoodTaskTeachesAFactASkillAndATip() = runTest {
         val critic = Critic(
             reply(
-                change("add", "fact", "Sonali", "Sonali: message her on WhatsApp", subject = "sonali"),
+                change("add", "fact", "Asha", "Asha: message her on WhatsApp", subject = "asha"),
                 change("add", "skill", "Message [Person] on WhatsApp", "1. open WhatsApp\n2. tap the person\n3. type, send", keywords = listOf("message", "whatsapp"), app = "WhatsApp"),
                 change("add", "tip", "WhatsApp", "search is at the top of Chats", subject = "whatsapp", app = "WhatsApp"),
             ),
         )
         val r = Reflector(critic, repo).reflect(input(), "m")
-        assertEquals(listOf("Sonali: message her on WhatsApp"), r.remembered.map { it.text }, "only facts are announced")
+        assertEquals(listOf("Asha: message her on WhatsApp"), r.remembered.map { it.text }, "only facts are announced")
         assertEquals(3, r.saved.size)
         assertEquals(0.0004, r.costUsd)
         assertEquals(setOf(MemoryKind.Fact, MemoryKind.Skill, MemoryKind.Tip), repo.all().map { it.kind }.toSet())
@@ -73,12 +73,12 @@ class ReflectorTest {
 
     @Test
     fun theCriticSeesTheFinalScreenAndWhatIsKnownButNotTheAgentsReasons() = runTest {
-        val known = (repo.save(MemoryDraft(MemoryKind.Fact, "sonali", "Sonali", "Sonali: WhatsApp", "e")) as SaveResult.Added).item
+        val known = (repo.save(MemoryDraft(MemoryKind.Fact, "asha", "Asha", "Asha: WhatsApp", "e")) as SaveResult.Added).item
         val critic = Critic(reply())
         Reflector(critic, repo).reflect(input(), "m")
         val user = critic.lastMessages.last()
         assertNotNull(user.image)
-        assertTrue("id=${known.id} [fact] Sonali: Sonali: WhatsApp" in user.text, user.text)
+        assertTrue("id=${known.id} [fact] Asha: Asha: WhatsApp" in user.text, user.text)
         assertTrue("1. open WhatsApp — ok" in user.text)
     }
 
@@ -139,8 +139,8 @@ class ReflectorTest {
 
     @Test
     fun aDuplicateFactIsNotAnnouncedAgain() = runTest {
-        repo.save(MemoryDraft(MemoryKind.Fact, "sonali", "Sonali", "Sonali: message her on WhatsApp", "e"))
-        val critic = Critic(reply(change("add", "fact", "Sonali", "Sonali: message her on WhatsApp", subject = "sonali")))
+        repo.save(MemoryDraft(MemoryKind.Fact, "asha", "Asha", "Asha: message her on WhatsApp", "e"))
+        val critic = Critic(reply(change("add", "fact", "Asha", "Asha: message her on WhatsApp", subject = "asha")))
         val r = Reflector(critic, repo).reflect(input(), "m")
         assertTrue(r.remembered.isEmpty())
         assertEquals(1, repo.all().size)

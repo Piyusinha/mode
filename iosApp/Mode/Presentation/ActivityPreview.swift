@@ -20,7 +20,7 @@ struct ActivityPreview: View {
     private var state: ModeActivityAttributes.ContentState {
         switch phase {
         case .working:
-            .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Sonali",
+            .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Asha",
                   plan: [.init("Open WhatsApp", state: .done), .init("Send message", state: .now), .init("Read calendar", state: .next)])
         case .waiting where Self.yourTurn:
             .init(phase: .waiting, step: 6, question: "Enter your UPI PIN in PhonePe. Mode carries on when you’re done.", questionId: "preview", yourTurn: true)
@@ -29,7 +29,7 @@ struct ActivityPreview: View {
         case .finished:
             // As the presenter sends it: one line; the agenda's rows are counted for the chat.
             .init(phase: .finished, outcome: .done, seconds: 62, reply: [
-                .paragraph("Sent **“Leaving in 10”** to Sonali on WhatsApp. Here's your day: three things, the next at 14:00."),
+                .paragraph("Sent **“Leaving in 10”** to Asha on WhatsApp. Here's your day: three things, the next at 14:00."),
             ], more: 3)
         }
     }

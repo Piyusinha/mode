@@ -18,16 +18,16 @@ class TasksPresenterTest {
 
     @Test
     fun showsTheRunningTaskItsQuestionAndWhatWaits() = runTest {
-        val f = Fixture(this, ScriptedModel(call("ask_user", "question" to "Which Sonali?"), call("done", "evidence" to "x", "summary" to "ok")))
+        val f = Fixture(this, ScriptedModel(call("ask_user", "question" to "Which Asha?"), call("done", "evidence" to "x", "summary" to "ok")))
         val p = tasks(f)
-        f.queue.submit("Message Sonali", TaskSource.App)
+        f.queue.submit("Message Asha", TaskSource.App)
         testScheduler.advanceUntilIdle()
         f.queue.submit("Book a cab", TaskSource.Watch)
         testScheduler.advanceUntilIdle()
 
         val s = p.state.awaitState { it.running?.question != null && it.upNext.isNotEmpty() }
-        assertEquals("Message Sonali", s.running!!.text)
-        assertEquals("Which Sonali?", s.running!!.question!!.text)
+        assertEquals("Message Asha", s.running!!.text)
+        assertEquals("Which Asha?", s.running!!.question!!.text)
         assertEquals(listOf("Book a cab"), s.upNext.map { it.text })
         assertEquals(TaskSource.Watch, s.upNext.single().source)
 

@@ -16,7 +16,7 @@ class AccessRulesTest {
 
     @Test
     fun aWordInsideTheTaskOrAloneDoesNot() {
-        assertEquals(false, AccessRules.forTask("tell Sonali to just do it tomorrow", words).fullAccess)
+        assertEquals(false, AccessRules.forTask("tell Asha to just do it tomorrow", words).fullAccess)
         assertEquals(false, AccessRules.forTask("just do it", words).fullAccess)
         assertEquals(AccessRules.ForTask("auto to Bellandur", false), AccessRules.forTask("auto to Bellandur", words))
         // The user's own word, even one that is a ride elsewhere, works when they chose it.

@@ -23,3 +23,7 @@ native/out/
 # Swift package build output
 iosApp/Packages/*/.build/
 iosApp/Packages/*/.swiftpm/
+
+# Local research and reports (never published)
+reports/
+research_notes/

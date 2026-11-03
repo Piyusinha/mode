@@ -60,12 +60,12 @@ class SchedulerTest {
     @Test
     fun aDueScheduleGoesToTheInboxAndIsSetForNextTime() = runTest {
         val s = scheduler(this)
-        val added = s.add("Send good morning to Sonali", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))!!
-        assertEquals("Send good morning to Sonali — tap to run it" to at(1, 8), reminders.pending["schedule-${added.id}"])
+        val added = s.add("Send good morning to Asha", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))!!
+        assertEquals("Send good morning to Asha — tap to run it" to at(1, 8), reminders.pending["schedule-${added.id}"])
 
         clock = at(1, 8, 0)
         s.checkDue()
-        assertEquals(listOf("Send good morning to Sonali" to TaskSource.Schedule), inbox.submitted)
+        assertEquals(listOf("Send good morning to Asha" to TaskSource.Schedule), inbox.submitted)
         assertEquals(at(2, 8), repo.get(added.id)!!.nextRunAt)
         assertEquals(at(2, 8), reminders.pending["schedule-${added.id}"]!!.second)
 
@@ -131,7 +131,7 @@ class SchedulerTest {
     @Test
     fun resetDeletesEveryScheduleAndItsNotification() = runTest {
         val s = scheduler(this)
-        s.add("Send good morning to Sonali", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))
+        s.add("Send good morning to Asha", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))
         s.add("Read my calendar", ScheduleRule(9, 0, ScheduleRule.EVERY_DAY))
         assertEquals(2, reminders.pending.size)
 

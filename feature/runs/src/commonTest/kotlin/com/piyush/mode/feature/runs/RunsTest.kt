@@ -40,7 +40,7 @@ class RunsTest {
 
     @Test
     fun aRunThatCouldNotStartSaysWhy() {
-        RunRecorder(files, id = "a", index = repo).failedToStart("Text Sonali", "no API key")
+        RunRecorder(files, id = "a", index = repo).failedToStart("Text Asha", "no API key")
         val run = repo.run("a")!!
         assertEquals("not_started", run.outcome)
         assertEquals("no API key", run.summary)

@@ -206,7 +206,7 @@ public class Reflector(
             final screen, not the assistant's reasoning.
 
             Three kinds of memory:
-            - fact: about the user, stated by the task, their answers or the screen. People ("Sonali: message
+            - fact: about the user, stated by the task, their answers or the screen. People ("Asha: message
               her on WhatsApp"), preferences ("likes short, casual messages"), places ("Home: Indiranagar,
               Bengaluru"). subject = the person or topic, lower case. Never guess or infer beyond the evidence.
             - skill: a reusable route for this kind of task, only when the task succeeded. Title with

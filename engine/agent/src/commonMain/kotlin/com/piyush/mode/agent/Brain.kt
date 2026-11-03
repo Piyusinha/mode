@@ -17,7 +17,7 @@ import kotlinx.serialization.json.putJsonObject
  * The brain: a strong model that reads the request the way a personal assistant
  * would, before any tap, and writes a brief for the hands (the model that taps).
  * One text-only call. Seen on the phone, every failed run failed on judgement:
- * "talk with Sonali" asked what to say instead of reading the chat; "Beast Life in
+ * "talk with Asha" asked what to say instead of reading the chat; "Beast Life in
  * my snacks" used yesterday's diary; Swiggy reopened on an old restaurant page.
  */
 class Brain(private val llm: LlmClient, private val model: String) {
@@ -235,7 +235,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
             - Never invent facts, names or amounts. What is remembered about lists (ratings, prices) is out of
               date: the screen decides.
 
-            The steps: few and concrete, each a result to reach ("Open Sonali's chat", "Read her last messages
+            The steps: few and concrete, each a result to reach ("Open Asha's chat", "Read her last messages
             and his replies", "Write and send the reply"), not single taps. Keep every field to a few words; leave
             out what the hands already know (open the app, dismiss popups). Say what to reach, not how: "Set the
             drop to Bellandur", not "Search for Bellandur", because the app may already list it (a recent or

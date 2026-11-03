@@ -28,8 +28,8 @@ class SecretFilterTest {
     )
 
     private val fine = listOf(
-        "Sonali: message on WhatsApp",
-        "Sonali's number is +91 98765 43210",
+        "Asha: message on WhatsApp",
+        "Asha's number is +91 98765 43210",
         "Home: 12 MG Road, Bengaluru, PIN code 560034",
         "pincode 560034",
         "zip code 94107",

@@ -17,7 +17,7 @@ import kotlin.time.ExperimentalTime
  *   (EvoSkill-GUI's metadata matching). The best one above [SKILL_THRESHOLD]
  *   is given in full; the next few by name only, for `recall`.
  * - **Tips:** for apps the task names, or that a matched fact or skill names
- *   (one hop: "Sonali: WhatsApp" brings WhatsApp's tips).
+ *   (one hop: "Asha: WhatsApp" brings WhatsApp's tips).
  *
  * Ties go to items that worked recently and often (MAGNET's retention:
  * exp(−days since last use ÷ uses)).
@@ -60,7 +60,7 @@ public class MemoryRetrieval(
         else facts.sortedWith(compareByDescending<MemoryItem> { factScore(it, words) }.thenByDescending { retention(it) }).take(MAX_FACTS)
 
         val apps = (tips.map { it.subject } + skills.mapNotNull { it.app?.lowercase() }).toSet()
-        // Words the task brings with it through what is known: "message Sonali" + "Sonali: WhatsApp".
+        // Words the task brings with it through what is known: "message Asha" + "Asha: WhatsApp".
         val matchedFacts = shownFacts.filter { factScore(it, words) > 0 }
         val viaFacts = Words.of(matchedFacts.joinToString(" ") { it.text })
         val ranked = skills.map { it to skillScore(it, words, people, viaFacts) }
@@ -131,7 +131,7 @@ public class MemoryRetrieval(
      * 0.5 × how much of the task the skill covers + 0.3 × how much of the skill
      * the task covers + 0.2 when the task names the skill's app, directly or
      * through a fact it matched ([viaFacts]). Names of
-     * people the user knows don't count against a skill: "message Sonali" fits
+     * people the user knows don't count against a skill: "message Asha" fits
      * "Message [Person] on WhatsApp".
      */
     internal fun skillScore(s: MemoryItem, task: Set<String>, people: Set<String>, viaFacts: Set<String>): Double {

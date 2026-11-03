@@ -19,12 +19,12 @@ class MemorySettingsOnboardingTest {
     @Test
     fun memoryIsGroupedByKindAndCanBeForgotten() = runTest {
         val f = Fixture(this)
-        f.memory.save(MemoryDraft(MemoryKind.Fact, "sonali", "Sonali", "Sonali: WhatsApp", "e"))
+        f.memory.save(MemoryDraft(MemoryKind.Fact, "asha", "Asha", "Asha: WhatsApp", "e"))
         f.memory.save(MemoryDraft(MemoryKind.Skill, "turn off dark mode", "Turn off Dark Mode", "1. Settings", "e", app = "Settings"))
         f.memory.save(MemoryDraft(MemoryKind.Tip, "calendar", "Calendar", "list button top right", "e", app = "Calendar"))
         val p = MemoryPresenter(backgroundScope, f.memory, f.settings, f.clock)
         val s = p.state.awaitState { it.apps.isNotEmpty() }
-        assertEquals(listOf("Sonali"), s.aboutYou.map { it.title })
+        assertEquals(listOf("Asha"), s.aboutYou.map { it.title })
         assertEquals("Settings", s.routines.single().name)
         assertEquals(listOf("Settings"), s.routines.single().routines.single().steps)
         assertEquals(1, s.routineCount)

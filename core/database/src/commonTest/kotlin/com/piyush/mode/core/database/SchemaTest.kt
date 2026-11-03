@@ -48,8 +48,8 @@ class SchemaTest {
     @Test
     fun aChangedMemoryCanBeUndoneToItsPreviousText() {
         val db = testDatabase()
-        db.memoryQueries.insert("m1", "fact", "sonali", "Sonali", "on WhatsApp", "e", "", null, "k1", 1, 1)
-        db.memoryQueries.change("Sonali", "on Telegram", "e2", "", null, "k2", 2, "m1")
+        db.memoryQueries.insert("m1", "fact", "asha", "Asha", "on WhatsApp", "e", "", null, "k1", 1, 1)
+        db.memoryQueries.change("Asha", "on Telegram", "e2", "", null, "k2", 2, "m1")
         assertEquals("on WhatsApp", db.memoryQueries.byId("m1").executeAsOne().previous_text)
         db.memoryQueries.restorePrevious("m1")
         val back = db.memoryQueries.byId("m1").executeAsOne()

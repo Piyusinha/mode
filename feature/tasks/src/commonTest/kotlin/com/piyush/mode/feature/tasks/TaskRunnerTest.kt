@@ -260,7 +260,7 @@ class TaskRunnerTest {
     @Test
     fun aFollowUpContinuesTheSameConversation() = runTest {
         val f = Fixture(this, ScriptedModel(call("done", "evidence" to "on screen", "summary" to "Sent."), call("done", "evidence" to "on screen", "summary" to "Sent to Rahul too.")))
-        f.runner.runTask("Text Sonali I'm leaving", quick)
+        f.runner.runTask("Text Asha I'm leaving", quick)
         val conversation = f.runner.state.value.conversationId!!
         f.runner.runTask("Also tell Rahul", quick, conversationId = conversation)
         assertEquals(4, f.conversations.turns(conversation).first().size)
@@ -337,18 +337,18 @@ class TaskRunnerTest {
     @Test
     fun aFollowUpShowsTheModelHowTheEarlierTaskWentAndTheUsersName() = runTest {
         val model = ScriptedModel(
-            call("done", "evidence" to "on screen", "summary" to "Sent Sonali: I'm leaving."),
+            call("done", "evidence" to "on screen", "summary" to "Sent Asha: I'm leaving."),
             call("done", "evidence" to "on screen", "summary" to "Told Rahul."),
         )
         val f = Fixture(this, model)
         f.settings.update { it.copy(userName = "Piyush") }
-        f.runner.runTask("Text Sonali I'm leaving", quick)
+        f.runner.runTask("Text Asha I'm leaving", quick)
         assertFalse("EARLIER IN THIS CONVERSATION" in model.lastUserText, "a new conversation has no history")
 
         f.runner.runTask("Also tell Rahul", quick, conversationId = f.runner.state.value.conversationId)
         val prompt = model.lastUserText
-        assertTrue("They asked: Text Sonali I'm leaving" in prompt, prompt)
-        assertTrue("Result: Sent Sonali: I'm leaving." in prompt, prompt)
+        assertTrue("They asked: Text Asha I'm leaving" in prompt, prompt)
+        assertTrue("Result: Sent Asha: I'm leaving." in prompt, prompt)
         assertFalse("They asked: Also tell Rahul" in prompt, "the current task is not an earlier turn")
         assertTrue("Their name: Piyush" in prompt)
     }
@@ -365,8 +365,8 @@ class TaskRunnerTest {
                     put("failure_type", "none")
                     put("changes", buildJsonArray {
                         add(buildJsonObject {
-                            put("op", "add"); put("kind", "fact"); put("subject", "sonali"); put("title", "Sonali")
-                            put("text", "Sonali: message her on WhatsApp"); put("evidence", "step 1")
+                            put("op", "add"); put("kind", "fact"); put("subject", "asha"); put("title", "Asha")
+                            put("text", "Asha: message her on WhatsApp"); put("evidence", "step 1")
                         })
                     })
                 }
@@ -383,12 +383,12 @@ class TaskRunnerTest {
         val f = Fixture(this, model, withMemory = true)
         f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
 
-        f.runner.runTask("Message Sonali saying I'm late", quick)
+        f.runner.runTask("Message Asha saying I'm late", quick)
         testScheduler.advanceUntilIdle()
 
         assertTrue("ABOUT THE USER:\n- Home is in Indiranagar" in model.agentPrompts.first(), model.agentPrompts.first())
         assertEquals(1, model.reflections)
-        assertEquals(listOf("Sonali: message her on WhatsApp"), f.runner.state.value.remembered.map { it.text })
+        assertEquals(listOf("Asha: message her on WhatsApp"), f.runner.state.value.remembered.map { it.text })
         val saved = f.tasks.recent().first().single()
         assertEquals(0.001 + 0.0003, saved.costUsd!!, 1e-9, "the reflection's cost counts toward the task")
         assertEquals(1, f.memory.all().first { it.subject == "home" }.uses, "what it was shown is recorded")
@@ -397,7 +397,7 @@ class TaskRunnerTest {
     @Test
     fun undoTakesBackWhatATaskTaught() = runTest {
         val f = Fixture(this, AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent.")), withMemory = true)
-        f.runner.runTask("Message Sonali", quick)
+        f.runner.runTask("Message Asha", quick)
         testScheduler.advanceUntilIdle()
         val item = f.runner.state.value.remembered.single()
         f.runner.undoRemembered(item.id)
@@ -410,7 +410,7 @@ class TaskRunnerTest {
         val model = AgentAndCritic(call("done", "evidence" to "sent", "summary" to "Sent."))
         val f = Fixture(this, model, withMemory = true)
         f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
-        f.runner.runTask("Message Sonali", quick, private = true)
+        f.runner.runTask("Message Asha", quick, private = true)
         testScheduler.advanceUntilIdle()
         assertFalse("Indiranagar" in model.agentPrompts.single())
         assertEquals(0, model.reflections)
@@ -423,7 +423,7 @@ class TaskRunnerTest {
         val f = Fixture(this, model, withMemory = true)
         f.settings.update { it.copy(learnFromTasks = false) }
         f.memory.save(MemoryDraft(MemoryKind.Fact, "home", "Home", "Home is in Indiranagar", "e"))
-        f.runner.runTask("Message Sonali", quick)
+        f.runner.runTask("Message Asha", quick)
         testScheduler.advanceUntilIdle()
         assertTrue("Indiranagar" in model.agentPrompts.single())
         assertEquals(0, model.reflections)
@@ -466,7 +466,7 @@ class TaskRunnerTest {
     @Test
     fun aSecondTaskWaitsWhileTheFirstRunsAndCanBeCancelled() = runTest {
         val model = ScriptedModel(
-            call("ask_user", "question" to "Which Sonali?"),
+            call("ask_user", "question" to "Which Asha?"),
             call("done", "evidence" to "x", "summary" to "A done"),
             call("done", "evidence" to "x", "summary" to "C done"),
         )
@@ -523,7 +523,7 @@ class TaskRunnerTest {
     fun aPrivateTaskStaysPrivateWhileItWaits() = runTest {
         val model = AgentAndCritic(call("done", "evidence" to "x", "summary" to "ok"))
         val f = Fixture(this, model, withMemory = true)
-        val task = f.queue(this).submit("Message Sonali", TaskSource.App, private = true)!!
+        val task = f.queue(this).submit("Message Asha", TaskSource.App, private = true)!!
         assertTrue(f.tasks.get(task.id)!!.private)
         testScheduler.advanceUntilIdle()
         assertEquals(0, model.reflections)

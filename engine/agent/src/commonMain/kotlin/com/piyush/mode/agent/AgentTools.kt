@@ -167,7 +167,7 @@ object AgentTools {
         Tool(
             "recall", "Look up what Mode remembers: a person's details, a place, a preference, or the steps of a " +
                 "skill listed under WHAT WORKED BEFORE. Use it when the task needs something you don't have.", null,
-            listOf(Param("query", "string", "What to look up, e.g. \"Sonali\" or \"Message [Person] on WhatsApp\".")),
+            listOf(Param("query", "string", "What to look up, e.g. \"Asha\" or \"Message [Person] on WhatsApp\".")),
         ),
         Tool(
             "wait", "Wait for something to load or arrive before looking again.", null,
