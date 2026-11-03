@@ -3,6 +3,8 @@
 [workspace]
 resolver = "3"
 members = ["setup-core", "setup-cli"]
+# setup-app (the window app) joins the members once it builds.
+exclude = ["setup-app"]
 
 [workspace.package]
 edition = "2024"

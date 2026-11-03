@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Mode Setup's one window: its own commands and core events.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
