@@ -44,8 +44,10 @@ tools/build-ipa.sh both
 
 echo "== Mode Setup for Mac (.dmg)"
 if [ -n "${MODE_SIGN_IDENTITY:-}" ]; then export APPLE_SIGNING_IDENTITY="$MODE_SIGN_IDENTITY"; fi
-(cd desktop/setup-app && "$CARGO" tauri build --bundles dmg)
-DMG=$(ls desktop/target/release/bundle/dmg/*.dmg | head -1)
+# Universal: Apple silicon and Intel. CI=true skips Finder's window styling, which needs automation access.
+"$HOME/.cargo/bin/rustup" target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
+(cd desktop/setup-app && CI=true "$CARGO" tauri build --bundles dmg --target universal-apple-darwin)
+DMG=$(ls desktop/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
 [ -f "$DMG" ] || die "no .dmg was built"
 if [ -n "${MODE_NOTARY_PROFILE:-}" ]; then
     echo "== Notarizing $DMG"
