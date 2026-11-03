@@ -369,6 +369,14 @@ function phoneDevMode() {
 // ---- what each screen does when it opens --------------------------------------------------------------
 async function enter(screen) {
   if (MOCK) return;
+  if (screen === 'welcome') {
+    // Show the iPhone in the sidebar as soon as it is plugged in; Get started then goes straight on.
+    poll(async () => {
+      const phones = (await call('phones')).filter(p => p.usb);
+      const phone = phones.length === 1 ? phones[0] : null;
+      if (phone?.udid !== S.phone?.udid) { S.phones = phones; S.phone = phone; render(); }
+    }, 2000);
+  }
   if (screen === 'connect') {
     poll(async () => {
       const phones = (await call('phones')).filter(p => p.usb);
@@ -536,7 +544,7 @@ document.addEventListener('click', async e => {
   const [act, arg] = el.dataset.act.split(':');
   switch (act) {
     case 'start': case 'welcomeConnect': S.failure = null; S.after = null; go('connect'); break;
-    case 'welcome': go('welcome', { phone: null, readiness: null, shownDevSwitch: false, record: null }); break;
+    case 'welcome': go('welcome', { readiness: null, shownDevSwitch: false, record: null }); break;
     case 'pick': S.phone = S.phones[+arg]; render(); break;
     case 'pickContinue': go('trust'); break;
     case 'remember': S.remember = !S.remember; render(); break;
