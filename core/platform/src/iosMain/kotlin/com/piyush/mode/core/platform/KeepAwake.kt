@@ -26,6 +26,7 @@ import platform.AVFAudio.setActive
 import platform.AVFAudio.inputAvailable
 import platform.AVFAudio.currentRoute
 import platform.AVFAudio.sampleRate
+import platform.AVFAudio.otherAudioPlaying
 import platform.Foundation.NSData
 import platform.Foundation.NSError
 import kotlinx.cinterop.ObjCObjectVar
@@ -157,7 +158,8 @@ public object VoiceAudio {
         AppLog.log(
             "voice",
             "mic session " + (problem?.let { "FAILED: $it" } ?: "ready") + ": category ${session.category}, input available " +
-                "${session.inputAvailable}, inputs ${session.currentRoute.inputs.size}, rate ${session.sampleRate.toInt()}",
+                "${session.inputAvailable}, input ${session.currentRoute.inputs.joinToString { (it as? platform.AVFAudio.AVAudioSessionPortDescription)?.let { p -> "${p.portName} (${p.portType})" } ?: "?" }}, " +
+                "rate ${session.sampleRate.toInt()}, other audio ${session.otherAudioPlaying}, record permission ${platform.AVFAudio.AVAudioApplication.sharedInstance().recordPermission}",
         )
     }
 
