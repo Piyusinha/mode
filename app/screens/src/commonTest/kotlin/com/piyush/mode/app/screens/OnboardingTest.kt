@@ -68,6 +68,24 @@ class OnboardingTest {
     }
 
     @Test
+    fun aConnectedChatGptPlanIsEnoughToGoOnWithoutAnOpenRouterKey() = runTest {
+        val f = Fixture(this)
+        val secrets = com.piyush.mode.testing.InMemorySecretStore()
+        val settings = com.piyush.mode.feature.settings.data.SettingsRepository(secrets, com.piyush.mode.testing.InMemoryKeyValueStore())
+        val p = OnboardingPresenter(backgroundScope, settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth, lifecycle)
+        p.next(); p.setNameFromCard("Piyush", ""); p.next()
+        assertEquals(OnboardingStep.Key, p.state.value.step)
+        assertFalse(p.state.value.canContinue)
+
+        // "Continue with ChatGPT" finished: ChatGptAccount saved the sign-in and said so.
+        secrets.set(com.piyush.mode.feature.settings.data.ChatGptAccount.CONNECTED_KEY, "refresh")
+        settings.accountsChanged()
+        p.state.awaitState { it.canContinue }
+        p.next()
+        assertEquals(OnboardingStep.Model, p.state.value.step)
+    }
+
+    @Test
     fun connectOpenRouterSavesTheKeyWithoutCopying() = runTest {
         val f = Fixture(this)
         f.settings.apiKey = ""

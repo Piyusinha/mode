@@ -514,7 +514,10 @@ public class OnboardingPresenter(
             next.copy(
                 canContinue = when (next.step) {
                     OnboardingStep.Name -> next.callName.isNotBlank()
-                    OnboardingStep.Key -> next.connected || looksLikeKey(next.key) || (next.key.isBlank() && next.hasSavedKey)
+                    // OpenRouter (signed in, a key typed, or one saved) or the chosen plan's account
+                    // (ChatGPT, Claude): either is enough to go on.
+                    OnboardingStep.Key -> next.connected || looksLikeKey(next.key) || (next.key.isBlank() && next.hasSavedKey) ||
+                        settings.settings.value.hasModelAccess
                     OnboardingStep.Model -> selected != null
                     OnboardingStep.Test -> !next.testRunning
                     else -> true
