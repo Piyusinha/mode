@@ -60,7 +60,7 @@ struct MainTabs: View {
         // Talking mode: "Start Mode", and a question in a spoken task (Mode came forward to ask it out loud).
         .fullScreenCover(isPresented: Binding(get: { showingListen || run.state.talking },
                                               set: { if !$0 { showingListen = false } })) {
-            TalkRoute(app: app, forQuestion: !showingListen) { showingListen = false }
+            TalkRoute(app: app, forQuestion: !showingListen, onClose: { showingListen = false }, onVoiceSettings: openVoiceSettings)
         }
         .sheet(isPresented: $showingAsk) {
             AskRoute(app: app) { conversation in
@@ -87,6 +87,12 @@ struct MainTabs: View {
     }
 
     /// Follows a link from the Live Activity.
+    /// Talking mode's "Update in Settings": Settings → Mode's voice or Listening, from Home.
+    private func openVoiceSettings(hearing: Bool) {
+        tab = .home
+        paths[.home, default: []].append(contentsOf: [Route.settings, hearing ? Route.listening : Route.voice])
+    }
+
     private func open(_ link: DeepLink) {
         switch link {
         case let .conversation(id):

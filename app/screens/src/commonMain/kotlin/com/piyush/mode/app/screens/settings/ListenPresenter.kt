@@ -56,7 +56,16 @@ public data class ListenUiState(
     /** The task was handed to the queue; [finished] once it ended. */
     val sent: Boolean = false,
     val finished: Boolean = false,
+    /** The chosen voice or listener failed ("Mode couldn't hear with Deepgram"), with a way to Settings. */
+    val voiceNotice: VoiceNotice? = null,
 )
+
+/** The chosen voice ([hearing] false) or listener [provider] failed, and why ([trouble]: a VoiceTrouble name). */
+public data class VoiceNotice(val provider: String, val hearing: Boolean, val trouble: String) {
+    public companion object {
+        public fun of(p: com.piyush.mode.feature.settings.voice.VoiceProblem): VoiceNotice = VoiceNotice(p.kind.id, p.hearing, p.trouble.name)
+    }
+}
 
 public class ListenPresenter(
     parent: CoroutineScope,
@@ -75,7 +84,7 @@ public class ListenPresenter(
     init {
         // A spoken question in the task takes over the screen while it lasts.
         scope.launch {
-            combine(own, runner.state) { mine, task ->
+            combine(own, runner.state, voices.problem) { mine, task, problem ->
                 val turn = task.voice
                 when {
                     turn != null && mine.sent -> mine.copy(
@@ -95,7 +104,7 @@ public class ListenPresenter(
                         finished = !task.running && (taskId == null || task.taskId == taskId),
                     )
                     else -> mine
-                }
+                }.copy(voiceNotice = problem?.let(VoiceNotice::of))
             }.collect { mutableState.value = it }
         }
     }

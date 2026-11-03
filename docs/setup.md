@@ -31,6 +31,16 @@ xcrun devicectl device install app --device <UDID> \
 (`embedAndSignAppleFrameworkForXcode`), which builds the Kotlin framework and,
 through cinterop, the Rust library.
 
+### Updating a copy installed by Mode Setup
+
+Preserve its existing bundle ID, team, Keychain access groups, and app groups.
+Mode Setup adds the team suffix to the bundle ID and signs with the provisioning
+profile's groups. Xcode automatic signing can omit those explicit groups even
+when the bundle ID matches: preferences remain, but saved provider credentials
+can become inaccessible. Use the Mode Setup signer for updates, or preserve and
+verify the installed signer's entitlements before installing an Xcode build.
+Release versus Debug does not determine which preference container is used.
+
 ## 2. Pair (once, phone on USB, Mode installed)
 
 ```sh

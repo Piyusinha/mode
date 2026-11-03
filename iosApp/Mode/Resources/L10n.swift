@@ -642,7 +642,7 @@ enum L10n {
         static let sampleLine = LocalizedStringResource("voice.sampleLine", defaultValue: "“I’ll turn on Dark Mode.”")
         static let changeVoice = LocalizedStringResource("voice.changeVoice", defaultValue: "Change voice")
         static let whoSpeaks = LocalizedStringResource("voice.whoSpeaks", defaultValue: "Who speaks first")
-        static let whoSpeaksNote = LocalizedStringResource("voice.whoSpeaksNote", defaultValue: "Drag to change the order. If the first can’t start, the next one speaks. A sentence Mode has started is never said again by another voice.")
+        static let whoSpeaksNote = LocalizedStringResource("voice.whoSpeaksNote", defaultValue: "Mode speaks with the one you pick, and only that one. If it can’t, Mode tells you and shows how to fix it. Tap a connected one to edit or remove its key.")
         static let speaking = LocalizedStringResource("voice.speaking", defaultValue: "Speaking")
         static let speed = LocalizedStringResource("voice.speed", defaultValue: "Speed")
         static let slower = LocalizedStringResource("voice.slower", defaultValue: "Slower")
@@ -667,7 +667,7 @@ enum L10n {
         static let listeningSubtitle = LocalizedStringResource("voice.listeningSubtitle", defaultValue: "How Mode turns what you say into a task.")
         static let turnOnApple = LocalizedStringResource("voice.turnOnApple", defaultValue: "Allow the microphone and Mode downloads Apple’s speech model.")
         static let micOff = LocalizedStringResource("voice.micOff", defaultValue: "The microphone is off for Mode in iPhone Settings.")
-        static let listeningNote = LocalizedStringResource("voice.listeningNote", defaultValue: "Mode tries them in this order and records only once. If one hears nothing, the next one reads the same clip.")
+        static let listeningNote = LocalizedStringResource("voice.listeningNote", defaultValue: "Mode listens with the one you pick, and only that one. Apple’s words show while you speak either way.")
         static let privacy = LocalizedStringResource("voice.privacy", defaultValue: "Your privacy")
         static let privacyListen = LocalizedStringResource("voice.privacyListen", defaultValue: "Mode listens only after you say “Start Mode” or tap the mic, and stops when you stop talking.")
         static let privacyWhere = LocalizedStringResource("voice.privacyWhere", defaultValue: "With Apple, nothing leaves your iPhone. With Soniox or Deepgram, the clip goes to them only.")
@@ -725,11 +725,58 @@ enum L10n {
         // Who speaks and who listens, with Mode's recommendations (boards SetupVoiceProviders, SetupSpeakPicker, SetupListenPicker)
         static let mostHuman = LocalizedStringResource("voice.mostHuman", defaultValue: "Most human")
         static let freePrivate = LocalizedStringResource("voice.freePrivate", defaultValue: "Free and private")
-        static let mostAccurate = LocalizedStringResource("voice.mostAccurate", defaultValue: "Most accurate")
+        // One chosen provider, keys checked before saving, failures with a fix (boards Voice, VoiceListening, VoiceProviderPage, VoiceKey*, VoiceProviderFailed)
+        static func connectedKey(_ masked: String) -> String { String(localized: "voice.connectedKey", defaultValue: "Connected · \(masked)") }
+        static func notConnected(_ plan: String) -> String { String(localized: "voice.notConnected", defaultValue: "Not connected · \(plan)") }
+        static let whoListens = LocalizedStringResource("voice.whoListens", defaultValue: "Who listens")
+        static let keysNote = LocalizedStringResource("voice.keysNote", defaultValue: "Keys stay in this iPhone’s Keychain. They only go to that provider, never to us.")
+        static let couldntSpeak = LocalizedStringResource("voice.couldntSpeak", defaultValue: "Couldn’t speak")
+        static let couldntHear = LocalizedStringResource("voice.couldntHear", defaultValue: "Couldn’t hear")
+        static let troubleNoKey = LocalizedStringResource("voice.troubleNoKey", defaultValue: "no key yet")
+        static let troubleKey = LocalizedStringResource("voice.troubleKey", defaultValue: "the key was refused")
+        static let troublePlanSpeak = LocalizedStringResource("voice.troublePlanSpeak", defaultValue: "your plan doesn’t include this voice")
+        static let troublePlanHear = LocalizedStringResource("voice.troublePlanHear", defaultValue: "your plan’s allowance ran out")
+        static let troubleNotReady = LocalizedStringResource("voice.troubleNotReady", defaultValue: "not ready on this iPhone")
+        static let troubleUnreachable = LocalizedStringResource("voice.troubleUnreachable", defaultValue: "no answer")
+        static func troubleKeyLong(_ p: String) -> String { String(localized: "voice.troubleKeyLong", defaultValue: "\(p) refused the key, so Mode stayed quiet. Update the key, or use Apple.") }
+        static func troublePlanSpeakLong(_ p: String) -> String { String(localized: "voice.troublePlanSpeakLong", defaultValue: "Your \(p) plan doesn’t include this voice, so Mode stayed quiet. Pick a voice your plan has, update the key, or speak with Apple.") }
+        static func troublePlanHearLong(_ p: String) -> String { String(localized: "voice.troublePlanHearLong", defaultValue: "Your \(p) allowance ran out, so Mode didn’t start anything. Update the key, or listen with Apple.") }
+        static func troubleNoKeyLong(_ p: String) -> String { String(localized: "voice.troubleNoKeyLong", defaultValue: "There’s no \(p) key on this iPhone. Add one, or use Apple.") }
+        static let troubleNotReadyLong = LocalizedStringResource("voice.troubleNotReadyLong", defaultValue: "Apple’s voice or listening isn’t ready on this iPhone yet.")
+        static func troubleUnreachableLong(_ p: String) -> String { String(localized: "voice.troubleUnreachableLong", defaultValue: "\(p) didn’t answer, so Mode stayed quiet. Check the internet, update the key, or use Apple.") }
+        static func keyRejected(_ p: String) -> String { String(localized: "voice.keyRejected", defaultValue: "\(p) said the key is not valid. Copy it again — keys are long and easy to cut short.") }
+        static func keyPlan(_ p: String) -> String { String(localized: "voice.keyPlan", defaultValue: "\(p) knows the key, but its plan doesn’t allow this. Check your plan on \(p).") }
+        static let keyEmpty = LocalizedStringResource("voice.keyEmpty", defaultValue: "Paste the key first.")
+        static func keyUnreachable(_ p: String) -> String { String(localized: "voice.keyUnreachable", defaultValue: "Couldn’t reach \(p) to check the key. Check the internet and try again.") }
+        static func inUseFailed(_ reason: String) -> String { String(localized: "voice.inUseFailed", defaultValue: "In use · \(reason)") }
+        static let inUseSpeaking = LocalizedStringResource("voice.inUseSpeaking", defaultValue: "Connected · in use for Mode’s voice")
+        static let inUseHearing = LocalizedStringResource("voice.inUseHearing", defaultValue: "Connected · in use for listening")
+        static func couldntSpeakTitle(_ p: String) -> String { String(localized: "voice.couldntSpeakTitle", defaultValue: "\(p) couldn’t speak") }
+        static func couldntHearTitle(_ p: String) -> String { String(localized: "voice.couldntHearTitle", defaultValue: "\(p) couldn’t hear") }
+        static let chooseAnotherVoice = LocalizedStringResource("voice.chooseAnotherVoice", defaultValue: "Choose another voice")
+        static let updateKey = LocalizedStringResource("voice.updateKey", defaultValue: "Update key")
+        static let useAppleSpeaking = LocalizedStringResource("voice.useAppleSpeaking", defaultValue: "Use Apple instead")
+        static let useAppleHearing = LocalizedStringResource("voice.useAppleHearing", defaultValue: "Listen with Apple instead")
+        static let keySection = LocalizedStringResource("voice.keySection", defaultValue: "Key")
+        static let editKey = LocalizedStringResource("voice.editKey", defaultValue: "Edit key")
+        static func speakWith(_ p: String) -> String { String(localized: "voice.speakWith", defaultValue: "Speak with \(p)") }
+        static func listenWith(_ p: String) -> String { String(localized: "voice.listenWith", defaultValue: "Listen with \(p)") }
+        static func removeNote(_ p: String) -> String { String(localized: "voice.removeNote", defaultValue: "Removing the key here leaves your \(p) account as it is. Apple takes over if it was in use.") }
+        static func editKeyTitle(_ p: String) -> String { String(localized: "voice.editKeyTitle", defaultValue: "Edit \(p) key") }
+        static func inUseNowKey(_ masked: String) -> String { String(localized: "voice.inUseNowKey", defaultValue: "In use now: \(masked). Paste a new key to replace it.") }
+        static func savedConnected(_ p: String) -> String { String(localized: "voice.savedConnected", defaultValue: "Saved · \(p) is connected and in use") }
+        static let keyDidntWork = LocalizedStringResource("voice.keyDidntWork", defaultValue: "That key didn’t work")
+        static func checkingKey(_ p: String) -> String { String(localized: "voice.checkingKey", defaultValue: "Checking your key with \(p)…") }
+        static let checking = LocalizedStringResource("voice.checking", defaultValue: "Checking…")
+        static let checkAgain = LocalizedStringResource("voice.checkAgain", defaultValue: "Check again")
+        static let checkAndSave = LocalizedStringResource("voice.checkAndSave", defaultValue: "Check and save")
+        static func couldntSpeakWith(_ p: String) -> String { String(localized: "voice.couldntSpeakWith", defaultValue: "Mode couldn’t speak with \(p)") }
+        static func couldntHearWith(_ p: String) -> String { String(localized: "voice.couldntHearWith", defaultValue: "Mode couldn’t hear with \(p)") }
+        static let updateInSettings = LocalizedStringResource("voice.updateInSettings", defaultValue: "Update in Settings")
         static let ourPick = LocalizedStringResource("voice.ourPick", defaultValue: "Our pick")
-        static let speakSubtitle = LocalizedStringResource("voice.speakSubtitle", defaultValue: "Who speaks when Mode talks back.")
+        static let speakSubtitle = LocalizedStringResource("voice.speakSubtitle", defaultValue: "Mode speaks with the one you pick.")
         static let listenTitle = LocalizedStringResource("voice.listenTitle", defaultValue: "How Mode listens")
-        static let listenSubtitle = LocalizedStringResource("voice.listenSubtitle", defaultValue: "Who turns what you say into words.")
+        static let listenSubtitle = LocalizedStringResource("voice.listenSubtitle", defaultValue: "Mode listens with the one you pick.")
         static let connected = LocalizedStringResource("voice.connected", defaultValue: "Connected")
         static let needsKey = LocalizedStringResource("voice.needsKey", defaultValue: "needs a key")
         static let connectKey = LocalizedStringResource("voice.connectKey", defaultValue: "Connect")

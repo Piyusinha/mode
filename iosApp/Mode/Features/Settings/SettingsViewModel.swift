@@ -44,6 +44,9 @@ final class SettingsViewModel {
         var voiceName = ""
         var listener: String?
         var listenerLabel = ""
+        /// Why the chosen voice couldn't speak, or the chosen listener couldn't hear (shown on its row, orange).
+        var speakProblem: String?
+        var listenProblem: String?
         var talkBack = true
         var query = ""
         var modelCount = 0
@@ -204,6 +207,8 @@ final class SettingsViewModel {
             listener: s.listener,
             listenerLabel: s.listener == nil ? String(localized: L10n.Voice.off)
                 : s.listener == "apple" ? String(localized: L10n.Voice.onIPhone) : (VoiceService(id: s.listener)?.title ?? ""),
+            speakProblem: s.speakProblem.map { VoiceTroubleText.short($0, hearing: false) },
+            listenProblem: s.listenProblem.map { VoiceTroubleText.short($0, hearing: true) },
             talkBack: s.talkBack,
             query: s.query,
             modelCount: Int(s.modelCount)

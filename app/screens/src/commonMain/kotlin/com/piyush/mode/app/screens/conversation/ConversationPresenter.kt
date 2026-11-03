@@ -37,6 +37,8 @@ public data class ConversationUiState(
     val offerRemember: String? = null,
     /** Mode is saving a lesson (the model is writing the tip). */
     val teaching: Boolean = false,
+    /** In a spoken chat: the chosen voice or listener failed ("Mode couldn't speak with ElevenLabs · Update in Settings"). */
+    val voiceNotice: com.piyush.mode.app.screens.settings.VoiceNotice? = null,
 )
 
 /** A tip the user taught in this chat. */
@@ -75,7 +77,14 @@ public class ConversationPresenter(
     /** Turns what the user teaches into tips (null: lessons are sent as tasks). */
     private val teacher: Teacher? = null,
     private val memory: MemoryRepository? = null,
+    /** For the voice notice in spoken chats (null: none). */
+    private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
 ) : Presenter<ConversationUiState>(parent, ConversationUiState()) {
+    private val noticeDismissed = MutableStateFlow<com.piyush.mode.feature.settings.voice.VoiceProblem?>(null)
+    private val notice = combine(voices?.problem ?: MutableStateFlow(null), noticeDismissed) { p, dismissed -> p?.takeIf { it != dismissed } }
+
+    /** The voice notice was closed (it returns if the voice fails again in another way). */
+    public fun dismissVoiceNotice() { noticeDismissed.value = voices?.problem?.value }
     private val privateNext = MutableStateFlow(false)
     private val lessons = MutableStateFlow<List<Lesson>>(emptyList())
     private val offer = MutableStateFlow<String?>(null)
@@ -83,8 +92,8 @@ public class ConversationPresenter(
 
     init {
         scope.launch {
-            val extras = combine(lessons, offer, teaching) { l, o, t -> Triple(l, o, t) }
-            combine(conversations.turns(conversationId), runner.state, tasks.recent(TASKS), privateNext, extras) { turns, run, _, private, (taught, offered, busy) ->
+            val extras = combine(lessons, offer, teaching, notice) { l, o, t, n -> Extras(l, o, t, n) }
+            combine(conversations.turns(conversationId), runner.state, tasks.recent(TASKS), privateNext, extras) { turns, run, _, private, (taught, offered, busy, problem) ->
                 ConversationUiState(
                     title = conversations.get(conversationId)?.title.orEmpty(),
                     turns = turns.map { t ->
@@ -109,6 +118,7 @@ public class ConversationPresenter(
                     lessons = taught,
                     offerRemember = offered.takeIf { run.running && run.conversationId == conversationId },
                     teaching = busy,
+                    voiceNotice = problem?.takeIf { turns.any { t -> t.taskId?.let(tasks::get)?.source == TaskSource.Voice } }?.let(com.piyush.mode.app.screens.settings.VoiceNotice::of),
                 )
             }.collect { mutableState.value = it }
         }
@@ -226,3 +236,10 @@ public class ConversationPresenter(
             OLD_PREFIXES.firstOrNull { text.startsWith(it) }?.let { text.removePrefix(it).replaceFirstChar(Char::uppercaseChar) } ?: text
     }
 }
+
+private data class Extras(
+    val lessons: List<Lesson>,
+    val offered: String?,
+    val busy: Boolean,
+    val problem: com.piyush.mode.feature.settings.voice.VoiceProblem?,
+)

@@ -317,9 +317,6 @@ private struct VoiceStep: View {
                     ModeChevron()
                 }
             }
-            if state.listener != .deepgram {
-                DeepgramSuggestion(compact: true) { onEvent(.openVoiceSheet(.listen)) }.padding(.bottom, ModeSpacing.m)
-            }
         }
     }
 }

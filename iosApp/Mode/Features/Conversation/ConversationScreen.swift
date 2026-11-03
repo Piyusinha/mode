@@ -27,6 +27,10 @@ struct ConversationScreen: View {
                                            onEdit: { onEvent(.editLesson(lesson.id)) }, onUndo: { onEvent(.undoLesson(lesson.id)) })
                         }
                     }
+                    if let notice = state.voiceNotice {
+                        ModeChip(notice, icon: .warning, actionTitle: L10n.Voice.updateInSettings) { onEvent(.openVoiceSettings) }
+                            .contextMenu { Button { onEvent(.dismissVoiceNotice) } label: { Text(L10n.Talk.close) } }
+                    }
                     if state.offerRemember {
                         ModeChip(String(localized: L10n.Conversation.alsoNextTime), icon: .memory, actionTitle: L10n.Conversation.remember) { onEvent(.remember) }
                     }

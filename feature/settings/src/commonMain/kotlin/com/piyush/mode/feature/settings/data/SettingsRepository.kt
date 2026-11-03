@@ -130,6 +130,9 @@ public class SettingsRepository(
     /** Last four characters, for the row. Null when there is no key. */
     public fun voiceKeyEnding(kind: VoiceKind): String? = voiceKey(kind)?.takeIf { it.length > 8 }?.takeLast(4)
 
+    /** The saved key as its first and last 2 characters around dots ("sk•••••9f"), for showing it safely. */
+    public fun voiceKeyMasked(kind: VoiceKind): String? = voiceKey(kind)?.let(::maskKey)
+
     /** What the agent runs with now. */
     public fun agentConfig(): AgentConfig = state.value.agentConfig()
 
@@ -210,3 +213,6 @@ public class SettingsRepository(
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"
     }
 }
+
+/** [key] as its first and last 2 characters around dots ("sk•••••9f"); a short key shows only dots. */
+public fun maskKey(key: String): String = key.trim().let { if (it.length < 8) "•••••" else it.take(2) + "•••••" + it.takeLast(2) }

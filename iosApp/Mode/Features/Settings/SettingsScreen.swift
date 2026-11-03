@@ -38,15 +38,14 @@ struct SettingsScreen: View {
                             ModeChevron()
                         }
                     }
+                    if let problem = state.speakProblem { problemLine(problem) { onEvent(.openVoice) } }
                     ModeRow(String(localized: L10n.Voice.listeningRow), leading: (VoiceService(id: state.listener) ?? .apple).tile, action: { onEvent(.openListening) }) {
                         HStack(spacing: ModeSpacing.s) {
                             Text(state.listenerLabel).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
                             ModeChevron()
                         }
                     }
-                    if VoiceService(id: state.listener) != .deepgram {
-                        DeepgramSuggestion { onEvent(.openListening) }.padding(.vertical, ModeSpacing.s)
-                    }
+                    if let problem = state.listenProblem { problemLine(problem) { onEvent(.openListening) } }
                     ModeToggleRow(L10n.Voice.talkBack, subtitle: L10n.Voice.talkBackDetail, isOn: Binding(get: { state.talkBack }, set: { onEvent(.talkBack($0)) }))
                 }
                 Text(L10n.Voice.sectionNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
@@ -229,5 +228,18 @@ struct ModelPickerRoute: View {
 
     var body: some View {
         ModelPickerScreen(state: model.state, listed: model.listed, filter: model.filter, stuck: stuck, query: $model.query, onEvent: model.send)
+    }
+}
+
+private extension SettingsScreen {
+    /// The chosen voice or listener failed last time: why, in orange, opening its page to fix it.
+    func problemLine(_ text: String, open: @escaping () -> Void) -> some View {
+        Button(action: open) {
+            Label { Text(text).frame(maxWidth: .infinity, alignment: .leading) } icon: { ModeIcon.warning.image }
+                .modeText(.subheadline, color: ModeColor.warning)
+                .padding(.vertical, ModeSpacing.s)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
     }
 }

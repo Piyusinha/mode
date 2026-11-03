@@ -34,47 +34,24 @@ struct VoiceChoiceRow<Trailing: View>: View {
     }
 }
 
-/// "Most accurate: Deepgram · Connect", shown while another provider listens. [compact]: one line, for setup.
-struct DeepgramSuggestion: View {
-    var compact = false
-    let connect: () -> Void
+/// The providers for one direction, as the AI providers are: radio for connected ones, Connect for the rest.
+private struct ProviderRows: View {
+    let rows: [VoiceListModel.Row]
+    let onEvent: (VoiceListModel.Event) -> Void
 
     var body: some View {
-        if compact {
-            Button(action: connect) {
-                HStack(spacing: ModeSpacing.s) {
-                    Text(L10n.Voice.suggestDeepgram).modeText(.captionEmphasis, color: ModeColor.tint)
-                    Spacer(minLength: 0)
-                    Text(L10n.Voice.connectKey).modeText(.captionEmphasis, color: ModeColor.tint)
-                    ModeChevron()
-                }
-                .padding(.horizontal, ModeSpacing.m)
-                .padding(.vertical, ModeSpacing.s)
-                .background(ModeColor.tintSoft, in: .rect(cornerRadius: ModeRadius.field))
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-        } else {
-            full
+        ForEach(rows) { row in
+            ModeProviderRow(title: row.service.title, status: row.status, logo: row.service.logo,
+                            tileBackground: ModeColor.textPrimary, tileForeground: ModeColor.page,
+                            tag: row.chosen ? String(localized: L10n.Voice.inUse) : row.service.recommendation,
+                            selected: row.chosen, connected: row.connected, connectTitle: String(localized: L10n.Voice.connectKey),
+                            onSelect: { onEvent(.choose(row.service)) }, onConnect: { onEvent(.addKey(row.service)) },
+                            onOpen: row.service == .apple ? nil : { onEvent(.open(row.service)) })
         }
-    }
-
-    private var full: some View {
-        HStack(spacing: ModeSpacing.m) {
-            ModeLeadingView(VoiceService.deepgram.tile).scaleEffect(0.75).frame(width: ModeSize.badge, height: ModeSize.badge)
-            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(L10n.Voice.suggestDeepgram).modeText(.captionEmphasis, color: ModeColor.tint)
-                Text(L10n.Voice.suggestDeepgramDetail).modeText(.caption, color: ModeColor.textSecondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            ModeButton(L10n.Voice.connectKey, action: connect)
-        }
-        .padding(ModeSpacing.m)
-        .background(ModeColor.tintSoft, in: .rect(cornerRadius: ModeRadius.field))
     }
 }
 
-/// Mode's voice: the speaking providers (with Connect where a key is missing), then the chosen one's voices.
+/// Mode's voice (board SetupSpeakPicker): who speaks, one chosen, then the chosen one's voices.
 struct SpeakPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var picker: VoicePickerModel
@@ -86,67 +63,56 @@ struct SpeakPickerSheet: View {
         _keys = State(initialValue: VoiceListModel(screens: app.screens, hearing: false, navigate: { _ in }))
     }
 
-    private func connected(_ s: VoiceService) -> Bool { s == .apple || keys.state.rows.first { $0.service == s }?.connected == true }
+    private var chosen: VoiceService { keys.state.rows.first { $0.chosen }?.service ?? .apple }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ForEach([VoiceService.apple, .elevenlabs, .fish]) { service in
-                        VoiceChoiceRow(service: service, title: service.title,
-                                       detail: connected(service) ? [service.plan(hearing: false), service == .apple ? nil : String(localized: L10n.Voice.connected)].compactMap { $0 }.joined(separator: " · ")
-                                                                  : [service.plan(hearing: false), String(localized: L10n.Voice.needsKey)].joined(separator: " · "),
-                                       action: { picker.send(.service(service)) }) {
-                            if connected(service) {
-                                ModeRadio(selected: picker.state.service == service)
-                            } else {
-                                ModeButton(L10n.Voice.connectKey, role: .secondary) { picker.send(.service(service)); picker.send(.addKey) }
-                            }
-                        }
+                    ProviderRows(rows: keys.state.rows) { event in
+                        if case let .choose(service) = event { picker.send(.service(service)) }
+                        keys.send(event)
                     }
                 } header: { Text(L10n.Voice.speakSubtitle) }
-                if connected(picker.state.service) {
-                    Section {
-                        ForEach(picker.state.voices.prefix(Self.shown)) { voice in
-                            Button { picker.send(.select(voice.id)) } label: {
-                                HStack(spacing: ModeSpacing.m) {
-                                    ModePlayButton(L10n.Voice.play(voice.name), playing: picker.state.playing == voice.id, size: ModeSize.badge) { picker.send(.play(voice.id)) }
-                                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                                        HStack(spacing: ModeSpacing.s) {
-                                            Text(voice.name).modeText(.headline)
-                                            if let tag = voice.tag { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint) }
-                                        }
-                                        if !voice.traits.isEmpty { Text(voice.traits).modeText(.subheadline, color: ModeColor.textSecondary).lineLimit(1) }
+                Section {
+                    ForEach(picker.state.voices.prefix(Self.shown)) { voice in
+                        Button { picker.send(.select(voice.id)) } label: {
+                            HStack(spacing: ModeSpacing.m) {
+                                ModePlayButton(L10n.Voice.play(voice.name), playing: picker.state.playing == voice.id, size: ModeSize.badge) { picker.send(.play(voice.id)) }
+                                VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                                    HStack(spacing: ModeSpacing.s) {
+                                        Text(voice.name).modeText(.headline)
+                                        if let tag = voice.tag { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint) }
                                     }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    ModeRadio(selected: picker.state.selected == voice.id)
+                                    if !voice.traits.isEmpty { Text(voice.traits).modeText(.subheadline, color: ModeColor.textSecondary).lineLimit(1) }
                                 }
-                                .contentShape(.rect)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                ModeRadio(selected: picker.state.selected == voice.id)
                             }
-                            .buttonStyle(.plain)
+                            .contentShape(.rect)
                         }
-                    } header: { Text(L10n.Voice.voicesFrom(picker.state.service.title)) } footer: {
-                        if picker.state.service != .apple { Text(L10n.Voice.speakFallback(picker.state.service.title)) }
+                        .buttonStyle(.plain)
                     }
-                }
+                } header: { Text(L10n.Voice.voicesFrom(picker.state.service.title)) }
             }
             .navigationTitle(Text(L10n.Voice.modesVoice))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { ModeToolbarButton(.close, label: L10n.Voice.close) { dismiss() } } }
             .safeAreaInset(edge: .bottom) {
-                if let name = picker.state.selectedName, connected(picker.state.service) {
+                if let name = picker.state.selectedName, picker.state.service == chosen {
                     ModeButton(LocalizedStringResource(stringLiteral: L10n.Voice.useVoice(name)), fullWidth: true) { picker.send(.use); dismiss() }
                         .padding(.horizontal, ModeSpacing.screenEdge)
                         .padding(.bottom, ModeSpacing.s)
                 }
             }
         }
-        .sheet(item: $picker.linking) { service in VoiceKeySheet(service: service) { picker.send(.saveKey($0)) } }
+        .voiceSheets(keys)
+        .onChange(of: chosen) { _, service in if picker.state.service != service { picker.send(.service(service)) } }
         .onDisappear { picker.stop() }
     }
 }
 
-/// How Mode listens: Apple, Deepgram (most accurate) and Soniox; choosing one puts it first.
+/// How Mode listens (board SetupListenPicker): Apple, Deepgram or Soniox, one chosen.
 struct ListenPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var list: VoiceListModel
@@ -159,38 +125,13 @@ struct ListenPickerSheet: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach([VoiceService.apple, .deepgram, .soniox]) { service in
-                        let row = list.state.rows.first { $0.service == service }
-                        VoiceChoiceRow(service: service, title: service.title, detail: row?.status ?? service.plan(hearing: true),
-                                       action: { choose(service, row: row) }) {
-                            if row?.ready == true {
-                                ModeRadio(selected: row?.first == true)
-                            } else if service == .apple, row?.canTurnOn == true {
-                                ModeButton(L10n.Voice.allowMic, role: .secondary) { list.send(.turnOnApple) }
-                            } else if service != .apple {
-                                ModeButton(L10n.Voice.connectKey, role: .secondary) { list.send(.addKey(service)) }
-                            }
-                        }
-                    }
-                } header: { Text(L10n.Voice.listenSubtitle) }
-                Section {
-                    Text(L10n.Voice.whyDeepgram).modeText(.subheadline, color: ModeColor.textSecondary)
-                } header: { Text(L10n.Voice.whyDeepgramTitle) }
+                    ProviderRows(rows: list.state.rows, onEvent: list.send)
+                } header: { Text(L10n.Voice.listenSubtitle) } footer: { Text(L10n.Voice.keysNote) }
             }
             .navigationTitle(Text(L10n.Voice.listenTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { ModeToolbarButton(.done, label: L10n.Common.done) { dismiss() } } }
         }
-        .sheet(item: $list.linking) { service in
-            VoiceKeySheet(service: service) { key in
-                list.send(.saveKey(key))
-                list.send(.moveTo(service.id, 0))
-            }
-        }
-    }
-
-    private func choose(_ service: VoiceService, row: VoiceListModel.Row?) {
-        if row?.ready == true { list.send(.moveTo(service.id, 0)) }
-        else if service != .apple { list.send(.addKey(service)) }
+        .voiceSheets(list)
     }
 }

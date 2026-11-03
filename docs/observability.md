@@ -90,8 +90,9 @@ bounded queue overflow, broken storage, no-op behavior, and retention/reopening.
 
 The existing agent, ops, model, connection, voice/settings, tasks, and iOS backend
 tests are also run. The iOS device graph compiles and the simulator framework
-links. A physical phone has not yet validated these changes, and device overhead
-has not yet been measured.
+links. The Release build has also been installed and launched on the connected
+iPhone: local OTLP files are created with zero reported drops or export failures.
+Full task-flow validation and physical-device overhead measurement remain pending.
 
 ## Remaining delivery
 

@@ -44,6 +44,9 @@ final class ConversationViewModel {
         var teaching = false
         /// The task runs: the message box steers it.
         var running = false
+        /// "Mode couldn't speak with ElevenLabs": the chosen voice or listener failed in this spoken chat.
+        var voiceNotice: String?
+        var voiceNoticeHearing = false
     }
 
     struct Lesson: Identifiable, Equatable {
@@ -62,6 +65,7 @@ final class ConversationViewModel {
         case send, speak, togglePrivate, undo(String), openScreens(String), stop, share, repeatTask, askDelete, confirmDelete
         case copy(Message), retry(Message), shareReply(Message), openLive
         case remember, notNow, undoLesson(String), editLesson(String), saveLesson(String)
+        case openVoiceSettings, dismissVoiceNotice
     }
 
     private(set) var state = State()
@@ -103,6 +107,8 @@ final class ConversationViewModel {
         case let .retry(message): _ = presenter.retry(turnId: message.id)
         case let .shareReply(message): sharing = SharedText(text: message.text)
         case .openLive: navigate(.liveRun)
+        case .openVoiceSettings: navigate(state.voiceNoticeHearing ? .listening : .voice)
+        case .dismissVoiceNotice: presenter.dismissVoiceNotice()
         case .remember: presenter.remember()
         case .notNow: presenter.dismissRemember()
         case let .undoLesson(id): presenter.undoLesson(itemId: id)
@@ -145,7 +151,7 @@ final class ConversationViewModel {
                 Message(
                     id: t.id,
                     fromUser: t.fromUser,
-                    spoken: t.source == .siri || t.source == .watch,
+                    spoken: t.source == .siri || t.source == .watch || t.source == .voice,
                     text: t.text,
                     blocks: t.parts.map(ModeReplyBlock.init),
                     status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
@@ -158,7 +164,12 @@ final class ConversationViewModel {
             lessons: s.lessons.map { l in
                 Lesson(id: l.itemId, context: [l.app, l.title].compactMap { $0 }.joined(separator: " · "), text: l.text, afterTurnId: l.afterTurnId)
             },
-            offerRemember: s.offerRemember != nil, teaching: s.teaching, running: s.running != nil
+            offerRemember: s.offerRemember != nil, teaching: s.teaching, running: s.running != nil,
+            voiceNotice: s.voiceNotice.map { n in
+                let provider = VoiceService(id: n.provider)?.title ?? n.provider
+                return n.hearing ? L10n.Voice.couldntHearWith(provider) : L10n.Voice.couldntSpeakWith(provider)
+            },
+            voiceNoticeHearing: s.voiceNotice?.hearing ?? false
         )
     }
 }

@@ -18,10 +18,23 @@ import kotlinx.coroutines.launch
 public data class VoiceRow(
     val id: String,
     val ready: Boolean,
-    /** The one that speaks or listens now (the first ready one). */
+    /** The one the user chose: Mode speaks or listens with it, and only it. */
     val first: Boolean,
     val keyEnding: String? = null,
     val block: String? = null,
+    /** The saved key, shown as "sk•••••9f"; null: not connected. */
+    val masked: String? = null,
+    /** Why it last failed ([com.piyush.mode.feature.settings.voice.VoiceTrouble] name), while it is the chosen one. */
+    val problem: String? = null,
+)
+
+/** Checking a pasted key with its provider before saving it. */
+public data class KeyCheckUi(
+    val id: String,
+    /** "checking", "failed" or "saved". */
+    val state: String,
+    /** Failed: the [com.piyush.mode.feature.settings.voice.VoiceTrouble] name, or "Unreachable". */
+    val trouble: String? = null,
 )
 
 public data class VoiceUiState(
@@ -35,6 +48,8 @@ public data class VoiceUiState(
     val speakResult: Boolean = true,
     /** The sample is playing. */
     val playing: Boolean = false,
+    /** A key being checked, or the result of the last check. */
+    val keyCheck: KeyCheckUi? = null,
 )
 
 /**
@@ -49,10 +64,49 @@ public class VoicePresenter(
 ) : Presenter<VoiceUiState>(parent, VoiceUiState(hearing = hearing)) {
     private val playing = MutableStateFlow(false)
     private val refreshed = MutableStateFlow(0)
+    private val checking = MutableStateFlow<KeyCheckUi?>(null)
     private var sample: Job? = null
 
     init {
-        scope.launch { combine(settings.settings, playing, refreshed) { _, p, _ -> p }.collect { publish(it) } }
+        scope.launch { combine(settings.settings, playing, refreshed, checking, voices.problem) { _, p, _, _, _ -> p }.collect { publish(it) } }
+    }
+
+    /** Makes [id] the one Mode speaks or listens with (only a ready one can be chosen). */
+    public fun choose(id: String) {
+        val kind = VoiceKind.fromId(id) ?: return
+        if (voices.block(kind, hearing) == com.piyush.mode.feature.settings.domain.VoiceBlock.NoKey) return
+        moveTo(id, 0)
+    }
+
+    /**
+     * Checks [key] with [id]'s provider, then saves it and makes it the one in use. A refused key is not
+     * saved; [VoiceUiState.keyCheck] says why.
+     */
+    public fun checkAndSaveKey(id: String, key: String) {
+        val kind = VoiceKind.fromId(id) ?: return
+        checking.value = KeyCheckUi(id, "checking")
+        scope.launch {
+            when (val result = voices.checkKey(kind, key)) {
+                com.piyush.mode.feature.settings.voice.KeyCheck.Valid -> {
+                    settings.setVoiceKey(kind, key)
+                    moveTo(id, 0)
+                    checking.value = KeyCheckUi(id, "saved")
+                }
+                is com.piyush.mode.feature.settings.voice.KeyCheck.Rejected -> checking.value = KeyCheckUi(id, "failed", result.trouble.name)
+                com.piyush.mode.feature.settings.voice.KeyCheck.Unreachable -> checking.value = KeyCheckUi(id, "failed", "Unreachable")
+            }
+        }
+    }
+
+    /** The key sheet closed: forget the check. */
+    public fun clearKeyCheck() { checking.value = null }
+
+    /** Removes [id]'s key; when it was the one in use, Apple takes over (it needs no key). */
+    public fun remove(id: String) {
+        val kind = VoiceKind.fromId(id) ?: return
+        val wasChosen = voices.chosen(hearing) == kind
+        settings.setVoiceKey(kind, null)
+        if (wasChosen) moveTo(VoiceKind.Apple.id, 0)
     }
 
     public fun saveKey(id: String, key: String) {
@@ -128,9 +182,12 @@ public class VoicePresenter(
             val kind = VoiceKind.fromId(id) ?: return@mapNotNull null
             if (kind !in (if (hearing) VoiceKind.HEARING else VoiceKind.SPEECH)) return@mapNotNull null
             val block = voices.block(kind, hearing)
-            VoiceRow(id = id, ready = block == null, first = false, keyEnding = settings.voiceKeyEnding(kind), block = block?.name)
+            val problem = voices.problem.value?.takeIf { it.kind == kind && it.hearing == hearing }?.trouble?.name
+            VoiceRow(id = id, ready = block == null, first = false, keyEnding = settings.voiceKeyEnding(kind), block = block?.name,
+                masked = settings.voiceKeyMasked(kind), problem = problem)
         }
-        val first = rows.indexOfFirst { it.ready }
+        // The chosen one is first in the saved order, ready or not: there is no falling back to the next.
+        val first = rows.indexOfFirst { it.id == voices.chosen(hearing).id }
         val speaker = if (hearing) null else voices.speaker()
         mutableState.value = VoiceUiState(
             rows = rows.mapIndexed { index, row -> row.copy(first = index == first) },
@@ -141,6 +198,7 @@ public class VoicePresenter(
             speed = s.speechSpeed.id,
             speakResult = s.speakResult,
             playing = isPlaying,
+            keyCheck = checking.value,
         )
     }
 

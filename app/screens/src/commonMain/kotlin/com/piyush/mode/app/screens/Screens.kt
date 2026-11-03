@@ -100,7 +100,7 @@ public class Screens(
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)
 
     public fun conversation(conversationId: String): ConversationPresenter =
-        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock, teacher, memory)
+        ConversationPresenter(scope, conversationId, conversations, runner, queue, tasks, runs, clock, teacher, memory, voices)
 
     /** Turns what the user teaches into tips, written by the brain's model. */
     private val teacher: com.piyush.mode.feature.memory.data.Teacher? by lazy {

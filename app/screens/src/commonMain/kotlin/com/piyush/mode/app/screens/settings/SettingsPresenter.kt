@@ -58,6 +58,9 @@ public data class SettingsUiState(
     val speaker: String? = null,
     val voiceName: String? = null,
     val listener: String? = null,
+    /** Why the chosen voice couldn't speak, or the chosen listener couldn't hear, last time ([com.piyush.mode.feature.settings.voice.VoiceTrouble] name). */
+    val speakProblem: String? = null,
+    val listenProblem: String? = null,
     /** Spoken tasks get spoken questions and results. */
     val talkBack: Boolean = true,
 )
@@ -101,6 +104,8 @@ public class SettingsPresenter(
 
     init {
         scope.launch { catalog.refresh() }
+        // A voice failing elsewhere (a task, talking mode) shows on the Voice rows here.
+        voices?.let { v -> scope.launch { v.problem.collect { keyChanges.value++ } } }
         scope.launch {
             combine(settings.settings, catalog.state, query, keyChanges, connectionState) { s, models, (q, maker), _, auth ->
                 val recommended = when (s.provider) {
@@ -133,6 +138,8 @@ public class SettingsPresenter(
                     speaker = voices?.speaker()?.first?.id,
                     voiceName = voices?.speaker()?.second?.name,
                     listener = voices?.listener()?.id,
+                    speakProblem = voices?.problem?.value?.takeIf { !it.hearing }?.trouble?.name,
+                    listenProblem = voices?.problem?.value?.takeIf { it.hearing }?.trouble?.name,
                     talkBack = s.talkBack,
                     fullAccess = s.fullAccess,
                     stuckEffort = s.strongModel?.let(ProviderModels::effortUsed),

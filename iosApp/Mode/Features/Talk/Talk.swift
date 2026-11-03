@@ -24,6 +24,9 @@ final class TalkModel {
         var answerReply = ""
         var micDenied = false
         var finished = false
+        /// "Mode couldn't hear with Deepgram": the chosen listener or voice failed (Update in Settings).
+        var voiceNotice: String?
+        var voiceNoticeHearing = false
     }
 
     private(set) var state = State()
@@ -71,7 +74,12 @@ final class TalkModel {
             phase: s.phase, greeting: s.greeting,
             settled: words.dropLast().joined(separator: " "), forming: words.last ?? "",
             task: s.task, reply: s.reply, working: s.working, question: s.question, options: s.options,
-            answer: s.answer, answerReply: s.answerReply, micDenied: s.micDenied, finished: s.finished
+            answer: s.answer, answerReply: s.answerReply, micDenied: s.micDenied, finished: s.finished,
+            voiceNotice: s.voiceNotice.map { n in
+                let provider = VoiceService(id: n.provider)?.title ?? n.provider
+                return n.hearing ? L10n.Voice.couldntHearWith(provider) : L10n.Voice.couldntSpeakWith(provider)
+            },
+            voiceNoticeHearing: s.voiceNotice?.hearing ?? false
         )
     }
 }
@@ -90,6 +98,8 @@ struct TalkScreen: View {
     let onLater: () -> Void
     let onStop: () -> Void
     let onClose: () -> Void
+    /// The voice notice's Update in Settings (closes talking mode first).
+    var onVoiceSettings: () -> Void = {}
     @FocusState private var typing: Bool
 
     private var listening: Bool { (state.phase == .listening || state.phase == .answering) && !typingAnswer }
@@ -97,6 +107,10 @@ struct TalkScreen: View {
     var body: some View {
         VStack(spacing: ModeSpacing.l) {
             header
+            if let notice = state.voiceNotice {
+                ModeChip(notice, icon: .warning, actionTitle: L10n.Voice.updateInSettings, action: onVoiceSettings)
+                    .padding(.horizontal, ModeSpacing.screenEdge)
+            }
             ScrollView {
                 VStack(spacing: ModeSpacing.l) { content }
                     .frame(maxWidth: .infinity)
@@ -369,18 +383,21 @@ struct TalkScreen: View {
 struct TalkRoute: View {
     @State private var model: TalkModel
     private let onClose: () -> Void
+    private let onVoiceSettings: (Bool) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    init(app: AppModel, forQuestion: Bool, onClose: @escaping () -> Void) {
+    init(app: AppModel, forQuestion: Bool, onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in }) {
         _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion))
         self.onClose = onClose
+        self.onVoiceSettings = onVoiceSettings
     }
 
     var body: some View {
         TalkScreen(
             state: model.state, level: model.level, speaking: model.speaking, typingAnswer: model.typingAnswer, typed: $model.typed,
             onAllowMic: model.allowMic, onDone: model.done, onType: model.typeInstead, onSend: model.send,
-            onAnswer: model.answer, onLater: { model.later(); close() }, onStop: { model.stop(); close() }, onClose: close
+            onAnswer: model.answer, onLater: { model.later(); close() }, onStop: { model.stop(); close() }, onClose: close,
+            onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; close(); onVoiceSettings(hearing) }
         )
         .task { model.begin() }
         .onChange(of: model.state.finished) { _, finished in if finished { close() } }
