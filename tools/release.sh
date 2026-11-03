@@ -9,7 +9,8 @@
 #   Mode-paid.ipa, Mode-paid.ipa.sha256   with Mode's own VPN, for paid Apple accounts
 #   Mode Setup for Mac (.dmg), then Windows (.msi, .exe) and Linux (.deb, .AppImage) from CI
 #
-# Signing the Mac app (optional until you have the certificate):
+# Signing the Mac app: this Mac's "Developer ID Application" certificate and the notarytool
+# profile "mode-notary" are used by default. Override with:
 #   MODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)"   the identity to sign with
 #   MODE_NOTARY_PROFILE=mode-notary   a notarytool keychain profile, made once with
 #       xcrun notarytool store-credentials mode-notary --apple-id <you> --team-id <TEAMID>
@@ -43,7 +44,15 @@ echo "== Mode (.ipa, free and paid)"
 tools/build-ipa.sh both
 
 echo "== Mode Setup for Mac (.dmg)"
-if [ -n "${MODE_SIGN_IDENTITY:-}" ]; then export APPLE_SIGNING_IDENTITY="$MODE_SIGN_IDENTITY"; fi
+# This Mac's Developer ID and the "mode-notary" password are used unless others are given.
+if [ -z "${MODE_SIGN_IDENTITY:-}" ]; then
+    MODE_SIGN_IDENTITY=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1)
+fi
+if [ -n "$MODE_SIGN_IDENTITY" ]; then
+    export APPLE_SIGNING_IDENTITY="$MODE_SIGN_IDENTITY"
+    MODE_NOTARY_PROFILE=${MODE_NOTARY_PROFILE:-mode-notary}
+    echo "   signing as $MODE_SIGN_IDENTITY, notarizing with profile $MODE_NOTARY_PROFILE"
+fi
 # Universal: Apple silicon and Intel. CI=true skips Finder's window styling, which needs automation access.
 "$HOME/.cargo/bin/rustup" target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
 (cd desktop/setup-app && CI=true "$CARGO" tauri build --bundles dmg --target universal-apple-darwin)
