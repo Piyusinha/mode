@@ -26,6 +26,8 @@ enum class Operation(val wireName: String) {
     VoiceTranscribe("mode.voice.transcribe"), VoiceSynthesize("mode.voice.synthesize"),
     /** One talking-mode screen, from how it opened (Field.Entry) to how it ended (Field.Outcome). */
     VoiceSession("mode.voice.session"),
+    /** What Mode says when handed a task: written by the AI (Outcome AI) or Mode's own line (Fallback). */
+    VoiceAcknowledge("mode.voice.acknowledge"),
 }
 
 enum class Event(val wireName: String) {

@@ -2,6 +2,7 @@ package com.piyush.mode.app.screens.settings
 
 import com.piyush.mode.app.screens.common.Presenter
 import com.piyush.mode.core.telemetry.withParent
+import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.app.screens.common.ScreenClock
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.voice.DeviceVoice
@@ -16,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.ExperimentalTime
@@ -247,22 +249,36 @@ public class ListenPresenter(
         if (!own.value.sent) stop() else { job?.cancel(); voices.stop() }
     }
 
+    /**
+     * Sends [task] at once and, while it starts, has the AI write what Mode says (a personal line, up to
+     * [ACK_WAIT_MS]); Mode's own short line only if the AI can't. The phone connects and the agent plans in
+     * the meantime, so the line never holds the task up.
+     */
     private suspend fun start(task: String, source: TaskSource) {
-        own.value = own.value.copy(phase = TalkPhase.Starting, task = task, partial = "")
-        // The AI's own words, about a second at most; Mode's short line if it is slower.
-        val reply = acknowledger?.line(task, settings.settings.value.userName, hour()) ?: replyLine(task)
-        own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = reply, partial = "")
-        voices.speak(reply)
+        own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = "", partial = "")
+        val written = scope.async {
+            telemetry.trace(com.piyush.mode.core.telemetry.Operation.VoiceAcknowledge) { span ->
+                acknowledger?.line(task, settings.settings.value.userName, hour(), budgetMs = ACK_WAIT_MS).also {
+                    span.fields(mapOf(com.piyush.mode.core.telemetry.Field.Outcome to if (it == null) "Fallback" else "AI"))
+                }
+            }
+        }
         taskId = queue.submit(task, source, conversationId, false)?.id
         outcome = if (source == TaskSource.Voice) "TaskSent" else "TaskTyped"
         mark(com.piyush.mode.core.telemetry.Event.TaskSent, mapOf(com.piyush.mode.core.telemetry.Field.Source to source.name))
         own.value = own.value.copy(sent = true)
+        val reply = written.await() ?: replyLine(task)
+        own.value = own.value.copy(reply = reply)
+        voices.speak(reply)
     }
 
     @OptIn(ExperimentalTime::class)
     private fun hour(): Int = Instant.fromEpochMilliseconds(clock.now()).toLocalDateTime(clock.zone()).hour
 
     internal companion object {
+        /** How long the AI may take to write what Mode says on taking a task (the task is already going). */
+        const val ACK_WAIT_MS = 4_000L
+
         private const val MAX_SILENT_LISTENS = 2
         private const val PREPARE_CHECKS = 60
         private val QUESTION_PHASES = setOf(TalkPhase.Asking, TalkPhase.Answering, TalkPhase.Answered)

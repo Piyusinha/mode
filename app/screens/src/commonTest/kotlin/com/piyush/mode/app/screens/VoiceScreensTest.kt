@@ -155,4 +155,25 @@ class VoiceScreensTest {
             DeviceVoice.hearingState = before
         }
     }
+
+    @Test
+    fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
+        val f = Fixture(backgroundScope)
+        val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
+            kotlinx.coroutines.delay(2_000)
+            com.piyush.mode.llm.ChatResult(
+                com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
+                    put("line", kotlinx.serialization.json.JsonPrimitive("On it, Piyush. Dark Mode, coming right up."))
+                }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
+        }
+        val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            acknowledger = ack)
+
+        talk.submitTyped("Turn on dark mode")
+        val sent = talk.state.awaitState { it.sent }
+        assertEquals("", sent.reply)   // the task went before the line was written
+        val spoken = talk.state.awaitState { it.reply.isNotEmpty() }
+        assertEquals("On it, Piyush. Dark Mode, coming right up.", spoken.reply)
+    }
 }
