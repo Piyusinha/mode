@@ -70,7 +70,11 @@ final class SettingsViewModel {
     }
 
     private(set) var state = State()
-    var name = ""
+    /// The name field. It follows the saved name until the person types, and only what they typed is
+    /// saved: saving the field as it was when this screen opened wiped the name from setup.
+    var name = "" { didSet { if !syncingName { nameEdited = true } } }
+    private var nameEdited = false
+    private var syncingName = false
     var query = ""
     var showingProviders = false
     /// The provider in use (ModelProvider id), for its page.
@@ -89,13 +93,27 @@ final class SettingsViewModel {
     init(screens: Screens, navigate: @escaping (Route) -> Void) {
         presenter = screens.settings()
         self.navigate = navigate
-        name = presenter.state.value.name
-        updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
+        syncName(presenter.state.value.name)
+        updates = observe(presenter.state) { [weak self] s in
+            self?.state = Self.map(s)
+            self?.syncName(s.name)
+        }
+    }
+
+    /// Shows the saved name unless the person is mid-edit.
+    private func syncName(_ saved: String) {
+        guard !nameEdited, name != saved else { return }
+        syncingName = true
+        name = saved
+        syncingName = false
     }
 
     func send(_ event: Event) {
         switch event {
-        case .saveName: presenter.setName(name: name)
+        case .saveName:
+            guard nameEdited else { return }
+            nameEdited = false
+            if name != presenter.state.value.name { presenter.setName(name: name) }
         case let .chooseModel(id): presenter.chooseModel(id: id)
         case let .chooseStuck(id): presenter.chooseStuckModel(id: id)
         case .search: presenter.search(text: query)

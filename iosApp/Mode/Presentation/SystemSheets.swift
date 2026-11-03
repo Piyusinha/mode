@@ -3,29 +3,49 @@ import ContactsUI
 import SwiftUI
 
 /// iOS's contact picker: the user picks one card; Mode never reads the rest (no permission needed).
-struct ContactPicker: UIViewControllerRepresentable {
-    let onPick: (_ given: String, _ family: String) -> Void
+/// Presented by UIKit from the front-most screen: inside a SwiftUI sheet Apple's picker can show
+/// empty or close without answering.
+@MainActor
+enum ContactPicker {
+    private static var delegate: Delegate?
 
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+    static func present(onPick: @escaping (_ given: String, _ family: String) -> Void) {
+        guard let top = frontViewController() else { return }
         let picker = CNContactPickerViewController()
-        picker.delegate = context.coordinator
-        return picker
+        let d = Delegate { given, family in
+            onPick(given, family)
+            delegate = nil
+        } cancelled: {
+            delegate = nil
+        }
+        delegate = d
+        picker.delegate = d
+        top.present(picker, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+    private static func frontViewController() -> UIViewController? {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive } ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        var top = scene?.keyWindow?.rootViewController
+        while let next = top?.presentedViewController { top = next }
+        return top
+    }
 
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+    private final class Delegate: NSObject, CNContactPickerDelegate {
+        let picked: (String, String) -> Void
+        let cancelled: () -> Void
 
-    final class Coordinator: NSObject, CNContactPickerDelegate {
-        let onPick: (String, String) -> Void
-
-        init(onPick: @escaping (String, String) -> Void) {
-            self.onPick = onPick
+        init(picked: @escaping (String, String) -> Void, cancelled: @escaping () -> Void) {
+            self.picked = picked
+            self.cancelled = cancelled
         }
 
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
-            onPick(contact.givenName, contact.familyName)
+            picked(contact.givenName, contact.familyName)
         }
+
+        func contactPickerDidCancel(_ picker: CNContactPickerViewController) { cancelled() }
     }
 }
 

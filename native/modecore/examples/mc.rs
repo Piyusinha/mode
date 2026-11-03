@@ -83,7 +83,7 @@ fn main() {
                 let usage = modecore::keys::named(&name).unwrap_or_else(|| fail(&format!("no key {name}")));
                 session.key(usage, &[])
             }
-            "launch" => session.launch(&next()),
+            "launch" => session.launch(&next(), false),
             "apps" => session.list_apps_json().map(|json| println!("{json}")),
             "clock" => session.set_clock(if next() == "wall" { Clock::Wall } else { Clock::Mach }),
             "sleep" => {

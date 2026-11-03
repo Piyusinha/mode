@@ -20,8 +20,10 @@ struct OnboardingRoute: View {
     var body: some View {
         OnboardingScreen(state: model.state, callName: $model.callName, providers: providers.state, onProvider: providers.send, onEvent: model.send)
             .modifier(ProviderLinks(model: providers, app: app))
-            .sheet(isPresented: $model.showingContactPicker) {
-                ContactPicker { given, family in model.cardPicked(given: given, family: family) }
+            .onChange(of: model.showingContactPicker) { _, showing in
+                guard showing else { return }
+                model.showingContactPicker = false
+                ContactPicker.present { given, family in model.cardPicked(given: given, family: family) }
             }
             .sheet(isPresented: $model.showingSearch) {
                 ModelSearchSheet(results: model.state.results, query: $model.query) { model.send(.chooseModel($0)) }
