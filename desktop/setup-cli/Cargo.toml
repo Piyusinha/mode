@@ -1,0 +1,17 @@
+[package]
+name = "mode-setup-cli"
+description = "Command-line driver for Mode Setup's engine, for testing each step against a real iPhone."
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "mode-setup"
+path = "src/main.rs"
+
+[dependencies]
+mode-setup-core = { path = "../setup-core" }
+tokio = { version = "1.49", features = ["macros", "rt-multi-thread", "io-std", "io-util"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rpassword = "7"
