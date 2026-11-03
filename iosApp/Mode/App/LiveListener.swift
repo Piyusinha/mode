@@ -10,6 +10,8 @@ final class VoiceLevel {
     static let shared = VoiceLevel()
     var level: Double = 0
     var speaking = false
+    /// Listening for a while with no speech and no words: talking mode asks whether the microphone is on.
+    var cantHear = false
 }
 
 /// The loudness the microphone tap measures, read by the main thread (the tap runs on the audio thread).
@@ -163,6 +165,8 @@ final class LiveListener {
         self.feed = feed
         heardSpeech = false
         silenceSince = nil
+        let startedAt = Date()
+        var warned = false
         floor = 0.2
         words = ""
         wordsChangedAt = Date()
@@ -177,6 +181,13 @@ final class LiveListener {
                 self.floor = level < self.floor ? level : self.floor * 0.995 + level * 0.005
                 let speaking = level > max(0.25, self.floor + 0.18)
                 if speaking { self.heardSpeech = true; self.silenceSince = nil }
+                // Nothing heard yet after a moment: say so (the microphone may be off or blocked).
+                let quietTooLong = !self.heardSpeech && self.words.isEmpty && Date().timeIntervalSince(startedAt) >= LiveListener.cantHearAfter
+                if VoiceLevel.shared.cantHear != quietTooLong { VoiceLevel.shared.cantHear = quietTooLong }
+                if quietTooLong && !warned {
+                    warned = true
+                    VoiceAudio.shared.note(message: "no speech after \(LiveListener.cantHearAfter) s (peak level \(String(format: "%.2f", self.meter.report.peak)))")
+                }
                 else if self.heardSpeech {
                     let since = self.silenceSince ?? Date()
                     self.silenceSince = since
@@ -229,6 +240,9 @@ final class LiveListener {
     }
 
 
+    /// How long listening may hear nothing before talking mode asks whether the microphone is on.
+    static let cantHearAfter: TimeInterval = 2.5
+
     nonisolated static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
         let ratio = format.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 32
@@ -264,6 +278,7 @@ final class LiveListener {
         let callback = done
         done = nil
         VoiceLevel.shared.level = 0
+        VoiceLevel.shared.cantHear = false
         VoiceAudio.shared.done()
         _Concurrency.Task {
             if keep { try? await analyzer?.finalizeAndFinishThroughEndOfInput() } else { await analyzer?.cancelAndFinishNow() }

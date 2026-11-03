@@ -566,6 +566,9 @@ enum L10n {
     }
 
     enum Talk {
+        static let cantHear = LocalizedStringResource(
+            "talk.cantHear", defaultValue: "Can't hear you. Is your mic on? If this keeps happening, restart Mode."
+        )
         static let listening = LocalizedStringResource("talk.listening", defaultValue: "Listening")
         static let speaking = LocalizedStringResource("talk.speaking", defaultValue: "Mode is speaking")
         static let working = LocalizedStringResource("talk.working", defaultValue: "Working")

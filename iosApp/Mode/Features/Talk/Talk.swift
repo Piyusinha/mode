@@ -36,6 +36,8 @@ final class TalkModel {
     /// The microphone's loudness and whether Mode is talking, for the orb and the bars.
     var level: Double { VoiceLevel.shared.level }
     var speaking: Bool { VoiceLevel.shared.speaking }
+    /// No speech heard for a while: the screen asks whether the microphone is on.
+    var cantHear: Bool { VoiceLevel.shared.cantHear }
     private let presenter: ListenPresenter
     private let forQuestion: Bool
     private var updates: Updates?
@@ -100,6 +102,8 @@ struct TalkScreen: View {
     let onClose: () -> Void
     /// The voice notice's Update in Settings (closes talking mode first).
     var onVoiceSettings: () -> Void = {}
+    /// Listening hears nothing: a small warning at the top.
+    var cantHear = false
     @FocusState private var typing: Bool
 
     private var listening: Bool { (state.phase == .listening || state.phase == .answering) && !typingAnswer }
@@ -110,6 +114,10 @@ struct TalkScreen: View {
             if let notice = state.voiceNotice {
                 ModeChip(notice, icon: .warning, actionTitle: L10n.Voice.updateInSettings, action: onVoiceSettings)
                     .padding(.horizontal, ModeSpacing.screenEdge)
+            } else if listening && cantHear {
+                ModeInfoCard(icon: .warning, L10n.Talk.cantHear)
+                    .padding(.horizontal, ModeSpacing.screenEdge)
+                    .transition(.opacity)
             }
             ScrollView {
                 VStack(spacing: ModeSpacing.l) { content }
@@ -398,7 +406,8 @@ struct TalkRoute: View {
             state: model.state, level: model.level, speaking: model.speaking, typingAnswer: model.typingAnswer, typed: $model.typed,
             onAllowMic: model.allowMic, onDone: model.done, onType: model.typeInstead, onSend: model.send,
             onAnswer: model.answer, onLater: { model.later(); close() }, onStop: { model.stop(); close() }, onClose: close,
-            onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; close(); onVoiceSettings(hearing) }
+            onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; close(); onVoiceSettings(hearing) },
+            cantHear: model.cantHear
         )
         .task { model.begin() }
         .onChange(of: model.state.finished) { _, finished in if finished { close() } }

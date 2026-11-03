@@ -9,9 +9,10 @@ struct ScreenSample: Identifiable {
     /// "chatgpt-bottom": the same screen, scrolled to its end.
     var bottom: Bool { id.hasSuffix("-bottom") }
 
-    private func talk(_ state: TalkModel.State, level: Double, speaking: Bool) -> some View {
+    private func talk(_ state: TalkModel.State, level: Double, speaking: Bool, cantHear: Bool = false) -> some View {
         TalkScreen(state: state, level: level, speaking: speaking, typingAnswer: false, typed: .constant(""),
-                   onAllowMic: {}, onDone: {}, onType: {}, onSend: {}, onAnswer: { _ in }, onLater: {}, onStop: {}, onClose: {})
+                   onAllowMic: {}, onDone: {}, onType: {}, onSend: {}, onAnswer: { _ in }, onLater: {}, onStop: {}, onClose: {},
+                   cantHear: cantHear)
     }
 
     @ViewBuilder var screen: some View {
@@ -23,6 +24,7 @@ struct ScreenSample: Identifiable {
         case "teach-steer": ConversationScreen(state: Self.teachSteer, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
         case "teach-learned": ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in })
         case "talk-mic": talk(.init(phase: .needsMic), level: 0, speaking: false)
+        case "talk-canthear": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?"), level: 0, speaking: false, cantHear: true)
         case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
                                  level: 0.7, speaking: false)
         case "talk-start": talk(.init(phase: .starting, task: "Order my usual from Swiggy", reply: "I'll order my usual from Swiggy.", working: "Opening Swiggy"),

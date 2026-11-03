@@ -1,18 +1,19 @@
 package com.piyush.mode.feature.settings.voice
 
 /**
- * When the person has finished talking. A pause long enough for a thought ends the turn; it is longer
+ * When the person has finished talking. People stop for 3–4 s to think mid-task, so only a pause that long
+ * ends the turn (Done ends it at once); it is longer
  * when the words so far stop mid-sentence ("turn on the… dark mode", "message Asha and…"), so Mode
  * never cuts someone off while they think. Used by live listening on the iPhone.
  */
 public object TurnEnd {
     /** Quiet after speech that ends a finished-sounding sentence. */
-    public const val PAUSE_MS: Long = 1_400
+    public const val PAUSE_MS: Long = 3_000
     /** Quiet after words that stop mid-sentence, or before any words were recognised. */
-    public const val UNFINISHED_PAUSE_MS: Long = 2_800
+    public const val UNFINISHED_PAUSE_MS: Long = 4_000
     /** In a noisy room the level never falls: the recognised words standing still this long end the turn. */
-    public const val SETTLE_MS: Long = 2_000
-    public const val UNFINISHED_SETTLE_MS: Long = 3_500
+    public const val SETTLE_MS: Long = 3_500
+    public const val UNFINISHED_SETTLE_MS: Long = 5_000
 
     /** How long a quiet pause must last to end the turn, after [words]. */
     public fun pauseMs(words: String): Long = if (looksUnfinished(words)) UNFINISHED_PAUSE_MS else PAUSE_MS
