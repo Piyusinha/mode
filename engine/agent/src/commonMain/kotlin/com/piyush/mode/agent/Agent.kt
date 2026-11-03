@@ -1,5 +1,10 @@
 package com.piyush.mode.agent
 
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.trace
+
 import com.piyush.mode.llm.ModelProvider
 
 import com.piyush.mode.llm.ChatMessage
@@ -156,6 +161,7 @@ class Agent(
     private val onScreen: (ByteArray) -> Unit = {},
     /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
     private val onPlan: (List<PlanItem>) -> Unit = {},
+    private val telemetry: Telemetry = Telemetry.None,
 ) {
     /** One-time codes seen on screen: masked in everything recorded. */
     private val codes = OneTimeCodes()
@@ -171,7 +177,12 @@ class Agent(
      * Shortcuts), the agent works from whatever is on screen.
      */
     suspend fun run(task: String, startsInMode: Boolean = false, context: TaskContext = TaskContext.Empty): AgentResult {
-        val result = runSteps(task, startsInMode, context)
+        val result = telemetry.trace(Operation.Agent) { span ->
+            runSteps(task, startsInMode, context).also { result ->
+                span.fields(mapOf(Field.Outcome to result.outcome::class.simpleName.orEmpty()))
+                if (result.outcome is AgentOutcome.Failed) span.failed("AgentFailed")
+            }
+        }
         trace.runEnded(result)
         return result
     }
@@ -189,7 +200,9 @@ class Agent(
         if (routeSteps != null) trace.briefed("learned route", routeSteps.joinToString("\n"), 0.0, null)
         val brief = brain?.takeIf { routeSteps == null }?.let { b ->
             onStatus(WORKING)
-            val r = b.brief(task, startContext)
+            val r = telemetry.trace(Operation.BrainBrief) { span ->
+                b.brief(task, startContext).also { if (it.error != null) span.failed(if (it.callFailed) "ModelRequestFailed" else "InvalidBrief") }
+            }
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
@@ -225,7 +238,10 @@ class Agent(
         suspend fun askBrain(question: String): String {
             val b = brain ?: return "no planning mind is set: choose yourself from what you have seen"
             onStatus(WORKING)
-            val d = b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow)
+            val d = telemetry.trace(Operation.BrainDecide) { span ->
+                b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow)
+                    .also { if (it.error != null) span.failed(if (it.callFailed) "ModelRequestFailed" else "InvalidDecision") }
+            }
             cost += d.costUsd
             trace.decided(question, d.answer, d.costUsd, d.error)
             return d.answer?.let { "your planning mind decided: $it. Do that now" } ?: "your planning mind could not decide (${d.error}): choose yourself"
@@ -299,7 +315,7 @@ class Agent(
             val stepStarted = clock.markNow()
             onStatus(WORKING)
             val lookStarted = clock.markNow()
-            val screen = look()
+            val screen = telemetry.trace(Operation.ScreenLook) { look() }
             // A screen showing a one-time code is not kept as the task's last screen.
             finalScreen = screen.jpeg.takeIf { screen.texts.none { OneTimeCodes.codesIn(it.first).isNotEmpty() } }
             onScreen(screen.jpeg)

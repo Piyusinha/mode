@@ -1,5 +1,11 @@
 package com.piyush.mode.feature.connection.presentation
 
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.trace
+import com.piyush.mode.core.telemetry.withLock
+import com.piyush.mode.ops.ObservedPhoneBackend
+
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.feature.connection.domain.ConnectionState
 import com.piyush.mode.feature.connection.domain.PhoneLink
@@ -27,6 +33,7 @@ import kotlin.time.TimeSource
 public class PhoneSession(
     private val link: PhoneLink,
     private val releaseDelay: Duration = 2.seconds,
+    private val telemetry: Telemetry = Telemetry.None,
 ) {
     private val mutableState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     public val state: StateFlow<ConnectionState> = mutableState.asStateFlow()
@@ -37,14 +44,16 @@ public class PhoneSession(
     private var current: PhoneBackend? = null
 
     /** The session, connecting first if needed. */
-    public suspend fun phone(): PhoneBackend = lock.withLock {
-        current ?: run {
-            val first = connectOnce()
-            var pending: PhoneBackend? = first
-            ResilientBackend(
-                connect = { pending?.also { pending = null } ?: connectOnce() },
-                onReconnect = { why -> AppLog.log("phone", "connection dropped ($why); reconnected") },
-            ).also { current = it }
+    public suspend fun phone(): PhoneBackend = telemetry.trace(Operation.PhoneAcquire) {
+        telemetry.withLock(lock, Operation.PhoneLock) {
+            current ?: run {
+                val first = connectOnce()
+                var pending: PhoneBackend? = first
+                ResilientBackend(
+                    connect = { pending?.also { pending = null } ?: connectOnce() },
+                    onReconnect = { why -> AppLog.log("phone", "connection dropped ($why); reconnected") },
+                ).also { current = it }
+            }
         }
     }
 
@@ -53,7 +62,7 @@ public class PhoneSession(
      * and controlling" indicator) and the link is released. The next use
      * connects again, which takes about a second.
      */
-    public suspend fun disconnect() {
+    public suspend fun disconnect(): Unit = telemetry.trace(Operation.PhoneDisconnect) {
         val had = lock.withLock {
             val open = current != null
             close()
@@ -72,7 +81,7 @@ public class PhoneSession(
      * releases the link (Mode's VPN), even if Mode thinks it is not connected.
      * Unlike iOS's own Stop, it does not unpair Mode.
      */
-    public suspend fun stopSession() {
+    public suspend fun stopSession(): Unit = telemetry.trace(Operation.PhoneStop) {
         AppLog.log("phone", "Stop session pressed")
         lock.withLock {
             close()
@@ -119,11 +128,11 @@ public class PhoneSession(
         AppLog.log("phone", "connecting")
         val started = TimeSource.Monotonic.markNow()
         try {
-            val connection = link.connect()
+            val connection = telemetry.trace(Operation.PhoneConnect) { link.connect() }
             val ms = started.elapsedNow().inWholeMilliseconds
             mutableState.value = ConnectionState.Connected(connection.route)
             AppLog.log("phone", "connected via ${connection.route} in $ms ms\n${connection.attempts}")
-            return connection.backend
+            return ObservedPhoneBackend(connection.backend, telemetry)
         } catch (e: Exception) {
             mutableState.value = ConnectionState.Failed(e.message ?: e.toString())
             AppLog.error("phone", "connect failed after ${started.elapsedNow().inWholeMilliseconds} ms", e)

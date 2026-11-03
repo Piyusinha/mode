@@ -1,5 +1,11 @@
 package com.piyush.mode.app.graph
 
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.trace
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.llm.ObservedLlmClient
+
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.database.DatabaseFactory
@@ -61,6 +67,7 @@ class PlatformServices(
     val permissions: com.piyush.mode.core.platform.Permissions,
     /** Each stage of reaching this iPhone, for the Diagnose screen. */
     val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks,
+    val telemetry: Telemetry = Telemetry.None,
 )
 
 /**
@@ -71,31 +78,42 @@ class ModeGraph(platform: PlatformServices) {
     /** Lives as long as the app; work started here outlives any one screen. */
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val activity: ActivityTracker = ActivityTracker()
+    val telemetry: Telemetry = platform.telemetry
     val files: FileStore = platform.files
     val database: ModeDatabase = platform.database.create()
 
     val settings: SettingsRepository = SettingsRepository(platform.secrets, platform.prefs)
     /** Speaks and hears (one instance: the runner and the Settings lists share it). */
-    private val voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http)
+    private val voices = com.piyush.mode.feature.settings.voice.Voices(settings, platform.http, telemetry = telemetry)
     /** The models to pick from: OpenRouter's live list, cached for a day. */
     val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
-    val session: PhoneSession = PhoneSession(platform.phoneLink)
+    val session: PhoneSession = PhoneSession(platform.phoneLink, telemetry = telemetry)
     val runs: RunRepository = RunRepository(platform.files, database)
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)
     val claude: ClaudeAccount = ClaudeAccount(settings.claudeCredentials, ClaudeOAuth(platform.http))
     private val router = OpenRouterClient(platform.http, apiKey = { settings.apiKey })
-    private val claudeClient = ClaudeOAuthClient(platform.http, token = { force -> claude.accessToken(force) })
+    private val claudeClient = ClaudeOAuthClient(platform.http, token = { force ->
+        telemetry.trace(Operation.AccessToken, mapOf(Field.Provider to ModelProvider.ClaudeOAuth.name)) {
+            claude.accessToken(force)
+        }
+    })
     /** "Continue with ChatGPT": the account and the plan's Responses API. */
     val chatGpt: com.piyush.mode.feature.settings.data.ChatGptAccount = com.piyush.mode.feature.settings.data.ChatGptAccount(
         com.piyush.mode.llm.ChatGptAuth(platform.http), platform.secrets, onChange = { settings.accountsChanged() },
     )
     private val chatGptLlm = com.piyush.mode.llm.ResponsesClient(
-        platform.http, accessToken = { chatGpt.accessToken() }, onLimit = { chatGpt.limitReached() },
+        platform.http,
+        accessToken = {
+            telemetry.trace(Operation.AccessToken, mapOf(Field.Provider to ModelProvider.ChatGpt.name)) {
+                chatGpt.accessToken()
+            }
+        },
+        onLimit = { chatGpt.limitReached() },
     )
-    private val llm = ProviderClients(
+    private val llm = ObservedLlmClient(ProviderClients(
         mapOf(ModelProvider.OpenRouter to router, ModelProvider.ClaudeOAuth to claudeClient, ModelProvider.ChatGpt to chatGptLlm),
-    )
+    ), telemetry)
     /** What Mode remembers about the user, skills and app tips; on this iPhone only. */
     val memory: MemoryRepository = MemoryRepository(database)
 
@@ -114,6 +132,7 @@ class ModeGraph(platform: PlatformServices) {
         scope = scope,
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
         voices = voices,
+        telemetry = telemetry,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */

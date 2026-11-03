@@ -36,11 +36,15 @@ As of 2026-11-01.
 
 ## Roadmap
 
-### Telemetry, diagnostics, and backup (planned 2026-11-03)
+### Telemetry, diagnostics, and backup (started 2026-11-03)
 
 - [ ] **Cross-platform OpenTelemetry:** shared Kotlin instrumentation, correlated
   traces/logs, offline persistence, and Rust metric aggregation. Reuse on Android;
   add platform adapters rather than duplicating flow instrumentation.
+  **In progress:** shared SDK/OTLP persistence and task, connection, perception,
+  model, voice, and reflection instrumentation are implemented. Common contract
+  tests pass on JVM, iOS simulator, and Android library host target. Native detail,
+  metric aggregation, physical-device validation, and overhead measurement remain.
 - [ ] **Desktop diagnostics:** fetch phone and desktop traces, export reports,
   explain bottlenecks/failures with deterministic rules (no AI), and offer
   explicit repair actions.
@@ -50,7 +54,8 @@ As of 2026-11-01.
 
 Implementation and acceptance criteria:
 [OpenTelemetry, diagnostics, and backup plan](telemetry-diagnostics-backup-plan.md).
-These are planned features, not part of the desktop fixes already implemented.
+Current implementation: [Observability](observability.md). Desktop fetching,
+deterministic analysis, and backup/restore are still pending.
 
 ### Focus now (set 2026-11-01)
 In this order; everything else below waits until these are done.

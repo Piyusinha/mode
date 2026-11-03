@@ -33,6 +33,7 @@ kotlin {
             export(projects.engine.ops)
             // The notifier's question ids and actions, for the app's notification-answer handler.
             export(projects.core.platform)
+            export(projects.core.telemetry)
         }
     }
 
@@ -53,6 +54,7 @@ kotlin {
             api(projects.engine.llm)
             api(projects.engine.ops)
             api(projects.core.platform)
+            api(projects.core.telemetry)
             implementation(projects.app.devUi)
         }
     }

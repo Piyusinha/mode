@@ -12,6 +12,7 @@ built this way.
 | [harness.md](harness.md) | How the agent thinks, remembers and stays within budget |
 | [status.md](status.md) | What is done, what is pending, and the commit history |
 | [telemetry-diagnostics-backup-plan.md](telemetry-diagnostics-backup-plan.md) | Planned cross-platform OpenTelemetry, local diagnostics, and encrypted settings backup |
+| [observability.md](observability.md) | Implemented local OpenTelemetry pipeline, coverage, tests, and remaining diagnostics work |
 | [architecture.md](architecture.md) | Layers, modules, data shapes, threading, build |
 | [flows.md](flows.md) | Sequence and flow diagrams: pairing, connecting, a look, a tap, the hands check, the planned agent loop |
 | [decisions.md](decisions.md) | Every design decision, with the options weighed and why one won |

@@ -31,6 +31,7 @@ dependencyResolutionManagement {
 
 // Layers, lowest first: core → engine → feature → app (see docs/architecture.md).
 include(":core:common")
+include(":core:telemetry")
 include(":core:storage")
 include(":core:platform")
 include(":core:network")

@@ -6,6 +6,7 @@ plugins {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.telemetry)
             api(libs.ktor.client.core)
             api(libs.kotlinx.serialization.json)
         }

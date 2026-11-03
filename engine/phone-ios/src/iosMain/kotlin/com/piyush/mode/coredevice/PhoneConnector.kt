@@ -2,6 +2,10 @@
 
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.ops.PhoneUnavailable
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
@@ -46,6 +50,7 @@ class ConnectedPhone(
 class PhoneConnector(
     private val hostname: String = "Mode",
     private val port: Int = DEFAULT_PORT,
+    private val telemetry: Telemetry = Telemetry.None,
 ) {
     suspend fun connect(
         pairingFile: ByteArray,
@@ -56,15 +61,17 @@ class PhoneConnector(
         for (route in routes) {
             if (route == Route.Vpn) {
                 try {
-                    LoopbackVpn.ensureUp()
+                    telemetry.trace(Operation.VpnStart, mapOf(Field.BuiltInVpn to LoopbackVpn.builtIn.toString())) { LoopbackVpn.ensureUp() }
                 } catch (e: Exception) {
                     attempts += route to (e.message ?: e.toString())
                     continue
                 }
             }
             val session = try {
-                withContext(Dispatchers.IO) {
-                    ModecoreSession.open(route.host, port, hostname, pairingFile, bundledDiskImage())
+                telemetry.trace(Operation.DeviceOpen) {
+                    withContext(Dispatchers.IO) {
+                        ModecoreSession.open(route.host, port, hostname, pairingFile, bundledDiskImage())
+                    }
                 }
             } catch (e: Exception) {
                 attempts += route to (e.message ?: e.toString())
@@ -72,8 +79,8 @@ class PhoneConnector(
             }
             attempts += route to null
             val reader = VisionTextReader()
-            withContext(Dispatchers.IO) { reader.warmUp() }
-            val backend = CoreDeviceBackend(session, screen, reader, UIKitImageTools(), Dispatchers.IO)
+            telemetry.trace(Operation.OcrWarmup) { withContext(Dispatchers.IO) { reader.warmUp() } }
+            val backend = CoreDeviceBackend(session, screen, reader, UIKitImageTools(), Dispatchers.IO, telemetry = telemetry)
             return ConnectedPhone(backend, route, attempts, session.mountedDiskImage)
         }
         // The VPN reached the phone but it refused the pairing: Mode was unpaired.

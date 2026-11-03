@@ -1,7 +1,9 @@
 # Cross-Platform OpenTelemetry, Diagnostics, and Settings Backup
 
-Agreed implementation plan, 2026-11-03. This is planned work, not an implemented
-feature. It replaces the earlier platform-specific tracing proposal.
+Agreed implementation plan, 2026-11-03. Implementation has started; see
+[observability.md](observability.md) for delivered tracing coverage and remaining
+work. The full diagnostics and backup feature is not complete. This replaces the
+earlier platform-specific tracing proposal.
 
 ## 1. Architecture and reuse
 

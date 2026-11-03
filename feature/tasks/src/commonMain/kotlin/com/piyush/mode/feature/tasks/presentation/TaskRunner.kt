@@ -1,5 +1,14 @@
 package com.piyush.mode.feature.tasks.presentation
 
+import com.piyush.mode.core.telemetry.TraceSpan
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.Event
+import com.piyush.mode.core.telemetry.currentContext
+import com.piyush.mode.core.telemetry.trace
+import com.piyush.mode.core.telemetry.withLock
+
 import com.piyush.mode.llm.ModelProvider
 
 import com.piyush.mode.core.platform.QuestionKind
@@ -83,6 +92,7 @@ public class TaskRunner(
     private val startOfToday: () -> Long = ::startOfTodayMillis,
     /** Speaks questions and the summary, and hears a spoken answer. Null keeps today's taps. */
     private val voices: Voices? = null,
+    private val telemetry: Telemetry = Telemetry.None,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
@@ -196,21 +206,25 @@ public class TaskRunner(
         return saved
     }
 
-    private suspend fun runSaved(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? =
-        phoneLock.withLock {
-            activity.track {
-                coroutineScope {
-                    current = coroutineContext[Job]
-                    try {
-                        run(saved, config, tag, stayConnected)
-                    } finally {
-                        current = null
+    private suspend fun runSaved(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
+        val taskStarted = kotlin.time.TimeSource.Monotonic.markNow()
+        return telemetry.trace(Operation.Task, mapOf(Field.TaskId to saved.id, Field.Source to saved.source.name)) { span ->
+            telemetry.withLock(phoneLock, Operation.TaskLock) {
+                activity.track {
+                    coroutineScope {
+                        current = coroutineContext[Job]
+                        try {
+                            run(saved, config, tag, stayConnected, taskStarted, span)
+                        } finally {
+                            current = null
+                        }
                     }
                 }
             }
         }
+    }
 
-    private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean): AgentResult? {
+    private suspend fun run(saved: Task, config: AgentConfig, tag: String?, stayConnected: Boolean, taskStarted: kotlin.time.TimeMark, span: TraceSpan): AgentResult? {
         val task = saved.text
         // Only a task the user spoke is answered by voice: others keep the quiet notification and Live Activity.
         spoken = saved.source == TaskSource.Voice && settings.settings.value.talkBack
@@ -250,8 +264,20 @@ public class TaskRunner(
                 return null
             }
             status("Getting started…")
+            val taskContext = telemetry.currentContext()
+            var firstAction = true
             val phone = try {
-                session.phone()
+                val connected = session.phone()
+                object : PhoneBackend by connected {
+                    override suspend fun send(op: Op): kotlinx.serialization.json.JsonElement {
+                        val result = connected.send(op)
+                        if (firstAction && op !is Op.ScreenCapture && op !is Op.ScreenText && op != Op.ScreenBounds && op != Op.SessionState && op != Op.Tree && op != Op.CurrentApp) {
+                            firstAction = false
+                            telemetry.event(Event.FirstAction, taskContext, mapOf(Field.DurationMs to taskStarted.elapsedNow().inWholeMilliseconds.toString()))
+                        }
+                        return result
+                    }
+                }
             } catch (e: Exception) {
                 recorder.failedToStart(task, "could not connect: ${e.message}")
                 throw e
@@ -265,7 +291,7 @@ public class TaskRunner(
             } else budget
             val useMemory = !private && tag == null
             val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier, today = today())
-            val prepared = memory?.prepare(agentTask, base, useMemory, saved.id)
+            val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
                 phone = phone,
                 llm = llm.forProvider(budget.provider),
@@ -275,6 +301,7 @@ public class TaskRunner(
                 onPlan = { items -> mutableState.update { it.copy(plan = items) } },
                 onStatus = ::status,
                 trace = recorder,
+                telemetry = telemetry,
                 memory = prepared?.agentMemory,
                 pause = gate,
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
@@ -311,6 +338,8 @@ public class TaskRunner(
             notifier.post("Mode", "Task failed: ${e.message}")
             return null
         } finally {
+            span.fields(mapOf(Field.Outcome to outcome.name))
+            if (outcome == TaskStatus.Failed) span.failed("TaskFailed")
             tasks.finish(saved.id, outcome, reply, result?.steps,
                 if (config.provider.reportsCurrencyCost) result?.costUsd else null)
             conversation?.let { conversations.addTurn(it, TurnRole.Mode, reply, saved.id) }
@@ -339,15 +368,16 @@ public class TaskRunner(
      * learning is on, reflect on it in the background (the user already has
      * the answer, so this never slows a task down).
      */
-    private fun learnFrom(taskId: String, task: String, result: AgentResult, usedIds: List<String>, config: AgentConfig) {
+    private suspend fun learnFrom(taskId: String, task: String, result: AgentResult, usedIds: List<String>, config: AgentConfig) {
         val memory = memory ?: return
         memory.recordUse(result, usedIds)
         val settings = settings.settings.value
         val reflectionModel = settings.reflectionModel.takeIf { settings.provider == config.provider } ?: config.model
         if (!settings.learnFromTasks) return
+        val parent = telemetry.currentContext()
         scope.launch {
             try {
-                val reflection = memory.learn(taskId, task, result, reflectionModel, config.provider)
+                val reflection = telemetry.trace(Operation.Reflection, mapOf(Field.TaskId to taskId), parent = parent) { memory.learn(taskId, task, result, reflectionModel, config.provider) }
                 AppLog.log(
                     "memory",
                     "task $taskId: saved ${reflection.saved.size}, refused ${reflection.refused.size}" +
@@ -444,7 +474,10 @@ public class TaskRunner(
         }
         notifier.ask(pending.id, text, kind, options)
         // A PIN or password screen must stay in front: Mode never comes forward for the user's turn.
-        val voice = if (yourTurn || voices == null || !spoken) null else scope.launch { hearQuestion(phone, pending) }.also { voiceJob = it }
+        val parent = telemetry.currentContext()
+        val voice = if (yourTurn || voices == null || !spoken) null else scope.launch {
+            telemetry.trace(Operation.VoiceTurn, parent = parent) { hearQuestion(phone, pending) }
+        }.also { voiceJob = it }
         askedInMode = !yourTurn && (!notifier.canAskInPlace() || voice != null)
         if (askedInMode && voice == null) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
         try {

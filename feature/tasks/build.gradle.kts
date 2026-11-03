@@ -5,6 +5,7 @@ plugins {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.telemetry)
             api(projects.engine.agent)
             api(projects.feature.connection)
             api(projects.feature.settings)

@@ -1,5 +1,9 @@
 package com.piyush.mode.feature.settings.voice
 
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.feature.settings.data.SettingsRepository
 import com.piyush.mode.feature.settings.domain.VoiceBlock
@@ -72,6 +76,7 @@ public class Voices(
     private val settings: SettingsRepository,
     private val http: HttpClient,
     private val device: DeviceVoice = DeviceVoice,
+    private val telemetry: Telemetry = Telemetry.None,
 ) {
     public fun block(kind: VoiceKind, hearing: Boolean): VoiceBlock? = when {
         kind.needsKey && settings.voiceKey(kind).isNullOrBlank() -> VoiceBlock.NoKey
@@ -86,13 +91,19 @@ public class Voices(
         else -> null
     }
 
-    public suspend fun speak(text: String) {
+    public suspend fun speak(text: String): Unit = telemetry.trace(Operation.VoiceSpeak) { speakLine(text) }
+
+    private suspend fun speakLine(text: String) {
         val line = text.trim()
         if (line.isEmpty()) return
         for (kind in order(hearing = false)) {
             if (block(kind, hearing = false) != null) continue
             val spoken = try {
-                say(kind, settings.settings.value.voices[kind.id]?.id, line)
+                telemetry.trace(Operation.VoiceSynthesize, mapOf(Field.Provider to kind.id)) { span ->
+                    say(kind, settings.settings.value.voices[kind.id]?.id, line).also {
+                        if (it == Spoken.NotStarted) span.failed("SpeechNotStarted")
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -108,22 +119,29 @@ public class Voices(
      * user speaks: [onPartial] gets the words so far (the screen shows them), and its final text needs no second
      * pass. The same recording goes to Soniox or Deepgram if Apple heard nothing.
      */
-    public suspend fun hear(onPartial: (String) -> Unit = {}): Heard {
+    public suspend fun hear(onPartial: (String) -> Unit = {}): Heard =
+        telemetry.trace(Operation.VoiceHear) { listen(onPartial) }
+
+    private suspend fun listen(onPartial: (String) -> Unit): Heard {
         val ready = order(hearing = true).filter { block(it, hearing = true) == null }
         if (ready.isEmpty()) return Heard.Nothing
-        val heard = device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = VoiceKind.Apple in ready, onPartial)
+        val heard = telemetry.trace(Operation.VoiceRecord) {
+            device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = VoiceKind.Apple in ready, onPartial)
+        }
         val path = heard.path ?: return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim())
         return try {
             val deadline = TimeSource.Monotonic.markNow() + TOTAL_HEAR
             for (kind in ready) {
                 if (deadline.hasPassedNow()) break
-                val text = withTimeoutOrNull(PER_HEAR) {
-                    when (kind) {
-                        VoiceKind.Apple -> heard.text ?: device.transcribeApple(path)
-                        VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
-                        VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
-                        else -> null
-                    }
+                val text = telemetry.trace(Operation.VoiceTranscribe, mapOf(Field.Provider to kind.id)) { span ->
+                    withTimeoutOrNull(PER_HEAR) {
+                        when (kind) {
+                            VoiceKind.Apple -> heard.text ?: device.transcribeApple(path)
+                            VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
+                            VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
+                            else -> null
+                        }
+                    }.also { span.fields(mapOf(Field.Outcome to if (it.isNullOrBlank()) "Empty" else "Words")) }
                 }
                 if (!text.isNullOrBlank()) return Heard.Words(text.trim())
                 AppLog.log("voice", "${kind.id} heard nothing")

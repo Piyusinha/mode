@@ -8,8 +8,13 @@ ktor = "3.5.1"
 skie = "0.10.15"
 sqldelight = "2.4.1"
 kotlinx-datetime = "0.7.1"
+opentelemetry-kotlin = "0.9.0"
+android-gradle = "9.2.1"
 
 [libraries]
+otel-core = { module = "io.opentelemetry.kotlin:core", version.ref = "opentelemetry-kotlin" }
+otel-implementation = { module = "io.opentelemetry.kotlin:implementation", version.ref = "opentelemetry-kotlin" }
+otel-protobuf = { module = "io.opentelemetry.kotlin:exporters-protobuf", version.ref = "opentelemetry-kotlin" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
@@ -29,6 +34,7 @@ sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", versi
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 
 [plugins]
+androidKmp = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

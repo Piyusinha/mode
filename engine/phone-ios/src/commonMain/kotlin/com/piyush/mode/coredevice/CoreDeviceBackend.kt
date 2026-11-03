@@ -1,5 +1,8 @@
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.core.telemetry.Telemetry
+import com.piyush.mode.core.telemetry.Operation
+import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.OpFailed
 import com.piyush.mode.ops.PhoneBackend
@@ -40,6 +43,7 @@ class CoreDeviceBackend(
     private val images: ImageTools,
     private val io: CoroutineDispatcher = Dispatchers.Default,
     private val clock: TimeSource = TimeSource.Monotonic,
+    private val telemetry: Telemetry = Telemetry.None,
 ) : PhoneBackend, AutoCloseable {
 
     override val name = "ios-coredevice"
@@ -77,7 +81,7 @@ class CoreDeviceBackend(
         lock.withLock { withContext(io) { session.resumeStream() } }
     }
 
-    private fun run(op: Op): JsonElement = when (op) {
+    private suspend fun run(op: Op): JsonElement = when (op) {
         is Op.Tap -> touch(op.x, op.y, op.x, op.y, holdMs = TAP_HOLD_MS, travelMs = 0)
         is Op.LongPress -> touch(op.x, op.y, op.x, op.y, holdMs = seconds(op.duration), travelMs = 0)
         is Op.Drag -> touch(op.x1, op.y1, op.x2, op.y2, holdMs = TAP_HOLD_MS, travelMs = seconds(op.duration))
@@ -143,8 +147,8 @@ class CoreDeviceBackend(
     }
 
     @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-    private fun capture(maxSize: Int?): JsonElement {
-        val png = session.screenshotPng().also { lastShot = clock.markNow() to it }
+    private suspend fun capture(maxSize: Int?): JsonElement {
+        val png = telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }.also { lastShot = clock.markNow() to it }
         if (maxSize == null || maxSize <= 0) {
             return buildJsonObject {
                 put("png_b64", Base64.encode(png))
@@ -152,7 +156,7 @@ class CoreDeviceBackend(
             }
         }
         // A smaller JPEG for models: the full PNG is several megabytes.
-        val small = images.shrinkToJpeg(png, maxSize)
+        val small = telemetry.trace(Operation.ImageEncode) { images.shrinkToJpeg(png, maxSize) }
         return buildJsonObject {
             put("jpeg_b64", Base64.encode(small.jpeg))
             put("bounds", bounds())
@@ -164,8 +168,9 @@ class CoreDeviceBackend(
     }
 
     /** OCR boxes in screen points, centres ready to tap: `{text, confidence, source, x, y, w, h}`. */
-    private fun readText(minConfidence: Double): List<JsonElement> =
-        reader.read(shotForText())
+    private suspend fun readText(minConfidence: Double): List<JsonElement> {
+        val shot = shotForText()
+        return telemetry.trace(Operation.ScreenOcr) { reader.read(shot) }
             .filter { it.confidence >= minConfidence && it.text.isNotBlank() }
             .map {
                 buildJsonObject {
@@ -178,13 +183,14 @@ class CoreDeviceBackend(
                     put("h", round(it.height * screen.heightPt))
                 }
             }
+    }
 
     /** The capture's shot if it was just taken, else a fresh one; either way used once. */
-    private fun shotForText(): ByteArray {
+    private suspend fun shotForText(): ByteArray {
         val shot = lastShot
         lastShot = null
         if (shot != null && shot.first.elapsedNow() < SHOT_REUSE) return shot.second
-        return session.screenshotPng()
+        return telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }
     }
 
     private fun round(v: Double): Double = kotlin.math.round(v)
