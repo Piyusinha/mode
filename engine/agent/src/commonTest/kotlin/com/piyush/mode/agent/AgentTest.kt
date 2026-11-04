@@ -569,9 +569,9 @@ class AgentTest {
         val churn = Array(12) { plan }
         val model = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14)).run("t")
-        // Plans are steps without progress: after six the run stops, having asked the strong model at most a few times.
+        // Plans are steps without progress: after ten the run stops, having asked the strong model at most a few times.
         assertTrue(model.models.count { it == "strong" } in 1..3, model.models.toString())
-        assertTrue(model.models.size <= 8, "stopped after six steps without progress: ${model.models}")
+        assertTrue(model.models.size <= 12, "stopped after ten steps without progress: ${model.models}")
 
         val tight = ScriptedModel(*churn, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, tight, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0, maxSteps = 14, maxCostUsd = 0.03)).run("t")
@@ -1144,5 +1144,55 @@ class AgentTest {
         val done = outcome as AgentOutcome.Done
         assertEquals("**Dark Mode** is now on.", done.summary)
         assertEquals("Done, Piyush. Dark Mode is on.", done.spoken)
+    }
+
+    @Test
+    fun theBudgetGrowsWhileEveryStepReachesANewPage() = runTest {
+        // 3 Nov 19:48: stopped at step 30 of 30, one tap from "Search Flight". Progress now buys more steps.
+        val phone = FakePhone(List(14) { i -> listOf("Page $i" to (100.0 to 300.0), "Next $i" to (200.0 to 500.0)) })
+        val taps = List(9) { i -> call("tap", "x" to 250, "y" to 570, "reason" to "Next page $i") }
+        val model = ScriptedModel(*taps.toTypedArray(), call("done", "evidence" to "x", "summary" to "x"))
+        val r = Agent(phone, model, Gate(), AgentConfig(settleMs = 0, maxSteps = 4, budgetCeiling = 12)).run("go through the pages")
+        assertIs<AgentOutcome.Done>(r.outcome, "did not stop at 4: ${r.outcome}")
+        assertEquals(9, phone.actions.count { it is Op.Tap })
+    }
+
+    @Test
+    fun withoutProgressTheBudgetStaysAndTheTaskStopsAtIt() = runTest {
+        val page = listOf("Settings" to (100.0 to 300.0))
+        val phone = FakePhone(List(10) { page })
+        val tap = call("tap", "x" to 300, "y" to 800, "reason" to "Trying")
+        val r = Agent(phone, ScriptedModel(tap, tap, tap, tap, tap, tap), Gate(), AgentConfig(settleMs = 0, maxSteps = 4, budgetCeiling = 12)).run("t")
+        val stopped = assertIs<AgentOutcome.Stopped>(r.outcome)
+        assertTrue("limit of 4 steps" in stopped.why || "Stuck" in stopped.why, stopped.why)
+    }
+
+    @Test
+    fun theSameTapTwiceWithNoChangeGetsAnotherWayThenARouteChange() = runTest {
+        val page = listOf("Flights" to (100.0 to 300.0), "Search" to (200.0 to 600.0))
+        val phone = FakePhone(List(10) { page })
+        val tap = call("tap", "x" to 100, "y" to 300, "reason" to "Opening flights")
+        val model = ScriptedModel(tap, tap, tap, tap, call("done", "success" to false, "summary" to "x", "evidence" to "x"))
+        Agent(phone, model, Gate(), AgentConfig(settleMs = 0, maxSteps = 10)).run("find my flight")
+        val prompt = model.lastUserText
+        assertTrue("TRY ANOTHER WAY" in prompt, prompt)
+        assertTrue("ROUTE CHANGE" in prompt, prompt)
+    }
+
+    @Test
+    fun aPhoneThatStopsAnsweringIsReconnectedAndTheStepGivenBack() = runTest {
+        // 3 Nov 19:22: every op silently dropped; the run died "running". The frame never changes after actions
+        // that cannot all do nothing: phone control is brought back, not the model blamed.
+        val page = listOf("Hotels" to (100.0 to 300.0))
+        val phone = FakePhone(List(12) { page }).also { it.frames = mutableListOf("AAAB") }
+        var reconnected = 0
+        val model = ScriptedModel(
+            call("scroll", "direction" to "down", "reason" to "Looking"), call("tap", "x" to 100, "y" to 300, "reason" to "Opening"),
+            call("back", "reason" to "Back"), call("tap", "x" to 100, "y" to 300, "reason" to "Opening again"),
+            call("done", "success" to false, "summary" to "x", "evidence" to "x"),
+        )
+        Agent(phone, model, Gate(), AgentConfig(settleMs = 0, maxSteps = 8), recoverPhone = { reconnected++; phone }).run("hotel near the airport")
+        assertEquals(1, reconnected, "phone control was brought back once")
+        assertTrue("phone control had stopped responding: reconnected" in model.lastUserText, model.lastUserText)
     }
 }

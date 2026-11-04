@@ -46,6 +46,8 @@ data class AgentConfig(
     /** Used for one step after the cheap model makes no progress twice; null to never step up. */
     val strongModel: String? = DEFAULT_STRONG_MODEL,
     val maxSteps: Int = 30,
+    /** Steps are added while the task makes progress (StepBudget), never beyond this. */
+    val budgetCeiling: Int = 60,
     /** Longer side of the screenshot sent to the model, in pixels. */
     val imageMaxSide: Int = 1000,
     /** Pause after each action before checking that the screen is still. */
@@ -147,7 +149,7 @@ class AgentResult(
  * tool, and the agent carries it out through the [PhoneBackend].
  */
 class Agent(
-    private val phone: PhoneBackend,
+    phone: PhoneBackend,
     private val llm: LlmClient,
     private val gate: UserGate,
     private val config: AgentConfig = AgentConfig(),
@@ -163,8 +165,11 @@ class Agent(
     /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
     private val onPlan: (List<PlanItem>) -> Unit = {},
     private val telemetry: Telemetry = Telemetry.None,
+    /** Brings phone control back when it stops answering (ops silently dropped); null: nothing to do. */
+    private val recoverPhone: (suspend () -> PhoneBackend)? = null,
 ) {
     /** One-time codes seen on screen: masked in everything recorded. */
+    private var phone: PhoneBackend = phone
     private val codes = OneTimeCodes()
     private val trace: AgentTrace = RedactingTrace(trace, codes)
 
@@ -214,6 +219,17 @@ class Agent(
         var lastScreen: String? = null
         var lastWasPhoneAction = false
         val stuck = StuckDetector(canStepUp = config.strongModel != null)
+        val budget = StepBudget(config.maxSteps, config.budgetCeiling)
+        val ladder = RecoveryLadder()
+        /** The same action done again and again: how many times the last one was (StuckDetector.repeated). */
+        var repeats = 0
+        /** How the last phone action was described, for the routes list. */
+        var lastDescribed: String? = null
+        /** The last frame as bytes, and frames in a row identical to the one before an action. */
+        var lastJpeg: ByteArray? = null
+        var identicalFrames = 0
+        var lastActionKinds = ArrayDeque<String>()
+        var planDoneSeen = 0
         /** The app the agent last opened, to return to after the user answers a question. */
         var lastApp: String? = null
         /** The model's own plan for multi-part tasks, shown back to it every step; the brain's steps first. */
@@ -293,8 +309,17 @@ class Agent(
         /** " Last: tap "Send"." for a stop message, from the latest step. */
         fun lastAction() = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
 
-        for (step in 1..config.maxSteps) {
+        var stepCount = 0
+        while (true) {
+            val step = ++stepCount
+            if (step > budget.limit) {
+                // Never stop one action from done: typed, and the submit is in view.
+                val submitVisible = lastOp == "type_text" && screenNow.any { SUBMIT.containsMatchIn(it) }
+                if (!budget.grace(step, submitVisible)) break
+                if (history.isNotEmpty()) history[history.lastIndex] += " (${StepBudget.GRACE} more steps: submit what you typed, then finish)"
+            }
             currentCoroutineContext().ensureActive()
+            budget.warning(step)?.let { if (history.isNotEmpty()) history[history.lastIndex] += " [$it]" }
             config.maxCostUsd?.let { limit ->
                 if (cost >= limit) {
                     return result(
@@ -320,7 +345,21 @@ class Agent(
             val stepStarted = clock.markNow()
             onStatus(WORKING)
             val lookStarted = clock.markNow()
-            val screen = telemetry.trace(Operation.ScreenLook) { look() }
+            var screen = telemetry.trace(Operation.ScreenLook) { look() }
+            // A frame identical to the one before the action is stale or the phone stalled: look once more.
+            if (lastWasPhoneAction && lastJpeg?.contentEquals(screen.jpeg) == true) {
+                delay(RECAPTURE_MS)
+                screen = telemetry.trace(Operation.ScreenLook) { look() }
+                identicalFrames = if (lastJpeg?.contentEquals(screen.jpeg) == true) identicalFrames + 1 else 0
+            } else identicalFrames = 0
+            // Phone control silently dropping every op: the same frame after actions that cannot all do nothing.
+            if (identicalFrames >= DEADLOCK_FRAMES && lastActionKinds.any { it in MOVING_KINDS } && lastActionKinds.toSet().size >= 2) {
+                identicalFrames = 0
+                val (fresh, note) = recoverStalledPhone()
+                if (fresh != null) { screen = fresh; budget.refund() }
+                if (history.isNotEmpty()) history[history.lastIndex] += note
+            }
+            lastJpeg = screen.jpeg
             // A screen showing a one-time code is not kept as the task's last screen.
             finalScreen = screen.jpeg.takeIf { screen.texts.none { OneTimeCodes.codesIn(it.first).isNotEmpty() } }
             onScreen(screen.jpeg)
@@ -342,7 +381,7 @@ class Agent(
             if (changed != null) {
                 // Progress: a scroll that moved, or a different page. A tap that left the same page is not.
                 val moved = changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")
-                if (moved && !endOfList) stuck.progressed() else stuck.stalled()
+                if (moved && !endOfList) { stuck.progressed(); budget.progressed(); ladder.progressed() } else stuck.stalled()
             }
             if (changed != null && history.isNotEmpty()) {
                 history[history.lastIndex] += when {
@@ -380,7 +419,11 @@ class Agent(
                 navigated = lastOp != "scroll" && lastOp != "wait",
                 rightAfter = lastWasPhoneAction && ledger.entries.lastOrNull()?.step == step - 1,
             )
-            if (ledger.entries.count { it.confirmed } > confirmedBefore) stuck.progressed()
+            if (ledger.entries.count { it.confirmed } > confirmedBefore) { stuck.progressed(); budget.progressed(); ladder.progressed() }
+            // A plan step done is progress too; one that drags on gets the plan rewritten (tier 3 below).
+            val planDoneNow = plan?.let { PlanItem.parse(it).count { item -> item.done } } ?: 0
+            if (planDoneNow > planDoneSeen) { planDoneSeen = planDoneNow; stuck.progressed(); budget.progressed(); ladder.progressed() }
+            val planStepDragging = plan != null && budget.planStep(planDoneNow)
             val verdict = stuck.looked(screen.signature, changed)
             if (verdict is StuckDetector.Verdict.Stop) {
                 trace.stuck(step, verdict.why)
@@ -392,7 +435,18 @@ class Agent(
             // No progress for a few steps: the brain decides from what was seen (text only, ~$0.005).
             if (verdict is StuckDetector.Verdict.Decide && brain != null && history.isNotEmpty()) {
                 history[history.lastIndex] += " (no progress in the last few steps; " +
-                    askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\"). What should it do now?") + ")"
+                    askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\").${ladder.routesTried()} What should it do now?") + ")"
+            }
+            // The recovery ladder: another way to act, another route, a new plan, then the user.
+            if (history.isNotEmpty()) {
+                ladder.climb(
+                    repeats, stuck.visits, changed, expectMisses, planStepDragging, lastDescribed,
+                    history.last().substringAfter(" — "), plan,
+                ) { q -> askBrain(q) }?.let { rung ->
+                    history[history.lastIndex] += rung.note
+                    rung.plan?.let { items -> plan = RecoveryLadder.render(items); onPlan(items) }
+                    if (rung.critical) stuck.critical()
+                }
             }
             // The strong model costs ~20× a step: at most a few per task, and only with budget to spare.
             val wantsStrong = verdict is StuckDetector.Verdict.StepUp || (verdict is StuckDetector.Verdict.Decide && brain == null)
@@ -416,7 +470,7 @@ class Agent(
                     brief = brief?.brief?.text(),
                     context = context,
                     step = step,
-                    maxSteps = config.maxSteps,
+                    maxSteps = budget.limit,
                     answers = answers,
                     plan = plan,
                     notes = notes,
@@ -495,7 +549,7 @@ class Agent(
                     }
                     // Seen on the phone: tasks given up with routes left (a closed shop with a later slot, a flight
                     // number in Mail): once per task, the planning mind looks for another way before Mode gives up.
-                    if (!success && !giveUpQuestioned && step < config.maxSteps - GIVE_UP_RESERVE) {
+                    if (!success && !giveUpQuestioned && step < budget.limit - GIVE_UP_RESERVE) {
                         giveUpQuestioned = true
                         val why = evidence.ifBlank { summary }.take(MAX_GIVE_UP_CHARS)
                         val advice = if (brain != null) askBrain(
@@ -722,6 +776,10 @@ class Agent(
                         lastOp = call.name
                         lastPage = screen.pageTexts()
                         stuck.acted()
+                        repeats = stuck.repeated("${call.name}|${label ?: described}")
+                        lastDescribed = described
+                        lastActionKinds.addLast(call.name)
+                        if (lastActionKinds.size > DEADLOCK_FRAMES) lastActionKinds.removeFirst()
                         stuck.scrolled(if (op is Op.Scroll) call.arguments.string("direction") else null)
                         lastScrollUp = op is Op.Scroll && call.arguments.string("direction") == "up"
                         if (op is Op.LaunchApp) {
@@ -784,7 +842,7 @@ class Agent(
                 }
             }
         }
-        return result(AgentOutcome.Stopped("Reached the limit of ${config.maxSteps} steps"), config.maxSteps)
+        return result(AgentOutcome.Stopped("Reached the limit of ${budget.limit} steps"), budget.limit)
     }
 
     private class Answer(val reply: ChatResult, val model: String)
@@ -1037,6 +1095,15 @@ class Agent(
             ?.let { g.x(it.second.toDouble()) to g.y(it.third.toDouble()) }
     }
 
+    /** Phone control stopped answering: reconnected and looked afresh (the new screen), or not (null), with the note. */
+    private suspend fun recoverStalledPhone(): Pair<Screen?, String> {
+        val fixed = recoverPhone?.let { recover -> runCatching { phone = recover(); true }.getOrDefault(false) } ?: false
+        if (!fixed) return null to " (the phone is not responding to actions: try home, then open the app again)"
+        settle()
+        val fresh = telemetry.trace(Operation.ScreenLook) { look() }
+        return fresh to " (phone control had stopped responding: reconnected; look afresh)"
+    }
+
     private fun pixel(x: Double, y: Double, screen: Screen): String =
         "${screen.geometry.toPixelsX(x).roundToInt()}, ${screen.geometry.toPixelsY(y).roundToInt()}"
 
@@ -1207,6 +1274,12 @@ class Agent(
         private const val MAX_RECALL_CHARS = 1200
         /** Steps kept for acting on the planning mind's other way before giving up is accepted anyway. */
         private const val GIVE_UP_RESERVE = 3
+        private const val RECAPTURE_MS = 700L
+        /** Identical frames after this many actions that cannot all do nothing: phone control has stalled. */
+        private const val DEADLOCK_FRAMES = 3
+        private val MOVING_KINDS = setOf("scroll", "back", "home", "open_app", "press_key")
+        private val SUBMIT = Regex("\\b(search|submit|go|done|send|next|continue|find|sign in|log in|pay|book|order)\\b", RegexOption.IGNORE_CASE)
+
         private const val MAX_GIVE_UP_CHARS = 300
 
         val SYSTEM_PROMPT = """

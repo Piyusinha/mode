@@ -3,6 +3,7 @@ package com.piyush.mode.agent
 import com.piyush.mode.agent.StuckDetector.Verdict
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -68,11 +69,25 @@ class StuckDetectorTest {
     }
 
     @Test
-    fun sixStepsWithoutProgressStop() {
+    fun tenStepsWithoutProgressStop() {
+        // Six used to stop; the recovery ladder (another way, another route, a new plan, the user) needs room first.
         val d = StuckDetector(canStepUp = true)
         repeat(6) { d.stalled() }
+        assertFalse(d.looked("same", changed = null) is Verdict.Stop, "six stalls: the ladder is still climbing")
+        repeat(4) { d.stalled() }
         assertIs<Verdict.Stop>(d.looked("same", changed = null))
         d.progressed()
         assertIs<Verdict.Fine>(d.looked("same", changed = null), "progress resets the meter")
+    }
+
+    @Test
+    fun theSameActionAgainAndAgainIsCountedInAWindow() {
+        val d = StuckDetector(canStepUp = true)
+        assertEquals(1, d.repeated("back|<"))
+        assertEquals(1, d.repeated("tap|Search"))
+        assertEquals(2, d.repeated("back|<"))
+        assertEquals(3, d.repeated("back|<"), "the route is not working")
+        repeat(StuckDetector.ACTION_WINDOW) { d.repeated("scroll|down") }
+        assertEquals(1, d.repeated("back|<"), "old repeats fall out of the window")
     }
 }

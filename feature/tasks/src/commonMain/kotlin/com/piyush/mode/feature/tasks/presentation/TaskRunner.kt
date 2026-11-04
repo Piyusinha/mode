@@ -323,6 +323,7 @@ public class TaskRunner(
                 memory = prepared?.agentMemory,
                 pause = gate,
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
+                recoverPhone = { session.reconnect() },
             )
             // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
             val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null

@@ -18,6 +18,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /** A 402×874-point phone whose screen is 500×1000 in screenshots, with scripted text per screen. */
+@OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
 public class FakePhone(
     var screens: List<List<Pair<String, Pair<Double, Double>>>>,
     private val supported: Set<String> = setOf(
@@ -32,11 +33,13 @@ public class FakePhone(
     private var screen = 0
     override val name = "fake"
     override suspend fun ops() = supported
+    private fun frameFor(index: Int): String = kotlin.io.encoding.Base64.encode("frame $index".encodeToByteArray())
 
     override suspend fun send(op: Op): JsonElement = when (op) {
         is Op.ScreenCapture -> buildJsonObject {
             captures++
-            put("jpeg_b64", if (frames.size > 1) frames.removeAt(0) else frames.first())
+            // A frame per screen, as a phone gives (the agent treats an identical frame after an action as stale).
+            put("jpeg_b64", if (frames.size > 1) frames.removeAt(0) else if (frames.first() == "AAAA") frameFor(screen) else frames.first())
             put("bounds", buildJsonObject { put("x", 0); put("y", 0); put("w", 402.0); put("h", 874.0); put("id", 0) })
             put("img_px", buildJsonObject { put("w", 500); put("h", 1000) })
         }
