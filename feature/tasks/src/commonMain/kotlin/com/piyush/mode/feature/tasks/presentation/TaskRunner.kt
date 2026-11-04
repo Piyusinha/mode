@@ -100,6 +100,8 @@ public class TaskRunner(
     private val narrator: Narrator? = null,
     /** Turns a request in another language into English before the task starts (null: as said). */
     private val translator: Translator? = null,
+    /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
+    private val device: com.piyush.mode.ops.DeviceData? = null,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
@@ -308,6 +310,7 @@ public class TaskRunner(
             val base = TaskContext(
                 userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today(),
                 resumed = resumedFrom(saved),
+                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device),
             )
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
@@ -324,6 +327,7 @@ public class TaskRunner(
                 pause = gate,
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
+                device = device,
             )
             // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
             val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null

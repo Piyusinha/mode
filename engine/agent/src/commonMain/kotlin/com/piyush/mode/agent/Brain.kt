@@ -75,10 +75,11 @@ class Brain(private val llm: LlmClient, private val model: String) {
      * screen and Haiku re-planned nine times instead of picking it). Text only: the brief, what was seen
      * while scrolling, the screen's text.
      */
-    suspend fun decide(question: String, task: String, brief: String?, seen: List<String>, screen: List<String>): Decision {
+    suspend fun decide(question: String, task: String, brief: String?, seen: List<String>, screen: List<String>, facts: List<String> = emptyList()): Decision {
         val input = buildString {
             append("REQUEST: ").append(task).append("\n\n")
             brief?.let { append("THE BRIEF YOU WROTE:\n").append(it).append("\n\n") }
+            if (facts.isNotEmpty()) append("FACTS FOUND SO FAR:\n").append(facts.joinToString("\n") { "- $it" }).append("\n\n")
             if (seen.isNotEmpty()) append("SEEN WHILE SCROLLING (top to bottom):\n").append(seen.joinToString("\n") { "- $it" }).append("\n\n")
             append("ON SCREEN NOW:\n").append(screen.joinToString("\n") { "- $it" }).append("\n\n")
             append("THE ASSISTANT ASKS: ").append(question)
@@ -108,6 +109,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
             append("TIPS FOR THESE APPS (from earlier tasks):\n").append(c.appNotes.take(ContextBuilder.MAX_APP_NOTES).joinToString("\n") { "- $it" }).append("\n\n")
         }
         if (c.recentTasks.isNotEmpty()) append("RECENT TASKS:\n").append(c.recentTasks.joinToString("\n") { "- $it" }).append("\n\n")
+        if (c.directRoutes.isNotEmpty()) {
+            append("DIRECT ROUTES THE HANDS HAVE BESIDES THE SCREEN: ").append(c.directRoutes.joinToString(", "))
+            append(". Prefer them in the steps where they fit (a link or an app's URL to the page, a Shortcut, the calendar, a contact); the screen only for the rest.\n\n")
+        }
         c.resumed?.let { r ->
             append("AN EARLIER ATTEMPT WAS CUT SHORT (Mode was closed at step ${r.step}); this one carries on from it. ")
             append("Start the app where it is (not fresh) unless its notes say otherwise.\n")
@@ -243,6 +248,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
               them first (ABOUT THE USER, their stated preferences); if they said "any" or "you choose", decide.
             - Never invent facts, names or amounts. What is remembered about lists (ratings, prices) is out of
               date: the screen decides.
+
+            Direct routes first: when a step can be done by opening a link or an app's own URL (a search, a
+            product page, a place), by running one of their Shortcuts, or by reading the calendar or a contact,
+            say so in that step; the screen is for the app-specific part only. Direct routes are shorter and surer.
 
             The steps: few and concrete, each a result to reach ("Open Asha's chat", "Read her last messages
             and his replies", "Write and send the reply"), not single taps. Keep every field to a few words; leave

@@ -14,6 +14,7 @@ import com.piyush.mode.llm.ChatResult
 import com.piyush.mode.llm.ToolCall
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.llm.LlmFailed
+import com.piyush.mode.ops.DeviceData
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.wireName
@@ -169,9 +170,13 @@ class Agent(
     private val telemetry: Telemetry = Telemetry.None,
     /** Brings phone control back when it stops answering (ops silently dropped); null: nothing to do. */
     private val recoverPhone: (suspend () -> PhoneBackend)? = null,
+    /** What Mode's own app can do without a screen: links, the calendar, contacts. */
+    private val device: DeviceData? = null,
 ) {
     /** One-time codes seen on screen: masked in everything recorded. */
     private var phone: PhoneBackend = phone
+    /** Key facts the model found ("flight" → "6E223"), kept for the task and shown every step. */
+    private val facts = LinkedHashMap<String, String>()
     // The loop's state lives on the agent (one agent runs one task): a suspend loop spills every local at each
     // await, and with sixty locals the method outgrew the JVM's limit.
     /** Grows when an opened app brings tips with it. */
@@ -286,7 +291,8 @@ class Agent(
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
-        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null)
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device)
+        facts.clear()
         val schema = AgentTools.schema(tools)
         history.clear()
         cost = brief?.costUsd ?: 0.0
@@ -319,7 +325,7 @@ class Agent(
             val b = brain ?: return "no planning mind is set: choose yourself from what you have seen"
             onStatus(WORKING)
             val d = telemetry.trace(Operation.BrainDecide) { span ->
-                b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow)
+                b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow, factLines())
                     .also { if (it.error != null) span.failed(if (it.callFailed) "ModelRequestFailed" else "InvalidDecision") }
             }
             cost += d.costUsd
@@ -529,6 +535,7 @@ class Agent(
                     brief = brief?.brief?.text(),
                     context = context,
                     step = step,
+                    facts = factLines(),
                     maxSteps = budget.limit,
                     answers = answers,
                     plan = plan,
@@ -581,6 +588,11 @@ class Agent(
                 continue
             }
             val reason = AgentTools.reasonOf(call)
+            AgentTools.factsOf(call).forEach { fact ->
+                val key = fact.substringBefore(':').trim().lowercase()
+                val value = fact.substringAfter(':', "").trim()
+                if (key.isNotEmpty() && value.isNotEmpty() && OneTimeCodes.codesIn(value).isEmpty()) facts[key] = codes.mask(value)
+            }
             AgentTools.noteOf(call)?.let { note ->
                 // Seen on the phone: the same note kept again a few steps later.
                 if (notes.none { it.equals(note, ignoreCase = true) }) {
@@ -660,6 +672,45 @@ class Agent(
                         onPlan(PlanItem.parse(plan.orEmpty()))
                         record("plan", "", "plan saved; it is shown to you every step: now do the next open item")
                     }
+                }
+                "open_url", "run_shortcut" -> {
+                    val url = if (call.name == "open_url") call.arguments.string("url").orEmpty().trim()
+                        else AgentTools.shortcutUrl(call.arguments.string("name").orEmpty().trim(), call.arguments.string("input"))
+                    val what = if (call.name == "open_url") "open $url" else "run shortcut \"${call.arguments.string("name").orEmpty()}\""
+                    if (url.isBlank() || url.startsWith("shortcuts://run-shortcut?name=&")) {
+                        stuck.badReply(); record("$what (not done)", reason, "not done: it needs the URL or the Shortcut's name"); continue
+                    }
+                    actionStarted = clock.markNow()
+                    val opened = if ("url.open" in ops) runCatching { phone.send(Op.OpenUrl(url)); true }.getOrDefault(false)
+                        else device?.let { runCatching { it.openUrl(url) }.getOrDefault(false) } ?: false
+                    lastWasPhoneAction = true
+                    answeredSinceAction = false
+                    lastOp = call.name
+                    lastPage = screen.pageTexts()
+                    stuck.acted()
+                    expectation = AgentTools.expectOf(call)
+                    if (opened) settle()
+                    record(what, reason, if (opened) "ok: read the screen now" else "failed: the phone could not open it. Open the app and find it by its screen instead", url)
+                }
+                "read_calendar" -> {
+                    val days = (call.arguments["days"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1).coerceIn(1, MAX_CALENDAR_DAYS)
+                    val events = device?.let { runCatching { it.calendar(days) }.getOrDefault(emptyList()) }.orEmpty()
+                    stuck.thought()
+                    record(
+                        "read calendar ($days day${if (days == 1) "" else "s"})", reason,
+                        if (events.isEmpty()) "nothing in the calendar for then (or no access: then look in the Calendar app)"
+                        else "events:\n" + events.take(MAX_DEVICE_LINES).joinToString("\n"),
+                    )
+                }
+                "find_contact" -> {
+                    val name = call.arguments.string("name").orEmpty().trim()
+                    val found = if (name.isEmpty()) emptyList() else device?.let { runCatching { it.contacts(name) }.getOrDefault(emptyList()) }.orEmpty()
+                    stuck.thought()
+                    record(
+                        "find contact \"$name\"", reason,
+                        if (found.isEmpty()) "no contact matches (or no access: then look in the Contacts app)"
+                        else "contacts:\n" + found.take(MAX_DEVICE_LINES).joinToString("\n") { codes.mask(it) },
+                    )
                 }
                 "decide" -> {
                     val question = call.arguments.string("question")?.trim().orEmpty().ifBlank { reason.ifBlank { task } }
@@ -1132,6 +1183,9 @@ class Agent(
             ?.let { g.x(it.second.toDouble()) to g.y(it.third.toDouble()) }
     }
 
+    /** The facts as "name: value" lines, newest last. */
+    private fun factLines(): List<String> = facts.map { (k, v) -> "$k: $v" }
+
     /** Once-per-task flags of the done handling. */
     private class DoneFlags {
         var verifyAsked = false
@@ -1394,6 +1448,8 @@ class Agent(
         private val FLASH_READS_COMMIT_MS = listOf(400L, 800L, 2500L)
         private const val COMMIT_FACTS = 4
         private const val MAX_GIVE_UP_REFUSALS = 2
+        private const val MAX_CALENDAR_DAYS = 31
+        private const val MAX_DEVICE_LINES = 25
         private val DATE_SLOT = Regex("\\b(\\d{1,2}:\\d{2}|\\d{1,2}\\s?(am|pm)|today|tomorrow|tonight|mon|tue|wed|thu|fri|sat|sun)\\b", RegexOption.IGNORE_CASE)
         /** A row: half its height, and the gap between its text and the icon tapped (screen points). */
         private const val ROW_HALF_PT = 28.0

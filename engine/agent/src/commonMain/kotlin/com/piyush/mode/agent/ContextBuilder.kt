@@ -25,6 +25,7 @@ object ContextBuilder {
     const val MAX_ANSWERS = 5
     const val MAX_PLAN_CHARS = 1500
     const val MAX_NOTES = 30
+    const val MAX_FACTS = 20
     const val MAX_NOTE_CHARS = 200
     const val MAX_TEXTS = 80
     const val MAX_TIP_CHARS = 400
@@ -47,6 +48,8 @@ object ContextBuilder {
         val brief: String? = null,
         val context: TaskContext,
         val step: Int,
+        /** Key facts found so far ("flight: 6E223"), kept for the task. */
+        val facts: List<String> = emptyList(),
         val maxSteps: Int,
         val answers: List<Pair<String, String>>,
         val plan: String?,
@@ -135,6 +138,11 @@ object ContextBuilder {
         if (input.done.isNotEmpty()) {
             append("DONE SO FAR (Mode's record of what you changed for the user; trust it over how the screen looks now, and never repeat a confirmed one):\n")
             input.done.forEach { append("- ").append(it).append('\n') }
+            append('\n')
+        }
+        if (input.facts.isNotEmpty()) {
+            append("TASK FACTS (found so far; use them, do not look for them again; they belong in your reply):\n")
+            input.facts.takeLast(MAX_FACTS).forEach { append("- ").append(it.clip(MAX_NOTE_CHARS)).append('\n') }
             append('\n')
         }
         if (input.notes.isNotEmpty()) {

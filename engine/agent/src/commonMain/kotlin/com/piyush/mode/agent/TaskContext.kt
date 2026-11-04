@@ -24,6 +24,8 @@ data class TaskContext(
     val today: String? = null,
     /** The attempt this one carries on from, when the last one was cut short by Mode being closed. */
     val resumed: Resumed? = null,
+    /** Direct routes the hands have besides the screen ("open_url", "read_calendar"), for the brief. */
+    val directRoutes: List<String> = emptyList(),
     /** A learned route that fits this task closely and has worked: numbered steps to follow, no brief needed. */
     val knownRoute: String? = null,
 ) {

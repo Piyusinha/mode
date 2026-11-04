@@ -62,4 +62,12 @@ class BrainTest {
         assertTrue("Between midnight and 05:00" in model.lastSystemText)
         assertTrue("NOW: Wednesday 4 November 2026, 01:14" in model.lastUserText)
     }
+
+    @Test
+    fun theBriefIsToldTheDirectRoutesAndPrefersThem() = runTest {
+        val model = ScriptedModel(asha)
+        Brain(model, "strong").brief("is my flight tomorrow on time", TaskContext(directRoutes = listOf("open_url", "read_calendar")))
+        assertTrue("DIRECT ROUTES THE HANDS HAVE BESIDES THE SCREEN: open_url, read_calendar" in model.lastUserText, model.lastUserText)
+        assertTrue("Direct routes first" in model.lastSystemText)
+    }
 }

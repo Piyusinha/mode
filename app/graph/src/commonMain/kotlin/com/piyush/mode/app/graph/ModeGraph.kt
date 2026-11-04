@@ -69,6 +69,8 @@ class PlatformServices(
     /** Each stage of reaching this iPhone, for the Diagnose screen. */
     val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks,
     val telemetry: Telemetry = Telemetry.None,
+    /** Links, the calendar and contacts from the app itself (None where the platform has nothing). */
+    val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
 )
 
 /**
@@ -138,6 +140,7 @@ class ModeGraph(platform: PlatformServices) {
         telemetry = telemetry,
         narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),
         translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
+        device = platform.device,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
