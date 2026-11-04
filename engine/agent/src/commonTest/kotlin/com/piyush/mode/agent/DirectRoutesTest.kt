@@ -67,4 +67,30 @@ class DirectRoutesTest {
         Agent(phone, model, Gate(), config).run("order tres leches")
         assertEquals<List<Op>>(listOf(Op.OpenUrl("zomato://search?q=tres+leches")), phone.actions)
     }
+
+    @Test
+    fun aLookupAsksTheProvidersWebSearchAndBowsOutOnAPlanWithoutIt() = runTest {
+        val phone = FakePhone(List(8) { page })
+        val tap = call("tap", "x" to 1, "y" to 1, "reason" to "x")
+        var lookups = 0
+        val script = ScriptedModel(
+            call("lookup", "question" to "IndiGo 6E223 status today", "reason" to "Flight status"),
+            call("lookup", "question" to "Magnolia Bakery Indiranagar hours", "reason" to "Hours"),
+            call("done", "success" to true, "summary" to "On time", "evidence" to "Home"),
+        )
+        val model = com.piyush.mode.llm.LlmClient { m, msgs, tools ->
+            if (com.piyush.mode.llm.WebSearchTool.wanted(tools)) {
+                lookups++
+                if (lookups == 1) com.piyush.mode.llm.ChatResult(null, "6E223 BLR→DEL departs 06:40, on time (flightradar24).", com.piyush.mode.llm.Usage(50, 20, 0.002))
+                else throw com.piyush.mode.llm.LlmFailed("web_search is not available", status400 = true)
+            } else script.chat(m, msgs, tools)
+        }
+        val steps = mutableListOf<StepRecord>()
+        Agent(phone, model, Gate(), config, onStep = { steps += it }).run("is my flight on time")
+        assertTrue(steps[0].outcome.startsWith("found: 6E223 BLR→DEL departs 06:40"), steps[0].outcome)
+        assertTrue("lookup is not available on this plan" in steps[1].outcome, steps[1].outcome)
+        assertEquals(2, lookups)
+        assertTrue(AgentTools.available(setOf("input.tap"), lookup = false).none { it.name == "lookup" })
+        assertTrue(AgentTools.directRoutes(setOf("input.tap"), null, lookup = true).contains("lookup"))
+    }
 }

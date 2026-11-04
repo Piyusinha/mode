@@ -56,7 +56,7 @@ object AgentTools {
     )
 
     /** Tools that reach a result without the screen (offered when the platform has them). */
-    val DIRECT = setOf("open_url", "run_shortcut", "read_calendar", "find_contact")
+    val DIRECT = setOf("open_url", "run_shortcut", "read_calendar", "find_contact", "lookup")
 
     private val reason = Param(
         "reason", "string",
@@ -228,6 +228,11 @@ object AgentTools {
             listOf(Param("name", "string", "Their name, or part of it."), reason),
         ),
         Tool(
+            "lookup", "Look a fact up on the web through your AI (a flight's status, a shop's hours, a price, an address, " +
+                "today's date for a holiday) in one step, without opening Safari. For facts, not for doing things in apps.", null,
+            listOf(Param("question", "string", "The question, specific (\"IndiGo 6E223 status today\")."), reason),
+        ),
+        Tool(
             "done", "The task is complete, or cannot be done. Check the screen first.", null,
             listOf(
                 Param(
@@ -281,7 +286,7 @@ object AgentTools {
      */
     fun available(
         phoneOps: Set<String>, recall: Boolean = false, brain: Boolean = false, briefed: Boolean = false,
-        device: DeviceData? = null,
+        device: DeviceData? = null, lookup: Boolean = false,
     ): List<Tool> {
         val urls = "url.open" in phoneOps || device?.canOpenUrl == true
         return ALL.filter {
@@ -291,14 +296,15 @@ object AgentTools {
                     "open_url", "run_shortcut" -> urls
                     "read_calendar" -> device?.hasCalendar == true
                     "find_contact" -> device?.hasContacts == true
+                    "lookup" -> lookup
                     else -> true
                 }
         }
     }
 
     /** The direct routes on offer, for the brief ("open_url, read_calendar"). */
-    fun directRoutes(phoneOps: Set<String>, device: DeviceData?): List<String> =
-        available(phoneOps, device = device).map { it.name }.filter { it in DIRECT }
+    fun directRoutes(phoneOps: Set<String>, device: DeviceData?, lookup: Boolean = false): List<String> =
+        available(phoneOps, device = device, lookup = lookup).map { it.name }.filter { it in DIRECT }
 
     /** The Shortcuts app's URL to run [name], with [input] as text when given. */
     fun shortcutUrl(name: String, input: String?): String =

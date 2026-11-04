@@ -16,6 +16,8 @@ import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.llm.LlmFailed
 import com.piyush.mode.ops.DeviceData
 import com.piyush.mode.ops.Op
+import com.piyush.mode.core.common.AppLog
+import kotlinx.serialization.json.buildJsonArray
 import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.wireName
 import kotlinx.coroutines.async
@@ -73,6 +75,8 @@ data class AgentConfig(
     val askAboveAmount: Double? = null,
     /** The agent may read one-time codes from Messages or a notification and type them (never kept). */
     val readCodes: Boolean = true,
+    /** Offer lookup (the provider's web search) for facts; a plan without it answers 400 and the tool bows out. */
+    val webLookup: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -177,6 +181,8 @@ class Agent(
     private var phone: PhoneBackend = phone
     /** Key facts the model found ("flight" → "6E223"), kept for the task and shown every step. */
     private val facts = LinkedHashMap<String, String>()
+    /** The provider answered a web lookup with a 400 this task: the plan has no web search. */
+    private var lookupUnsupported = false
     // The loop's state lives on the agent (one agent runs one task): a suspend loop spills every local at each
     // await, and with sixty locals the method outgrew the JVM's limit.
     /** Grows when an opened app brings tips with it. */
@@ -291,7 +297,8 @@ class Agent(
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
-        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device)
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device, lookup = config.webLookup)
+        lookupUnsupported = false
         facts.clear()
         // "If it goes wrong" rules from the skills memory offered, shown only when their trigger is on screen.
         val playbook = (listOfNotNull(startContext.knownRoute) + startContext.skills).flatMap { Playbook.rules(it) }.distinctBy { it.trigger.lowercase() }
@@ -693,6 +700,38 @@ class Agent(
                     expectation = AgentTools.expectOf(call)
                     if (opened) settle()
                     record(what, reason, if (opened) "ok: read the screen now" else "failed: the phone could not open it. Open the app and find it by its screen instead", url)
+                }
+                "lookup" -> {
+                    val question = call.arguments.string("question")?.trim().orEmpty()
+                    stuck.thought()
+                    when {
+                        question.isEmpty() -> { stuck.badReply(); record("lookup (not done)", reason, "not done: it needs the question") }
+                        lookupUnsupported -> record("lookup \"$question\"", reason, LOOKUP_UNAVAILABLE)
+                        else -> {
+                            onStatus(WORKING)
+                            val answer = try {
+                                withTimeoutOrNull(LOOKUP_MS) {
+                                    llm.chat(
+                                        config.model,
+                                        listOf(ChatMessage("system", LOOKUP_SYSTEM), ChatMessage("user", question)),
+                                        buildJsonArray { add(com.piyush.mode.llm.WebSearchTool.MARKER) },
+                                    )
+                                }?.also { cost += it.usage.costUsd }?.text?.trim()?.takeIf { it.isNotEmpty() }
+                            } catch (e: LlmFailed) {
+                                if (e.status400) lookupUnsupported = true
+                                AppLog.log("agent", "lookup failed: ${e.message}")
+                                null
+                            }
+                            record(
+                                "lookup \"$question\"", reason,
+                                when {
+                                    answer != null -> "found: " + answer.take(LOOKUP_CHARS)
+                                    lookupUnsupported -> LOOKUP_UNAVAILABLE
+                                    else -> "the lookup did not answer in time: try once more, or open the page with open_url or Safari"
+                                },
+                            )
+                        }
+                    }
                 }
                 "read_calendar" -> {
                     val days = (call.arguments["days"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1).coerceIn(1, MAX_CALENDAR_DAYS)
@@ -1451,6 +1490,10 @@ class Agent(
         private const val COMMIT_FACTS = 4
         private const val MAX_GIVE_UP_REFUSALS = 2
         private const val MAX_CALENDAR_DAYS = 31
+        private const val LOOKUP_MS = 25_000L
+        private const val LOOKUP_CHARS = 900
+        private const val LOOKUP_UNAVAILABLE = "lookup is not available on this plan: open the page instead (open_url with a search URL, or Safari)"
+        private const val LOOKUP_SYSTEM = "Answer the question with the facts, in a few lines, as of today; name the source. If the web search is not available, say so."
         private const val MAX_DEVICE_LINES = 25
         private val DATE_SLOT = Regex("\\b(\\d{1,2}:\\d{2}|\\d{1,2}\\s?(am|pm)|today|tomorrow|tonight|mon|tue|wed|thu|fri|sat|sun)\\b", RegexOption.IGNORE_CASE)
         /** A row: half its height, and the gap between its text and the icon tapped (screen points). */

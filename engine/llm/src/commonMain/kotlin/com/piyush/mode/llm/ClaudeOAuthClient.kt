@@ -153,6 +153,7 @@ class ClaudeOAuthClient(
             if (tools.isNotEmpty()) {
                 put("tools", buildJsonArray {
                     tools.forEach { t ->
+                        if (WebSearchTool.isMarker(t)) { add(buildJsonObject { put("type", "web_search_20260209"); put("name", "web_search") }); return@forEach }
                         val f = t.jsonObject.getValue("function").jsonObject
                         add(buildJsonObject {
                             put("name", f.getValue("name")); f["description"]?.let { put("description", it) }
