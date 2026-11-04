@@ -276,6 +276,8 @@ class Agent(
         var finalScreen: ByteArray? = null
         /** What the last phone action was expected to do; shown on the next step only. */
         var expectation: String? = null
+        /** Actions in a row that did not do what the model expected (ExpectCheck). */
+        var expectMisses = 0
         /** A successful done was sent back once to be checked; the next one is accepted. */
         var verifyAsked = false
         /** Giving up was questioned once already (by the planning mind when there is one). */
@@ -353,6 +355,14 @@ class Agent(
                     samePage && lastOp == "tap" -> " → same page (only small parts changed)" + labelHint(lastTapLabel, screen.layout)
                     else -> " → screen changed"
                 }
+                // What the model said the action would do, checked against the screen (no model call): a miss
+                // says what shows instead and the usual causes, so the next step is not the same tap again.
+                ExpectCheck.check(expectation, screen.pageTexts(), changed, screen.keyboardUp, history.last().substringAfter(". ").substringBefore(" — "))
+                    ?.takeIf { it.missed }?.let { miss ->
+                        history[history.lastIndex] += miss.hint
+                        expectMisses++
+                        stuck.stalled()
+                    } ?: run { if (expectation != null) expectMisses = 0 }
             }
             lastScreen = screen.signature
             screenNow = screen.pageTexts()
