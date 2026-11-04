@@ -46,6 +46,8 @@ public data class VoiceUiState(
     val voiceId: String? = null,
     val speed: String = SpeechSpeed.Normal.id,
     val speakResult: Boolean = true,
+    /** Listening: the language picked (its English name), for the Language row. */
+    val languageName: String = "",
     /** The sample is playing. */
     val playing: Boolean = false,
     /** A key being checked, or the result of the last check. */
@@ -197,6 +199,7 @@ public class VoicePresenter(
             voiceId = speaker?.second?.id,
             speed = s.speechSpeed.id,
             speakResult = s.speakResult,
+            languageName = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(s.language).english,
             playing = isPlaying,
             keyCheck = checking.value,
         )

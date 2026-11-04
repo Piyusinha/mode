@@ -54,6 +54,10 @@ public data class ModeSettings(
     val speechSpeed: SpeechSpeed = SpeechSpeed.Normal,
     /** The voice picked for each speech provider (by [VoiceKind.id]); none: the provider's default. */
     val voices: Map<String, VoiceChoice> = emptyMap(),
+    /** What the user speaks ([SpeechLanguage.id]); Auto: this iPhone's language, or detected by a cloud listener. */
+    val language: String = SpeechLanguage.Auto.id,
+    /** Mode answers in the language spoken; false: always English. */
+    val replyInSpokenLanguage: Boolean = true,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

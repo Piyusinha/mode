@@ -8,6 +8,8 @@ package com.piyush.mode.agent
 data class TaskContext(
     /** The user's name, so messages can be signed and "me" understood. */
     val userName: String? = null,
+    /** The language to answer in ("Hindi"); null: English. The task itself is always in English. */
+    val replyLanguage: String? = null,
     /** Facts about the user (people, preferences, places). */
     val aboutYou: List<String> = emptyList(),
     /** Routes that worked before: the best match in full, then names of others. */

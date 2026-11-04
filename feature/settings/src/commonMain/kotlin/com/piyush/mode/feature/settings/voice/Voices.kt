@@ -34,6 +34,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonArray
 import com.piyush.mode.feature.settings.domain.VoiceChoice
 import kotlin.time.Duration.Companion.seconds
@@ -186,6 +189,8 @@ public class Voices(
         block(kind, hearing = true)?.let { failed(kind, hearing = true, blockTrouble(it)); return Heard.Nothing }
         // Apple's live words show while the user speaks, whichever provider writes the final text.
         val appleLive = block(VoiceKind.Apple, hearing = true) == null
+        val language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(settings.settings.value.language)
+        device.listenLanguage = language.takeUnless { it == com.piyush.mode.feature.settings.domain.SpeechLanguage.Auto }?.id
         val heard = telemetry.trace(Operation.VoiceRecord, mapOf(Field.Provider to kind.id)) { span ->
             device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = appleLive, onPartial).also { got ->
                 val words = got.text?.trim()?.split(Regex("\\s+"))?.count { it.isNotEmpty() } ?: 0
@@ -205,8 +210,8 @@ public class Voices(
                 (withTimeoutOrNull(PER_HEAR) {
                     when (kind) {
                         VoiceKind.Apple -> Transcript.Text(heard.text ?: device.transcribeApple(path))
-                        VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path)
-                        VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path)
+                        VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path, language.code)
+                        VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path, language.code)
                         else -> Transcript.Text(null)
                     }
                 } ?: Transcript.Failed(VoiceTrouble.Unreachable)).also {
@@ -387,9 +392,11 @@ public class Voices(
         }
     }.toString()
 
-    private suspend fun deepgram(key: String, path: String): Transcript {
+    /** [language]: the two-letter code to listen in; null: Deepgram detects it. */
+    private suspend fun deepgram(key: String, path: String, language: String? = null): Transcript {
         val bytes = readFile(path) ?: return Transcript.Text(null)
-        val response = http.post("https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true") {
+        val lang = language?.let { "&language=$it" } ?: "&detect_language=true"
+        val response = http.post("https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true$lang") {
             header("Authorization", "Token $key")
             header(HttpHeaders.ContentType, "audio/wav")
             setBody(bytes)
@@ -401,7 +408,8 @@ public class Voices(
         return Transcript.Text(alternatives?.firstOrNull()?.jsonObject?.get("transcript")?.jsonPrimitive?.contentOrNull)
     }
 
-    private suspend fun soniox(key: String, path: String): Transcript {
+    /** [language]: a hint for Soniox ("hi"); it detects the language either way. */
+    private suspend fun soniox(key: String, path: String, language: String? = null): Transcript {
         val bytes = readFile(path) ?: return Transcript.Text(null)
         var fileId: String? = null
         var jobId: String? = null
@@ -421,6 +429,7 @@ public class Voices(
                 setBody(TextContent(buildJsonObject {
                     put("model", "stt-async-v3")
                     put("file_id", fileId)
+                    language?.let { putJsonArray("language_hints") { add(JsonPrimitive(it)) } }
                 }.toString(), ContentType.Application.Json))
             }
             if (!created.status.isSuccess()) return Transcript.Failed(troubleFor(created.status.value) ?: VoiceTrouble.Unreachable)

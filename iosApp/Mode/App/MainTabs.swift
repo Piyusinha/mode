@@ -144,6 +144,7 @@ struct MainTabs: View {
         case "access": paths[.home] = [.settings, .access]
         case "voice": paths[.home] = [.settings, .voice]
         case "listening": paths[.home] = [.settings, .listening]
+        case "language": paths[.home] = [.settings, .listening, .language]
         case "voicepicker": paths[.home] = [.settings, .voice, .voicePicker(provider: parts.count > 1 ? parts[1] : "apple")]
         case "listen": showingListen = true
         case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
@@ -189,6 +190,7 @@ private struct TabRoot<Content: View>: View {
                     case .access: AccessRoute(app: app)
                     case .voice: VoiceRoute(app: app, hearing: false, navigate: navigate)
                     case .listening: VoiceRoute(app: app, hearing: true, navigate: navigate)
+                    case .language: LanguageRoute(app: app)
                     case let .voicePicker(provider): VoicePickerRoute(app: app, provider: provider)
                     case let .providerDetail(id): ProviderDetailRoute(app: app, id: id, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)

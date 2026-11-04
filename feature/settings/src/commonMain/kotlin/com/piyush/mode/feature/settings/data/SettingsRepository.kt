@@ -120,6 +120,8 @@ public class SettingsRepository(
         prefs.putString(TALK_BACK, next.talkBack.toString())
         prefs.putString(SPEAK_RESULT, next.speakResult.toString())
         prefs.putString(SPEECH_SPEED, next.speechSpeed.id)
+        prefs.putString(LANGUAGE, next.language)
+        prefs.putString(REPLY_IN_SPOKEN, next.replyInSpokenLanguage.toString())
         prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
@@ -179,6 +181,8 @@ public class SettingsRepository(
             talkBack = prefs.getString(TALK_BACK)?.toBooleanStrictOrNull() ?: defaults.talkBack,
             speakResult = prefs.getString(SPEAK_RESULT)?.toBooleanStrictOrNull() ?: defaults.speakResult,
             speechSpeed = SpeechSpeed.fromId(prefs.getString(SPEECH_SPEED)),
+            language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(prefs.getString(LANGUAGE)).id,
+            replyInSpokenLanguage = prefs.getString(REPLY_IN_SPOKEN)?.toBooleanStrictOrNull() ?: defaults.replyInSpokenLanguage,
             voices = prefs.getString(VOICES)?.let {
                 runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
             } ?: defaults.voices,
@@ -214,6 +218,8 @@ public class SettingsRepository(
         const val TALK_BACK = "voice_talk_back"
         const val SPEAK_RESULT = "voice_speak_result"
         const val SPEECH_SPEED = "voice_speech_speed"
+        const val LANGUAGE = "voice_language"
+        const val REPLY_IN_SPOKEN = "voice_reply_in_spoken"
         const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"

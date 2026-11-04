@@ -99,11 +99,12 @@ final class VoiceListModel {
         var speakResult = true
         var playing = false
         var keyCheck: KeyCheck?
+        var languageName = ""
     }
 
     enum Event {
         case choose(VoiceService), open(VoiceService), addKey(VoiceService), checkKey(VoiceService, String), keySheetClosed, removeKey(VoiceService)
-        case turnOnApple, playSample, speed(String), speakResult(Bool), changeVoice
+        case turnOnApple, playSample, speed(String), speakResult(Bool), changeVoice, openLanguage
     }
 
     private(set) var state = State()
@@ -127,6 +128,7 @@ final class VoiceListModel {
         switch event {
         case let .choose(service): presenter.choose(id: service.id)
         case let .open(service): opened = service
+        case .openLanguage: navigate(.language)
         case let .addKey(service): presenter.clearKeyCheck(); opened = nil; linking = service
         case let .checkKey(service, key): presenter.checkAndSaveKey(id: service.id, key: key)
         case .keySheetClosed: presenter.clearKeyCheck()
@@ -174,7 +176,8 @@ final class VoiceListModel {
             speaker: speaker,
             voiceName: s.voiceName ?? String(localized: L10n.Voice.defaultVoice),
             speed: s.speed, speakResult: s.speakResult, playing: s.playing,
-            keyCheck: s.keyCheck.map { KeyCheck(id: $0.id, state: $0.state, trouble: $0.trouble) }
+            keyCheck: s.keyCheck.map { KeyCheck(id: $0.id, state: $0.state, trouble: $0.trouble) },
+            languageName: s.languageName
         )
     }
 }
@@ -326,6 +329,11 @@ struct ListeningScreen: View {
                 VoiceProviderPicker(rows: state.rows, hearing: true, onEvent: onEvent)
                 Text(L10n.Voice.listeningNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
                 ModeNote(icon: .lock, L10n.Voice.keysNote).padding(.horizontal, ModeSpacing.xs)
+                ModeSectionHeader(L10n.Language.title)
+                ModeCard {
+                    ModeValueRow(String(localized: L10n.Language.iSpeak), value: state.languageName) { onEvent(.openLanguage) }
+                        .frame(minHeight: ModeSize.rowMin)
+                }
                 ModeSectionHeader(L10n.Voice.privacy)
                 ModeCard {
                     VStack(alignment: .leading, spacing: ModeSpacing.m) {

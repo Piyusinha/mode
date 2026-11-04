@@ -15,6 +15,8 @@ enum Route: Hashable {
     /// Settings → Voice: Mode's voice, Listening, and choosing a voice from a provider.
     case voice
     case listening
+    /// Settings → Listening → Language.
+    case language
     case voicePicker(provider: String)
     case providerDetail(id: String)
     case developer

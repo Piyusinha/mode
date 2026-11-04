@@ -30,6 +30,8 @@ public class Narrator(
         /** What the last few steps were for ("search for IndiGo flights"), so there is something real to say. */
         recent: List<String> = emptyList(),
         budgetMs: Long = BUDGET_MS,
+        /** The language to speak ("Hindi"); null: English unless the whole request is in another language. */
+        language: String? = null,
     ): String? {
         val (id, provider) = model() ?: return null
         val user = buildString {
@@ -42,7 +44,8 @@ public class Narrator(
         }
         return try {
             withTimeoutOrNull(budgetMs) {
-                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", SYSTEM), ChatMessage("user", user)), TOOLS)
+                val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
+                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 (args?.get("line") as? JsonPrimitive)?.contentOrNull?.let(::clean)
             }
@@ -89,6 +92,7 @@ public class Narrator(
         public const val MAX_UPDATES: Int = 6
         private const val MAX_WORDS = 18
         private const val TOOL = "say"
+        private const val LANGUAGE_RULE = "Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English."
         /** The model's way of saying there is nothing new: stay quiet. */
         private const val NOTHING = "nothing"
 

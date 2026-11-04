@@ -8,6 +8,11 @@ import kotlin.coroutines.resume
  * The app installs the real one at launch. Until then every call is "not ready".
  */
 public object DeviceVoice {
+    /** The language to listen in (BCP-47, "hi-IN"); null: this iPhone's language. Set before each listen. */
+    public var listenLanguage: String? = null
+    /** Languages Apple can listen in on this iPhone, and those already downloaded (BCP-47). */
+    public var appleLanguages: () -> List<String> = { emptyList() }
+    public var appleInstalled: () -> List<String> = { emptyList() }
     public var speechReady: () -> Boolean = { false }
     /** ready, permission, denied, unsupported, or asset. */
     public var hearingState: () -> String = { "unsupported" }

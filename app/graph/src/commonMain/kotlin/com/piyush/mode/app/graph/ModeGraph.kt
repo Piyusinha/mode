@@ -136,12 +136,8 @@ class ModeGraph(platform: PlatformServices) {
         memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
         voices = voices,
         telemetry = telemetry,
-        narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm) {
-            val s = settings.settings.value
-            com.piyush.mode.feature.settings.domain.ProviderModels.quick(
-                s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value,
-            )
-        },
+        narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),
+        translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
@@ -151,6 +147,12 @@ class ModeGraph(platform: PlatformServices) {
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
 
     private val claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() })
+
+    /** The phone-control model at its lowest effort: quick lines, updates, translation. */
+    private fun quickModel(): Pair<String, ModelProvider>? {
+        val s = settings.settings.value
+        return com.piyush.mode.feature.settings.domain.ProviderModels.quick(s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value)
+    }
 
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     /** Each screen's presenter, for the native UI. */

@@ -33,7 +33,11 @@ public class Acknowledger(
      * The spoken line for [task] said by [name] at [hour] (0–23), or null when the AI is slow, fails or
      * isn't set up. [private] tasks use no memory.
      */
-    public suspend fun line(task: String, name: String?, hour: Int, private: Boolean = false, budgetMs: Long = BUDGET_MS): String? {
+    public suspend fun line(
+        task: String, name: String?, hour: Int, private: Boolean = false, budgetMs: Long = BUDGET_MS,
+        /** The language to speak ("Hindi"); null: English unless the whole request is in another language. */
+        language: String? = null,
+    ): String? {
         val said = task.trim()
         if (said.isEmpty()) return null
         val (id, provider) = model() ?: return null
@@ -48,7 +52,8 @@ public class Acknowledger(
                     }
                     append("WHAT THEY JUST ASKED: ").append(said)
                 }
-                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", SYSTEM), ChatMessage("user", user)), TOOLS)
+                val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
+                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 ((args?.get("line") as? JsonPrimitive)?.contentOrNull ?: reply.text).let(::clean)
             }
@@ -65,6 +70,7 @@ public class Acknowledger(
         private const val FACTS = 8
         private const val MAX_WORDS = 20
         private const val TOOL = "say"
+        private const val LANGUAGE_RULE = "Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English."
 
         internal fun partOfDay(hour: Int): String = when (hour) {
             in 5..11 -> "morning"

@@ -258,7 +258,10 @@ public class ListenPresenter(
         own.value = own.value.copy(phase = TalkPhase.Starting, task = task, reply = "", partial = "")
         val written = scope.async {
             telemetry.trace(com.piyush.mode.core.telemetry.Operation.VoiceAcknowledge) { span ->
-                acknowledger?.line(task, settings.settings.value.userName, hour(), budgetMs = ACK_WAIT_MS).also {
+                val s = settings.settings.value
+                val chosen = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(s.language)
+                val speak = chosen.takeIf { !it.isEnglish && s.replyInSpokenLanguage }?.languageName
+                acknowledger?.line(task, s.userName, hour(), budgetMs = ACK_WAIT_MS, language = speak).also {
                     span.fields(mapOf(com.piyush.mode.core.telemetry.Field.Outcome to if (it == null) "Fallback" else "AI"))
                 }
             }

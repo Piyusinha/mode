@@ -565,6 +565,25 @@ enum L10n {
         static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
     }
 
+    enum Language {
+        static let title = LocalizedStringResource("language.title", defaultValue: "Language")
+        static let subtitle = LocalizedStringResource("language.subtitle", defaultValue: "What you speak, and what Mode answers in.")
+        static let iSpeak = LocalizedStringResource("language.iSpeak", defaultValue: "I speak")
+        static let repliesIn = LocalizedStringResource("language.repliesIn", defaultValue: "Mode replies in")
+        static let spoken = LocalizedStringResource("language.spoken", defaultValue: "The language I speak")
+        static let spokenDetail = LocalizedStringResource("language.spokenDetail", defaultValue: "Mode answers you in it")
+        static let english = LocalizedStringResource("language.english", defaultValue: "Always English")
+        static let englishDetail = LocalizedStringResource("language.englishDetail", defaultValue: "Even when you speak another language")
+        static let worksInEnglish = LocalizedStringResource(
+            "language.worksInEnglish", defaultValue: "Mode always works in English: words in another language are translated before it starts."
+        )
+        static let auto = LocalizedStringResource("language.auto", defaultValue: "Apple uses this iPhone’s language; Soniox and Deepgram detect it")
+        static let onIphone = LocalizedStringResource("language.onIphone", defaultValue: "On this iPhone")
+        static let download = LocalizedStringResource("language.download", defaultValue: "Downloads once, then works offline")
+        static let needsCloud = LocalizedStringResource("language.needsCloud", defaultValue: "Apple can’t hear it yet: choose Soniox or Deepgram")
+        static func cloud(_ listener: String) -> LocalizedStringResource { LocalizedStringResource("language.cloud", defaultValue: "With \(listener)") }
+    }
+
     enum Talk {
         static let cantHear = LocalizedStringResource(
             "talk.cantHear", defaultValue: "Can't hear you. Is your mic on? If this keeps happening, restart Mode."

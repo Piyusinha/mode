@@ -95,6 +95,8 @@ public class TaskRunner(
     private val telemetry: Telemetry = Telemetry.None,
     /** Spoken updates while a spoken task works (null: Mode stays quiet until the answer). */
     private val narrator: Narrator? = null,
+    /** Turns a request in another language into English before the task starts (null: as said). */
+    private val translator: Translator? = null,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
@@ -104,6 +106,8 @@ public class TaskRunner(
 
     /** The running task was spoken to Mode: its questions and summary are spoken and heard. */
     @kotlin.concurrent.Volatile private var spoken = false
+    /** The language this run answers in (null: English), for the spoken updates. */
+    @kotlin.concurrent.Volatile private var runReplyLanguage: String? = null
     private val mutableState = MutableStateFlow(TaskState())
     public val state: StateFlow<TaskState> = mutableState.asStateFlow()
 
@@ -285,14 +289,20 @@ public class TaskRunner(
                 throw e
             }
             // A trigger word ("just do it, order my usual") gives this task full access; the agent reads the rest.
-            val access = AccessRules.forTask(task, settings.settings.value.triggerWords)
-            val agentTask = if (budget.fullAccess) task else access.task
+            // Mode works in English; it answers in the language spoken unless the user chose English replies.
+            val spokenIn = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(settings.settings.value.language)
+            val translated = translator?.toEnglish(task, spokenIn) ?: Translator.Result(task, null)
+            if (translated.english != task) AppLog.log("agent", "translated from ${translated.language ?: "another language"} into English")
+            val replyLanguage = translated.language?.takeIf { settings.settings.value.replyInSpokenLanguage }
+            runReplyLanguage = replyLanguage
+            val access = AccessRules.forTask(translated.english, settings.settings.value.triggerWords)
+            val agentTask = if (budget.fullAccess) translated.english else access.task
             val runConfig = if (access.fullAccess && !budget.fullAccess) {
                 AppLog.log("agent", "full access for this task (trigger word)")
                 budget.copy(fullAccess = true, askAboveAmount = settings.settings.value.askAboveAmount)
             } else budget
             val useMemory = !private && tag == null
-            val base = TaskContext(userName = settings.settings.value.userName, earlierTurns = earlier, today = today())
+            val base = TaskContext(userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today())
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
                 phone = phone,
@@ -450,7 +460,7 @@ public class TaskRunner(
             val recent = s.steps.takeLast(RECENT_STEPS).map { it.reason }.filter { it.isNotBlank() }
             telemetry.trace(Operation.VoiceUpdate) { span ->
                 val line = narrator.line(task, done, listOfNotNull(next, s.status.ifBlank { null }).joinToString(" · "), said,
-                    settings.settings.value.userName, recent)
+                    settings.settings.value.userName, recent, language = runReplyLanguage)
                 val stillQuiet = state.value.running && state.value.voice == null && state.value.question == null
                 val result = when {
                     line == null -> "Skipped"

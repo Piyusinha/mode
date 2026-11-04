@@ -78,6 +78,10 @@ public class Screens(
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
+    /** Settings → Listening → Language. */
+    public fun language(): com.piyush.mode.app.screens.settings.LanguagePresenter =
+        com.piyush.mode.app.screens.settings.LanguagePresenter(scope, settings, voices!!)
+
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,

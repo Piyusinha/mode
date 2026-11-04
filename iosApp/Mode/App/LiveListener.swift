@@ -205,7 +205,7 @@ final class LiveListener {
 
         // Apple, live, set up while the microphone already listens.
         guard let feed else { return }
-        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? .current
+        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: AppleVoice.listenLocale()) ?? .current
         let transcriber = SpeechTranscriber(locale: locale, transcriptionOptions: [], reportingOptions: [.volatileResults], attributeOptions: [])
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         guard active, self.feed === feed,

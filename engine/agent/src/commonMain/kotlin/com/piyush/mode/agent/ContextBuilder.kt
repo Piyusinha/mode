@@ -86,7 +86,10 @@ object ContextBuilder {
     /** Changes only when an answer arrives. */
     fun stable(input: Input): String = buildString {
         val c = input.context
-        val about = listOfNotNull(c.userName?.let { "Their name: $it" }) + c.aboutYou
+        val about = listOfNotNull(
+            c.userName?.let { "Their name: $it" },
+            c.replyLanguage?.let { "They speak $it: write done's summary and spoken in $it (the task is given to you in English)" },
+        ) + c.aboutYou
         if (about.isNotEmpty()) {
             append("ABOUT THE USER:\n")
             about.take(MAX_ABOUT_YOU).forEach { append("- ").append(it).append('\n') }

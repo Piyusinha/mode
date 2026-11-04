@@ -1,4 +1,5 @@
 import AVFoundation
+import NaturalLanguage
 import ModeDesignSystem
 import ModeKit
 import Speech
@@ -43,7 +44,25 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         synth.delegate = self
     }
 
+    /// Languages Apple can hear on this iPhone, and those downloaded (BCP-47), filled in by prepareHearing.
+    private var appleSupported: [String] = []
+    private var appleInstalled: [String] = []
+
+    /// The language to listen in: the one picked in Settings → Listening → Language, else this iPhone's.
+    static func listenLocale() -> Locale {
+        DeviceVoice.shared.listenLanguage.map { Locale(identifier: $0) } ?? .current
+    }
+
+    /// The language of a line written mostly in a non-Latin script ("hi" for Devanagari), else nil.
+    static func otherScriptLanguage(_ text: String) -> String? {
+        let letters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+        guard !letters.isEmpty, letters.filter({ $0.value > 0x024F }).count * 2 > letters.count else { return nil }
+        return NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+    }
+
     func install() {
+        DeviceVoice.shared.appleLanguages = { [weak self] in self?.appleSupported ?? [] }
+        DeviceVoice.shared.appleInstalled = { [weak self] in self?.appleInstalled ?? [] }
         Voices.companion.installReader { path in
             guard let data = FileManager.default.contents(atPath: path) else { return nil }
             let bytes = KotlinByteArray(size: Int32(data.count))
@@ -87,6 +106,12 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
 
     /// Where Apple hearing stands; with [ask], the microphone prompt and the speech model download too.
     func prepareHearing(ask: Bool) async {
+        // For Settings → Listening → Language: which languages Apple can hear here, and which are downloaded,
+        // whatever the microphone permission is.
+        if SpeechTranscriber.isAvailable {
+            appleSupported = await SpeechTranscriber.supportedLocales.map { $0.identifier(.bcp47) }
+            appleInstalled = await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) }
+        }
         if ask, AVAudioApplication.shared.recordPermission == .undetermined {
             _ = await AVAudioApplication.requestRecordPermission()
         }
@@ -96,8 +121,9 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         default: break
         }
         guard SpeechTranscriber.isAvailable else { hearing = "unsupported"; return }
-        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? Locale.current
+        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Self.listenLocale()) ?? Locale.current
         let installed = await SpeechTranscriber.installedLocales
+        appleInstalled = installed.map { $0.identifier(.bcp47) }
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         if !installed.contains(where: { $0.identifier(.bcp47) == locale.identifier(.bcp47) }) {
             hearing = "asset"
@@ -118,7 +144,14 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         VoiceAudio.shared.forSpeech()
         synth.usesApplicationAudioSession = true
         let line = AVSpeechUtterance(string: text)
-        if let voiceId, let voice = AVSpeechSynthesisVoice(identifier: voiceId) { line.voice = voice }
+        let chosen = voiceId.flatMap { AVSpeechSynthesisVoice(identifier: $0) }
+        // A line in another script (Hindi in Devanagari) is read by a voice for its language, not the English one.
+        if let language = Self.otherScriptLanguage(text), chosen.map({ !$0.language.hasPrefix(language) }) ?? true,
+           let voice = AVSpeechSynthesisVoice(language: language) {
+            line.voice = voice
+        } else if let chosen {
+            line.voice = chosen
+        }
         let rate = Double(AVSpeechUtteranceDefaultSpeechRate) * speed
         line.rate = Float(min(max(rate, Double(AVSpeechUtteranceMinimumSpeechRate)), Double(AVSpeechUtteranceMaximumSpeechRate)))
         VoiceLevel.shared.speaking = true
@@ -278,7 +311,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     /// Apple's on-device transcription of the one recording. The analyzer reads the file itself, converting it to the
     /// format its model needs (handing it the file's own buffers crashed: AnalyzerInput traps on a format it can't take).
     private func transcribe(_ path: String) async -> String? {
-        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) ?? Locale.current
+        let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Self.listenLocale()) ?? Locale.current
         let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
         guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)) else { return nil }
