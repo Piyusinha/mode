@@ -116,7 +116,8 @@ public class Reflector(
         }
         when (op) {
             "add" -> {
-                if (kind == MemoryKind.Skill && !succeeded) return Applied.Refused("a skill only comes from a task that worked: $title")
+                if ((kind == MemoryKind.Skill || kind == MemoryKind.Usual) && !succeeded) return Applied.Refused("a ${kind.stored} only comes from a task that worked: $title")
+                if (kind == MemoryKind.Candidate) return Applied.Refused("candidates are not for the critic: $title")
                 val draft = MemoryDraft(
                     kind = kind,
                     subject = change.str("subject"),
@@ -205,15 +206,26 @@ public class Reflector(
             critic, and decide what Mode should remember to do better next time. You see what was done and the
             final screen, not the assistant's reasoning.
 
-            Three kinds of memory:
+            Four kinds of memory:
             - fact: about the user, stated by the task, their answers or the screen. People ("Asha: message
               her on WhatsApp"), preferences ("likes short, casual messages"), places ("Home: Indiranagar,
               Bengaluru"). subject = the person or topic, lower case. Never guess or infer beyond the evidence.
             - skill: a reusable route for this kind of task, only when the task succeeded. Title with
               placeholders ("Message [Person] on WhatsApp", "Turn off Dark Mode"); text = short numbered steps
-              that worked, without the detours, plus "If it goes wrong:" lines when useful. subject = the title
-              in lower case; keywords = 4 to 10 words someone might use to ask for it (synonyms too); app = the
-              main app.
+              that worked, without the detours, then optional sections, each on its own lines:
+                Backup: another way to find a thing when a step's label is not there (the search, a tab, a
+                  deep link that opens the page).
+                If it goes wrong:
+                - if "CLOSED RIGHT NOW": tap Schedule, pick the next slot, then ask which
+                (one rule per line, the trigger quoted exactly as the screen shows it, then what to do.)
+                Failed: a one-line note of a failure this skill saw, with the date.
+              subject = the title in lower case; keywords = 4 to 10 words someone might use to ask for it
+              (synonyms too); app = the main app.
+            - usual: when the task ordered, booked, paid for or sent something and it went through: exactly
+              what, so "my usual" needs no question next time. text = the app · the item with its options and
+              size · the address or place · the payment · the time or slot, as one line. title = "Usual:
+              <what>" ("Usual: chocolate oats from Swiggy"); subject = the kind of thing in two or three plain
+              words ("order oats", "cab home", "message asha"); keywords = words they might say for it.
             - tip: one short note about an app's layout or behaviour that would have saved steps ("Calendar:
               the list button is top right; the icon next to it opens search"). Above all a shortcut the
               assistant missed or found: a recent or suggested entry to tap instead of typing ("Rapido: recent
@@ -230,7 +242,9 @@ public class Reflector(
             - Quote on-screen labels in a skill's steps exactly as shown ("Tap 'Log' beside the meal"): Mode
               finds them on screen next time and points at them.
             - If the task failed, say why in failure_type and root_cause; add tips about what to avoid, or add
-              "If it goes wrong:" lines to an existing skill. Never make a new skill from a failure.
+              to an existing skill an "If it goes wrong:" rule (the quoted trigger that was on screen, then what
+              should have been done) and a "Failed:" line. Never make a new skill or usual from a failure.
+            - If a skill's rule was followed and it worked, keep it; if it was followed and did not work, change it.
             - Never store passwords, passcodes, one-time codes, card or bank numbers, or ID numbers.
             - Never store what is on a list today: prices, ratings, offers, availability, delivery times, which
               items or restaurants were shown. It goes out of date. Keep how to get things done in an app, and
@@ -263,7 +277,7 @@ public class Reflector(
                                         put("type", "object")
                                         putJsonObject("properties") {
                                             putJsonObject("op") { put("type", "string"); putJsonArray("enum") { listOf("add", "update", "forget", "noop").forEach { add(JsonPrimitive(it)) } } }
-                                            putJsonObject("kind") { put("type", "string"); putJsonArray("enum") { listOf("fact", "skill", "tip").forEach { add(JsonPrimitive(it)) } } }
+                                            putJsonObject("kind") { put("type", "string"); putJsonArray("enum") { listOf("fact", "skill", "tip", "usual").forEach { add(JsonPrimitive(it)) } } }
                                             putJsonObject("id") { put("type", "string"); put("description", "For update or forget: the remembered item's id.") }
                                             putJsonObject("subject") { put("type", "string") }
                                             putJsonObject("title") { put("type", "string") }

@@ -293,6 +293,8 @@ class Agent(
         }
         val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device)
         facts.clear()
+        // "If it goes wrong" rules from the skills memory offered, shown only when their trigger is on screen.
+        val playbook = (listOfNotNull(startContext.knownRoute) + startContext.skills).flatMap { Playbook.rules(it) }.distinctBy { it.trigger.lowercase() }
         val schema = AgentTools.schema(tools)
         history.clear()
         cost = brief?.costUsd ?: 0.0
@@ -546,7 +548,7 @@ class Agent(
                     expectation = expectation,
                     done = ledger.lines(),
                     seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
-                    tipsNow = if (inMode) emptyList() else JustInTime.tips(context.appNotes, screen.pageTexts(), lastApp),
+                    tipsNow = if (inMode) emptyList() else JustInTime.tips(context.appNotes, screen.pageTexts(), lastApp) + Playbook.applicable(playbook, screen.pageTexts()),
                     routeHint = (if (inMode) null else JustInTime.hint(routine, routineAt, screen.layout)).also { routineHinted = it }?.text(),
                     screen = ContextBuilder.Screen(
                         screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.layout, keyboardUp = screen.keyboardUp,

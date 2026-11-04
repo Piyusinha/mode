@@ -7,6 +7,7 @@ import com.piyush.mode.agent.AgentOutcome
 import com.piyush.mode.agent.AgentResult
 import com.piyush.mode.agent.TaskContext
 import com.piyush.mode.feature.memory.data.MemoryForAgent
+import com.piyush.mode.feature.memory.data.PreferenceCandidates
 import com.piyush.mode.feature.memory.data.MemoryRepository
 import com.piyush.mode.feature.memory.data.MemoryRetrieval
 import com.piyush.mode.feature.memory.data.Reflector
@@ -69,7 +70,13 @@ public class TaskMemory(
             provider,
         )
         if (provider.reportsCurrencyCost) tasks.addCost(taskId, reflection.costUsd)
-        return reflection
+        // Ask once, remember forever: the same answer to the same kind of question twice becomes a fact.
+        val promoted = runCatching { PreferenceCandidates(memory).learn(result.answers, taskId) }.getOrDefault(emptyList())
+        if (promoted.isEmpty()) return reflection
+        return Reflector.Reflection(
+            remembered = reflection.remembered + promoted, saved = reflection.saved + promoted, refused = reflection.refused,
+            failureType = reflection.failureType, rootCause = reflection.rootCause, costUsd = reflection.costUsd,
+        )
     }
 
     private fun outcomeOf(result: AgentResult) = when (val o = result.outcome) {

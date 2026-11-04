@@ -58,6 +58,8 @@ public data class ModeSettings(
     val language: String = SpeechLanguage.Auto.id,
     /** Mode answers in the language spoken; false: always English. */
     val replyInSpokenLanguage: Boolean = true,
+    /** Suggest a routine (the same task most days at the same time) when it is about due; never run it unasked. */
+    val suggestRoutines: Boolean = false,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

@@ -9,7 +9,13 @@ public enum class MemoryKind(internal val stored: String) {
     Skill("skill"),
 
     /** A short note about one app: "Calendar: the list button is top right". */
-    Tip("tip");
+    Tip("tip"),
+
+    /** What the user usually gets: the app, the item and its options, the address, the payment, the time. */
+    Usual("usual"),
+
+    /** A choice the user made once when asked; made twice the same way it becomes a fact. Never shown. */
+    Candidate("candidate");
 
     internal companion object {
         fun of(stored: String): MemoryKind = entries.firstOrNull { it.stored == stored } ?: Fact

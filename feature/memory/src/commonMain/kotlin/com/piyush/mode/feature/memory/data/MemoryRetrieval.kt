@@ -54,6 +54,13 @@ public class MemoryRetrieval(
         }
         val skills = items.filter { it.kind == MemoryKind.Skill && !otherApp(it) }
         val tips = items.filter { it.kind == MemoryKind.Tip }
+        // What they usually get: shown when the task is vague ("my usual", "same as last time") or names it.
+        val vague = VAGUE.containsMatchIn(task)
+        val usuals = items.filter { it.kind == MemoryKind.Usual && !otherApp(it) }
+            .map { it to (Words.of("${it.subject} ${it.title} ${it.keywords.joinToString(" ")}") intersect words).size }
+            .filter { (_, score) -> score > 0 || vague }
+            .sortedWith(compareByDescending<Pair<MemoryItem, Int>> { it.second }.thenByDescending { it.first.uses }.thenByDescending { retention(it.first) })
+            .take(MAX_USUALS).map { it.first }
         val people = facts.map { it.subject }.toSet()
 
         val shownFacts = if (facts.size <= MAX_FACTS) facts.sortedByDescending { retention(it) }
@@ -77,12 +84,20 @@ public class MemoryRetrieval(
         val wanted = apps.filter { app -> appNamed(app, words) || appNamed(app, hop) }.toSet()
         val shownTips = tips.filter { it.subject in wanted }.sortedByDescending { retention(it) }.take(MAX_TIPS)
 
+        // The profile the brief reads: usuals first, then facts, within a budget of characters.
+        val profile = mutableListOf<String>()
+        var chars = 0
+        for (line in usuals.map { "${it.title}: ${it.text}" } + shownFacts.map { it.text }) {
+            if (chars + line.length > MAX_PROFILE_CHARS) continue
+            profile += line
+            chars += line.length
+        }
         return ForTask(
-            aboutYou = shownFacts.map { it.text },
+            aboutYou = profile,
             skills = listOfNotNull(best?.let(::skillInFull)) +
                 named.map { "Also known${it.app?.let { a -> " (in $a)" }.orEmpty()}: ${it.title} (recall \"${it.title}\" for the steps)" },
             tips = shownTips.map { "${it.title}: ${it.text}" },
-            usedIds = (shownFacts + listOfNotNull(best) + shownTips).map { it.id },
+            usedIds = (shownFacts + usuals + listOfNotNull(best) + shownTips).map { it.id },
             knownRoute = knownRoute,
         )
     }
@@ -155,6 +170,11 @@ public class MemoryRetrieval(
 
     public companion object {
         public const val MAX_FACTS: Int = 25
+        public const val MAX_USUALS: Int = 5
+        /** About 400 tokens of profile in every brief and step. */
+        public const val MAX_PROFILE_CHARS: Int = 1600
+        /** A request that leans on what they usually get. */
+        private val VAGUE = Regex("""\b(usual|usually|regular|same as|like last time|as always|as usual|again|the same)\b""", RegexOption.IGNORE_CASE)
         public const val MAX_TIPS: Int = 10
         public const val MAX_SKILL_NAMES: Int = 3
         public const val SKILL_THRESHOLD: Double = 0.5
