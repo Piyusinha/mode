@@ -32,6 +32,21 @@ class ScreenLayout private constructor(val cards: List<Card>) {
         return row.filter { it.x > x }
     }
 
+    /**
+     * The value beside a form label ("Serving Size" → "6 pieces"), or null when the row is a list row: a mail's
+     * sender with its date and chevron, a setting with "On >". Seen on the phone (Mail): the hint sent the agent
+     * to tap a date. A value is short, not a date, a time, a weekday or a chevron, and the label is short too.
+     */
+    fun valueOf(label: String): Element? {
+        if (label.trim().length > MAX_LABEL) return null
+        val right = rightOf(label)
+        val value = right.firstOrNull() ?: return null
+        if (right.size > 2) return null
+        val t = value.text.trim()
+        if (t.isEmpty() || t.length > MAX_VALUE || t.last() in CHEVRONS || DATE_OR_TIME.containsMatchIn(t)) return null
+        return value
+    }
+
     /** One line per row, a blank line between cards, "(ad)" before an ad's first row; at most [max] elements. */
     fun render(max: Int): String = buildString {
         var shown = 0
@@ -54,6 +69,14 @@ class ScreenLayout private constructor(val cards: List<Card>) {
     }
 
     companion object {
+        private const val MAX_LABEL = 28
+        private const val MAX_VALUE = 14
+        private const val CHEVRONS = ">›vV〉"
+        private val DATE_OR_TIME = Regex(
+            "(\\b\\d{1,2}[/.-]\\d{1,2}([/.-]\\d{2,4})?\\b|\\b\\d{1,2}:\\d{2}\\b|\\b(am|pm)\\b|\\b(today|yesterday|tomorrow|now)\\b|" +
+                "\\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\\b|\\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\b|\\bago\\b)",
+            RegexOption.IGNORE_CASE,
+        )
         /** A card ends where the gap to the next row is over this many line heights. */
         const val CARD_GAP = 1.6
 

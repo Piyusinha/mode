@@ -664,7 +664,12 @@ class Agent(
                     }
                     // Replacing what a field holds (a quantity's 1): seen on the phone, the agent pressed delete,
                     // tapped the field and pressed digits one at a time for ten steps.
-                    if (call.name == "type_text" && call.arguments["clear"]?.jsonPrimitive?.booleanOrNull == true) {
+                    val clearing = call.name == "type_text" && call.arguments["clear"]?.jsonPrimitive?.booleanOrNull == true
+                    if (clearing) {
+                        // A field's own × clears all of it at once; deletes alone left "boarding pass" in Mail's
+                        // search and the agent typed "4 November" after it (seen on the phone).
+                        AgentTools.focusPoint(call, screen.geometry)?.let { (fx, fy) -> clearControl(fx, fy, screen) }
+                            ?.let { (cx, cy) -> runCatching { phone.send(Op.Tap(cx, cy)) }; delay(FOCUS_MS) }
                         repeat(CLEAR_KEYS) { runCatching { phone.send(Op.PressKey("delete")) } }
                     }
                     if (op is Op.Scroll) {
@@ -737,13 +742,35 @@ class Agent(
                     }
                     // Never look (or tap) while the screen is still moving.
                     if (lastWasPhoneAction) settle()
+                    // Seen on the phone (Mail, four times): open_app said "ok" while Mode's own chat stayed in front,
+                    // and eleven steps were lost. The phone cannot say which app is in front, but Mode's screen
+                    // shows the task's own words: then Home, open the app again, and say what happened.
+                    val launchNote = (op as? Op.LaunchApp)?.takeIf { lastWasPhoneAction }?.let { launch ->
+                        val now = runCatching { screenTexts(screen.geometry).map { it.first } }.getOrNull().orEmpty()
+                        if (!looksLikeMode(now, task)) return@let ""
+                        runCatching { phone.send(Op.Home) }
+                        settle()
+                        runCatching { phone.send(launch) }
+                        settle()
+                        val again = runCatching { screenTexts(screen.geometry).map { it.first } }.getOrNull().orEmpty()
+                        stuck.stalled()
+                        if (looksLikeMode(again, task)) "; but Mode is still in front: ${launch.name} did not open. Try home, then open it again, or open_url"
+                        else " (Mode was in front; opened ${launch.name} again)"
+                    }.orEmpty()
                     // Typing is checked: does the text now show? (A field that wasn't focused takes nothing.)
                     val typedNote = (op as? Op.TypeText)?.takeIf { lastWasPhoneAction && call.arguments["submit"]?.jsonPrimitive?.booleanOrNull != true }?.let { t ->
                         val now = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
-                        if (now.any { it.first.contains(t.text.take(TYPED_PROBE), ignoreCase = true) }) "; the field shows \"${t.text.take(TYPED_PROBE)}\""
-                        else "; \"${t.text.take(TYPED_PROBE)}\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
+                        val probe = t.text.take(TYPED_PROBE)
+                        val shown = now.firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim()
+                        when {
+                            shown == null -> "; \"$probe\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
+                            // Seen on the phone: "4 November" typed after "boarding pass" that clear did not remove.
+                            clearing && shown.length > t.text.length + STALE_SLACK ->
+                                "; the field shows \"${shown.take(TYPED_SHOWN)}\": the old text was not cleared. Tap the field's ×, or select all and delete, then type again"
+                            else -> "; the field shows \"${shown.take(TYPED_SHOWN)}\""
+                        }
                     }.orEmpty()
-                    record(described, reason, outcome + typedNote, op.toString())
+                    record(described, reason, outcome + launchNote + typedNote, op.toString())
                 }
             }
         }
@@ -898,7 +925,7 @@ class Agent(
      * Servings" and "Serving Size" tapped again and again while "1" and "6 pieces" sat beside them.
      */
     private fun labelHint(tapped: String?, layout: ScreenLayout): String {
-        val value = tapped?.let(layout::rightOf)?.firstOrNull() ?: return ""
+        val value = tapped?.let(layout::valueOf) ?: return ""
         return ": \"$tapped\" is a label; its value is [${value.id}] \"${value.text}\" on the right of the same row. " +
             "Tap that (or type_text with id ${value.id})"
     }
@@ -974,6 +1001,30 @@ class Agent(
         is Op.Drag -> "swipe"
         Op.Home -> "home"
         else -> call.name
+    }
+
+    /**
+     * Mode's own screen, told by the task's words in its chat: a line of four or more words that starts the task.
+     * Nothing about Mode's layout or language is assumed.
+     */
+    private fun looksLikeMode(texts: List<String>, task: String): Boolean {
+        val t = ChangeLedger.norm(task)
+        if (t.length < MODE_MARK_MIN) return false
+        return texts.any { line ->
+            val l = ChangeLedger.norm(line)
+            l.length >= MODE_MARK_MIN && l.split(' ').size >= MODE_MARK_WORDS && t.startsWith(l)
+        }
+    }
+
+    /** The field's clear control (×, ⓧ, "Clear") on its row, to its right, in screen points. */
+    private fun clearControl(fx: Double, fy: Double, screen: Screen): Pair<Double, Double>? {
+        val g = screen.geometry
+        val py = g.toPixelsY(fy)
+        val half = g.toPixelsY(ROW_HALF_PT)
+        return screen.texts
+            .filter { abs(it.third - py) <= half && it.second > g.toPixelsX(fx) && CLEAR_MARKS.matches(it.first.trim()) }
+            .minByOrNull { it.second }
+            ?.let { g.x(it.second.toDouble()) to g.y(it.third.toDouble()) }
     }
 
     private fun pixel(x: Double, y: Double, screen: Screen): String =
@@ -1088,6 +1139,12 @@ class Agent(
         private const val MAX_ROUTE_STEPS = 8
         /** Deletes pressed to empty a field before typing (quantities, short entries). */
         private const val CLEAR_KEYS = 12
+        private val CLEAR_MARKS = Regex("[×✕✖xXⓧ⊗⊠]|clear", RegexOption.IGNORE_CASE)
+        /** A shown field this much longer than what was typed still holds old text. */
+        private const val STALE_SLACK = 2
+        private const val TYPED_SHOWN = 40
+        private const val MODE_MARK_MIN = 16
+        private const val MODE_MARK_WORDS = 4
         /** A scroll showing fewer new lines than this has reached the end. */
         private const val MIN_NEW_LINES = 2
         private const val BACK_DID_NOTHING =
