@@ -44,6 +44,14 @@ All of it stays generic (no per-app code), per the no-hard-coded-tasks rule.
 
 ---
 
+## Status, 5 November 2026
+
+Built on branch `harness-fixes` (worktree `~/piyush/mode-harness`), each item a tested commit:
+A1 (`ee60c63`, `9964428`, `e281984`), A10 (`ff16084`), A2+A3+A12 (`fbac612`), A4+A5 (`6ff7803`),
+A6+A11 (`58b584a`), A13+C1–C4 (`8c7e92c`), A8 (`a5773d4`), B1–B3+B5 (`ace494b`). A9: the golden
+tests exist; the on-phone suite is `docs/eval-suite.md` (runner UI pending). B4 (narration
+barge-in) and the Live Activity "Speak" button are pending. Nothing has run on the phone yet.
+
 ## Review, 4 November 2026 (second research pass)
 
 A second pass over the code and over what was published since the plan was written (StepReflect/Q-Reflector,

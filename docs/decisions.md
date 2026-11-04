@@ -406,3 +406,53 @@ the graph grows past what one file reads comfortably.
   tab, and the running task in the bottom accessory. Native controls give real
   Liquid Glass and accessibility.
 
+## D32. Steps are a budget that grows with progress, not a cap
+
+- 30 steps, plus 10 for each real progress (a new page, a confirmed change, a plan
+  step done), up to 60; grace steps when the submit is in view; a plan step that
+  drags for 12 steps gets a new plan. Seen on the phone: a flight check stopped
+  at 30 of 30 one tap from "Search Flight". The 15-minute limit stays.
+
+## D33. Recover by rungs before stopping
+
+- Try another way → another route (the planning mind, told what failed) → a new
+  plan → the user with options. The stop for no progress moves from 6 steps to
+  10 to leave room. Research: VLAA-GUI's loop breaker, Magentic-One's stall
+  counter, MobileUse's reflectors (+5.7 from the per-action check alone).
+
+## D34. A give-up needs evidence, routes and the user's say
+
+- `blocked_by` and `routes_tried` on `done(success=false)`; a login or payment is
+  a hand-over; closed/unavailable/needs_* are asked with options; one route is
+  not enough with steps left; evidence must quote the screen. Seen: "CLOSED RIGHT
+  NOW · Schedule" and a give-up with twenty steps left.
+
+## D35. An order is done only when the screen says so
+
+- Proof by kind of change; history and promos never count ("You ordered 5 months
+  ago", "ADDED ×" were taken as proof on 3 Nov); the button back on the same page
+  means no effect; one retry; unconfirmed means check Orders and never claim it.
+
+## D36. Direct routes before the screen
+
+- `open_url`, `run_shortcut`, `read_calendar`, `find_contact` from Mode's own app
+  (`DeviceData`), and `lookup` through the provider's web search (one marker in
+  the tools, mapped per provider). Research: PhoneHarness 75% vs 62% for screens
+  alone; CLI agents 10.7 steps vs 18.6. iOS has no shell, but it has these.
+
+## D37. The loop's state lives on the agent
+
+- A suspend loop spills every local at each await; with sixty locals `runSteps`
+  outgrew the JVM's method limit. The mutable state moved to private fields of
+  `Agent` (one agent runs one task); the body did not change. Helpers now take
+  the agent, not thirty parameters.
+
+## D38. Talking over Mode
+
+- While Mode speaks the greeting, the acknowledgement, a question or the answer,
+  the microphone is open with echo cancellation; the user's own words (two not in
+  the line being said, after 250 ms, never a nod) stop the line and are the task,
+  a steer, the answer or a follow-up. Not during the narration while the agent
+  drives another app (D17: the microphone and the screen stream cannot be on
+  together); the Live Activity "Speak" button is the way in there (pending).
+

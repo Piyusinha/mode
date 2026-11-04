@@ -85,19 +85,79 @@ flowchart LR
    summary and proposes memory changes (section 4). It runs after you have
    your answer, so it never slows a task down.
 
-**Stop conditions:** max steps; **max cost per task**; stuck (the same screen 4
-times despite different actions, even after stepping up); max time; or the
-user's Stop. Each ends with an honest summary of how far it got.
+**Stop conditions:** the step budget (below); **max cost per task**; stuck (the
+same screen 6 times, or 10 steps without progress after the recovery ladder has
+been climbed); 15 minutes; or the user's Stop. Each ends with an honest summary
+of how far it got.
+
+### 3a. Fighting to finish (added 2026-11-05, branch `harness-fixes`)
+
+What the runs of 3 November taught (`docs/agent-resilience-and-barge-in-plan.md`):
+the harness, not the model, caused most failures, and Mode never tried a second
+strategy before quitting. So:
+
+- **Every action is checked against what the model expected of it** (`ExpectCheck`).
+  The model's `expect` ("the cart shows 1 item") is compared with the screen after
+  the action, with no model call. A miss says what showed instead and the usual
+  causes, and tells the model not to repeat the same tap. Misses count as stalls.
+- **A step budget that grows with progress** (`StepBudget`): 30 steps, plus 10 each
+  time a new page is reached, a change is confirmed or a plan step is done, up to
+  60; a warning at 70%; three grace steps when the last action typed and the
+  submit is in view; one plan step dragging for 12 steps asks for a new plan.
+- **A recovery ladder** (`RecoveryLadder`), one rung per stretch without progress:
+  1. the same action twice with no change: "try another way" (no model call);
+  2. the same action three times in eight, or the same screen four times: the
+     planning mind names another route, told the routes that did not work;
+  3. still repeating: the planning mind rewrites the remaining plan;
+  4. still nothing: ask the user with options, or hand over.
+- **A give-up gate** (`GiveUpGate`): `done(success=false)` names `blocked_by` and
+  `routes_tried`. A login or payment is a hand-over, never a give-up; closed,
+  unavailable, needs_info and needs_choice are the user's call (ask with options
+  first); with steps left, more than one route must have been tried; the evidence
+  must quote the screen. A reason is refused once, then the planning mind's
+  other-way question, then the give-up stands.
+- **Two-phase commit** for orders, payments, bookings and sends (`Changes`,
+  `ChangeLedger`): proof is read for the kind of change (an order needs order
+  words, an order number or an ETA; history and promos never count); before the
+  tap the amounts and the slot go into the notes; the button on the same page
+  again means it did not go through (one retry); an unconfirmed commit sends the
+  agent to Orders/History and `done(success=true)` is sent back once.
+- **Direct routes before the screen** (`DeviceData`): `open_url`, `run_shortcut`,
+  `read_calendar`, `find_contact` from Mode's own app, and `lookup` through the
+  provider's web search. The brief is told which it has and prefers them.
+- **Facts** (`facts` on every action): "flight: 6E223" kept for the task, shown
+  every step and given to the planning mind.
+- **Anomaly recovery:** a frame identical after three actions that cannot all do
+  nothing means phone control stalled: reconnect, look again, give the step back.
+  A stale frame is read again before it counts as "unchanged". Mode's own screen
+  after `open_app` (told by the task's words in it) means Home and open again.
+- **Resume after Mode is closed:** "Try again" with the same words in the same
+  chat carries on from the cut-short run's notes and last steps.
+- **Playbook rules** from skills: "if \"CLOSED RIGHT NOW\": tap Schedule…", shown
+  only when the trigger is on the screen (section 4).
+
+Traces: `mode.agent.recovery` (tier), `mode.agent.give_up` (accepted/refused,
+blocked_by), `mode.agent.commit` (tapped/verified/no_effect/unclear).
 
 ## 4. Memory
 
-Three kinds, each with a different job:
+Five kinds, each with a different job (the last two added 2026-11-05):
 
 | Kind | What it holds | Example | Written by |
 |---|---|---|---|
 | **About you** | People, preferences, places, accounts in use | "Asha: message on WhatsApp"; "messages short and casual"; "Home: [address]" | Reflection after tasks; you, in the Memory screen |
 | **How to do it** | Notes per app on what worked or failed (procedural memory, the biggest win in the research) | "Settings: search 'Dark Mode' goes straight there"; "Calendar: tap Today, then scroll; events may be below the fold" | Reflection, from successful runs and from failures |
 | **What happened** | The runs themselves: task, outcome, summary | "Sent Asha 'Leaving in 10' (1 Nov)" | Already recorded; indexed for search |
+| **Usuals** | What the user usually gets, exactly: the app, the item and options, the address, the payment, the slot | "Usual: chocolate oats from Swiggy: Swiggy · Dark chocolate oats 100 g · Home · wallet · mornings" | Reflection, after an order, booking or send that went through |
+| **Candidates** | A choice made once when Mode asked; the same answer twice becomes a fact ("ask once, remember forever") | "Chose Medium" → "Prefers Medium: use it without asking" | `PreferenceCandidates`, from the task's answers; never shown |
+
+A **skill** is a small package in one text: the numbered route, `Backup:` lines
+(another way to find each thing), `If it goes wrong:` rules with the on-screen
+trigger quoted exactly, and `Failed:` lines. The rules are shown to the agent
+only when their trigger is on the screen now (`Playbook`). A vague request
+("my usual") gets the usuals first in the profile, which is budgeted at about
+400 tokens. Routines (the same task most days at the same time) are detected
+from past tasks and only suggested, behind a setting (`Routines`).
 
 **Writing (reflection):** after each task, the cheap model gets the task, the
 plan, the step lines (no screenshots) and the current memory items for those
