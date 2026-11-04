@@ -116,7 +116,9 @@ private struct MessageView: View {
                 if let screens = message.screens {
                     ModeScreensLink(title: screens.label, thumbnails: thumbnails) { onEvent(.openScreens(screens.taskId)) }
                 }
-                if actions { ModeReplyActions([
+                if let taskId = message.debugTaskId {
+                    FailedTaskCard(onDebug: { onEvent(.debug(taskId)) }, onRetry: { onEvent(.retry(message)) })
+                } else if actions { ModeReplyActions([
                     .init(.copy, label: L10n.Conversation.copy) { onEvent(.copy(message)) },
                     .init(.runAgain, label: L10n.Conversation.tryAgain) { onEvent(.retry(message)) },
                     .init(.share, label: L10n.Conversation.shareReply) { onEvent(.shareReply(message)) },
@@ -180,5 +182,26 @@ private struct LessonEditor: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .modeScreen()
         .presentationDetents([.medium])
+    }
+}
+
+/// Under a reply whose task couldn't finish (board TaskFailedChat): What went wrong, and Try again.
+private struct FailedTaskCard: View {
+    let onDebug: () -> Void
+    let onRetry: () -> Void
+
+    var body: some View {
+        ModeCard {
+            VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                Label { Text(L10n.Debug.couldntFinish) } icon: { ModeIcon.warning.image }
+                    .modeText(.bodyEmphasis, color: ModeColor.tileOrangeText)
+                Text(L10n.Debug.cardDetail).modeText(.footnote, color: ModeColor.textSecondary)
+                HStack(spacing: ModeSpacing.s) {
+                    ModeButton(L10n.Debug.whatWentWrong, fullWidth: true, action: onDebug)
+                    ModeButton(L10n.Conversation.tryAgain, icon: .runAgain, role: .secondary, action: onRetry)
+                }
+            }
+            .padding(.vertical, ModeSpacing.m)
+        }
     }
 }

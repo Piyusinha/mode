@@ -146,6 +146,7 @@ struct MainTabs: View {
         case "listening": paths[.home] = [.settings, .listening]
         case "language": paths[.home] = [.settings, .listening, .language]
         case "health": paths[.home] = [.settings, .health]
+        case let open? where open.hasPrefix("debug:"): paths[.home] = [.taskDebug(taskId: String(open.dropFirst(6)))]
         case "voicepicker": paths[.home] = [.settings, .voice, .voicePicker(provider: parts.count > 1 ? parts[1] : "apple")]
         case "listen": showingListen = true
         case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
@@ -193,6 +194,8 @@ private struct TabRoot<Content: View>: View {
                     case .listening: VoiceRoute(app: app, hearing: true, navigate: navigate)
                     case .language: LanguageRoute(app: app)
                     case .health: HealthRoute(app: app, navigate: navigate)
+                    case let .taskDebug(taskId): TaskDebugRoute(app: app, taskId: taskId, navigate: navigate)
+                    case let .taskDebugAsk(taskId): TaskDebugAskRoute(app: app, taskId: taskId, navigate: navigate)
                     case let .voicePicker(provider): VoicePickerRoute(app: app, provider: provider)
                     case let .providerDetail(id): ProviderDetailRoute(app: app, id: id, navigate: navigate)
                     case .memoryAboutYou: MemoryAboutYouRoute(app: app, navigate: navigate)

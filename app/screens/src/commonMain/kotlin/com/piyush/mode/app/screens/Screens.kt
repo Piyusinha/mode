@@ -80,6 +80,12 @@ public class Screens(
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
+    /** What went wrong in a task that couldn't finish, and questions about it. */
+    public fun taskDebug(taskId: String): com.piyush.mode.app.screens.debug.TaskDebugPresenter =
+        com.piyush.mode.app.screens.debug.TaskDebugPresenter(
+            scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude,
+        )
+
     /** Settings → Health & repair. */
     public fun health(): com.piyush.mode.app.screens.settings.HealthPresenter =
         com.piyush.mode.app.screens.settings.HealthPresenter(

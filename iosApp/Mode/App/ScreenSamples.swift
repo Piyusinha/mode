@@ -34,6 +34,9 @@ struct ScreenSample: Identifiable {
                                          options: ["Medium · ₹249", "Large · ₹399"]), level: 0.5, speaking: false)
         case "talk-answered": talk(.init(phase: .answered, task: "Order my usual from Swiggy", answer: "Large", answerReply: "Got it. Going back."),
                                    level: 0, speaking: true)
+        case "task-failed": ConversationScreen(state: Self.taskFailed, thumbnails: [:], draft: .constant(""), canSend: true, onEvent: { _ in })
+        case "task-debug": NavigationStack { TaskDebugScreen(state: Self.taskDebug, onEvent: { _ in }) }
+        case "task-debug-ask": NavigationStack { TaskDebugAskScreen(state: Self.taskDebugAsk, onEvent: { _ in }) }
         case "claude": detail(Self.claude)
         case "openrouter": detail(Self.openRouter)
         default: detail(Self.chatGPT)
@@ -79,6 +82,30 @@ struct ScreenSample: Identifiable {
     private static func reply(_ id: String, _ text: String) -> ConversationViewModel.Message {
         .init(id: id, fromUser: false, spoken: false, steered: false, text: text, blocks: [.paragraph(text)], status: nil, screens: nil)
     }
+
+    /// Board TaskFailedChat: a reply whose task couldn't finish, with What went wrong.
+    static let taskFailed = ConversationViewModel.State(
+        title: "Order chocolate oats from Swiss", when: "Today 06:50",
+        messages: [said("1", "Can you order chocolate oats from Swiss for me, from the wallet money", spoken: true),
+                   .init(id: "2", fromUser: false, spoken: false, steered: false, text: "I couldn’t get this done: the screen stopped changing after a few tries.",
+                         blocks: [.paragraph("I couldn’t get this done: the screen stopped changing after a few tries.")],
+                         status: Format.badge(.stopped), screens: nil, debugTaskId: "t1")]
+    )
+
+    /// Board TaskDebug: what Mode found in the run, and how things are now.
+    static let taskDebug = TaskDebugModel.State(
+        title: "Order chocolate oats from Swiss, from the wallet money", when: "4 Nov 2026 at 06:50",
+        problems: [.init(id: 0, title: "Your AI answered without choosing an action", detail: "6 times, so nothing on screen changed. Health & repair can test it.", icon: .sparkle, status: .warning),
+                   .init(id: 1, title: "Mode got stuck", detail: "it made no progress in 6 steps", icon: .repeatTask, status: .warning)],
+        now: [.init(id: 2, title: "Phone control", detail: "Paired with this iPhone", icon: .vpn, status: .ok),
+              .init(id: 3, title: "ChatGPT", detail: "Signed in", icon: .sparkle, status: .ok)],
+        repaired: ["Refreshed your ChatGPT sign-in"], canRepair: true, provider: "ChatGPT")
+
+    /// Board TaskDebugAsk: a question answered with the user's own plan.
+    static let taskDebugAsk = TaskDebugModel.State(
+        title: taskDebug.title,
+        turns: [.init(id: 0, question: "Why did it stop?", answer: "ChatGPT replied six times without picking anything to tap, so the screen never changed and Mode stopped. That was a problem in how the replies came back, which is fixed now. Try again; if it happens again, open Health & repair and run Check again.", failed: false)],
+        provider: "ChatGPT")
 
     /// Board TeachSteer: the user changes how the running task is done.
     static let teachSteer = ConversationViewModel.State(

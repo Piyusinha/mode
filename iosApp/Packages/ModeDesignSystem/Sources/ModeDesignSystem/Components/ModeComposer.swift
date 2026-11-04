@@ -54,3 +54,58 @@ public struct ModeComposer: View {
         .glassEffect(.regular.interactive(), in: .capsule)
     }
 }
+
+/// A question bar without the private switch (Ask about this task): the text and a send button.
+public struct ModeAskBar: View {
+    @Binding private var text: String
+    private let prompt: LocalizedStringResource
+    private let send: LocalizedStringResource
+    private let canSend: Bool
+    private let onSend: () -> Void
+
+    public init(text: Binding<String>, prompt: LocalizedStringResource, send: LocalizedStringResource, canSend: Bool, onSend: @escaping () -> Void) {
+        self._text = text
+        self.prompt = prompt
+        self.send = send
+        self.canSend = canSend
+        self.onSend = onSend
+    }
+
+    public var body: some View {
+        HStack(spacing: ModeSpacing.xs) {
+            TextField(text: $text, axis: .vertical) { Text(prompt) }
+                .modeText(.body)
+                .lineLimit(1...5)
+                .submitLabel(.send)
+                .onSubmit { if canSend { onSend() } }
+                .padding(.leading, ModeSpacing.l)
+            ModeIconButton(.send, label: send, prominent: true, action: onSend)
+                .disabled(!canSend)
+                .opacity(canSend ? 1 : 0.5)
+        }
+        .padding(ModeSpacing.xs)
+        .frame(minHeight: ModeSize.composerHeight)
+        .glassEffect(.regular.interactive(), in: .capsule)
+    }
+}
+
+/// A suggested question to tap ("Why did it stop?").
+public struct ModeSuggestionChip: View {
+    private let text: String
+    private let action: () -> Void
+
+    public init(_ text: String, action: @escaping () -> Void) {
+        self.text = text
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) {
+            Text(text).modeText(.footnote, color: ModeColor.tint)
+                .padding(.horizontal, ModeSpacing.m)
+                .frame(minHeight: ModeSize.touch)
+                .glassEffect(.regular.interactive(), in: .capsule)
+        }
+        .buttonStyle(.plain)
+    }
+}

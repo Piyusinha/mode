@@ -23,6 +23,8 @@ final class ConversationViewModel {
         let status: Format.BadgeStyle?
         /// "See all 11 screens" and the task it opens.
         let screens: (label: String, taskId: String)?
+        /// A task that couldn't finish: What went wrong opens its check (board TaskFailedChat).
+        var debugTaskId: String? = nil
 
         static func == (a: Message, b: Message) -> Bool {
             a.id == b.id && a.text == b.text && a.blocks == b.blocks && a.status?.text.key == b.status?.text.key
@@ -66,7 +68,7 @@ final class ConversationViewModel {
 
     enum Event {
         case send, speak, togglePrivate, undo(String), openScreens(String), stop, share, repeatTask, askDelete, confirmDelete
-        case copy(Message), retry(Message), shareReply(Message), openLive
+        case copy(Message), retry(Message), shareReply(Message), openLive, debug(String)
         case remember, notNow, undoLesson(String), editLesson(String), saveLesson(String)
         case openVoiceSettings, dismissVoiceNotice
     }
@@ -110,6 +112,7 @@ final class ConversationViewModel {
         case .repeatTask: repeating = SharedText(text: presenter.taskToRepeat())
         case let .copy(message): UIPasteboard.general.string = message.text
         case let .retry(message): _ = presenter.retry(turnId: message.id)
+        case let .debug(taskId): navigate(.taskDebug(taskId: taskId))
         case let .shareReply(message): sharing = SharedText(text: message.text)
         case .openLive: navigate(.liveRun)
         case .openVoiceSettings: navigate(state.voiceNoticeHearing ? .listening : .voice)
@@ -161,7 +164,8 @@ final class ConversationViewModel {
                     text: t.text,
                     blocks: t.parts.map(ModeReplyBlock.init),
                     status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
-                    screens: t.screens > 0 ? t.taskId.map { (L10n.Conversation.seeScreens(Int(t.screens)), $0) } : nil
+                    screens: t.screens > 0 ? t.taskId.map { (L10n.Conversation.seeScreens(Int(t.screens)), $0) } : nil,
+                    debugTaskId: t.badge.flatMap { $0 == .done ? nil : t.taskId }
                 )
             },
             working: s.running.map { $0.paused ? String(localized: L10n.Run.paused) : $0.status },

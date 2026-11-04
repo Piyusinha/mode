@@ -19,6 +19,9 @@ enum Route: Hashable {
     case language
     /// Settings → Health & repair.
     case health
+    /// What went wrong in a task that couldn't finish, and Ask about it.
+    case taskDebug(taskId: String)
+    case taskDebugAsk(taskId: String)
     case voicePicker(provider: String)
     case providerDetail(id: String)
     case developer

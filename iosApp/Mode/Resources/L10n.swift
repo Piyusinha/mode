@@ -565,6 +565,33 @@ enum L10n {
         static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
     }
 
+    enum Debug {
+        static let couldntFinish = LocalizedStringResource("debug.couldntFinish", defaultValue: "Couldn’t finish")
+        static let cardDetail = LocalizedStringResource("debug.cardDetail", defaultValue: "Mode can check what went wrong and repair what it can.")
+        static let whatWentWrong = LocalizedStringResource("debug.whatWentWrong", defaultValue: "What went wrong")
+        static let title = LocalizedStringResource("debug.title", defaultValue: "What went wrong")
+        static let found = LocalizedStringResource("debug.found", defaultValue: "What Mode found")
+        static let now = LocalizedStringResource("debug.now", defaultValue: "Right now")
+        static let nothingFound = LocalizedStringResource("debug.nothingFound", defaultValue: "Nothing clear")
+        static let nothingFoundDetail = LocalizedStringResource("debug.nothingFoundDetail", defaultValue: "Ask about it, and your AI reads the steps.")
+        static let repair = LocalizedStringResource("debug.repair", defaultValue: "Repair what Mode can")
+        static let onDevice = LocalizedStringResource("debug.onDevice", defaultValue: "Checked on this iPhone from the task’s steps and trace. Nothing left your iPhone.")
+        static let ask = LocalizedStringResource("debug.ask", defaultValue: "Ask about it")
+        static let askTitle = LocalizedStringResource("debug.askTitle", defaultValue: "Ask about it")
+        static func answeredWith(_ provider: String) -> LocalizedStringResource {
+            LocalizedStringResource("debug.answeredWith", defaultValue: "Answered with your \(provider) plan")
+        }
+        static let askIntro = LocalizedStringResource("debug.askIntro", defaultValue: "Ask anything about this task. Your AI reads its steps and says what happened and what to do.")
+        static let whyStop = LocalizedStringResource("debug.whyStop", defaultValue: "Why did it stop?")
+        static let whatToChange = LocalizedStringResource("debug.whatToChange", defaultValue: "What should I change?")
+        static let willWork = LocalizedStringResource("debug.willWork", defaultValue: "Will it work if I try again?")
+        static let thinking = LocalizedStringResource("debug.thinking", defaultValue: "Reading the steps…")
+        static let askPrompt = LocalizedStringResource("debug.askPrompt", defaultValue: "Ask about this task")
+        static func whatIsSent(_ provider: String) -> LocalizedStringResource {
+            LocalizedStringResource("debug.whatIsSent", defaultValue: "The task’s steps go to \(provider) to answer. Screenshots and keys stay on this iPhone.")
+        }
+    }
+
     enum Health {
         static let title = LocalizedStringResource("health.title", defaultValue: "Health & repair")
         static let row = LocalizedStringResource("health.row", defaultValue: "Health & repair")
