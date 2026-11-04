@@ -22,10 +22,15 @@ data class TaskContext(
     val earlierTurns: List<EarlierTurn> = emptyList(),
     /** The weekday, date and time now ("Sunday 1 November 2026, 19:05"), so "today" means today. */
     val today: String? = null,
+    /** The attempt this one carries on from, when the last one was cut short by Mode being closed. */
+    val resumed: Resumed? = null,
     /** A learned route that fits this task closely and has worked: numbered steps to follow, no brief needed. */
     val knownRoute: String? = null,
 ) {
     data class EarlierTurn(val task: String, val outcome: String)
+
+    /** An earlier attempt at this same task that Mode's closing cut short: where it got to, for carrying on. */
+    data class Resumed(val step: Int, val notes: List<String>, val lastSteps: List<String>)
 
     companion object {
         val Empty = TaskContext()

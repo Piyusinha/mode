@@ -24,6 +24,9 @@ import com.piyush.mode.agent.UserGate
 import com.piyush.mode.feature.settings.domain.AccessRules
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import com.piyush.mode.core.common.startOfTodayMillis
 import com.piyush.mode.core.platform.AppInfo
 import com.piyush.mode.core.platform.BackgroundWork
@@ -302,7 +305,10 @@ public class TaskRunner(
                 budget.copy(fullAccess = true, askAboveAmount = settings.settings.value.askAboveAmount)
             } else budget
             val useMemory = !private && tag == null
-            val base = TaskContext(userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today())
+            val base = TaskContext(
+                userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today(),
+                resumed = resumedFrom(saved),
+            )
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
                 phone = phone,
@@ -416,6 +422,29 @@ public class TaskRunner(
     }
 
     /** Each earlier task in the conversation with Mode's reply to it. */
+    /**
+     * The attempt this task carries on from: the newest task in the same chat with the same words that Mode's
+     * closing cut short (seen on the phone: a hotel search died at step 17 and was never picked up). Its notes
+     * and last steps come from its run's record, so nothing new is written while a task runs.
+     */
+    private fun resumedFrom(task: Task): TaskContext.Resumed? {
+        val conversation = task.conversationId ?: return null
+        val cut = tasks.latest(RESUME_LOOKBACK).firstOrNull {
+            it.id != task.id && it.conversationId == conversation && it.text == task.text &&
+                it.status == TaskStatus.Failed && it.summary?.startsWith(INTERRUPTED_SUMMARY) == true && it.runId != null
+        } ?: return null
+        val events = runCatching { runs.events(cut.runId!!) }.getOrDefault(emptyList())
+        if (events.isEmpty()) return null
+        fun JsonObject.str(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+        val step = events.maxOfOrNull { it.str("step")?.toIntOrNull() ?: 0 } ?: 0
+        val notes = events.filter { it.str("event") == "note" }.mapNotNull { it.str("text")?.trim()?.takeIf(String::isNotEmpty) }.distinct().takeLast(RESUME_NOTES)
+        val acts = events.filter { it.str("event") == "act" }.takeLast(RESUME_STEPS).map { e ->
+            "${e.str("step")}. ${e.str("action")} — ${e.str("outcome").orEmpty().take(RESUME_OUTCOME_CHARS)}"
+        }
+        AppLog.log("agent", "carrying on from task ${cut.id} (cut short at step $step)")
+        return TaskContext.Resumed(step, notes, acts)
+    }
+
     private fun earlierTurns(conversationId: String, excluding: String): List<TaskContext.EarlierTurn> {
         val turns = conversations.turnsNow(conversationId).filter { it.taskId != excluding }
         return turns.mapIndexedNotNull { i, turn ->
@@ -631,3 +660,10 @@ private const val GOT_IT = "Got it. Going back."
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */
 private const val ANSWERED_PAUSE_MS = 900L
+
+/** Matches the summary tidyAfterRelaunch writes (Task.sq interruptRunning). */
+private const val INTERRUPTED_SUMMARY = "Mode was closed"
+private const val RESUME_LOOKBACK = 50L
+private const val RESUME_NOTES = 8
+private const val RESUME_STEPS = 5
+private const val RESUME_OUTCOME_CHARS = 120

@@ -75,10 +75,12 @@ public class ScriptedModel(vararg replies: ToolCall?) : LlmClient {
     val models = mutableListOf<String>()
     var lastTools: JsonArray? = null
     var lastUserText = ""
+    var lastSystemText = ""
     override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
         models += model
         lastTools = tools
         lastUserText = messages.last().text
+        lastSystemText = messages.firstOrNull { it.role == "system" }?.text.orEmpty()
         val reply = if (next < script.size) script[next] else call("done", "evidence" to "on screen", "summary" to "out of script")
         next++
         return ChatResult(reply, "", Usage(100, 10, 0.001))

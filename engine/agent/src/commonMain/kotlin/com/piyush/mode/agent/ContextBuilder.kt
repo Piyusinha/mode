@@ -104,6 +104,13 @@ object ContextBuilder {
             c.recentTasks.take(MAX_RECENT_TASKS).forEach { append("- ").append(it.clip(MAX_TURN_CHARS)).append('\n') }
             append('\n')
         }
+        c.resumed?.let { r ->
+            append("AN EARLIER ATTEMPT AT THIS SAME TASK WAS CUT SHORT: Mode was closed at step ${r.step}. Carry on from where ")
+            append("it got to: read the screen first, keep what it noted, and never redo a change it recorded as done.\n")
+            if (r.notes.isNotEmpty()) append("It had noted:\n").append(r.notes.joinToString("\n") { "- " + it.clip(MAX_TURN_CHARS) }).append('\n')
+            if (r.lastSteps.isNotEmpty()) append("Its last steps:\n").append(r.lastSteps.joinToString("\n") { "- " + it.clip(MAX_TURN_CHARS) }).append('\n')
+            append('\n')
+        }
         if (c.earlierTurns.isNotEmpty()) {
             append("EARLIER IN THIS CONVERSATION (context only; the task below is what to do now):\n")
             c.earlierTurns.takeLast(MAX_EARLIER_TURNS).forEach {

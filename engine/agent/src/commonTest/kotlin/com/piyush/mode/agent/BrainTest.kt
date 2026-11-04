@@ -52,4 +52,14 @@ class BrainTest {
         assertNull(r.brief)
         assertEquals("down", r.error)
     }
+
+    @Test
+    fun theBriefKnowsANamedDateWinsAndThatLateAtNightTomorrowIsToday() = runTest {
+        // 3 Nov 19:44 UTC was 01:14 on 4 Nov in Bengaluru: "tomorrow, the fourth" was read as the fifth.
+        val model = ScriptedModel(asha)
+        Brain(model, "strong").brief("Tomorrow I have a flight on the fourth of November", TaskContext(today = "Wednesday 4 November 2026, 01:14"))
+        assertTrue("A date the user names wins" in model.lastSystemText, model.lastSystemText.take(400))
+        assertTrue("Between midnight and 05:00" in model.lastSystemText)
+        assertTrue("NOW: Wednesday 4 November 2026, 01:14" in model.lastUserText)
+    }
 }

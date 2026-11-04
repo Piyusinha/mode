@@ -108,6 +108,12 @@ class Brain(private val llm: LlmClient, private val model: String) {
             append("TIPS FOR THESE APPS (from earlier tasks):\n").append(c.appNotes.take(ContextBuilder.MAX_APP_NOTES).joinToString("\n") { "- $it" }).append("\n\n")
         }
         if (c.recentTasks.isNotEmpty()) append("RECENT TASKS:\n").append(c.recentTasks.joinToString("\n") { "- $it" }).append("\n\n")
+        c.resumed?.let { r ->
+            append("AN EARLIER ATTEMPT WAS CUT SHORT (Mode was closed at step ${r.step}); this one carries on from it. ")
+            append("Start the app where it is (not fresh) unless its notes say otherwise.\n")
+            if (r.notes.isNotEmpty()) append("It had noted:\n").append(r.notes.joinToString("\n") { "- $it" }).append('\n')
+            append('\n')
+        }
         if (c.earlierTurns.isNotEmpty()) {
             append("EARLIER IN THIS CONVERSATION:\n")
             c.earlierTurns.forEach { append("- They asked: ").append(it.task).append("\n  Result: ").append(it.outcome).append('\n') }
@@ -218,8 +224,11 @@ class Brain(private val llm: LlmClient, private val model: String) {
             Read the request as the user means it:
             - Spoken requests are often misheard or clipped: work out the plain meaning ("Mood shot open the
               Swiggy app" means open Swiggy). Brand and app names may be misspelt; use the right one.
-            - Dates and times mean today unless they say otherwise. Apps reopen where they were left (yesterday's
-              diary, an old search, a restaurant from before), so a new task starts the app fresh.
+            - Dates and times mean today unless they say otherwise. A date the user names wins over "today" or
+              "tomorrow" ("tomorrow, the fourth" means the fourth). Between midnight and 05:00 they are up late:
+              "tomorrow" then usually means the coming day, which is today's date; say in Gather first which date
+              you took and that the screen (a ticket, an itinerary) decides. Apps reopen where they were left
+              (yesterday's diary, an old search, a restaurant from before), so a new task starts the app fresh.
             - "Talk to", "chat with", "reply to" someone means: read the conversation, see what is unanswered
               or where it is going, and continue it in the user's own voice (their language mix, length, tone,
               emoji), not ask the user what to say. Mode shows the user the message before it is sent.
