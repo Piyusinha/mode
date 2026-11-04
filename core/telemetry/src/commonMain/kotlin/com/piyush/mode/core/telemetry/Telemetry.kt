@@ -49,6 +49,8 @@ enum class Event(val wireName: String) {
     ListenStarted("mode.voice.listen_started"), TaskSent("mode.voice.task_sent"),
     /** In a voice session: no microphone or speech access; nothing understood after every try. */
     MicBlocked("mode.voice.mic_blocked"), NothingHeard("mode.voice.nothing_heard"),
+    /** The user talked over Mode and it stopped mid-line; Field.Words: how many of theirs were heard. */
+    BargeIn("mode.voice.barge_in"),
 }
 
 /** Only these fields may cross the telemetry boundary. No arbitrary attribute keys or log bodies. */

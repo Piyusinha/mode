@@ -3,6 +3,8 @@ package com.piyush.mode.feature.settings.voice
 import com.piyush.mode.core.telemetry.Telemetry
 import com.piyush.mode.core.telemetry.Operation
 import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.Event
+import kotlinx.coroutines.async
 import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.feature.settings.data.SettingsRepository
@@ -105,6 +107,8 @@ public class Voices(
     private val http: HttpClient,
     private val device: DeviceVoice = DeviceVoice,
     private val telemetry: Telemetry = Telemetry.None,
+    /** For the moment speech started while Mode speaks (tests pass a virtual one). */
+    private val timeSource: kotlin.time.TimeSource = kotlin.time.TimeSource.Monotonic,
 ) {
     private val troubles = kotlinx.coroutines.flow.MutableStateFlow<VoiceProblem?>(null)
 
@@ -143,6 +147,74 @@ public class Voices(
 
     /** Says [text] with the chosen voice; the span records the provider and whether sound played (Spoke, Blocked, Failed). */
     public suspend fun speak(text: String): Unit = telemetry.trace(Operation.VoiceSpeak) { span -> speakLine(text, span) }
+
+    /**
+     * Says [text] with the microphone open, so the user can talk over Mode: the moment their words are heard
+     * (BargeIn), Mode stops mid-line and keeps listening to the end of their turn. Their words come back; null
+     * when the line was said to its end (or they only nodded). [onPartial] gets the words as they come.
+     */
+    public suspend fun speakOrHear(text: String, onPartial: (String) -> Unit = {}): Heard? {
+        val line = text.trim()
+        if (line.isEmpty()) return null
+        if (!settings.settings.value.bargeIn || block(VoiceKind.Apple, hearing = true) != null || block(chosen(hearing = true), hearing = true) != null) {
+            speak(line); return null
+        }
+        return telemetry.trace(Operation.VoiceSpeak, mapOf(Field.Entry to "interruptible")) { span -> kotlinx.coroutines.coroutineScope {
+            var interrupted = false
+            var speechStartedAt: kotlin.time.TimeMark? = null
+            val language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(settings.settings.value.language)
+            device.listenLanguage = language.takeUnless { it == com.piyush.mode.feature.settings.domain.SpeechLanguage.Auto }?.id
+            val listening = async {
+                device.listenOnce(MAX_RECORD_MS, SILENCE_MS, live = true) { words ->
+                    onPartial(words)
+                    if (words.isNotBlank() && speechStartedAt == null) speechStartedAt = timeSource.markNow()
+                    val speechMs = speechStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0L
+                    if (!interrupted && BargeIn.shouldInterrupt(words, line, speechMs)) {
+                        interrupted = true
+                        device.hush()
+                        telemetry.event(Event.BargeIn, span.context, mapOf(Field.Words to BargeIn.newWords(words, line).size.toString()))
+                    }
+                }
+            }
+            try {
+                speakLine(line, span)
+            } catch (e: CancellationException) {
+                listening.cancel(); throw e
+            }
+            if (!interrupted) {
+                // The line was said to its end: the microphone closes; the caller listens afresh if it wants to.
+                listening.cancel()
+                return@coroutineScope null
+            }
+            span.fields(mapOf(Field.Outcome to "Interrupted"))
+            val got = listening.await()
+            val text = got.text?.trim().orEmpty()
+            when {
+                text.isNotEmpty() -> Heard.Words(text).also { worked(hearing = true) }
+                got.path != null -> hearRecording(got.path, chosen(hearing = true), language)
+                else -> Heard.Silence
+            }
+        } }
+    }
+
+    /** A recording without Apple's words: the chosen cloud hearer transcribes it. */
+    private suspend fun hearRecording(path: String, kind: VoiceKind, language: com.piyush.mode.feature.settings.domain.SpeechLanguage): Heard = try {
+        val result = withTimeoutOrNull(PER_HEAR) {
+            when (kind) {
+                VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path, language.code)
+                VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path, language.code)
+                else -> Transcript.Text(device.transcribeApple(path))
+            }
+        }
+        val text = (result as? Transcript.Text)?.text?.trim().orEmpty()
+        if (text.isEmpty()) Heard.Silence else Heard.Words(text)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Heard.Nothing
+    } finally {
+        device.deleteRecording(path)
+    }
 
     private suspend fun speakLine(text: String, span: com.piyush.mode.core.telemetry.TraceSpan) {
         val line = text.trim()

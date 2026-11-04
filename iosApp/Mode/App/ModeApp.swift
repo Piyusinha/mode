@@ -98,7 +98,8 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
             listen: { maxMs, silenceMs, live, partial, done in
                 LiveListener.shared.start(maxMs: maxMs.int64Value, silenceMs: silenceMs.int64Value, live: live.boolValue,
                                           partial: { _ = partial($0) }, done: { _ = done($0, $1, $2) })
-            }
+            },
+            hush: { [weak self] in self?.hush() }
         )
         // Only reads where things stand: the microphone prompt waits until the user turns Apple hearing on.
         _Concurrency.Task { await prepareHearing(ask: false) }
@@ -141,7 +142,8 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         if let old = speakDone { speakDone = nil; synth.stopSpeaking(at: .immediate); old(started) }
         started = false
         speakDone = done
-        VoiceAudio.shared.forSpeech()
+        // With the microphone open (talking over Mode), the session already records and plays: leave it.
+        if !LiveListener.shared.active { VoiceAudio.shared.forSpeech() }
         synth.usesApplicationAudioSession = true
         let line = AVSpeechUtterance(string: text)
         let chosen = voiceId.flatMap { AVSpeechSynthesisVoice(identifier: $0) }
@@ -213,14 +215,20 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         VoiceLevel.shared.speaking = false
         guard let done = speakDone else { return }
         speakDone = nil
-        VoiceAudio.shared.done()
+        if !LiveListener.shared.active { VoiceAudio.shared.done() }
         done(soundStarted)
+    }
+
+    /// Stops the line being said, at once, and nothing else: the microphone stays as it is (the user talked over Mode).
+    private func hush() {
+        if speakDone != nil { synth.stopSpeaking(at: .immediate) }
+        if playDone != nil { finishPlaying() }
     }
 
     /// Plays a cloud clip to its end; true once sound started.
     private func play(_ bytes: KotlinByteArray, done: @escaping (Bool) -> Void) {
         if let old = playDone { playDone = nil; player?.stop(); player = nil; old(true) }
-        VoiceAudio.shared.forSpeech()
+        if !LiveListener.shared.active { VoiceAudio.shared.forSpeech() }
         player = try? AVAudioPlayer(data: bytes.toData())
         player?.delegate = self
         guard player?.play() == true else { VoiceAudio.shared.done(); done(false); return }
@@ -244,7 +252,7 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
         player = nil
         guard let done = playDone else { return }
         playDone = nil
-        VoiceAudio.shared.done()
+        if !LiveListener.shared.active { VoiceAudio.shared.done() }
         done(true)
     }
 

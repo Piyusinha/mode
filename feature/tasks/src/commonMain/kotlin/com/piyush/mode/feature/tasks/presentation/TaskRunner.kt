@@ -105,6 +105,8 @@ public class TaskRunner(
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
+    /** What to do with words said over Mode's spoken answer: a follow-up task in that chat (set by the graph). */
+    public var onFollowUp: ((text: String, conversationId: String?) -> Unit)? = null
 
     /** The spoken question being asked now (Later cancels it). */
     private var voiceJob: kotlinx.coroutines.Job? = null
@@ -348,7 +350,9 @@ public class TaskRunner(
             if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
                 // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
                 val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
-                runCatching { voices?.speak(said) }
+                // Talking over the answer ("and also tell Rahul"): a follow-up task in the same chat.
+                val over = runCatching { voices?.speakOrHear(said) }.getOrNull()
+                if (over is Heard.Words) onFollowUp?.invoke(over.text, conversation)
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
@@ -600,7 +604,9 @@ public class TaskRunner(
             // A tap on an option, or an answer from the notification, closes the microphone at once.
             val stopListening = pending.answer.invokeOnCompletion { voices?.stop() }
             try {
-                voices?.speak(pending.text)
+                // Talking over the question is the answer.
+                val over = voices?.speakOrHear(pending.text) { words -> turn { it.copy(phase = VoiceTurnPhase.Listening, heard = words) } }
+                if (over is Heard.Words) answer(pending.id, over.text)
                 if (!pending.answer.isCompleted) {
                     turn { it.copy(phase = VoiceTurnPhase.Listening) }
                     val heard = voices?.hear { words -> turn { it.copy(heard = words) } }

@@ -127,6 +127,10 @@ final class LiveListener {
     private func begin(maxMs: Int64, silenceMs: Int64, live: Bool, partial: @escaping (String) -> Void) async {
         VoiceAudio.shared.forRecording()
         let engine = AVAudioEngine()
+        // Echo cancellation: with it the microphone does not hear Mode's own voice, so the user can talk over it.
+        do { try engine.inputNode.setVoiceProcessingEnabled(true) } catch {
+            VoiceAudio.shared.note(message: "voice processing not available: \(error.localizedDescription)")
+        }
         let format = engine.inputNode.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { fail(); return }
 
@@ -166,6 +170,7 @@ final class LiveListener {
         heardSpeech = false
         silenceSince = nil
         let startedAt = Date()
+        var lastSpokeAt = Date.distantPast
         var warned = false
         floor = 0.2
         words = ""
@@ -179,10 +184,14 @@ final class LiveListener {
                 VoiceLevel.shared.level = level
                 // The room's floor: falls at once, rises slowly, so speech never becomes the floor.
                 self.floor = level < self.floor ? level : self.floor * 0.995 + level * 0.005
-                let speaking = level > max(0.25, self.floor + 0.18)
+                // While Mode speaks, loudness is Mode's own voice (what echo cancellation leaves of it): only words count.
+                let modeSpeaking = VoiceLevel.shared.speaking
+                if modeSpeaking { lastSpokeAt = Date() }
+                let speaking = !modeSpeaking && level > max(0.25, self.floor + 0.18)
                 if speaking { self.heardSpeech = true; self.silenceSince = nil }
-                // Nothing heard yet after a moment: say so (the microphone may be off or blocked).
-                let quietTooLong = !self.heardSpeech && self.words.isEmpty && Date().timeIntervalSince(startedAt) >= LiveListener.cantHearAfter
+                // Nothing heard yet after a moment: say so (the microphone may be off or blocked). Not while Mode speaks.
+                let quietSince = max(startedAt, lastSpokeAt)
+                let quietTooLong = !modeSpeaking && !self.heardSpeech && self.words.isEmpty && Date().timeIntervalSince(quietSince) >= LiveListener.cantHearAfter
                 if VoiceLevel.shared.cantHear != quietTooLong { VoiceLevel.shared.cantHear = quietTooLong }
                 if quietTooLong && !warned {
                     warned = true
@@ -229,7 +238,12 @@ final class LiveListener {
                     }
                     let now = [settled, forming].filter { !$0.isEmpty }.joined(separator: " ")
                     await MainActor.run {
-                        if now != self.words { self.words = now; self.wordsChangedAt = Date() }
+                        if now != self.words {
+                            self.words = now
+                            self.wordsChangedAt = Date()
+                            // Words are speech whether or not the level said so (they are what barge-in goes by).
+                            if !now.isEmpty { self.heardSpeech = true; self.silenceSince = nil }
+                        }
                         partial(now)
                     }
                 }

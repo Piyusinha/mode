@@ -123,6 +123,7 @@ public class SettingsRepository(
         prefs.putString(LANGUAGE, next.language)
         prefs.putString(REPLY_IN_SPOKEN, next.replyInSpokenLanguage.toString())
         prefs.putString(SUGGEST_ROUTINES, next.suggestRoutines.toString())
+        prefs.putString(BARGE_IN, next.bargeIn.toString())
         prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
@@ -185,6 +186,7 @@ public class SettingsRepository(
             language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(prefs.getString(LANGUAGE)).id,
             replyInSpokenLanguage = prefs.getString(REPLY_IN_SPOKEN)?.toBooleanStrictOrNull() ?: defaults.replyInSpokenLanguage,
             suggestRoutines = prefs.getString(SUGGEST_ROUTINES)?.toBooleanStrictOrNull() ?: defaults.suggestRoutines,
+            bargeIn = prefs.getString(BARGE_IN)?.toBooleanStrictOrNull() ?: defaults.bargeIn,
             voices = prefs.getString(VOICES)?.let {
                 runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
             } ?: defaults.voices,
@@ -223,6 +225,7 @@ public class SettingsRepository(
         const val LANGUAGE = "voice_language"
         const val REPLY_IN_SPOKEN = "voice_reply_in_spoken"
         const val SUGGEST_ROUTINES = "suggest_routines"
+        const val BARGE_IN = "voice_barge_in"
         const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"

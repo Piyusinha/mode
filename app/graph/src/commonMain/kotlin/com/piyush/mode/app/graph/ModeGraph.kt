@@ -144,7 +144,9 @@ class ModeGraph(platform: PlatformServices) {
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
-    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope)
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope).also { queue ->
+        tasks.onFollowUp = { text, conversation -> queue.submit(text, com.piyush.mode.feature.tasks.domain.TaskSource.Voice, conversation, false) }
+    }
 
     /** Tasks that repeat; due ones go to the inbox, with a notification for when Mode is closed. */
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)

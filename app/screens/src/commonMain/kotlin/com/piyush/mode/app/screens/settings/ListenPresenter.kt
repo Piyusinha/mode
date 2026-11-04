@@ -173,7 +173,9 @@ public class ListenPresenter(
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = greeting)
         job = scope.launch {
             inSession {
-                voices.speak(greeting)
+                // Talking over the greeting: what they say is the task.
+                val overGreeting = voices.speakOrHear(greeting) { words -> own.value = own.value.copy(phase = TalkPhase.Listening, partial = words) }
+                if (overGreeting is Heard.Words) { start(overGreeting.text, TaskSource.Voice); return@inSession }
                 own.value = own.value.copy(phase = TalkPhase.Listening)
                 mark(com.piyush.mode.core.telemetry.Event.ListenStarted)
                 repeat(MAX_SILENT_LISTENS) {
@@ -272,7 +274,12 @@ public class ListenPresenter(
         own.value = own.value.copy(sent = true)
         val reply = written.await() ?: replyLine(task)
         own.value = own.value.copy(reply = reply)
-        voices.speak(reply)
+        // Talking over the acknowledgement ("use Flightradar"): the running task takes it at its next step.
+        val over = voices.speakOrHear(reply) { words -> own.value = own.value.copy(partial = words) }
+        if (over is Heard.Words) {
+            own.value = own.value.copy(partial = "")
+            if (!runner.steer(over.text)) queue.submit(over.text, TaskSource.Voice, conversationId, false)
+        }
     }
 
     @OptIn(ExperimentalTime::class)
