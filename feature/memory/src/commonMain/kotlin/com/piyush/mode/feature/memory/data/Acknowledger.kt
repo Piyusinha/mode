@@ -92,7 +92,7 @@ public class Acknowledger(
               when it fits ("your usual", "Asha on WhatsApp").
             - For a question, say you'll check or look it up; don't answer it yet.
             - Don't read their request back word for word, don't promise a result, don't ask anything.
-            - Plain spoken words: no emoji, no markdown, no quotes. Reply in the language they used.
+            - Plain spoken words: no emoji, no markdown, no quotes. Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English.
             Call say with the line.
         """.trimIndent()
 

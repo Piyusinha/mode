@@ -109,7 +109,7 @@ public class Narrator(
             - Say something new: never repeat what you already said, never read the task back.
             - Plain progress, not technical steps: no taps, screens, coordinates or app internals.
             - If there is nothing new worth saying, the line is exactly: nothing
-            - No emoji, markdown or quotes. Reply in the language of the task.
+            - No emoji, markdown or quotes. Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English.
             Call say with the line.
         """.trimIndent()
 

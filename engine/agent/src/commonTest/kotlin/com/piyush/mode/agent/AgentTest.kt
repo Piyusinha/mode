@@ -206,7 +206,8 @@ class AgentTest {
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         // Two taps change nothing, so the third decision goes to the strong model, then back to cheap.
         // Two taps change nothing: the third decision goes to the strong model; the next stall too.
-        assertEquals(listOf("cheap", "cheap", "strong", "strong"), model.models)
+        // …and the questioned give-up takes one more decision before it is accepted.
+        assertEquals(listOf("cheap", "cheap", "strong", "strong", "cheap"), model.models)
     }
 
     @Test
@@ -318,7 +319,8 @@ class AgentTest {
         }
         val result = Agent(phone, flaky, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         assertIs<AgentOutcome.Done>(result.outcome, "the run survives the strong model's error")
-        assertEquals(listOf("cheap", "cheap", "cheap"), scripted.models)
+        // The give-up is questioned once, so one more decision is made (by the main model) before it is accepted.
+        assertEquals(listOf("cheap", "cheap", "cheap", "cheap"), scripted.models)
     }
 
     @Test
@@ -976,10 +978,15 @@ class AgentTest {
     }
 
     @Test
-    fun aFailedDoneIsNeverSentBack() = runTest {
+    fun aGiveUpIsQuestionedOnceThenAccepted() = runTest {
         val phone = FakePhone(List(5) { listOf("Same" to (1.0 to 1.0)) })
-        val model = ScriptedModel(call("done", "summary" to "no such setting", "success" to false))
-        assertEquals(1, Agent(phone, model, Gate(), noSettle).run("t").steps)
+        val giveUp = call("done", "summary" to "no such setting", "success" to false)
+        val model = ScriptedModel(giveUp, giveUp)
+        val result = Agent(phone, model, Gate(), noSettle).run("t")
+        // The first give-up is sent back to look for another way; the second is accepted.
+        assertEquals(2, result.steps)
+        assertTrue("before giving up" in model.lastUserText, model.lastUserText)
+        assertEquals(false, assertIs<AgentOutcome.Done>(result.outcome).success)
     }
 
     @Test
@@ -1019,7 +1026,8 @@ class AgentTest {
         val model = ScriptedModel(plan, plan, plan, call("done", "evidence" to "x", "summary" to "x", "success" to false))
         Agent(phone, model, Gate(), AgentConfig(model = "cheap", strongModel = "strong", settleMs = 0)).run("t")
         // Plans make no progress: after three, the strong model takes the next decision.
-        assertEquals(listOf("cheap", "cheap", "cheap", "strong"), model.models)
+        // The questioned give-up takes one more decision, still on the strong model (the stall goes on).
+        assertEquals(listOf("cheap", "cheap", "cheap", "strong", "strong"), model.models)
         assertTrue("not saved: you just planned" in model.lastUserText, model.lastUserText)
     }
 
