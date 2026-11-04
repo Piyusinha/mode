@@ -11,6 +11,7 @@ built this way.
 |---|---|
 | [harness.md](harness.md) | How the agent thinks, remembers and stays within budget |
 | [status.md](status.md) | What is done, what is pending, and the commit history |
+| [agent-resilience-and-barge-in-plan.md](agent-resilience-and-barge-in-plan.md) | Plan: an agent that fights to finish (budget, recovery ladder, give-up gate, verified commits, app playbooks) and voice barge-in |
 | [telemetry-diagnostics-backup-plan.md](telemetry-diagnostics-backup-plan.md) | Planned cross-platform OpenTelemetry, local diagnostics, and encrypted settings backup |
 | [observability.md](observability.md) | Implemented local OpenTelemetry pipeline, coverage, tests, and remaining diagnostics work |
 | [architecture.md](architecture.md) | Layers, modules, data shapes, threading, build |
