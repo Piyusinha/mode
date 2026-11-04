@@ -14,11 +14,11 @@ public struct ModeStepDots: View {
     }
 
     public var body: some View {
-        HStack(spacing: ModeSpacing.xs) {
+        HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
             ForEach(1...max(total, 1), id: \.self) { step in
                 Capsule()
-                    .fill(step <= current ? ModeColor.accent : ModeColor.separator)
-                    .frame(width: step == current ? ModeSize.stepDotCurrent : ModeSize.stepDot, height: ModeSize.stepDot)
+                    .fill(step <= current ? ModeColor.brand : ModeColor.track)
+                    .frame(width: step == current ? ModeSize.stepDotCurrent : ModeSize.stepDot, height: ModeSize.stepDotHeight)
             }
         }
         .animation(ModeMotion.standard, value: current)
@@ -57,7 +57,7 @@ public struct ModeMark: View {
     }
 }
 
-/// A small glass label ("Open source").
+/// A small label ("Open source"): a white pill with a soft lift.
 public struct ModePill: View {
     private let text: LocalizedStringResource
 
@@ -71,7 +71,8 @@ public struct ModePill: View {
             .fontWeight(.semibold)
             .padding(.horizontal, ModeSpacing.m)
             .padding(.vertical, ModeSpacing.s)
-            .glassEffect(.regular, in: .capsule)
+            .background(ModeColor.card, in: .capsule)
+            .modeShadow(in: Capsule())
     }
 }
 
@@ -108,12 +109,12 @@ public struct ModeRadio: View {
         Group {
             if selected {
                 ModeIcon.checkmark.image
-                    .font(ModeTextStyle.footnote.font.weight(.bold))
+                    .font(ModeIconFont.chevron.weight(.heavy))
                     .foregroundStyle(ModeColor.onAccent)
                     .frame(width: ModeSize.radio, height: ModeSize.radio)
                     .background(ModeColor.accent, in: .circle)
             } else {
-                Circle().strokeBorder(ModeColor.separator, lineWidth: ModeSize.separator * 2)
+                Circle().strokeBorder(ModeColor.ring, lineWidth: ModeSize.separator * 2)
                     .frame(width: ModeSize.radio, height: ModeSize.radio)
             }
         }
@@ -208,8 +209,8 @@ public struct ModeNote: View {
 
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.m) {
-            icon.image.foregroundStyle(ModeColor.textSecondary).accessibilityHidden(true)
-            Text(text).modeText(.subheadline, color: ModeColor.textSecondary)
+            icon.image.font(ModeIconFont.small).foregroundStyle(ModeColor.textSecondary).accessibilityHidden(true)
+            Text(text).modeText(.footnote, color: ModeColor.textSecondary)
         }
         .padding(.horizontal, ModeSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,6 +235,7 @@ public struct ModeInfoCard: View {
         .padding(ModeSpacing.l)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.card))
     }
 }
 
@@ -338,8 +340,8 @@ public struct ModeTestStrip: View {
             .frame(width: ModeSize.testPhoneWidth, height: ModeSize.testPhoneHeight)
             .overlay {
                 switch phase {
-                case .done: ModeIcon.checkmark.image.font(ModeTextStyle.title.font.weight(.bold)).foregroundStyle(ModeColor.success)
-                case .failed: ModeIcon.close.image.font(ModeTextStyle.title.font.weight(.bold)).foregroundStyle(ModeColor.danger)
+                case .done: ModeIcon.checkmark.image.font(ModeIconFont.status).foregroundStyle(ModeColor.success)
+                case .failed: ModeIcon.close.image.font(ModeIconFont.status).foregroundStyle(ModeColor.danger)
                 case .running: ProgressView().tint(ModeColor.tint)
                 case .pending: content(index)
                 }
@@ -364,7 +366,7 @@ public struct ModeTestStrip: View {
                     .offset(y: -ModeSpacing.s)
             }
         default:
-            ModeIcon.checkmark.image.font(ModeTextStyle.title.font.weight(.bold)).foregroundStyle(ModeColor.success.opacity(0.5))
+            ModeIcon.checkmark.image.font(ModeIconFont.status).foregroundStyle(ModeColor.success.opacity(0.5))
         }
     }
 }
@@ -379,7 +381,7 @@ public struct ModeResultBadge: View {
 
     public var body: some View {
         (success ? ModeIcon.checkmark : ModeIcon.warning).image
-            .font(ModeTextStyle.title.font.weight(.bold))
+            .font(ModeIconFont.status)
             .foregroundStyle(ModeColor.onAccent)
             .frame(width: ModeSize.successBadge, height: ModeSize.successBadge)
             .background(success ? ModeColor.success : ModeColor.warning, in: .circle)

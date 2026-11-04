@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A floating glass choice of two or three views (Grid / Play): the chosen one sits in a lens.
+/// A floating choice of two or three views (Grid / Play): a white capsule, the chosen one in a raised pill.
 public struct ModeGlassSwitch<ID: Hashable>: View {
     private let options: [ModeTabItem<ID>]
     @Binding private var selection: ID
@@ -19,11 +19,11 @@ public struct ModeGlassSwitch<ID: Hashable>: View {
                     withAnimation(ModeMotion.standard) { selection = option.id }
                 } label: {
                     Label { Text(option.title) } icon: { option.icon.image }
-                        .modeText(.bodyEmphasis, color: selected ? ModeColor.tint : ModeColor.textPrimary)
+                        .modeText(.subheadlineEmphasis, color: selected ? ModeColor.textPrimary : ModeColor.textSecondary)
                         .padding(.horizontal, ModeSpacing.l)
                         .frame(minHeight: ModeSize.touch)
                         .background {
-                            if selected { Capsule().fill(ModeColor.tintSoft).matchedGeometryEffect(id: "lens", in: glass) }
+                            if selected { Capsule().fill(ModeColor.cardRaised).matchedGeometryEffect(id: "lens", in: glass) }
                         }
                 }
                 .buttonStyle(.plain)
@@ -31,6 +31,7 @@ public struct ModeGlassSwitch<ID: Hashable>: View {
             }
         }
         .padding(ModeSpacing.xs)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .background(ModeColor.card, in: .capsule)
+        .modeShadow(in: Capsule())
     }
 }

@@ -10,7 +10,7 @@ struct ModeApp: App {
     @State private var app = AppModel()
 
     init() {
-        if !ModeTypography.registerFonts() { NSLog("Mode: Instrument Sans did not load; headings use SF Pro") }
+        if !ModeTypography.registerFonts() { NSLog("Mode: Bricolage Grotesque did not load; headings use SF Pro") }
         ModeAppearance.apply()
     }
 

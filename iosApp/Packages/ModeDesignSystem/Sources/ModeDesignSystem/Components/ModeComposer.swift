@@ -33,8 +33,8 @@ public struct ModeComposer: View {
 
     public var body: some View {
         HStack(spacing: ModeSpacing.xs) {
-            TextField(text: $text, axis: .vertical) { Text(labels.prompt) }
-                .modeText(.body)
+            TextField(text: $text, axis: .vertical) { Text(labels.prompt).foregroundStyle(ModeColor.textSecondary) }
+                .modeText(.callout)
                 .lineLimit(1...5)
                 .focused($focused)
                 .submitLabel(.send)
@@ -42,16 +42,19 @@ public struct ModeComposer: View {
                 .padding(.leading, ModeSpacing.l)
             Button(action: onTogglePrivate) {
                 (isPrivate ? ModeIcon.privateOn : ModeIcon.privateOff).image
+                    .font(ModeIconFont.regular)
                     .foregroundStyle(isPrivate ? ModeColor.tint : ModeColor.textSecondary)
-                    .frame(width: ModeSize.touch, height: ModeSize.touch)
+                    .frame(width: ModeSize.sendButton, height: ModeSize.sendButton)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(isPrivate ? labels.privateOn : labels.privateOff))
-            ModeIconButton(.send, label: labels.send, prominent: true, action: onSend)
+            ModeIconButton(.send, label: labels.send, prominent: true, size: ModeSize.sendButton, action: onSend)
         }
-        .padding(ModeSpacing.xs)
+        .padding(.vertical, ModeSpacing.xs + 1)
+        .padding(.trailing, ModeSpacing.xs + 1)
         .frame(minHeight: ModeSize.composerHeight)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeSize.composerHeight / 2))
+        .modeShadow(in: RoundedRectangle(cornerRadius: ModeSize.composerHeight / 2))
     }
 }
 
@@ -73,19 +76,21 @@ public struct ModeAskBar: View {
 
     public var body: some View {
         HStack(spacing: ModeSpacing.xs) {
-            TextField(text: $text, axis: .vertical) { Text(prompt) }
-                .modeText(.body)
+            TextField(text: $text, axis: .vertical) { Text(prompt).foregroundStyle(ModeColor.textSecondary) }
+                .modeText(.callout)
                 .lineLimit(1...5)
                 .submitLabel(.send)
                 .onSubmit { if canSend { onSend() } }
                 .padding(.leading, ModeSpacing.l)
-            ModeIconButton(.send, label: send, prominent: true, action: onSend)
+            ModeIconButton(.send, label: send, prominent: true, size: ModeSize.sendButton, action: onSend)
                 .disabled(!canSend)
                 .opacity(canSend ? 1 : 0.5)
         }
-        .padding(ModeSpacing.xs)
+        .padding(.vertical, ModeSpacing.xs + 1)
+        .padding(.trailing, ModeSpacing.xs + 1)
         .frame(minHeight: ModeSize.composerHeight)
-        .glassEffect(.regular.interactive(), in: .capsule)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeSize.composerHeight / 2))
+        .modeShadow(in: RoundedRectangle(cornerRadius: ModeSize.composerHeight / 2))
     }
 }
 
@@ -101,10 +106,12 @@ public struct ModeSuggestionChip: View {
 
     public var body: some View {
         Button(action: action) {
-            Text(text).modeText(.footnote, color: ModeColor.tint)
-                .padding(.horizontal, ModeSpacing.m)
+            Text(text).modeText(.footnoteEmphasis)
+                .padding(.horizontal, ModeSpacing.m + ModeSpacing.xxs)
+                .frame(minHeight: ModeSize.pillButton)
+                .background(ModeColor.card, in: .capsule)
+                .modeShadow(in: Capsule())
                 .frame(minHeight: ModeSize.touch)
-                .glassEffect(.regular.interactive(), in: .capsule)
         }
         .buttonStyle(.plain)
     }

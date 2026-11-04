@@ -1,16 +1,20 @@
 import SwiftUI
 
-/// Mode's buttons, in Liquid Glass.
+/// Mode's buttons, as on the Mo theme canvas: solid capsules, ink for the one main action.
 public struct ModeButton: View {
     public enum Role: Sendable {
-        /// The one main action on a screen: tinted glass.
+        /// The one main action on a screen: an ink capsule, 56 tall when full width.
         case primary
-        /// Other actions: clear glass.
+        /// Other actions: a raised-grey capsule.
         case secondary
         /// A text-only action.
         case plain
         /// Deleting or forgetting.
         case destructive
+        /// A small pill inside a row or a card (Connect, Change, Undo): raised grey.
+        case pill
+        /// A small ink pill (the chosen provider's Connect).
+        case pillProminent
     }
 
     private let title: LocalizedStringResource
@@ -18,6 +22,7 @@ public struct ModeButton: View {
     private let role: Role
     private let fullWidth: Bool
     private let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
 
     public init(_ title: LocalizedStringResource, icon: ModeIcon? = nil, role: Role = .primary, fullWidth: Bool = false, action: @escaping () -> Void) {
         self.title = title
@@ -28,27 +33,62 @@ public struct ModeButton: View {
     }
 
     public var body: some View {
-        styled(Button(action: action) { label })
+        Button(action: action) { label }
+            .buttonStyle(ModePressStyle())
+            .opacity(isEnabled ? 1 : 0.45)
+    }
+
+    private var isPill: Bool { role == .pill || role == .pillProminent }
+
+    private var height: CGFloat {
+        switch role {
+        case .primary: fullWidth ? ModeSize.primaryButton : ModeSize.secondaryButton
+        case .secondary: ModeSize.secondaryButton
+        case .pill, .pillProminent: ModeSize.pillButton
+        case .plain, .destructive: ModeSize.touch
+        }
+    }
+
+    private var foreground: Color {
+        switch role {
+        case .primary, .pillProminent: ModeColor.onAccent
+        case .secondary, .pill: ModeColor.textPrimary
+        case .plain: ModeColor.textPrimary
+        case .destructive: ModeColor.danger
+        }
+    }
+
+    private var background: Color {
+        switch role {
+        case .primary, .pillProminent: ModeColor.accent
+        case .secondary, .pill: ModeColor.cardRaised
+        case .plain, .destructive: .clear
+        }
     }
 
     private var label: some View {
         HStack(spacing: ModeSpacing.s) {
-            if let icon { icon.image }
+            if let icon { icon.image.font(isPill ? ModeIconFont.small : ModeIconFont.regular) }
             Text(title)
         }
-        .font(ModeTextStyle.bodyEmphasis.font)
-        .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: ModeSize.touch)
-        .padding(.horizontal, ModeSpacing.s)
+        .modeText(isPill ? .subheadlineEmphasis : (role == .primary && fullWidth ? .headline : .calloutEmphasis), color: foreground)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+        .padding(.horizontal, isPill ? ModeSpacing.m + ModeSpacing.xxs : ModeSpacing.xl)
+        .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
+        .background(background, in: .capsule)
+        .contentShape(.capsule)
     }
+}
 
-    @ViewBuilder
-    private func styled(_ button: Button<some View>) -> some View {
-        switch role {
-        case .primary: button.buttonStyle(.glassProminent).tint(ModeColor.accent)
-        case .secondary: button.buttonStyle(.glass).foregroundStyle(ModeColor.textPrimary)
-        case .plain: button.buttonStyle(.plain).foregroundStyle(ModeColor.tint)
-        case .destructive: button.buttonStyle(.plain).foregroundStyle(ModeColor.danger)
-        }
+/// Dims a button a little while it is held.
+public struct ModePressStyle: ButtonStyle {
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .animation(ModeMotion.quick, value: configuration.isPressed)
     }
 }
 
@@ -65,12 +105,13 @@ public struct ModeToolbarButton: View {
     }
 
     public var body: some View {
-        Button(action: action) { icon.image }
+        Button(action: action) { icon.image.foregroundStyle(ModeColor.textPrimary) }
             .accessibilityLabel(Text(label))
     }
 }
 
-/// A round glass button with only an icon; [label] is read by VoiceOver.
+/// A round button with only an icon; [label] is read by VoiceOver. A white card with a soft
+/// lift, or ink when prominent (Speak, Send).
 public struct ModeIconButton: View {
     private let icon: ModeIcon
     private let label: LocalizedStringResource
@@ -87,17 +128,16 @@ public struct ModeIconButton: View {
     }
 
     public var body: some View {
-        let button = Button(action: action) {
+        Button(action: action) {
             icon.image
-                .font(ModeTextStyle.bodyEmphasis.font)
+                .font(size >= ModeSize.speakButton ? ModeIconFont.hero : ModeIconFont.regular)
+                .foregroundStyle(prominent ? ModeColor.onAccent : ModeColor.textPrimary)
                 .frame(width: size, height: size)
+                .background(prominent ? ModeColor.accent : ModeColor.card, in: .circle)
+                .modeShadow(in: Circle())
+                .contentShape(.circle)
         }
-        .buttonBorderShape(.circle)
+        .buttonStyle(ModePressStyle())
         .accessibilityLabel(Text(label))
-        if prominent {
-            button.buttonStyle(.glassProminent).tint(ModeColor.accent)
-        } else {
-            button.buttonStyle(.glass).foregroundStyle(ModeColor.textPrimary)
-        }
     }
 }

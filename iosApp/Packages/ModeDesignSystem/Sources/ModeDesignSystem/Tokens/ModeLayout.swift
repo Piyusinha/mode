@@ -18,9 +18,31 @@ public enum ModeSpacing {
 /// Corner radii, concentric with the iPhone's screen corners.
 public enum ModeRadius {
     public static let chip: CGFloat = 14
-    public static let field: CGFloat = 22
+    /// A small rounded square (a screenshot thumbnail).
+    public static let thumb: CGFloat = 6
+    public static let field: CGFloat = 26
     public static let card: CGFloat = 26
+    /// The running task's card on Home.
+    public static let hero: CGFloat = 30
     public static let sheet: CGFloat = 34
+    /// A chat bubble's corners, and the small one by its tail.
+    public static let bubble: CGFloat = 22
+    public static let bubbleTail: CGFloat = 6
+}
+
+/// Icon sizes for SF Symbols, so an icon never borrows a text style's size.
+public enum ModeIconFont {
+    /// A chevron at the end of a row.
+    public static let chevron = Font.system(size: 14, weight: .semibold)
+    public static let small = Font.system(size: 16, weight: .medium)
+    /// Most icons: in a circle, in a button, at the start of a row.
+    public static let regular = Font.system(size: 19, weight: .medium)
+    /// Tab bar icons, a row's status mark.
+    public static let large = Font.system(size: 22, weight: .medium)
+    /// The Speak button's microphone.
+    public static let hero = Font.system(size: 24, weight: .semibold)
+    /// A big status mark (a test passed or failed).
+    public static let status = Font.system(size: 28, weight: .bold)
 }
 
 /// Fixed sizes: touch targets, icons, avatars, rows.
@@ -50,15 +72,32 @@ public enum ModeSize {
     /// The selection circle on a choice row.
     public static let radio: CGFloat = 24
     /// The step dots in setup: a dot, and the current step's longer bar.
-    public static let stepDot: CGFloat = 8
+    public static let stepDot: CGFloat = 10
     public static let stepDotCurrent: CGFloat = 24
     /// The tab bar, the Speak button and the mini player above them.
     public static let tabBarHeight: CGFloat = 64
     public static let speakButton: CGFloat = 64
     public static let miniPlayerHeight: CGFloat = 56
     /// A suggestion card on Home.
-    public static let suggestionWidth: CGFloat = 176
-    public static let suggestionHeight: CGFloat = 168
+    public static let suggestionWidth: CGFloat = 168
+    public static let suggestionHeight: CGFloat = 124
+    /// The round icon on a suggestion card, an avatar of initials in a row.
+    public static let iconCircle: CGFloat = 40
+    /// The main button at the bottom of a screen, and the secondary one.
+    public static let primaryButton: CGFloat = 56
+    public static let secondaryButton: CGFloat = 50
+    /// A small pill button inside a row (Connect, Change, Undo).
+    public static let pillButton: CGFloat = 36
+    /// The round Send button inside the message bar.
+    public static let sendButton: CGFloat = 40
+    /// Mo: on a page's header, on the running card, on a row.
+    public static let moLarge: CGFloat = 80
+    public static let moHero: CGFloat = 56
+    public static let moRow: CGFloat = 32
+    /// A progress bar's thickness on the running card.
+    public static let progressBar: CGFloat = 6
+    /// The step dots' height in setup.
+    public static let stepDotHeight: CGFloat = 6
     /// The little phones in the setup test illustration.
     public static let testPhoneWidth: CGFloat = 74
     public static let testPhoneHeight: CGFloat = 140
@@ -125,9 +164,9 @@ public enum ModeSize {
 
     /// Readable line length for blocks of text.
     public static let readableWidth: CGFloat = 520
-    /// The glows behind the page's top edge, as a share of its width and height.
-    public static let glowWidth: CGFloat = 0.9
-    public static let glowHeight: CGFloat = 0.42
+    /// How tall the fade is where content scrolls under the top bar and under the tab bar.
+    public static let edgeFadeTop: CGFloat = 120
+    public static let edgeFadeBottom: CGFloat = 150
 }
 
 /// How things move.
@@ -136,6 +175,13 @@ public enum ModeMotion {
     public static let standard = Animation.smooth(duration: 0.35)
     /// One sweep of the working shimmer.
     public static let shimmerSeconds: Double = 1.4
+}
+
+/// The soft lift under floating things (cards in setup, the tab bar, round buttons).
+public enum ModeShadow {
+    public static let radius: CGFloat = 12
+    public static let y: CGFloat = 8
+    public static let opacity: Double = 0.10
 }
 
 /// Opacities for effects.

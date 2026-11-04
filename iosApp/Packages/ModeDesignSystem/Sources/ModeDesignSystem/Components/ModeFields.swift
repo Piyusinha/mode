@@ -24,12 +24,13 @@ public struct ModeTextField: View {
                     TextField(text: $text) { Text(prompt) }
                 }
             }
-            .modeText(.body)
+            .modeText(.callout)
             .textInputAutocapitalization(secure ? .never : .sentences)
             .autocorrectionDisabled(secure)
             .padding(.horizontal, ModeSpacing.l)
             .frame(minHeight: ModeSize.fieldHeight)
             .background(ModeColor.field, in: .rect(cornerRadius: ModeRadius.field))
+            .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.field))
         }
     }
 }
@@ -49,7 +50,7 @@ public struct ModeToggleRow: View {
     public var body: some View {
         Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(title).modeText(.body)
+                Text(title).modeText(.callout)
                 if let subtitle { Text(subtitle).modeText(.footnote, color: ModeColor.textSecondary) }
             }
         }
@@ -96,9 +97,9 @@ public struct ModeDayPicker: View {
                 let on = selected.contains(day)
                 Button { toggle(day) } label: {
                     Text(label)
-                        .modeText(.bodyEmphasis, color: on ? ModeColor.onAccent : ModeColor.textPrimary)
+                        .modeText(.calloutEmphasis, color: on ? ModeColor.onAccent : ModeColor.textPrimary)
                         .frame(width: ModeSize.dayButton, height: ModeSize.dayButton)
-                        .background(on ? ModeColor.accent : ModeColor.field, in: .circle)
+                        .background(on ? ModeColor.accent : ModeColor.cardRaised, in: .circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])

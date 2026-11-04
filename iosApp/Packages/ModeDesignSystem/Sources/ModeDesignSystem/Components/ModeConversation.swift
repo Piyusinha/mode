@@ -173,7 +173,7 @@ public struct ModeMessageBar: View {
         GlassEffectContainer(spacing: ModeSpacing.s) {
             HStack(alignment: .bottom, spacing: ModeSpacing.s) {
                 Menu { addMenu } label: {
-                    ModeIcon.add.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.textPrimary)
+                    ModeIcon.add.image.font(ModeIconFont.regular).foregroundStyle(ModeColor.textPrimary)
                         .frame(width: ModeSize.composerHeight, height: ModeSize.composerHeight)
                 }
                 .glassEffect(.regular.interactive(), in: .circle)

@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Grouped content on the page: rows separated by hairlines, in a rounded card.
+/// Grouped content on the page: rows separated by hairlines, in a white card with 26-point corners.
+/// [lifted] adds the soft shadow the setup screens use; lists in Settings sit flat.
 public struct ModeCard<Content: View>: View {
     private let content: Content
+    private let lifted: Bool
 
-    public init(@ViewBuilder content: () -> Content) {
+    public init(lifted: Bool = false, @ViewBuilder content: () -> Content) {
         self.content = content()
+        self.lifted = lifted
     }
 
     public var body: some View {
@@ -21,10 +24,11 @@ public struct ModeCard<Content: View>: View {
         }
         .padding(.horizontal, ModeSpacing.l)
         .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.card), lifted: lifted)
     }
 }
 
-/// A heading above a group of rows.
+/// A heading above a group of rows: Bricolage, 18 bold.
 public struct ModeSectionHeader: View {
     private let title: LocalizedStringResource
 
@@ -34,7 +38,7 @@ public struct ModeSectionHeader: View {
 
     public var body: some View {
         Text(title)
-            .modeText(.headline)
+            .modeText(.section)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, ModeSpacing.xs)
             .padding(.top, ModeSpacing.m)

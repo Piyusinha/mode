@@ -38,7 +38,7 @@ public struct ModeHero: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.m) {
             icon.image
-                .font(ModeTextStyle.title.font)
+                .font(ModeIconFont.status)
                 .foregroundStyle(ModeColor.tint)
                 .frame(width: ModeSize.iconHero, height: ModeSize.iconHero)
                 .glassEffect(.regular, in: .circle)

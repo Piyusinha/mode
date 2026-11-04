@@ -4,7 +4,9 @@ import SwiftUI
 /// What sits at the start of a row.
 public enum ModeRowLeading: Equatable, Sendable {
     case none
-    case icon(ModeIcon, Color = ModeColor.tint)
+    case icon(ModeIcon, Color = ModeColor.textPrimary)
+    /// Mo, in a mood (a recent task, How Mode acts).
+    case mo(ModeMo.Mood)
     /// A round badge with a letter, for people.
     case initial(String)
     /// A numbered step (Welcome).
@@ -65,8 +67,8 @@ public struct ModeRow<Trailing: View>: View {
         HStack(spacing: ModeSpacing.m) {
             leadingView
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(title).modeText(emphasis == .prominent ? .headline : .body)
-                if let subtitle { Text(subtitle).modeText(emphasis == .prominent ? .subheadline : .footnote, color: ModeColor.textSecondary) }
+                Text(title).modeText(emphasis == .prominent ? .headline : .callout)
+                if let subtitle { Text(subtitle).modeText(.footnote, color: ModeColor.textSecondary) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             trailing
@@ -94,44 +96,46 @@ public struct ModeLeadingView: View {
         case .none: EmptyView()
         case let .icon(icon, color):
             icon.image
-                .font(ModeTextStyle.callout.font)
+                .font(ModeIconFont.small)
                 .foregroundStyle(color)
                 .frame(width: ModeSize.badge, height: ModeSize.badge)
-                .background(ModeColor.tintSoft, in: .circle)
+                .background(ModeColor.cardRaised, in: .circle)
                 .accessibilityHidden(true)
+        case let .mo(mood):
+            ModeMo(mood, size: ModeSize.moRow)
         case let .initial(letter):
             Text(letter)
-                .modeText(.bodyEmphasis, color: ModeColor.tint)
+                .modeText(.title3)
                 .frame(width: ModeSize.avatar, height: ModeSize.avatar)
-                .background(ModeColor.tintSoft, in: .circle)
+                .background(ModeColor.cardRaised, in: .circle)
                 .accessibilityHidden(true)
         case let .number(n):
             Text(n, format: .number)
-                .modeText(.bodyEmphasis, color: ModeColor.tint)
+                .modeText(.calloutEmphasis)
                 .frame(width: ModeSize.badge, height: ModeSize.badge)
-                .background(ModeColor.tintSoft, in: .circle)
+                .background(ModeColor.cardRaised, in: .circle)
                 .accessibilityHidden(true)
         case .success:
-            ModeIcon.done.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.success).accessibilityHidden(true)
+            ModeIcon.done.image.font(ModeIconFont.large).foregroundStyle(ModeColor.success).accessibilityHidden(true)
         case let .symbol(icon, color):
-            icon.image.font(ModeTextStyle.title2.font).foregroundStyle(color).frame(width: ModeSize.badge).accessibilityHidden(true)
+            icon.image.font(ModeIconFont.large).foregroundStyle(color).frame(width: ModeSize.badge).accessibilityHidden(true)
         case .check:
-            ModeIcon.checkmark.image.font(ModeTextStyle.headline.font).foregroundStyle(ModeColor.success).frame(width: ModeSize.badge).accessibilityHidden(true)
+            ModeIcon.checkmark.image.font(ModeIconFont.small.weight(.bold)).foregroundStyle(ModeColor.success).frame(width: ModeSize.badge).accessibilityHidden(true)
         case .failure:
-            ModeIcon.failed.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.danger).accessibilityHidden(true)
+            ModeIcon.failed.image.font(ModeIconFont.large).foregroundStyle(ModeColor.danger).accessibilityHidden(true)
         case .pending:
-            ModeIcon.emptyCircle.image.font(ModeTextStyle.title2.font).foregroundStyle(ModeColor.separator).accessibilityHidden(true)
+            ModeIcon.emptyCircle.image.font(ModeIconFont.large).foregroundStyle(ModeColor.ring).accessibilityHidden(true)
         case .progress:
-            ProgressView().tint(ModeColor.tint).frame(width: ModeSize.badge, height: ModeSize.badge)
+            ProgressView().tint(ModeColor.brand).frame(width: ModeSize.badge, height: ModeSize.badge)
         case let .letterTile(letter, background, foreground):
             Text(letter)
-                .modeText(.bodyEmphasis, color: foreground)
+                .modeText(.calloutEmphasis, color: foreground)
                 .frame(width: ModeSize.tile, height: ModeSize.tile)
                 .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))
                 .accessibilityHidden(true)
         case let .iconTile(icon, background, foreground):
             icon.image
-                .font(ModeTextStyle.callout.font)
+                .font(ModeIconFont.regular)
                 .foregroundStyle(foreground)
                 .frame(width: ModeSize.tile, height: ModeSize.tile)
                 .background(background, in: .rect(cornerRadius: ModeSize.tileRadius))
@@ -169,7 +173,7 @@ public struct ModeChevron: View {
 
     public var body: some View {
         ModeIcon.chevron.image
-            .font(ModeTextStyle.footnote.font.weight(.semibold))
+            .font(ModeIconFont.chevron)
             .foregroundStyle(ModeColor.textSecondary)
             .accessibilityHidden(true)
     }
