@@ -207,4 +207,21 @@ class LocalTelemetryTest {
         fun traces() = values.filterKeys { it.endsWith(".traces.pb") }.values.flatMap { it.toSpanDataList() }
         fun logs() = values.filterKeys { it.endsWith(".logs.pb") }.values.flatMap { it.toLogRecordDataList() }
     }
+
+    @Test
+    fun theNewestSpansStayInMemorySoATaskCanBeDebuggedFromItsTrace() = runTest {
+        val telemetry = LocalTelemetry(MemoryFiles(), resource, StandardTestDispatcher(testScheduler))
+        telemetry.trace(Operation.Task, mapOf(Field.TaskId to "task-7", Field.Source to "Voice")) {
+            telemetry.trace(Operation.ModelRequest, mapOf(Field.Model to "gpt-test")) { span -> span.failed("LlmFailed") }
+            telemetry.event(Event.FirstAction, telemetry.currentContext(), mapOf(Field.DurationMs to "1200"))
+        }
+        val recent = telemetry.recent
+        val trace = assertNotNull(recent.traceOfTask("task-7"))
+        val (spans, events) = recent.trace(trace)
+        assertEquals(listOf(Operation.ModelRequest.wireName, Operation.Task.wireName), spans.map { it.name })
+        assertEquals("LlmFailed", spans.first().error)
+        assertEquals("gpt-test", spans.first().fields[Field.Model.wireName])
+        assertEquals(spans.last().spanId, spans.first().parentId)
+        assertEquals(listOf(Event.FirstAction.wireName), events.map { it.name })
+    }
 }

@@ -81,6 +81,9 @@ interface Telemetry {
     fun start(operation: Operation, parent: TraceContext? = null, fields: Fields = emptyMap()): TraceSpan
     fun event(event: Event, parent: TraceContext? = null, fields: Fields = emptyMap()) {}
 
+    /** The newest spans and events in memory (null: this telemetry keeps none). */
+    val recent: RecentTelemetry? get() = null
+
     object None : Telemetry {
         override fun start(operation: Operation, parent: TraceContext?, fields: Fields): TraceSpan = TraceSpan.None
     }

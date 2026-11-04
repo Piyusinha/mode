@@ -169,6 +169,7 @@ class ModeGraph(platform: PlatformServices) {
         claudeModels = claudeModels,
         voices = voices,
         telemetry = telemetry,
+        logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
     )
 
     /**
@@ -219,5 +220,7 @@ class ModeGraph(platform: PlatformServices) {
     private companion object {
         /** How long Reset waits for a stopped task to finish writing its last step. */
         const val RESET_WAIT_MS = 5_000L
+        /** Lines of Mode's log a health report or a task's debug includes. */
+        const val LOG_TAIL_LINES = 80
     }
 }

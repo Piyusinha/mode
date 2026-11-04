@@ -62,6 +62,7 @@ final class SettingsViewModel {
         case dailyCap(Double)
         case learn(Bool)
         case openDeveloper
+        case openHealth
         case openMemory
         case openPicker(stuck: Bool)
         case showProviders
@@ -137,6 +138,7 @@ final class SettingsViewModel {
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
+        case .openHealth: navigate(.health)
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(state.showsCost ? .modelPicker(stuck: stuck) : .planModels(brain: stuck))
         case .openProvider: navigate(.providerDetail(id: activeProvider))

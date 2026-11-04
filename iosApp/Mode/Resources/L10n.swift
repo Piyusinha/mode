@@ -565,6 +565,41 @@ enum L10n {
         static let modelDetail = LocalizedStringResource("claude.modelDetail", defaultValue: "Claude account · availability depends on your plan")
     }
 
+    enum Health {
+        static let title = LocalizedStringResource("health.title", defaultValue: "Health & repair")
+        static let row = LocalizedStringResource("health.row", defaultValue: "Health & repair")
+        static let phoneControl = LocalizedStringResource("health.phoneControl", defaultValue: "Phone control")
+        static let thisIphone = LocalizedStringResource("health.thisIphone", defaultValue: "This iPhone")
+        static let paired = LocalizedStringResource("health.paired", defaultValue: "Paired with this iPhone")
+        static let vpn = LocalizedStringResource("health.vpn", defaultValue: "Mode’s VPN")
+        static let reach = LocalizedStringResource("health.reach", defaultValue: "Reaches this iPhone")
+        static let screen = LocalizedStringResource("health.screen", defaultValue: "Sees and taps the screen")
+        static let ai = LocalizedStringResource("health.ai", defaultValue: "Your AI")
+        static let actions = LocalizedStringResource("health.actions", defaultValue: "Chooses actions")
+        static let microphone = LocalizedStringResource("health.microphone", defaultValue: "Microphone")
+        static let listening = LocalizedStringResource("health.listening", defaultValue: "Listening")
+        static let speaking = LocalizedStringResource("health.speaking", defaultValue: "Mode’s voice")
+        static let notifications = LocalizedStringResource("health.notifications", defaultValue: "Notifications")
+        static let repaired = LocalizedStringResource("health.repaired", defaultValue: "Repaired on this iPhone")
+        static let allGood = LocalizedStringResource("health.allGood", defaultValue: "Everything works")
+        static let checkedNow = LocalizedStringResource("health.checkedNow", defaultValue: "Checked just now")
+        static let checking = LocalizedStringResource("health.checking", defaultValue: "Checking…")
+        static let repairing = LocalizedStringResource("health.repairing", defaultValue: "Repairing…")
+        static let checkingDetail = LocalizedStringResource("health.checkingDetail", defaultValue: "Mode checks each part on this iPhone.")
+        static func needAttention(_ n: Int) -> LocalizedStringResource {
+            LocalizedStringResource("health.needAttention", defaultValue: "\(n) need attention")
+        }
+        static func canRepair(_ n: Int) -> LocalizedStringResource {
+            LocalizedStringResource("health.canRepair", defaultValue: "Mode can repair \(n) itself.")
+        }
+        static let needsYou = LocalizedStringResource("health.needsYou", defaultValue: "Each one shows where to fix it.")
+        static let repair = LocalizedStringResource("health.repair", defaultValue: "Repair")
+        static let fix = LocalizedStringResource("health.fix", defaultValue: "Fix")
+        static let open = LocalizedStringResource("health.open", defaultValue: "Open")
+        static let share = LocalizedStringResource("health.share", defaultValue: "Share report")
+        static let checkAgain = LocalizedStringResource("health.checkAgain", defaultValue: "Check again")
+    }
+
     enum Language {
         static let title = LocalizedStringResource("language.title", defaultValue: "Language")
         static let subtitle = LocalizedStringResource("language.subtitle", defaultValue: "What you speak, and what Mode answers in.")

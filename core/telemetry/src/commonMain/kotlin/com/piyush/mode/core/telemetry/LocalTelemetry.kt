@@ -59,6 +59,9 @@ class LocalTelemetry(
 ) : Telemetry {
     private val pipeline = LocalPipeline(files, dispatcher, queueCapacity, retention)
     val health = pipeline.health
+    /** The second listener: the newest spans and events in memory, for debugging a task on the phone. */
+    override val recent: RecentTelemetry = RecentTelemetry()
+    private fun nowMs(): Long = (epochNanos + start.elapsedNow().inWholeNanoseconds) / 1_000_000
     private val start = TimeSource.Monotonic.markNow()
     private val epochNanos = kotlin.time.Clock.System.now().toEpochMilliseconds() * 1_000_000
     private val otel = createOpenTelemetry(clock = Clock { epochNanos + start.elapsedNow().inWholeNanoseconds }) {
@@ -90,13 +93,14 @@ class LocalTelemetry(
             val span = tracer.startSpan(operation.wireName, parentContext = context(parent)) {
                 applySafe(fields)
             }
-            LocalSpan(span, otel.context.root().storeSpan(span))
+            LocalSpan(span, otel.context.root().storeSpan(span), operation.wireName, parent, fields)
         }.getOrDefault(TraceSpan.None)
 
     override fun event(event: Event, parent: TraceContext?, fields: Fields) {
         runCatching {
             logger.emit(eventName = event.wireName, context = context(parent)) { applySafe(fields) }
         }
+        runCatching { recent.add(EventRecord(parent?.traceparent?.split('-')?.getOrNull(1), event.wireName, nowMs(), safeMap(fields))) }
     }
 
     /** Waits for records already queued. Intended for background/export, never task startup. */
@@ -109,15 +113,29 @@ class LocalTelemetry(
         return otel.propagator.extract(otel.context.root(), carrier, Headers)
     }
 
-    private inner class LocalSpan(private val span: Span, context: Context) : TraceSpan {
+    private inner class LocalSpan(
+        private val span: Span, context: Context, private val name: String, parent: TraceContext?, initial: Fields,
+    ) : TraceSpan {
         override val context = TraceContext(
             "00-${span.spanContext.traceId}-${span.spanContext.spanId}-" +
                 if (span.spanContext.traceFlags.isSampled) "01" else "00",
             context,
         )
-        override fun fields(fields: Fields) { runCatching { span.applySafe(fields) } }
+        // What the in-memory listener keeps of this span (allow-listed fields only, as in the files).
+        private val startedMs = nowMs()
+        private val parentId = parent?.traceparent?.split('-')?.getOrNull(2)
+        private val kept = linkedMapOf<String, String>().apply { putAll(safeMap(initial)) }
+        private val keptEvents = mutableListOf<EventRecord>()
+        private var errorType: String? = null
+        private var ended = false
+
+        override fun fields(fields: Fields) {
+            runCatching { span.applySafe(fields) }
+            kept.putAll(safeMap(fields))
+        }
         override fun event(event: Event, fields: Fields) {
             runCatching { span.addEvent(event.wireName) { applySafe(fields) } }
+            if (keptEvents.size < MAX_SPAN_EVENTS) keptEvents += EventRecord(span.spanContext.traceId, event.wireName, nowMs(), safeMap(fields))
             this@LocalTelemetry.event(event, context, fields)
         }
         override fun failed(type: String) {
@@ -125,10 +143,27 @@ class LocalTelemetry(
                 span.setStatus(StatusData.Error(null))
                 span.applySafe(mapOf(Field.ErrorType to type))
             }
+            errorType = Field.ErrorType.safe(type) ?: "error"
         }
-        override fun end() { runCatching { span.end() } }
+        override fun end() {
+            runCatching { span.end() }
+            if (ended) return
+            ended = true
+            runCatching {
+                recent.add(SpanRecord(
+                    span.spanContext.traceId, span.spanContext.spanId, parentId, name, startedMs, nowMs(),
+                    kept.toMap(), keptEvents.toList(), errorType,
+                ))
+            }
+        }
     }
 }
+
+private const val MAX_SPAN_EVENTS = 32
+
+/** The allow-listed fields as safe strings, for the in-memory listener. */
+private fun safeMap(fields: Fields): Map<String, String> =
+    fields.mapNotNull { (key, value) -> key.safe(value)?.let { key.wireName to it } }.toMap()
 
 private fun AttributesMutator.applySafe(fields: Fields) {
     fields.forEach { (key, value) ->

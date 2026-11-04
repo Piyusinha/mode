@@ -63,6 +63,8 @@ public class Screens(
     private val claudeModels: com.piyush.mode.feature.settings.data.ClaudeModels? = null,
     private val voices: com.piyush.mode.feature.settings.voice.Voices? = null,
     private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
+    /** The last lines of Mode's log (Health → Share report, debugging a task). */
+    private val logTail: () -> String = { "" },
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -78,6 +80,12 @@ public class Screens(
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
+    /** Settings → Health & repair. */
+    public fun health(): com.piyush.mode.app.screens.settings.HealthPresenter =
+        com.piyush.mode.app.screens.settings.HealthPresenter(
+            scope, settings, session, phoneChecks, runner, voices, permissions, providers, chatGpt, claude, logTail,
+        )
+
     /** Settings → Listening → Language. */
     public fun language(): com.piyush.mode.app.screens.settings.LanguagePresenter =
         com.piyush.mode.app.screens.settings.LanguagePresenter(scope, settings, voices!!)

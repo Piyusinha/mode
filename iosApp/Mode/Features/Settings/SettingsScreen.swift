@@ -115,6 +115,7 @@ struct SettingsScreen: View {
                     ModeRow(String(localized: L10n.Tab.memory), action: { onEvent(.openMemory) }) { ModeChevron() }
                 }
                 ModeCard {
+                    ModeRow(String(localized: L10n.Health.row), leading: .icon(.wrench), action: { onEvent(.openHealth) }) { ModeChevron() }
                     ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }
                 }
                 .padding(.top, ModeSpacing.l)
