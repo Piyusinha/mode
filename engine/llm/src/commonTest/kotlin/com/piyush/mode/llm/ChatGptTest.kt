@@ -110,4 +110,28 @@ class ChatGptTest {
         val body = ResponsesClient.request("gpt-6.1-sol@xhigh", emptyList(), JsonArray(emptyList()))
         assertEquals("xhigh", body["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content, "sent as listed")
     }
+
+    @Test
+    fun aFunctionCallThatArrivesOnlyAsAnItemEventIsStillTheAnswer() {
+        // The completed event can carry an empty output: the call is only in response.output_item.done.
+        val stream = """
+            data: {"type":"response.created","response":{"id":"r1","output":[]}}
+            data: {"type":"response.output_item.done","item":{"type":"reasoning","summary":[]}}
+            data: {"type":"response.output_item.done","item":{"type":"function_call","name":"open_app","arguments":"{\"name\":\"Settings\"}","call_id":"c1"}}
+            data: {"type":"response.completed","response":{"id":"r1","output":[],"usage":{"input_tokens":6800,"output_tokens":45}}}
+        """.trimIndent()
+        val result = ResponsesClient.parse(stream)
+        assertEquals("open_app", result.toolCall?.name)
+        assertEquals("Settings", result.toolCall?.arguments?.get("name")?.let { (it as kotlinx.serialization.json.JsonPrimitive).content })
+        assertEquals(45, result.usage.completionTokens)
+    }
+
+    @Test
+    fun theCompletedOutputStillWinsWhenItHasTheCall() {
+        val stream = """
+            data: {"type":"response.output_item.done","item":{"type":"function_call","name":"tap","arguments":"{}"}}
+            data: {"type":"response.completed","response":{"output":[{"type":"function_call","name":"done","arguments":"{}"}],"usage":{"input_tokens":1,"output_tokens":1}}}
+        """.trimIndent()
+        assertEquals("done", ResponsesClient.parse(stream).toolCall?.name)
+    }
 }

@@ -110,11 +110,18 @@ class ResponsesClient(
         /** The streamed events: the finished response carries the tool call or the text, and the usage. */
         fun parse(stream: String): ChatResult {
             var final: JsonObject? = null
+            // Each finished output item also arrives on its own (response.output_item.done); the completed event's
+            // output can be empty, and then these are the answer (a function call was missed that way).
+            val items = mutableListOf<JsonObject>()
+            val seen = linkedMapOf<String, Int>()
             for (line in stream.lineSequence()) {
                 val data = line.removePrefix("data:").trim().takeIf { line.startsWith("data:") && it.isNotEmpty() && it != "[DONE]" } ?: continue
                 val event = runCatching { Json.parseToJsonElement(data).jsonObject }.getOrNull() ?: continue
-                when (event["type"]?.jsonPrimitive?.contentOrNull) {
-                    "response.completed" -> final = event["response"]?.jsonObject
+                val type = event["type"]?.jsonPrimitive?.contentOrNull
+                type?.let { seen[it] = (seen[it] ?: 0) + 1 }
+                when (type) {
+                    "response.completed", "response.incomplete" -> final = event["response"]?.jsonObject
+                    "response.output_item.done" -> event["item"]?.jsonObject?.let(items::add)
                     "response.failed", "error" -> {
                         val error = event["response"]?.jsonObject?.get("error")?.jsonObject ?: event["error"]?.jsonObject ?: event
                         throw failure(0, error.toString())
@@ -122,8 +129,10 @@ class ResponsesClient(
                 }
             }
             val response = final ?: Json.parseToJsonElement(stream.trim()).jsonObject.takeIf { "output" in it }
+                ?: items.takeIf { it.isNotEmpty() }?.let { JsonObject(mapOf("output" to JsonArray(it))) }
                 ?: throw LlmFailed("ChatGPT ended without an answer")
-            val output = response["output"]?.jsonArray.orEmpty().map { it.jsonObject }
+            val listed = response["output"]?.jsonArray.orEmpty().map { it.jsonObject }
+            val output = listed.ifEmpty { items }
             val call = output.firstOrNull { it["type"]?.jsonPrimitive?.contentOrNull == "function_call" }?.let { c ->
                 val args = c["arguments"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 ToolCall(
@@ -134,6 +143,13 @@ class ResponsesClient(
             val text = output.filter { it["type"]?.jsonPrimitive?.contentOrNull == "message" }
                 .flatMap { it["content"]?.jsonArray.orEmpty() }
                 .mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }.joinToString("\n")
+            if (call == null && text.isBlank()) {
+                // Nothing usable: say what the stream held, so a change on OpenAI's side shows in the log.
+                com.piyush.mode.core.common.AppLog.log(
+                    "llm", "ChatGPT reply had no call or text: output types " +
+                        output.map { it["type"]?.jsonPrimitive?.contentOrNull ?: "?" } + ", events " + seen,
+                )
+            }
             val usage = response["usage"]?.jsonObject
             fun tokens(name: String) = usage?.get(name)?.jsonPrimitive?.intOrNull ?: 0
             val cached = usage?.get("input_tokens_details")?.jsonObject?.get("cached_tokens")?.jsonPrimitive?.intOrNull ?: 0

@@ -7,6 +7,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.telemetry)
+            implementation(projects.core.common)
             api(libs.ktor.client.core)
             api(libs.kotlinx.serialization.json)
         }

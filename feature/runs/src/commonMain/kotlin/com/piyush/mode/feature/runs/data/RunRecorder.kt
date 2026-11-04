@@ -127,6 +127,10 @@ public class RunRecorder @OptIn(ExperimentalTime::class) constructor(
         event("verify", buildJsonObject { put("step", step); put("why", why) })
     }
 
+    override fun giveUpQuestioned(step: Int, why: String, advice: String) {
+        event("give_up_questioned", buildJsonObject { put("step", step); put("why", why); put("advice", advice) })
+    }
+
     override fun stuck(step: Int, why: String) {
         event("stuck", buildJsonObject { put("step", step); put("why", why) })
         AppLog.log("agent", "run $id stopped as stuck at step $step: $why")

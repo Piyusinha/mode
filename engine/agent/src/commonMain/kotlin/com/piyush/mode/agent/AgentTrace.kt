@@ -38,6 +38,9 @@ interface AgentTrace {
     /** A `done` that was sent back once to be checked against the screen. */
     fun verifyRejected(step: Int, why: String) {}
 
+    /** The agent wanted to give up; the planning mind was asked for another way first ([advice]). */
+    fun giveUpQuestioned(step: Int, why: String, advice: String) {}
+
     /** The run was stopped because it was getting nowhere. */
     fun stuck(step: Int, why: String) {}
 

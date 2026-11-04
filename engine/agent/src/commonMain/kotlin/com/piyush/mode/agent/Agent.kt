@@ -278,6 +278,8 @@ class Agent(
         var expectation: String? = null
         /** A successful done was sent back once to be checked; the next one is accepted. */
         var verifyAsked = false
+        /** Giving up was questioned once already (by the planning mind when there is one). */
+        var giveUpQuestioned = false
 
         fun result(outcome: AgentOutcome, step: Int) = AgentResult(
             outcome, step, cost, started.elapsedNow().inWholeMilliseconds,
@@ -478,6 +480,24 @@ class Agent(
                             "done (not accepted yet)", summary,
                             "not accepted yet: $why. Look at the screen and check the task really happened; if it did, " +
                                 "call done again and say what on the screen shows it",
+                        )
+                        continue
+                    }
+                    // Seen on the phone: tasks given up with routes left (a closed shop with a later slot, a flight
+                    // number in Mail): once per task, the planning mind looks for another way before Mode gives up.
+                    if (!success && !giveUpQuestioned && step < config.maxSteps - GIVE_UP_RESERVE) {
+                        giveUpQuestioned = true
+                        val why = evidence.ifBlank { summary }.take(MAX_GIVE_UP_CHARS)
+                        val advice = if (brain != null) askBrain(
+                            "I am about to give up because: $why. Before I do: is there another way to still get this done " +
+                                "(another app, another place the information would be such as Mail, Messages, Wallet, Calendar " +
+                                "or the app's own orders, scheduling it for later, the same thing from somewhere else, a close " +
+                                "alternative)? If it needs the user's choice, give the question to ask them with 2–3 concrete options."
+                        ) else "look for another way first (see: When something is in the way)"
+                        trace.giveUpQuestioned(step, why, advice)
+                        record(
+                            "done (not given up yet)", summary,
+                            "before giving up: $advice. Try that now, or ask_user with concrete options; give up only if nothing can work",
                         )
                         continue
                     }
@@ -1114,6 +1134,9 @@ class Agent(
         /** What the user sees while the agent looks and thinks; never a model or a step number. */
         const val WORKING = "Working on it"
         private const val MAX_RECALL_CHARS = 1200
+        /** Steps kept for acting on the planning mind's other way before giving up is accepted anyway. */
+        private const val GIVE_UP_RESERVE = 3
+        private const val MAX_GIVE_UP_CHARS = 300
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.
@@ -1241,6 +1264,26 @@ class Agent(
             Once your notes hold what the task asks for, finish (done) with them: scrolling back to re-check
             something you already noted wastes the user's time. To read a long page, go through it once.
 
+            When something is in the way, keep going like a resourceful personal assistant would. Giving up is the
+            last resort, after the other routes below; when the way forward is the user's choice, ask_user with
+            2–3 concrete options instead of giving up:
+            - Closed, sold out, unavailable, no slots: look for the nearest way to still get it done (schedule it
+              for when it opens, the same thing from another place that is open, a close alternative), then ask
+              which they want, naming the times or places you found.
+            - Information you need is missing (a flight number, a booking, an address, an amount): look where it
+              usually is before asking: the app's own orders, bookings or trips; Mail and Messages (search the
+              name, date or word like "booking"); Wallet; Calendar; Photos screenshots. Ask only if none has it,
+              and say where you looked.
+            - Search finds nothing: try a shorter or different word, the brand or category, a filter, or browsing;
+              then another app that has it.
+            - A pop-up, ad, rating request, permission sheet, cookie or update banner: close or dismiss it and carry on.
+            - Logged out, a PIN, OTP or Face ID: wait_for_user, then carry on.
+            - Not sure an order or payment went through: look once in the app's orders or history; then say
+              plainly what you saw and ask before trying again (never pay twice).
+            - The app is stuck, blank or loading for long: wait once, then go back, or close and reopen the app.
+            - The same screen again after two tries: change approach (search instead of browsing, another tab,
+              another app, a web search) instead of repeating it.
+
             Finishing:
             - When your planning mind (decide) says the task is done, call done now with what is on screen;
               do not open more pages just to add detail to your summary.
@@ -1259,8 +1302,8 @@ class Agent(
               - Only the facts as they finally are. Never mention your notes, steps, screens or earlier
                 guesses; if something is uncertain, say so once in plain words ("about 22:00").
               - Short: a few lines unless the user asked for detail. No closing offers or questions.
-              If it cannot be done, call done with success false: say why in one sentence, then what the
-              user could try, as a short list if there is more than one thing.
+              If it really cannot be done after the routes above, call done with success false: say why in one
+              sentence, what you tried, then what the user could try, as a short list if there is more than one.
             - Plan once, then act. Plan again only to change course; progress is tracked for you (each action's
               item field, and DONE SO FAR).
             - Keep each reason to a few words.
