@@ -212,7 +212,21 @@ object AgentTools {
                 Param(
                     "evidence", "string",
                     "What on the current screen shows it is done (\"Dark Mode switch is off\", \"message shows Delivered\"), " +
-                        "or why it cannot be done.",
+                        "or why it cannot be done: quote the screen.",
+                ),
+                Param(
+                    "blocked_by", "string",
+                    "When success is false: what blocks it. closed or unavailable (the place or item), needs_info or " +
+                        "needs_choice (the user must say), login_or_payment (only they can do it; use wait_for_user instead), " +
+                        "app_broken, not_possible.",
+                    required = false,
+                    enum = listOf("closed", "unavailable", "needs_info", "needs_choice", "login_or_payment", "app_broken", "not_possible"),
+                ),
+                Param(
+                    "routes_tried", "array",
+                    "When success is false: each route you tried and what happened (\"Zomato search: closed until 11\", " +
+                        "\"Mail search 'IndiGo': nothing\").",
+                    required = false, items = "string",
                 ),
             ),
         ),
@@ -348,6 +362,10 @@ object AgentTools {
 
     /** The fact the model asked to keep with this action, if any. */
     /** The choices offered with a question, in order; empty when it is a free question. */
+    fun routesTriedOf(call: ToolCall): List<String> =
+        (call.arguments["routes_tried"] as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }.distinct()
+
     fun optionsOf(call: ToolCall): List<String> =
         (call.arguments["options"] as? kotlinx.serialization.json.JsonArray).orEmpty()
             .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }

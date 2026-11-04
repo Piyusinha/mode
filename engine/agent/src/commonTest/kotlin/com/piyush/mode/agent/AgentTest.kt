@@ -981,10 +981,11 @@ class AgentTest {
     fun aGiveUpIsQuestionedOnceThenAccepted() = runTest {
         val phone = FakePhone(List(5) { listOf("Same" to (1.0 to 1.0)) })
         val giveUp = call("done", "summary" to "no such setting", "success" to false)
-        val model = ScriptedModel(giveUp, giveUp)
+        val model = ScriptedModel(giveUp, giveUp, giveUp)
         val result = Agent(phone, model, Gate(), noSettle).run("t")
-        // The first give-up is sent back to look for another way; the second is accepted.
-        assertEquals(2, result.steps)
+        // The first give-up is refused by the gate (one route is not enough), the second is sent back to look
+        // for another way, the third is accepted.
+        assertEquals(3, result.steps)
         assertTrue("before giving up" in model.lastUserText, model.lastUserText)
         assertEquals(false, assertIs<AgentOutcome.Done>(result.outcome).success)
     }

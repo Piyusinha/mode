@@ -98,6 +98,9 @@ internal class ChangeLedger {
             e.noEffect && e.kind == Changes.Kind.Commit ->
                 "it did NOT go through (the same page came back with \"${e.button}\" still there): try it once more, or check the app's orders"
             e.noEffect -> "it had no effect (the page stayed the same): you may try it once more"
+            e.checked && e.kind == Changes.Kind.Commit ->
+                "not confirmed: before anything else, check the app's Orders, Bookings or History (profile or account tab) " +
+                    "for it; never tap \"${e.button ?: e.target}\" again meanwhile"
             e.checked -> "not confirmed; you left that page, so check the list you are on"
             else -> "NOT confirmed yet: check it before any other change"
         }

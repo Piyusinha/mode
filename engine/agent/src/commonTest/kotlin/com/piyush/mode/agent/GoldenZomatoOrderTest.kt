@@ -93,4 +93,14 @@ class GoldenZomatoOrderTest {
         Agent(phone, model, Gate(), config, onStep = { steps += it }).run("order Tres Leches on Zomato and pay")
         assertTrue("confirms it" in steps[0].outcome && "Order placed" in steps[0].outcome, steps[0].outcome)
     }
+
+    @Test
+    fun anOrderNeverConfirmedIsNotDoneAndTheAmountIsNotedBeforeTheTap() = runTest {
+        val phone = FakePhone(listOf(checkout, checkoutAgain, checkoutAgain, checkoutAgain))
+        val steps = mutableListOf<StepRecord>()
+        val model = ScriptedModel(place, call("done", "success" to true, "summary" to "Ordered!", "evidence" to "Order placed"), call("done", "success" to false, "summary" to "stop", "evidence" to "x"))
+        Agent(phone, model, Gate(), config, onStep = { steps += it }).run("order Tres Leches on Zomato and pay")
+        assertTrue("was never confirmed on screen" in steps[1].outcome && "Orders, Bookings or History" in steps[1].outcome, steps[1].outcome)
+        assertTrue("Before \"Place Order •\": " in model.lastUserText && "Use ·521.69 from Zomato Money" in model.lastUserText, model.lastUserText)
+    }
 }

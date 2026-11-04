@@ -34,6 +34,12 @@ enum class Operation(val wireName: String) {
 
 enum class Event(val wireName: String) {
     FirstAction("mode.task.first_action"), AppStarted("mode.app.started"),
+    /** The agent asked to give up; Field.Outcome: accepted or refused; Field.EndReason: what blocked it. */
+    AgentGiveUp("mode.agent.give_up"),
+    /** An order, payment, booking or send: Field.Outcome: tapped, verified, no_effect or unclear. */
+    AgentCommit("mode.agent.commit"),
+    /** A rung of the recovery ladder; Field.Outcome: the tier. */
+    AgentRecovery("mode.agent.recovery"),
     Foreground("mode.app.foreground"), Background("mode.app.background"),
     /** Siri or Shortcuts ran "Start Mode" (listen) or "Ask Mode" (a task in words); Field.Outcome says what Mode did. */
     IntentStartListening("mode.intent.start_listening"), IntentAsk("mode.intent.ask"),
