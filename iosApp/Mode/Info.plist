@@ -35,6 +35,10 @@
 	<true/>
 	<key>ModeBuiltInVPN</key>
 	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Mode reads your calendar when a task needs it (your flight tomorrow, your next meeting), instead of tapping through the Calendar app.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Mode looks up a person's number or email when a task needs it, instead of tapping through Contacts.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.</string>
 	<key>NSMicrophoneUsageDescription</key>
