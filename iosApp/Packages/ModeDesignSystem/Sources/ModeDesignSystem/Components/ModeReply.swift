@@ -36,7 +36,7 @@ public enum ModeReplyDensity: Sendable {
 
     var text: ModeTextStyle { self == .regular ? .body : .callout }
     var lead: ModeTextStyle { self == .regular ? .body : .subheadline }
-    var spacing: CGFloat { self == .regular ? ModeSpacing.m : ModeSpacing.xs }
+    var spacing: CGFloat { self == .regular ? ModeSpacing.chatGap : ModeSpacing.xs }
     /// A compact reply's first line: one line, so the rows below still fit.
     static let compactLines = 1
 }
@@ -191,33 +191,23 @@ public struct ModeAgenda: View {
         }
     }
 
+    /// The chat's agenda (board Chat): the time in a narrow bold column, then what; tight rows, no card.
     private var card: some View {
-        VStack(spacing: ModeSpacing.none) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                HStack(alignment: .center, spacing: ModeSpacing.m) {
-                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                        Text(row.time).modeText(row.allDay ? .captionEmphasis : .bodyEmphasis, color: row.allDay ? ModeColor.textSecondary : ModeColor.textPrimary)
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.chatGap, verticalSpacing: ModeSpacing.s) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    VStack(alignment: .leading, spacing: ModeSpacing.none) {
+                        Text(row.time).modeText(row.allDay ? .footnoteEmphasis : .calloutEmphasis, color: row.allDay ? ModeColor.textSecondary : ModeColor.textPrimary)
                         if let end = row.end { Text(end).modeText(.caption, color: ModeColor.textSecondary) }
                     }
                     .monospacedDigit()
-                    .frame(width: ModeSize.agendaTime, alignment: .leading)
-                    Capsule()
-                        .fill(row.allDay ? ModeColor.tintSoft : ModeColor.tint)
-                        .frame(width: ModeSize.agendaBar)
-                        .frame(maxHeight: .infinity)
-                    ModeInlineText(row.text, style: .body)
+                    .frame(minWidth: ModeSize.agendaTimeChat, alignment: .leading)
+                    ModeInlineText(row.text, style: .callout)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, ModeSpacing.m)
-                .padding(.horizontal, ModeSpacing.l)
-                if index < rows.count - 1 {
-                    Rectangle().fill(ModeColor.separator).frame(height: ModeSize.separator)
-                        .padding(.leading, ModeSpacing.l + ModeSize.agendaTime + ModeSpacing.m)
                 }
             }
         }
-        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.chip))
+        .padding(.horizontal, ModeSpacing.xs)
     }
 }
 
@@ -347,12 +337,12 @@ public struct ModeWorkingCard: View {
         HStack(spacing: ModeSpacing.m) {
             Button(action: onOpen) {
                 HStack(spacing: ModeSpacing.m) {
-                    ModeMark(size: ModeSize.badge)
+                    ModeMo(.working, size: ModeSize.moChatCard).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(elapsedLine(at: context.date)).modeText(.footnote, color: ModeColor.textSecondary).monospacedDigit()
+                            Text(elapsedLine(at: context.date)).modeText(.footnoteEmphasis, color: ModeColor.tint).monospacedDigit()
                         }
-                        Text(status).modeText(.bodyEmphasis).lineLimit(2).modeShimmer()
+                        Text(status).modeText(.subheadlineEmphasis).lineLimit(2).modeShimmer()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -360,15 +350,21 @@ public struct ModeWorkingCard: View {
             }
             .buttonStyle(.plain)
             Button(action: onStop) {
-                ModeIcon.stop.image.font(ModeTextStyle.caption.font).foregroundStyle(ModeColor.stopRed)
-                    .frame(width: ModeSize.replyAction, height: ModeSize.replyAction)
-                    .background(ModeColor.stopDisc, in: .circle)
+                RoundedRectangle(cornerRadius: ModeSize.stopGlyphRadius).fill(ModeColor.stopRed)
+                    .frame(width: ModeSize.stopGlyph, height: ModeSize.stopGlyph)
+                    .frame(width: ModeSize.workingStop, height: ModeSize.workingStop)
+                    .background(ModeColor.tileRed, in: .circle)
+                    .frame(width: ModeSize.touch, height: ModeSize.touch)
+                    .contentShape(.circle)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ModePressStyle())
             .accessibilityLabel(Text(stopLabel))
         }
-        .padding(ModeSpacing.m)
-        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        .padding(.leading, ModeSpacing.m)
+        .padding(.trailing, ModeSpacing.s)
+        .padding(.vertical, ModeSpacing.m)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.chatCard))
+        .overlay(RoundedRectangle(cornerRadius: ModeRadius.chatCard).strokeBorder(ModeColor.brand, lineWidth: ModeSize.chatRing))
         .animation(ModeMotion.standard, value: status)
     }
 

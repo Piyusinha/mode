@@ -13,19 +13,20 @@ public struct ModeRemovableChip: View {
     }
 
     public var body: some View {
-        HStack(spacing: ModeSpacing.s) {
-            Text(text).modeText(.subheadline, color: ModeColor.tint).fontWeight(.semibold)
+        HStack(spacing: ModeSpacing.xxs) {
+            Text(text).modeText(.subheadlineEmphasis)
             Button(action: onRemove) {
-                ModeIcon.close.image.font(ModeTextStyle.captionEmphasis.font).foregroundStyle(ModeColor.tint)
-                    .frame(minWidth: ModeSize.badge, minHeight: ModeSize.badge)
+                ModeIcon.close.image.font(ModeTextStyle.captionEmphasis.font).foregroundStyle(ModeColor.textPrimary)
+                    .frame(minWidth: ModeSize.badge, minHeight: ModeSize.filterChip)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(removeLabel))
         }
-        .padding(.leading, ModeSpacing.m)
-        .frame(minHeight: ModeSize.badge + ModeSpacing.xs)
-        .background(ModeColor.tintSoft, in: .capsule)
+        .padding(.leading, ModeSpacing.headerGap)
+        .padding(.trailing, ModeSpacing.xxs)
+        .frame(minHeight: ModeSize.filterChip)
+        .background(ModeColor.cardRaised, in: .capsule)
     }
 }
 
@@ -41,13 +42,16 @@ public struct ModeAddChip: View {
 
     public var body: some View {
         Button(action: action) {
-            Label { Text(title) } icon: { ModeIcon.add.image }
-                .modeText(.subheadline)
-                .fontWeight(.semibold)
-                .padding(.horizontal, ModeSpacing.m)
-                .frame(minHeight: ModeSize.badge + ModeSpacing.xs)
-                .overlay(Capsule().strokeBorder(ModeColor.separator, style: StrokeStyle(lineWidth: ModeSize.separator, dash: [ModeSpacing.xs])))
-                .contentShape(.capsule)
+            HStack(spacing: ModeSpacing.xs + ModeSpacing.xxs) {
+                ModeIcon.add.image.font(ModeIconFont.chevron.weight(.bold))
+                Text(title)
+            }
+                .modeText(.subheadlineEmphasis)
+                .padding(.horizontal, ModeSpacing.headerGap)
+                .frame(minHeight: ModeSize.filterChip)
+                .overlay(Capsule().strokeBorder(ModeColor.ring, style: StrokeStyle(lineWidth: ModeSize.separator, dash: [ModeSpacing.xs])))
+                // Drawn 34 tall; tapped anywhere in 44.
+                .contentShape(Rectangle().inset(by: -(ModeSize.touch - ModeSize.filterChip) / 2))
         }
         .buttonStyle(.plain)
     }

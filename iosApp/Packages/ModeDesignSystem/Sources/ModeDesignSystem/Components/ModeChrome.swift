@@ -52,8 +52,8 @@ public struct ModeTabBar<ID: Hashable, Player: View>: View {
                     withAnimation(ModeMotion.standard) { selection = item.id }
                 } label: {
                     VStack(spacing: ModeSpacing.xxs) {
-                        item.icon.image.font(ModeIconFont.large)
-                        Text(item.title).modeText(.captionEmphasis, color: selected ? ModeColor.textPrimary : ModeColor.textSecondary)
+                        item.icon.image.font(ModeIconFont.regular)
+                        Text(item.title).font(.caption2.weight(selected ? .bold : .semibold))
                     }
                     .foregroundStyle(selected ? ModeColor.textPrimary : ModeColor.textSecondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -75,8 +75,8 @@ public struct ModeTabBar<ID: Hashable, Player: View>: View {
     }
 }
 
-/// The running task, as Home's dark card: Mo at work, what it's doing, the task, Pause and Stop,
-/// and a bar per step. Also used above the tab bar on other tabs ([compact]).
+/// The running task. On Home, the dark hero card: Mo at work, what it's doing, the task, Pause and Stop,
+/// and a bar per plan item. On the other tabs ([compact]), a white bar above the tabs with the same controls.
 public struct ModeMiniPlayer: View {
     private let title: String
     private let status: String
@@ -107,47 +107,110 @@ public struct ModeMiniPlayer: View {
     }
 
     public var body: some View {
+        if compact { bar } else { hero }
+    }
+
+    private var hero: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.m + ModeSpacing.xxs) {
             HStack(spacing: ModeSpacing.m) {
                 Button(action: onOpen) {
                     HStack(spacing: ModeSpacing.m) {
-                        ModeMo(paused ? .sleep : .working, size: compact ? ModeSize.moRow + ModeSpacing.s : ModeSize.moHero)
+                        ModeMo(paused ? .sleep : .working, size: ModeSize.moHero)
                         VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                             Text(status).modeText(.footnote, color: ModeColor.heroSecondary).lineLimit(1)
-                            Text(title).modeText(compact ? .calloutEmphasis : .title3, color: ModeColor.heroText).lineLimit(compact ? 1 : 2)
+                            Text(title).modeText(.title3, color: ModeColor.heroText).lineLimit(2)
                         }
                         .frame(maxWidth: .infinity, minHeight: ModeSize.touch, alignment: .leading)
                     }
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                Button(action: onPauseToggle) {
-                    (paused ? ModeIcon.play : ModeIcon.pause).image
-                        .font(ModeIconFont.small)
-                        .foregroundStyle(ModeColor.heroText)
-                        .frame(width: ModeSize.touch, height: ModeSize.touch)
-                        .background(ModeColor.onDarkFill, in: .circle)
-                }
-                .buttonStyle(ModePressStyle())
-                .accessibilityLabel(Text(paused ? resumeLabel : pauseLabel))
-                Button(action: onStop) {
-                    RoundedRectangle(cornerRadius: ModeSpacing.xs).fill(ModeColor.stopOnDark)
-                        .frame(width: ModeSpacing.l, height: ModeSpacing.l)
-                        .frame(width: ModeSize.touch, height: ModeSize.touch)
-                        .background(ModeColor.stopDisc, in: .circle)
-                }
-                .buttonStyle(ModePressStyle())
-                .accessibilityLabel(Text(stopLabel))
+                pauseButton(foreground: ModeColor.heroText, background: ModeColor.onDarkFill)
+                stopButton(color: ModeColor.stopOnDark, background: ModeColor.stopDisc)
             }
-            if !compact, let progress, progress.total > 0 {
+            if let progress, progress.total > 0 {
                 ModeStepBars(done: progress.done, total: progress.total)
             }
         }
         .padding(.leading, ModeSpacing.l)
         .padding(.trailing, ModeSpacing.m)
-        .padding(.vertical, compact ? ModeSpacing.s : ModeSpacing.l)
-        .background(ModeColor.hero, in: .rect(cornerRadius: compact ? ModeRadius.card : ModeRadius.hero))
+        .padding(.vertical, ModeSpacing.l)
+        .background(ModeColor.hero, in: .rect(cornerRadius: ModeRadius.hero))
+        .transition(.opacity)
+    }
+
+    private var bar: some View {
+        HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
+            Button(action: onOpen) {
+                HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
+                    ModeMo(paused ? .sleep : .working, size: ModeSize.moBar)
+                    VStack(alignment: .leading, spacing: ModeSpacing.none) {
+                        Text(title).modeText(.subheadlineEmphasis).lineLimit(1)
+                        Text(status).modeText(.caption, color: ModeColor.textSecondary).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: ModeSize.touch, alignment: .leading)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            pauseButton(foreground: ModeColor.textPrimary, background: .clear)
+            stopButton(color: ModeColor.danger, background: .clear)
+        }
+        .padding(.leading, ModeSpacing.s + ModeSpacing.xxs)
+        .padding(.trailing, ModeSpacing.xs + ModeSpacing.xxs)
+        .frame(height: ModeSize.miniPlayerHeight)
+        .background(ModeColor.card, in: .capsule)
+        .modeShadow(in: Capsule())
         .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func pauseButton(foreground: Color, background: Color) -> some View {
+        Button(action: onPauseToggle) {
+            (paused ? ModeIcon.play : ModeIcon.pause).image
+                .font(ModeIconFont.small)
+                .foregroundStyle(foreground)
+                .frame(width: ModeSize.touch, height: ModeSize.touch)
+                .background(background, in: .circle)
+                .contentShape(.circle)
+        }
+        .buttonStyle(ModePressStyle())
+        .accessibilityLabel(Text(paused ? resumeLabel : pauseLabel))
+    }
+
+    private func stopButton(color: Color, background: Color) -> some View {
+        Button(action: onStop) {
+            RoundedRectangle(cornerRadius: ModeSize.stopSquareRadius).fill(color)
+                .frame(width: ModeSize.stopSquare, height: ModeSize.stopSquare)
+                .frame(width: ModeSize.touch, height: ModeSize.touch)
+                .background(background, in: .circle)
+                .contentShape(.circle)
+        }
+        .buttonStyle(ModePressStyle())
+        .accessibilityLabel(Text(stopLabel))
+    }
+}
+
+/// Home's greeting and its question, as on the board: 15 secondary, then Bricolage 30 heavy.
+public struct ModeHomeHeader: View {
+    private let greeting: String
+    private let title: LocalizedStringResource
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    public init(greeting: String, title: LocalizedStringResource) {
+        self.greeting = greeting
+        self.title = title
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+            Text(greeting).modeText(.subheadline, color: ModeColor.textSecondary)
+            Text(title)
+                .font(ModeTypography.display(size: 30, weight: 800, relativeTo: .largeTitle))
+                .tracking(-30 * 0.02)
+                .foregroundStyle(ModeColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -173,7 +236,8 @@ public struct ModeStepBars: View {
     }
 }
 
-/// A suggestion on Home: an icon in a raised circle, what to do, and why it's suggested.
+/// A suggestion on Home: an icon in a raised circle, what to do, and why it's suggested. 168 wide, at least
+/// 124 tall; cards in a row stretch to the tallest so a two-line title never clips.
 public struct ModeSuggestionCard: View {
     private let icon: ModeIcon
     private let title: String
@@ -195,17 +259,20 @@ public struct ModeSuggestionCard: View {
                     .foregroundStyle(ModeColor.textPrimary)
                     .frame(width: ModeSize.iconCircle, height: ModeSize.iconCircle)
                     .background(ModeColor.cardRaised, in: .circle)
-                Spacer(minLength: 0)
+                    .fixedSize()
+                Spacer(minLength: ModeSpacing.none)
                 VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                     Text(title).modeText(.calloutEmphasis).lineLimit(2).multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(1)
                 }
             }
             .padding(.horizontal, ModeSpacing.l)
             .padding(.vertical, ModeSpacing.m + ModeSpacing.xxs)
             .frame(width: ModeSize.suggestionWidth, alignment: .leading)
-            .frame(minHeight: ModeSize.suggestionHeight, alignment: .leading)
+            .frame(minHeight: ModeSize.suggestionHeight, maxHeight: .infinity, alignment: .leading)
             .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+            .contentShape(.rect(cornerRadius: ModeRadius.card))
         }
         .buttonStyle(ModePressStyle())
     }

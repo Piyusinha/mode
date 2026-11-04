@@ -62,7 +62,9 @@ final class OnboardingViewModel {
         let id: PermissionKind
         let title: LocalizedStringResource
         let why: LocalizedStringResource
-        let leading: ModeRowLeading
+        let icon: ModeIcon
+        let tileBackground: Color
+        let tileForeground: Color
         let action: ModeStatusAction
 
         static func == (a: PermissionRow, b: PermissionRow) -> Bool { a.id == b.id && a.action == b.action }
@@ -85,6 +87,14 @@ final class OnboardingViewModel {
         let trailing: String?
         /// Failed checks stand out, with their explanation under them.
         var emphasis: ModeRowEmphasis { detail == nil ? .standard : .prominent }
+        var state: ModeCheckRow.State {
+            switch leading {
+            case .check: .passed
+            case .progress: .running
+            case .failure: .failed
+            default: .notChecked
+            }
+        }
 
         static func == (a: CheckRow, b: CheckRow) -> Bool { a.id == b.id && a.leading == b.leading && a.detail == b.detail && a.trailing == b.trailing }
     }
@@ -213,9 +223,12 @@ final class OnboardingViewModel {
         guard let target = ProcessInfo.processInfo.environment["MODE_SETUP_STEP"] else { return }
         let order = ["welcome", "name", "key", "model", "permissions", "voice", "test", "result", "diagnose"]
         guard let index = order.firstIndex(of: target) else { return }
-        if index >= 1 { presenter.next() }
-        if index >= 2 { cardPicked(given: "Piyush", family: "Sinha"); presenter.next() }
+        if index >= 1 { presenter.next(); cardPicked(given: "Piyush", family: "Sinha") }
+        if index >= 2 { presenter.next() }
         if index >= 3 { key = "sk-or-v1-simulator-preview-0000"; presenter.next() }
+        if index == 3, let raw = ProcessInfo.processInfo.environment["MODE_SETUP_ROLE"], let role = PickerRole(rawValue: raw) {
+            picking = role
+        }
         if index >= 4 { presenter.next() }
         if index >= 5 { presenter.next() }
         if index >= 5, let raw = ProcessInfo.processInfo.environment["MODE_SETUP_PICKER"], let sheet = VoiceSheet(rawValue: raw) {
@@ -410,15 +423,22 @@ final class OnboardingViewModel {
         }
     }
 
-    /// The model maker's tile: its logo when known, else its first letter.
-    private static func maker(_ id: String) -> ModeRowLeading { ModelTile.leading(for: id, name: id) }
+    /// The model maker's tile: its logo when known, else its first letter. Setup draws OpenAI's in ink (board SetupModel).
+    private static func maker(_ id: String) -> ModeRowLeading {
+        switch ModeLogo.forModel(id) {
+        case .openAI: return .logoTile(.openAI, background: ModeColor.accent, foreground: ModeColor.onAccent)
+        case .claude: return .logoTile(.claude, background: ModeColor.setupClaudeTile, foreground: ModeColor.setupOnClaudeTile)
+        default: break
+        }
+        return ModelTile.leading(for: id, name: id)
+    }
 
     private static func permission(_ p: ModeKit.PermissionRow) -> PermissionRow {
-        let (title, why, leading): (LocalizedStringResource, LocalizedStringResource, ModeRowLeading) = switch p.kind {
-        case .vpn: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .iconTile(.vpn, background: ModeColor.tintSoft, foreground: ModeColor.tint))
-        case .notifications: (L10n.Setup.notifications, L10n.Setup.notificationsWhy, .iconTile(.bell, background: ModeColor.tileRed, foreground: ModeColor.danger))
-        case .siri: (L10n.Setup.siri, L10n.Setup.siriWhy, .iconTile(.siriWave, background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText))
-        case .microphone: (L10n.Setup.microphone, L10n.Setup.microphoneWhy, .iconTile(.microphone, background: ModeColor.tileGray, foreground: ModeColor.textPrimary))
+        let (title, why, icon, background, foreground): (LocalizedStringResource, LocalizedStringResource, ModeIcon, Color, Color) = switch p.kind {
+        case .vpn: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .vpn, ModeColor.tileGray, ModeColor.textPrimary)
+        case .notifications: (L10n.Setup.notifications, L10n.Setup.notificationsWhy, .bell, ModeColor.tileRed, ModeColor.danger)
+        case .siri: (L10n.Setup.siri, L10n.Setup.siriWhy, .siriWave, ModeColor.tileOrange, ModeColor.tileOrangeText)
+        case .microphone: (L10n.Setup.microphone, L10n.Setup.microphoneWhy, .microphone, ModeColor.tileGray, ModeColor.textPrimary)
         }
         let action: ModeStatusAction = switch p.status {
         case .allowed: .done(L10n.Setup.allowed)
@@ -426,7 +446,7 @@ final class OnboardingViewModel {
         case .unavailable: .note(String(localized: L10n.Setup.unavailable))
         case .notAsked: p.later ? .note(String(localized: L10n.Setup.later)) : p.optional ? .quiet(L10n.Setup.allow) : .prominent(L10n.Setup.allow)
         }
-        return PermissionRow(id: p.kind, title: title, why: why, leading: leading, action: action)
+        return PermissionRow(id: p.kind, title: title, why: why, icon: icon, tileBackground: background, tileForeground: foreground, action: action)
     }
 
     private static func didTitle(_ kind: TestItemKind) -> LocalizedStringResource {
@@ -454,6 +474,34 @@ final class OnboardingViewModel {
         case .running: return CheckRow(id: index, title: title, leading: .progress, detail: nil, trailing: nil)
         case let .passed(p): return CheckRow(id: index, title: title, leading: .check, detail: nil, trailing: p.ms.map { Format.seconds(Double(truncating: $0) / 1000) })
         case let .failed(f): return CheckRow(id: index, title: title, leading: .failure, detail: [f.reason, f.fix].compactMap { $0 }.joined(separator: " "), trailing: nil)
+        }
+    }
+}
+
+extension ProvidersViewModel.Kind {
+    /// What the provider is, on setup's "Connect your AI".
+    var setupDetail: LocalizedStringResource {
+        switch self {
+        case .chatGPT: L10n.Setup.chatGPTSetupDetail
+        case .claude: L10n.Setup.claudeSetupDetail
+        case .openRouter: L10n.Setup.openRouterSetupDetail
+        }
+    }
+
+    /// The provider's tile on setup (board Key): ChatGPT in ink, Claude in orange, OpenRouter in raised grey.
+    var setupTileBackground: Color {
+        switch self {
+        case .chatGPT: ModeColor.accent
+        case .claude: ModeColor.tileOrange
+        case .openRouter: ModeColor.cardRaised
+        }
+    }
+
+    var setupTileForeground: Color {
+        switch self {
+        case .chatGPT: ModeColor.onAccent
+        case .claude: ModeColor.tileOrangeText
+        case .openRouter: ModeColor.textPrimary
         }
     }
 }

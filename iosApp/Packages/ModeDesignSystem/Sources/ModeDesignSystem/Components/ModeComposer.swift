@@ -58,7 +58,7 @@ public struct ModeComposer: View {
     }
 }
 
-/// A question bar without the private switch (Ask about this task): the text and a send button.
+/// A question bar without the private switch (board TaskDebugAsk): a white capsule with the text and an ink Send.
 public struct ModeAskBar: View {
     @Binding private var text: String
     private let prompt: LocalizedStringResource
@@ -75,26 +75,34 @@ public struct ModeAskBar: View {
     }
 
     public var body: some View {
-        HStack(spacing: ModeSpacing.xs) {
+        HStack(alignment: .bottom, spacing: ModeSpacing.s) {
             TextField(text: $text, axis: .vertical) { Text(prompt).foregroundStyle(ModeColor.textSecondary) }
                 .modeText(.callout)
                 .lineLimit(1...5)
                 .submitLabel(.send)
                 .onSubmit { if canSend { onSend() } }
-                .padding(.leading, ModeSpacing.l)
-            ModeIconButton(.send, label: send, prominent: true, size: ModeSize.sendButton, action: onSend)
-                .disabled(!canSend)
-                .opacity(canSend ? 1 : 0.5)
+                .frame(maxWidth: .infinity, minHeight: ModeSize.askSend, alignment: .leading)
+            Button(action: onSend) {
+                ModeIcon.send.image
+                    .font(ModeIconFont.chatSend)
+                    .foregroundStyle(ModeColor.onAccent)
+                    .frame(width: ModeSize.askSend, height: ModeSize.askSend)
+                    .background(ModeColor.accent, in: .circle)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(ModePressStyle())
+            .disabled(!canSend)
+            .accessibilityLabel(Text(send))
         }
-        .padding(.vertical, ModeSpacing.xs + 1)
-        .padding(.trailing, ModeSpacing.xs + 1)
+        .padding(.leading, ModeSpacing.l + ModeSpacing.xxs)
+        .padding([.vertical, .trailing], ModeSpacing.xs)
         .frame(minHeight: ModeSize.composerHeight)
         .background(ModeColor.card, in: .rect(cornerRadius: ModeSize.composerHeight / 2))
         .modeShadow(in: RoundedRectangle(cornerRadius: ModeSize.composerHeight / 2))
     }
 }
 
-/// A suggested question to tap ("Why did it stop?").
+/// A suggested question to tap ("What should I change?"): a soft blue pill.
 public struct ModeSuggestionChip: View {
     private let text: String
     private let action: () -> Void
@@ -106,13 +114,14 @@ public struct ModeSuggestionChip: View {
 
     public var body: some View {
         Button(action: action) {
-            Text(text).modeText(.footnoteEmphasis)
+            Text(text).modeText(.subheadlineEmphasis, color: ModeColor.infoText)
+                .lineLimit(1)
+                .fixedSize()
                 .padding(.horizontal, ModeSpacing.m + ModeSpacing.xxs)
-                .frame(minHeight: ModeSize.pillButton)
-                .background(ModeColor.card, in: .capsule)
-                .modeShadow(in: Capsule())
-                .frame(minHeight: ModeSize.touch)
+                .frame(minHeight: ModeSize.askChip)
+                .background(ModeColor.infoSoft, in: .capsule)
+                .contentShape(Rectangle().inset(by: (ModeSize.askChip - ModeSize.touch) / 2))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ModePressStyle())
     }
 }

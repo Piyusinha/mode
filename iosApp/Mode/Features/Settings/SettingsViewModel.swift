@@ -48,6 +48,13 @@ final class SettingsViewModel {
         var speakProblem: String?
         var listenProblem: String?
         var talkBack = true
+        /// Settings → Voice rows: each one's logo, the voice as "ElevenLabs · Rachel" (Apple's by name alone),
+        /// the speaker's tag ("Most human"), and the note under them (it changes when one failed).
+        var speakerLogo: ModeLogo = .apple
+        var listenerLogo: ModeLogo = .apple
+        var voiceValue = ""
+        var speakerTag: String?
+        var voiceNote = L10n.Voice.sectionNote
         var query = ""
         var modelCount = 0
     }
@@ -183,14 +190,22 @@ final class SettingsViewModel {
         presenter.close()
     }
 
+    /// Mode's voice as the row shows it: "ElevenLabs · Rachel"; Apple's voice by its name alone ("Ava"); or Off.
+    private static func voiceValue(_ s: SettingsUiState) -> String {
+        guard let speaker = s.speaker else { return String(localized: L10n.Voice.off) }
+        let name = s.voiceName ?? String(localized: L10n.Voice.defaultVoice)
+        guard let service = VoiceService(id: speaker), service != .apple else { return name }
+        return "\(service.title) · \(name)"
+    }
+
     private static func map(_ s: SettingsUiState) -> State {
         let onPlan = !s.showsCost
         func model(_ c: ModelChoice) -> Model {
             let tag = c.tag.map { tag -> ModeChoiceRow.Tag in
                 switch tag {
-                case .recommended: .init(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                case .recommended: .init(String(localized: L10n.Settings.recommended), background: ModeColor.cardRaised, foreground: ModeColor.textPrimary)
                 case .cheapest: .init(String(localized: L10n.Settings.cheapest), background: ModeColor.tagGreen, foreground: ModeColor.tagGreenText)
-                case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.cardRaised, foreground: ModeColor.textPrimary)
                 }
             }
             let cost = onPlan ? String(localized: L10n.Settings.onYourPlan) : L10n.Settings.perTask(Format.money(c.costPerTaskUsd))
@@ -223,6 +238,11 @@ final class SettingsViewModel {
             speakProblem: s.speakProblem.map { VoiceTroubleText.short($0, hearing: false) },
             listenProblem: s.listenProblem.map { VoiceTroubleText.short($0, hearing: true) },
             talkBack: s.talkBack,
+            speakerLogo: (VoiceService(id: s.speaker) ?? .apple).logo,
+            listenerLogo: (VoiceService(id: s.listener) ?? .apple).logo,
+            voiceValue: voiceValue(s),
+            speakerTag: VoiceService(id: s.speaker)?.recommendation,
+            voiceNote: s.speakProblem != nil || s.listenProblem != nil ? L10n.Voice.sectionNoteFailed : L10n.Voice.sectionNote,
             query: s.query,
             modelCount: Int(s.modelCount)
         )

@@ -74,8 +74,8 @@ struct AccessScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                Text(L10n.Access.subtitle).modeText(.body, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                    .padding(.bottom, ModeSpacing.s)
+                ModePageTitle(L10n.Access.title, subtitle: L10n.Access.subtitle)
+                    .padding(.bottom, ModeSpacing.xl)
                 ModeCard {
                     ModeChoiceRow(String(localized: L10n.Access.askFirst), tag: nil, detail: String(localized: L10n.Access.askFirstDetail),
                                   leading: .none, selected: !state.fullAccess) { onEvent(.fullAccess(false)) }
@@ -96,7 +96,7 @@ struct AccessScreen: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    note(state.askAboveOn ? L10n.Access.askAboveOnNote : L10n.Access.askAboveOffNote)
+                    ModeFootnote(state.askAboveOn ? L10n.Access.askAboveOnNote : L10n.Access.askAboveOffNote)
                 } else {
                     ModeSectionHeader(L10n.Access.oneTask)
                     ModeCard {
@@ -106,32 +106,31 @@ struct AccessScreen: View {
                             }
                             if state.canAddWord { ModeAddChip(L10n.Access.addWord) { adding = true } }
                         }
-                        .padding(.vertical, ModeSpacing.m)
+                        .padding(.vertical, ModeSpacing.headerGap)
                     }
-                    note(L10n.Access.oneTaskNote(state.words.first ?? "just do it"))
+                    ModeFootnote(verbatim: L10n.Access.oneTaskNote(state.words.first ?? "just do it"))
                 }
 
                 ModeSectionHeader(L10n.Access.codes)
                 ModeCard {
                     ModeToggleRow(L10n.Access.readCodes, isOn: Binding(get: { state.readCodes }, set: { onEvent(.readCodes($0)) }))
                 }
-                note(state.readCodes ? L10n.Access.readCodesNote : L10n.Access.askCodesNote)
+                ModeFootnote(state.readCodes ? L10n.Access.readCodesNote : L10n.Access.askCodesNote)
 
                 ModeSectionHeader(L10n.Access.alwaysAsks)
                 ModeCard {
-                    ModeRow(String(localized: L10n.Access.pin), subtitle: String(localized: L10n.Access.pinDetail), leading: .icon(.lockFilled, ModeColor.warning))
-                    ModeRow(String(localized: L10n.Access.passwords), subtitle: String(localized: L10n.Access.passwordsDetail), leading: .icon(.lockFilled, ModeColor.warning))
-                    ModeRow(String(localized: L10n.Access.faceID), subtitle: String(localized: L10n.Access.faceIDDetail), leading: .icon(.lockFilled, ModeColor.warning))
+                    ModeBadgeRow(String(localized: L10n.Access.pin), subtitle: String(localized: L10n.Access.pinDetail), icon: .lock)
+                    ModeBadgeRow(String(localized: L10n.Access.passwords), subtitle: String(localized: L10n.Access.passwordsDetail), icon: .lock)
+                    ModeBadgeRow(String(localized: L10n.Access.faceID), subtitle: String(localized: L10n.Access.faceIDDetail), icon: .lock)
                 }
-                note(L10n.Access.alwaysAsksNote)
+                ModeFootnote(L10n.Access.alwaysAsksNote)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .navigationTitle(Text(L10n.Access.title))
-        .navigationBarTitleDisplayMode(.large)
+        .modePageChrome(L10n.Access.title)
         .alert(Text(L10n.Access.addWordTitle), isPresented: $adding) {
             TextField(text: $newWord) { Text(L10n.Access.addWordPrompt) }
                 .textInputAutocapitalization(.never)
@@ -140,14 +139,6 @@ struct AccessScreen: View {
         } message: {
             Text(L10n.Access.addWordMessage)
         }
-    }
-
-    private func note(_ text: LocalizedStringResource) -> some View {
-        Text(text).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
     }
 }
 

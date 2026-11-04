@@ -1,4 +1,5 @@
 import Foundation
+import ModeDesignSystem
 import ModeKit
 import Observation
 
@@ -8,8 +9,16 @@ import Observation
 final class RunStatusViewModel {
     struct Running: Equatable {
         let title: String
+        /// "Step 9 · Checking the cart", or Paused.
         let status: String
         let paused: Bool
+        /// The plan around the current item (done, now, next); empty without a plan.
+        var plan: [ModeSegments.Segment] = []
+
+        /// Bars on the running card: one per plan item, the done ones filled.
+        var progress: (done: Int, total: Int)? {
+            plan.isEmpty ? nil : (plan.filter { $0.state == .done }.count, plan.count)
+        }
     }
 
     struct PendingQuestion: Identifiable, Equatable {
@@ -36,11 +45,40 @@ final class RunStatusViewModel {
 
     private(set) var state = State()
     private let presenter: LiveRunPresenter
+    /// Only for the plan, which the running card shows as bars.
+    private let activity: LiveActivityPresenter
+    private var plan: [ModeSegments.Segment] = []
     private var updates: Updates?
+    private var planUpdates: Updates?
 
     init(screens: Screens) {
         presenter = screens.liveRun()
-        updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
+        activity = screens.liveActivity()
+        updates = observe(presenter.state) { [weak self] s in self?.apply(s) }
+        planUpdates = observe(activity.state) { [weak self] s in self?.applyPlan(s) }
+    }
+
+    private func apply(_ s: LiveRunUiState) {
+        var next = Self.map(s)
+        next.running?.plan = plan
+        state = next
+    }
+
+    private func applyPlan(_ s: ActivityUiState) {
+        if case let .working(w) = onEnum(of: s) {
+            plan = w.plan.map { ModeSegments.Segment($0.label, state: Self.segment($0.state)) }
+        } else {
+            plan = []
+        }
+        state.running?.plan = plan
+    }
+
+    private static func segment(_ state: PlanStepState) -> ModeSegments.State {
+        switch state {
+        case .done: .done
+        case .now: .now
+        case .next: .next
+        }
     }
 
     func stop() { presenter.stop() }
@@ -53,10 +91,16 @@ final class RunStatusViewModel {
 
     func stopFromQuestion() { presenter.answer(text: nil) }
 
+    /// "Step 9 · Checking the cart"; just the status before the first step.
+    static func status(_ r: RunningTask) -> String {
+        if r.paused { return String(localized: L10n.Run.paused) }
+        return r.steps > 0 ? L10n.Run.stepStatus(Int(r.steps), r.status) : r.status
+    }
+
     private static func map(_ s: LiveRunUiState) -> State {
         guard let running = s.running else { return State() }
         return State(
-            running: Running(title: running.text, status: running.paused ? String(localized: L10n.Run.paused) : running.status, paused: running.paused),
+            running: Running(title: running.text, status: status(running), paused: running.paused),
             talking: running.talking,
             question: running.question.map {
                 PendingQuestion(id: running.taskId + $0.text, text: $0.text, yesNo: $0.yesNo, options: $0.options, recommended: $0.recommended,

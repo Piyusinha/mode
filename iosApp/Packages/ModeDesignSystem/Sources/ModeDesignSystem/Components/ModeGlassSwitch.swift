@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A floating choice of two or three views (Grid / Play): a white capsule, the chosen one in a raised pill.
+/// A floating choice of two or three views (Grid / Play), as on All screens: a white capsule, the chosen one
+/// in an ink pill that slides between them.
 public struct ModeGlassSwitch<ID: Hashable>: View {
     private let options: [ModeTabItem<ID>]
     @Binding private var selection: ID
@@ -18,13 +19,17 @@ public struct ModeGlassSwitch<ID: Hashable>: View {
                 Button {
                     withAnimation(ModeMotion.standard) { selection = option.id }
                 } label: {
-                    Label { Text(option.title) } icon: { option.icon.image }
-                        .modeText(.subheadlineEmphasis, color: selected ? ModeColor.textPrimary : ModeColor.textSecondary)
-                        .padding(.horizontal, ModeSpacing.l)
-                        .frame(minHeight: ModeSize.touch)
-                        .background {
-                            if selected { Capsule().fill(ModeColor.cardRaised).matchedGeometryEffect(id: "lens", in: glass) }
-                        }
+                    HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
+                        option.icon.image.font(ModeIconFont.small)
+                        Text(option.title)
+                    }
+                    .modeText(.subheadlineEmphasis, color: selected ? ModeColor.onAccent : ModeColor.textPrimary)
+                    .padding(.horizontal, ModeSpacing.l + ModeSpacing.xxs)
+                    .frame(height: ModeSize.touch)
+                    .background {
+                        if selected { Capsule().fill(ModeColor.accent).matchedGeometryEffect(id: "lens", in: glass) }
+                    }
+                    .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? .isSelected : [])

@@ -58,29 +58,35 @@ struct LanguageScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                Text(L10n.Language.subtitle).modeText(.body, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs).padding(.bottom, ModeSpacing.s)
+                ModePageTitle(L10n.Language.title, subtitle: L10n.Language.subtitle)
                 ModeSectionHeader(L10n.Language.iSpeak)
                 ModeCard {
                     ForEach(state.rows) { row in
-                        ModeChoiceRow(row.name, tag: nil, detail: row.detail, leading: .none, selected: row.selected) { onEvent(.choose(row.id)) }
+                        ModeChoiceRow(row.name, tag: nil, detail: row.detail, leading: .none, selected: row.selected, emphasis: .standard) {
+                            onEvent(.choose(row.id))
+                        }
                     }
                 }
                 ModeSectionHeader(L10n.Language.repliesIn)
                 ModeCard {
                     ModeChoiceRow(String(localized: L10n.Language.spoken), tag: nil, detail: String(localized: L10n.Language.spokenDetail),
-                                  leading: .none, selected: state.replyInSpoken) { onEvent(.replyInSpoken(true)) }
+                                  leading: .none, selected: state.replyInSpoken, emphasis: .standard) { onEvent(.replyInSpoken(true)) }
                     ModeChoiceRow(String(localized: L10n.Language.english), tag: nil, detail: String(localized: L10n.Language.englishDetail),
-                                  leading: .none, selected: !state.replyInSpoken) { onEvent(.replyInSpoken(false)) }
+                                  leading: .none, selected: !state.replyInSpoken, emphasis: .standard) { onEvent(.replyInSpoken(false)) }
                 }
-                Text(L10n.Language.worksInEnglish).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                ModeFootnote(L10n.Language.worksInEnglish).padding(.top, ModeSpacing.xxs)
+                ModeExampleCard(lines: [
+                    (L10n.Language.exampleYouSay, L10n.Language.exampleSaid),
+                    (L10n.Language.exampleWorksOn, L10n.Language.exampleTask),
+                    (L10n.Language.exampleSays, L10n.Language.exampleReply),
+                ])
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .navigationTitle(Text(L10n.Language.title))
-        .navigationBarTitleDisplayMode(.large)
+        .modePageChrome(L10n.Language.title)
     }
 }
 

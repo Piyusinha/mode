@@ -12,36 +12,38 @@ struct OnboardingScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: ModeSpacing.l) {
+                VStack(alignment: .leading, spacing: ModeSpacing.none) {
                     content
                 }
                 .padding(.horizontal, ModeSpacing.screenEdge)
-                .padding(.bottom, ModeSpacing.xxl)
+                .padding(.bottom, ModeSpacing.xl)
             }
-            .scrollEdgeEffectStyle(.soft, for: .all)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(state.step == .voice ? .hidden : .visible, for: .navigationBar)
+            .scrollBounceBehavior(.basedOnSize)
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: ModeSpacing.none) { header }
+            .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) { buttons }
             .modeScreen()
-            .safeAreaInset(edge: .bottom) { buttons.background(ModeColor.page) }
-            .toolbar {
-                if state.step != .welcome && state.step != .result && state.step != .voice {
-                    ToolbarItem(placement: .topBarLeading) { ModeToolbarButton(.back, label: L10n.Common.back) { onEvent(.back) } }
-                }
-                if let number = state.stepNumber, state.step != .voice {
-                    ToolbarItem(placement: .principal) { ModeStepDots(current: number, total: state.stepTotal, label: state.stepLabel) }
-                }
-            }
             .animation(ModeMotion.standard, value: state.step)
+        }
+    }
+
+    /// The back button and step dots; none on Welcome or on the result.
+    @ViewBuilder
+    private var header: some View {
+        if state.step != .welcome && state.step != .result {
+            ModeSetupHeader(backLabel: L10n.Common.back, step: state.stepNumber.map { (current: $0, total: state.stepTotal, label: state.stepLabel) }) { onEvent(.back) }
+                .padding(.bottom, ModeSpacing.xs)
+                .background(ModeEdgeFade(edge: .top).ignoresSafeArea(edges: .top))
         }
     }
 
     @ViewBuilder
     private var content: some View {
         switch state.step {
-        case .welcome: WelcomeStep(state: state, onEvent: onEvent)
+        case .welcome: WelcomeStep(state: state)
         case .name: NameStep(state: state, callName: $callName, onEvent: onEvent)
         case .key: KeyStep(providers: providers, onProvider: onProvider)
-        case .model: ModelStep(state: state, onEvent: onEvent)
+        case .model: ModelStep(state: state, providers: providers, onEvent: onEvent)
         case .permissions: PermissionsStep(state: state, onEvent: onEvent)
         case .voice: VoiceStep(state: state, onEvent: onEvent)
         case .test: TestStep(state: state)
@@ -52,7 +54,7 @@ struct OnboardingScreen: View {
 
     @ViewBuilder
     private var buttons: some View {
-        VStack(spacing: ModeSpacing.m) {
+        VStack(spacing: ModeSpacing.xs) {
             switch state.step {
             case .welcome:
                 ModeButton(L10n.Setup.getStarted, fullWidth: true) { onEvent(.next) }
@@ -73,9 +75,9 @@ struct OnboardingScreen: View {
             case .result:
                 ModeButton(L10n.Setup.runAgain, icon: .runAgain, role: .plain) { onEvent(.runTest) }
             case .diagnose:
-                HStack(spacing: ModeSpacing.m) {
-                    ModeButton(L10n.Setup.sendReport, icon: .share, role: .secondary, fullWidth: true) { onEvent(.sendReport) }
-                    ModeButton(L10n.Setup.checkAgain, fullWidth: true) { onEvent(.checkAgain) }.disabled(state.checking)
+                HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
+                    ModeSetupButton(L10n.Setup.sendReport, icon: .share, style: .lifted) { onEvent(.sendReport) }
+                    ModeSetupButton(L10n.Setup.checkAgain, style: .ink) { onEvent(.checkAgain) }.disabled(state.checking)
                 }
                 ModeButton(L10n.Setup.continueAnyway, role: .plain) { onEvent(.finish) }
             default:
@@ -84,33 +86,38 @@ struct OnboardingScreen: View {
             }
         }
         .padding(.horizontal, ModeSpacing.screenEdge)
-        .padding(.bottom, ModeSpacing.s)
+        .padding(.top, ModeSpacing.l)
+        .background(ModeEdgeFade(edge: .bottom).ignoresSafeArea(edges: .bottom))
     }
 }
 
-/// A setup page's title and the line under it.
+/// A setup page's title and the line under it, inset a little from the cards as on the boards.
 private struct StepHeader: View {
     let title: LocalizedStringResource
     let message: LocalizedStringResource
+    var top: CGFloat = ModeSpacing.setupTop
+    var small = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            Text(title).modeText(.largeTitle)
-            Text(message).modeText(.callout, color: ModeColor.textSecondary)
+        VStack(alignment: .leading, spacing: ModeSpacing.setupTitleGap) {
+            Text(title).modeText(.title).accessibilityAddTraits(.isHeader)
+            Text(message).modeText(small ? .subheadline : .callout, color: ModeColor.textSecondary)
         }
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, ModeSpacing.s)
+        .padding(.top, top)
     }
 }
 
 private struct WelcomeStep: View {
     let state: OnboardingViewModel.State
-    let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        VStack(spacing: ModeSpacing.l) {
-            ModeMark().padding(.top, ModeSpacing.xxxl)
-            Text(L10n.Setup.appName).modeText(.largeTitle)
-            Text(L10n.Setup.tagline).modeText(.title2, color: ModeColor.textSecondary).fontWeight(.regular).multilineTextAlignment(.center)
+        VStack(spacing: ModeSpacing.m + ModeSpacing.xxs) {
+            ModeMo(.idle, size: ModeSize.setupMoWelcome)
+            ModeSetupText(L10n.Setup.appName, style: .welcomeTitle).padding(.top, ModeSpacing.xxs)
+            ModeSetupText(L10n.Setup.tagline, style: .welcomeTagline).multilineTextAlignment(.center)
             VStack(spacing: ModeSpacing.s) {
                 HStack(spacing: ModeSpacing.s) {
                     ModePill(L10n.Setup.pillOpenSource)
@@ -118,15 +125,18 @@ private struct WelcomeStep: View {
                 }
                 ModePill(L10n.Setup.pillOnPhone)
             }
+            .padding(.top, ModeSpacing.xs)
             ModeCard {
-                ModeRow(String(localized: L10n.Setup.thisIPhone), subtitle: String(localized: state.paired ? L10n.Setup.paired : L10n.Setup.notPaired),
-                        leading: state.paired ? .success : .icon(.warning, ModeColor.warning), emphasis: .prominent)
-                ModeRow(String(localized: L10n.Setup.stepName), subtitle: String(localized: L10n.Setup.stepNameDetail), leading: .number(1), emphasis: .prominent)
-                ModeRow(String(localized: L10n.Setup.stepAI), subtitle: String(localized: L10n.Setup.stepAIDetail), leading: .number(2), emphasis: .prominent)
-                ModeRow(String(localized: L10n.Setup.stepTest), subtitle: String(localized: L10n.Setup.stepTestDetail), leading: .number(3), emphasis: .prominent)
+                ModeWelcomeRow(String(localized: L10n.Setup.thisIPhone), subtitle: String(localized: state.paired ? L10n.Setup.paired : L10n.Setup.notPaired),
+                               mark: state.paired ? .done : .warning)
+                ModeWelcomeRow(String(localized: L10n.Setup.stepName), subtitle: String(localized: L10n.Setup.stepNameDetail), mark: .number(1))
+                ModeWelcomeRow(String(localized: L10n.Setup.stepAI), subtitle: String(localized: L10n.Setup.stepAIDetail), mark: .number(2))
+                ModeWelcomeRow(String(localized: L10n.Setup.stepTest), subtitle: String(localized: L10n.Setup.stepTestDetail), mark: .number(3))
             }
+            .padding(.top, ModeSpacing.xs)
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, ModeSpacing.xxl)
     }
 }
 
@@ -136,15 +146,24 @@ private struct NameStep: View {
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        StepHeader(title: L10n.Setup.nameTitle, message: L10n.Setup.nameMessage)
-        if let name = state.cardName {
-            ModeContactCard(initials: state.initials, name: name, subtitle: L10n.Setup.fromCard)
+        HStack(spacing: ModeSpacing.m) {
+            ModeMo(.yourTurn, size: ModeSize.moLarge)
+            ModeSpeechBubble(L10n.Setup.hiMo)
         }
-        ModeFieldCard(L10n.Setup.callYou, prompt: L10n.Setup.callYouPrompt, text: $callName)
-        ModeButton(state.cardName == nil ? L10n.Setup.chooseCard : L10n.Setup.chooseDifferentCard, icon: .contact, role: .secondary, fullWidth: true) {
-            onEvent(.chooseCard)
+        .padding(.horizontal, ModeSpacing.s)
+        .padding(.top, ModeSpacing.xl)
+        StepHeader(title: L10n.Setup.nameTitle, message: L10n.Setup.nameMessage, top: ModeSpacing.l + ModeSpacing.xxs)
+        VStack(spacing: ModeSpacing.m) {
+            if let name = state.cardName {
+                ModeContactCard(initials: state.initials, name: name, subtitle: L10n.Setup.fromCard)
+            }
+            ModeFieldCard(L10n.Setup.callYou, prompt: L10n.Setup.callYouPrompt, text: $callName)
+            ModeButton(state.cardName == nil ? L10n.Setup.chooseCard : L10n.Setup.chooseDifferentCard, icon: .contact, role: .secondary, fullWidth: true) {
+                onEvent(.chooseCard)
+            }
         }
-        ModeNote(icon: .lock, L10n.Setup.contactsNote).padding(.top, ModeSpacing.l)
+        .padding(.top, ModeSpacing.m)
+        ModeNote(icon: .lock, L10n.Setup.contactsNote).padding(.top, ModeSpacing.xxxl)
     }
 }
 
@@ -155,12 +174,31 @@ private struct KeyStep: View {
 
     var body: some View {
         StepHeader(title: L10n.Setup.keyTitle, message: L10n.Providers.setupMessage)
-        ProviderList(rows: providers.rows, setup: true, onEvent: onProvider)
-            .padding(.top, ModeSpacing.s)
-        Text(providers.activeConnected ? L10n.Providers.setupHintConnected : L10n.Providers.setupHint)
+        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+            ModeCard(lifted: true) {
+                ForEach(providers.rows) { row in
+                    ModeSetupProviderRow(
+                        title: row.title, detail: String(localized: row.kind.setupDetail), logo: row.kind.logo,
+                        tileBackground: row.kind.setupTileBackground, tileForeground: row.kind.setupTileForeground,
+                        tag: row.kind == .chatGPT ? String(localized: L10n.Providers.recommended) : nil,
+                        selected: row.inUse, connected: row.connected,
+                        connectTitle: String(localized: L10n.Providers.connect), connectedTitle: String(localized: L10n.Providers.connected),
+                        onSelect: { onProvider(.select(row.id)) }, onConnect: { onProvider(.connect(row.id)) }
+                    )
+                }
+            }
+            Group {
+                if providers.activeConnected {
+                    Text(L10n.Setup.keyConnectedHint(providers.activeTitle))
+                } else {
+                    Text(L10n.Providers.setupHint)
+                }
+            }
             .modeText(.footnote, color: ModeColor.textSecondary)
-            .padding(.horizontal, ModeSpacing.xs)
-        ModeNote(icon: .lock, L10n.Providers.keychainNote).padding(.top, ModeSpacing.m)
+            .padding(.horizontal, ModeSpacing.s)
+            ModeNote(icon: .lock, L10n.Providers.keychainNote, inset: ModeSpacing.s)
+        }
+        .padding(.top, ModeSpacing.xxxl)
     }
 }
 
@@ -168,14 +206,24 @@ private struct KeyStep: View {
 /// its model, how hard it thinks, and Mode's recommendation.
 private struct ModelStep: View {
     let state: OnboardingViewModel.State
+    let providers: ProvidersViewModel.State
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        StepHeader(title: L10n.Setup.modelTitle, message: L10n.Setup.modelMessage)
-        RoleCardView(label: L10n.Setup.phoneControl, detail: L10n.Setup.phoneDetail, card: state.phoneCard) { onEvent(.openPicker(.phone)) }
-        RoleCardView(label: L10n.Setup.whenStuck, detail: L10n.Setup.stuckDetail, card: state.brainCard) { onEvent(.openPicker(.brain)) }
-        if state.onPlan { ModeInfoCard(icon: .info, L10n.Setup.whyThese) }
-        Text(state.onPlan ? L10n.Setup.onPlanNote : L10n.Setup.pricesNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+        VStack(alignment: .leading, spacing: ModeSpacing.setupTitleGap) {
+            StepHeader(title: L10n.Setup.modelTitle, message: L10n.Setup.modelMessage, top: ModeSpacing.m, small: true)
+            if providers.activeConnected {
+                ModeConnectedChip(L10n.Setup.providerConnected(providers.activeTitle)).padding(.horizontal, ModeSpacing.s)
+            }
+        }
+        VStack(alignment: .leading, spacing: ModeSpacing.s + ModeSpacing.xxs) {
+            RoleCardView(label: L10n.Setup.phoneControl, detail: L10n.Setup.phoneDetail, card: state.phoneCard) { onEvent(.openPicker(.phone)) }
+            RoleCardView(label: L10n.Setup.whenStuck, detail: L10n.Setup.stuckDetail, card: state.brainCard) { onEvent(.openPicker(.brain)) }
+            if state.onPlan { ModeSetupNote(.mo, lead: String(localized: L10n.Setup.whyLead), text: String(localized: L10n.Setup.whyRest)) }
+            Text(state.onPlan ? L10n.Setup.onPlanNote : L10n.Setup.pricesNote).modeText(.footnote, color: ModeColor.textSecondary)
+                .padding(.horizontal, ModeSpacing.s).padding(.top, ModeSpacing.xxs)
+        }
+        .padding(.top, ModeSpacing.l)
     }
 }
 
@@ -189,30 +237,35 @@ private struct RoleCardView: View {
     var body: some View {
         ModeCard {
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(label).textCase(.uppercase).modeText(.captionEmphasis, color: ModeColor.textSecondary)
-                Text(detail).modeText(.caption, color: ModeColor.textSecondary)
+                Text(label).textCase(.uppercase).modeText(.caption, color: ModeColor.textSecondary).fontWeight(.bold).tracking(ModeSize.separator / 2)
+                Text(detail).modeText(.footnote, color: ModeColor.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, ModeSpacing.s)
+            .padding(.top, ModeSpacing.m + ModeSpacing.xxs)
+            .padding(.bottom, ModeSpacing.s + ModeSpacing.xxs)
             Button(action: action) {
                 HStack(spacing: ModeSpacing.m) {
                     if let leading = card?.leading { ModeLeadingView(leading) }
-                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.xs + ModeSpacing.xxs / 2) {
                         Text(card?.name ?? String(localized: L10n.Setup.stuckOff)).modeText(.headline)
                         if let card {
-                            HStack(spacing: ModeSpacing.s) {
-                                if let effort = card.effort { ModeTag(effort, background: ModeColor.fill, foreground: ModeColor.textSecondary) }
-                                if card.recommended {
-                                    ModeTag(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                            if card.effort != nil || card.recommended {
+                                HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
+                                    if let effort = card.effort { ModeTag(effort, icon: .effort, background: ModeColor.cardRaised, foreground: ModeColor.textPrimary, large: true) }
+                                    if card.recommended {
+                                        ModeTag(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint, large: true)
+                                    }
                                 }
                             }
-                            if !card.why.isEmpty { Text(card.why).modeText(.subheadline, color: ModeColor.textSecondary) }
+                            if !card.why.isEmpty { Text(card.why).modeText(.footnote, color: ModeColor.textSecondary) }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     ModeChevron()
                 }
-                .padding(.vertical, ModeSpacing.m)
+                .padding(.top, ModeSpacing.m)
+                .padding(.bottom, ModeSpacing.m + ModeSpacing.xxs)
+                .frame(minHeight: ModeSize.setupRoleRow)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -220,26 +273,31 @@ private struct RoleCardView: View {
     }
 }
 
-/// A model to choose: maker tile, name and tag, what it's good at and its cost, and the selection mark.
+/// A model to choose: maker tile, name and tag, what it's good at and its cost, and the selection mark
+/// (board Model; [compact] is the picker sheet's smaller row, board SetupModelPicker).
 struct ChoiceRow: View {
     let choice: OnboardingViewModel.Choice
+    var compact = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: ModeSpacing.m) {
                 ModeLeadingView(choice.leading)
+                    .scaleEffect(compact ? ModeSize.setupPickerTile / ModeSize.tile : 1)
+                    .frame(width: compact ? ModeSize.setupPickerTile : ModeSize.tile, height: compact ? ModeSize.setupPickerTile : ModeSize.tile)
                 VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                    HStack(spacing: ModeSpacing.s) {
-                        Text(choice.name).modeText(.headline)
-                        if let tag = choice.tag { ModeTag(tag.text, background: tag.background, foreground: tag.foreground) }
+                    HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
+                        Text(choice.name).modeText(.calloutEmphasis)
+                        if let tag = choice.tag { ModeTag(tag.text, background: tag.background, foreground: tag.foreground, large: compact).fixedSize() }
                     }
-                    Text(choice.detail).modeText(.subheadline, color: ModeColor.textSecondary)
+                    Text(choice.detail).modeText(.footnote, color: ModeColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 ModeRadio(selected: choice.selected)
             }
-            .padding(.vertical, ModeSpacing.m)
+            .padding(.vertical, ModeSpacing.s)
+            .frame(minHeight: compact ? ModeSize.setupPickerRow : ModeSize.setupModelRow)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -252,43 +310,41 @@ private struct PermissionsStep: View {
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        StepHeader(title: L10n.Setup.permissionsTitle, message: L10n.Setup.permissionsMessage)
-        ModeCard {
+        HStack(alignment: .bottom, spacing: ModeSpacing.m) {
+            StepHeader(title: L10n.Setup.permissionsTitle, message: L10n.Setup.permissionsMessage, top: ModeSpacing.xl + ModeSpacing.xs)
+            ModeMo(.yourTurn, size: ModeSize.moHero)
+        }
+        ModeCard(lifted: true) {
             ForEach(state.permissions) { row in
-                ModeRow(String(localized: row.title), subtitle: String(localized: row.why), leading: row.leading, emphasis: .prominent) {
-                    ModeStatusView(row.action) { onEvent(.allow(row.id)) }
+                ModePermissionRow(String(localized: row.title), why: String(localized: row.why), icon: row.icon,
+                                  tileBackground: row.tileBackground, tileForeground: row.tileForeground, status: row.action) {
+                    onEvent(.allow(row.id))
                 }
             }
         }
+        .padding(.top, ModeSpacing.xl + ModeSpacing.xs)
     }
 }
 
-/// Setup's Talk to Mode board: compact provider headers and the same voice rows as Settings.
+/// Setup's Talk to Mode board: Mo listening, compact provider headers and the same voice rows as Settings.
 private struct VoiceStep: View {
     let state: OnboardingViewModel.State
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: ModeSpacing.s) {
-                    ModeStepDots(current: state.stepNumber ?? 1, total: state.stepTotal, label: state.stepLabel)
-                        .padding(.top, ModeSpacing.l)
-                    ModeVoiceOrb(speaking: false, size: ModeSize.voiceLogo, compact: true, ringCount: 1)
-                    VStack(spacing: ModeSpacing.none) {
-                        Text(L10n.Voice.setupTitle).modeText(.title).multilineTextAlignment(.center)
-                        Text(L10n.Voice.setupPrompt).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                ModeIconButton(.back, label: L10n.Common.back, size: ModeSize.activityButton) { onEvent(.back) }
-            }
+        VStack(spacing: ModeSpacing.xs) {
+            ModeMo(.listening, size: ModeSize.setupMoTalk)
+            ModeSetupText(L10n.Voice.setupTitle, style: .compactTitle).multilineTextAlignment(.center).padding(.top, ModeSpacing.s)
+            Text(L10n.Voice.setupPrompt).modeText(.subheadline, color: ModeColor.textSecondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
 
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
             HStack {
-                Text(L10n.Voice.whoSpeaks).modeText(.headline).accessibilityAddTraits(.isHeader)
+                Text(L10n.Voice.whoSpeaks).modeText(.section).accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button { onEvent(.openVoiceSheet(.voices)) } label: {
-                    Text(L10n.Voice.viewMore).modeText(.footnote, color: ModeColor.tint).fontWeight(.semibold)
+                    Text(L10n.Voice.viewMore).modeText(.footnoteEmphasis, color: ModeColor.tint)
                         .frame(minHeight: ModeSize.touch)
                 }
                 .buttonStyle(.plain)
@@ -305,32 +361,37 @@ private struct VoiceStep: View {
                 }
                 if state.speaker == .apple {
                     Button { onEvent(.openVoiceSheet(.elevenLabs)) } label: {
-                        HStack(spacing: ModeSpacing.s) {
-                            ModeLeadingView(VoiceService.elevenlabs.tile).scaleEffect(0.7).frame(width: ModeSize.badge)
-                            Text(L10n.Voice.humanVoiceSuggestion).modeText(.footnote, color: ModeColor.tint).fontWeight(.semibold)
+                        HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
+                            ModeLeadingView(VoiceService.elevenlabs.tile)
+                                .scaleEffect(ModeSize.iconLarge / ModeSize.tile)
+                                .frame(width: ModeSize.iconLarge, height: ModeSize.iconLarge)
+                            Text(L10n.Voice.humanVoiceSuggestion).modeText(.subheadlineEmphasis)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             ModeChevron()
                         }
-                        .frame(minHeight: ModeSize.touch)
+                        .frame(minHeight: ModeSize.touch + ModeSpacing.xs)
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                 }
             }
 
-            ModeSectionHeader(L10n.Voice.whoListens)
+            Text(L10n.Voice.whoListens).modeText(.section).accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, ModeSpacing.xs).padding(.top, ModeSpacing.s - ModeSpacing.xxs)
             ModeCard {
                 provider(state.listener, hearing: true)
                 microphone
             }
         }
+        .padding(.top, ModeSpacing.m)
     }
 
     private var microphone: some View {
         HStack(spacing: ModeSpacing.m) {
-            ModeIcon.microphone.image.modeText(.callout, color: ModeColor.tint)
+            ModeIcon.microphone.image.font(ModeIconFont.small)
+                .foregroundStyle(state.microphoneAllowed ? ModeColor.success : ModeColor.infoText)
                 .frame(width: ModeSize.voiceProviderLogo, height: ModeSize.voiceProviderLogo)
-                .background(ModeColor.tintSoft, in: .circle)
+                .background(state.microphoneAllowed ? ModeColor.tagGreen : ModeColor.infoSoft, in: .circle)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                 Text(L10n.Setup.microphone).modeText(.callout)
@@ -339,21 +400,17 @@ private struct VoiceStep: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if state.microphoneAllowed {
-                HStack(spacing: ModeSpacing.xs) {
-                    Circle().fill(ModeColor.success).frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
-                    Text(L10n.Setup.allowed).modeText(.footnote, color: ModeColor.success).fontWeight(.semibold)
+                HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
+                    Circle().fill(ModeColor.success).frame(width: ModeSize.setupDot, height: ModeSize.setupDot)
+                    Text(L10n.Setup.allowed).modeText(.subheadlineEmphasis, color: ModeColor.success)
                 }
             } else {
-                Button { onEvent(state.microphoneDenied ? .openMicSettings : .allowMic) } label: {
-                    Text(state.microphoneDenied ? L10n.Voice.openSettings : L10n.Setup.allow)
-                        .modeText(.footnote, color: state.microphoneDenied ? ModeColor.tint : ModeColor.onAccent).fontWeight(.semibold)
-                        .padding(.horizontal, ModeSize.voiceChangePadding).frame(minHeight: ModeSize.voiceChangeHeight)
-                        .background(state.microphoneDenied ? ModeColor.fill : ModeColor.accent, in: .capsule)
-                        .frame(minHeight: ModeSize.touch).contentShape(.rect)
+                ModeAllowButton(state.microphoneDenied ? L10n.Voice.openSettings : L10n.Setup.allow, quiet: state.microphoneDenied) {
+                    onEvent(state.microphoneDenied ? .openMicSettings : .allowMic)
                 }
-                .buttonStyle(.plain)
             }
         }
+        .padding(.vertical, ModeSpacing.s)
         .frame(minHeight: ModeSize.rowMin)
     }
 
@@ -367,18 +424,18 @@ private struct VoiceStep: View {
                     HStack(spacing: ModeSpacing.s) { providerName(service).fixedSize(); recommendation(service) }
                     VStack(alignment: .leading, spacing: ModeSpacing.xxs) { providerName(service); recommendation(service) }
                 }
-                HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
+                HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
                     Circle().fill((hearing ? state.listenerConnected : state.speakerConnected) ? ModeColor.success : ModeColor.separator)
-                        .frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
+                        .frame(width: ModeSize.setupDot, height: ModeSize.setupDot)
                     Text(hearing ? state.listenerStatus : state.speakerStatus)
                         .modeText(.footnote, color: ModeColor.textSecondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button { onEvent(.openVoiceSheet(hearing ? .listen : .speak)) } label: {
-                Text(L10n.Providers.change).modeText(.footnote).fontWeight(.semibold)
+                Text(L10n.Providers.change).modeText(.subheadlineEmphasis)
                     .padding(.horizontal, ModeSize.voiceChangePadding).frame(minHeight: ModeSize.voiceChangeHeight)
-                    .background(ModeColor.fill, in: .capsule)
+                    .background(ModeColor.cardRaised, in: .capsule)
                     .frame(minHeight: ModeSize.touch)
                     .contentShape(.rect)
             }
@@ -392,9 +449,9 @@ private struct VoiceStep: View {
         .frame(minHeight: ModeSize.voiceProviderRow)
     }
 
-    private func providerName(_ service: VoiceService) -> some View { Text(service.title).modeText(.callout).fontWeight(.semibold) }
+    private func providerName(_ service: VoiceService) -> some View { Text(service.title).modeText(.calloutEmphasis) }
     @ViewBuilder private func recommendation(_ service: VoiceService) -> some View {
-        if let tag = service.recommendation { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint).fixedSize() }
+        if let tag = service.recommendation { ModeTag(tag, background: ModeColor.cardRaised, foreground: ModeColor.textPrimary).fixedSize() }
     }
 }
 
@@ -407,8 +464,8 @@ private struct TestStep: View {
             labels: [String(localized: L10n.Setup.openSettings), String(localized: L10n.Setup.tapWifi), String(localized: L10n.Setup.comeBack)],
             phases: state.testPhases
         )
-        .padding(.vertical, ModeSpacing.l)
-        ModeInfoCard(icon: .info, L10n.Setup.testNote)
+        .padding(.top, ModeSpacing.s)
+        ModeSetupNote(.icon(.info), text: String(localized: L10n.Setup.testNote)).padding(.top, ModeSpacing.setupTop)
     }
 }
 
@@ -417,45 +474,54 @@ private struct ResultStep: View {
     let onEvent: (OnboardingViewModel.Event) -> Void
 
     var body: some View {
-        VStack(spacing: ModeSpacing.l) {
-            ModeResultBadge(success: state.testPassed).padding(.top, ModeSpacing.xxxl)
-            Text(state.testPassed ? L10n.Setup.resultTitle : L10n.Setup.resultFailedTitle).modeText(.title).multilineTextAlignment(.center)
-            HStack(alignment: .top, spacing: ModeSpacing.l) {
-                Group {
-                    if let shot = state.shot {
-                        Image(uiImage: shot).resizable().scaledToFill()
-                    } else {
-                        ModeColor.fill
-                    }
-                }
-                .frame(width: ModeSize.resultShotWidth)
-                .frame(maxHeight: .infinity)
-                .clipShape(.rect(cornerRadius: ModeRadius.field))
-                VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                    Text(L10n.Setup.whatModeDid).modeText(.footnote, color: ModeColor.textSecondary)
-                    ForEach(state.did) { row in
-                        HStack(spacing: ModeSpacing.s) {
-                            ModeRow(String(localized: row.title), leading: row.leading, action: nil) {
-                                if let detail = row.detail { Text(detail).modeText(.subheadline, color: ModeColor.textSecondary) }
-                            }
-                        }
-                    }
-                    if state.shot != nil { Text(L10n.Setup.shotCaption).modeText(.caption, color: ModeColor.textSecondary) }
-                }
-            }
-            .padding(ModeSpacing.l)
-            .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
-            VStack(spacing: ModeSpacing.l) {
-                Text(L10n.Setup.question).modeText(.headline).multilineTextAlignment(.center)
-                HStack(spacing: ModeSpacing.m) {
-                    ModeButton(L10n.Setup.no, role: .secondary, fullWidth: true) { onEvent(.worked(false)) }
-                    ModeButton(L10n.Setup.itWorked, fullWidth: true) { onEvent(.worked(true)) }
-                }
-            }
-            .padding(ModeSpacing.l)
-            .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        VStack(spacing: ModeSpacing.s) {
+            ModeMo(state.testPassed ? .done : .stuck, size: ModeSize.setupMoResult)
+            ModeSetupText(state.testPassed ? L10n.Setup.resultTitle : L10n.Setup.resultFailedTitle, style: .compactTitle)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, ModeSpacing.s)
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, ModeSpacing.xl + ModeSpacing.xs)
+
+        HStack(alignment: .top, spacing: ModeSpacing.m + ModeSpacing.xxs) {
+            Group {
+                if let shot = state.shot {
+                    Image(uiImage: shot).resizable().scaledToFill()
+                } else {
+                    ModeShotPlaceholder()
+                }
+            }
+            .frame(width: ModeSize.resultShotWidth, height: ModeSize.setupShotHeight)
+            .clipShape(.rect(cornerRadius: ModeRadius.setupShot))
+            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+                Text(L10n.Setup.whatModeDid).modeText(.footnote, color: ModeColor.textSecondary)
+                ForEach(state.did) { row in
+                    ModeDidRow(String(localized: row.title), detail: row.detail, mark: row.leading)
+                }
+                Spacer(minLength: ModeSpacing.none)
+                Text(L10n.Setup.shotCaption).modeText(.caption, color: ModeColor.textSecondary)
+            }
+            .padding(.top, ModeSpacing.xs)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(ModeSpacing.m)
+        .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.card))
+        .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.card), lifted: false)
+        .padding(.top, ModeSpacing.l)
+
+        VStack(spacing: ModeSpacing.m + ModeSpacing.xxs) {
+            Text(L10n.Setup.question).modeText(.headline).multilineTextAlignment(.center)
+            HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
+                ModeSetupButton(L10n.Setup.no, style: .blueQuiet) { onEvent(.worked(false)) }
+                ModeSetupButton(L10n.Setup.itWorked, style: .blue) { onEvent(.worked(true)) }
+            }
+        }
+        .padding(.horizontal, ModeSpacing.l)
+        .padding(.top, ModeSpacing.l + ModeSpacing.xxs)
+        .padding(.bottom, ModeSpacing.l)
+        .frame(maxWidth: .infinity)
+        .background(ModeColor.infoSoft, in: .rect(cornerRadius: ModeRadius.card))
+        .padding(.top, ModeSpacing.m)
     }
 }
 
@@ -463,13 +529,22 @@ private struct DiagnoseStep: View {
     let state: OnboardingViewModel.State
 
     var body: some View {
-        StepHeader(title: L10n.Setup.diagnoseTitle, message: L10n.Setup.diagnoseMessage)
+        HStack(alignment: .top, spacing: ModeSpacing.m) {
+            VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                ModeSetupText(L10n.Setup.diagnoseTitle, style: .diagnoseTitle)
+                Text(L10n.Setup.diagnoseMessage).modeText(.subheadline, color: ModeColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            ModeMo(.stuck, size: ModeSize.setupMoDiagnose)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, ModeSpacing.xs)
+        .padding(.top, ModeSpacing.s)
         ModeCard {
             ForEach(state.checks) { check in
-                ModeRow(String(localized: check.title), subtitle: check.detail, leading: check.leading, emphasis: check.emphasis, action: nil) {
-                    if let trailing = check.trailing { Text(trailing).modeText(.subheadline, color: ModeColor.textSecondary) }
-                }
+                ModeCheckRow(String(localized: check.title), state: check.state, detail: check.detail, trailing: check.trailing)
             }
         }
+        .padding(.top, ModeSpacing.l)
     }
 }

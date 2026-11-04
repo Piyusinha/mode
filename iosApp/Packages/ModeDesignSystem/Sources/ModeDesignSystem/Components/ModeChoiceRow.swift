@@ -20,9 +20,13 @@ public struct ModeChoiceRow: View {
     private let detail: String
     private let leading: ModeRowLeading
     private let selected: Bool
+    private let emphasis: ModeRowEmphasis
     private let action: () -> Void
 
-    public init(_ title: String, tag: Tag?, detail: String, leading: ModeRowLeading, selected: Bool, action: @escaping () -> Void) {
+    /// [emphasis] .prominent sets the name semibold (models, Access); .standard plain (languages).
+    public init(_ title: String, tag: Tag?, detail: String, leading: ModeRowLeading, selected: Bool, emphasis: ModeRowEmphasis = .prominent,
+                action: @escaping () -> Void) {
+        self.emphasis = emphasis
         self.title = title
         self.tag = tag
         self.detail = detail
@@ -38,33 +42,36 @@ public struct ModeChoiceRow: View {
                 VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                     // The name is never cut short: when it and its tag don't fit on one line, the tag goes under it.
                     ViewThatFits(in: .horizontal) {
-                        HStack(spacing: ModeSpacing.s) {
-                            Text(title).modeText(.bodyEmphasis).fixedSize()
+                        HStack(spacing: ModeSpacing.xs + ModeSpacing.xxs) {
+                            Text(title).modeText(titleStyle).fixedSize()
                             tagView
                         }
                         VStack(alignment: .leading, spacing: ModeSpacing.xs) {
-                            Text(title).modeText(.bodyEmphasis).fixedSize(horizontal: false, vertical: true)
+                            Text(title).modeText(titleStyle).fixedSize(horizontal: false, vertical: true)
                             tagView
                         }
                     }
-                    Text(detail).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(3)
+                    Text(detail).modeText(.footnote, color: ModeColor.textSecondary).lineSpacing(ModeSpacing.xxs).lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 ModeRadio(selected: selected)
             }
-            .padding(.vertical, ModeSpacing.m)
+            .padding(.vertical, emphasis == .prominent ? ModeSpacing.headerGap : ModeSpacing.s)
+            .frame(minHeight: leading == .none ? ModeSize.rowMin : ModeSize.tileRow)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
+    private var titleStyle: ModeTextStyle { emphasis == .prominent ? .calloutEmphasis : .callout }
+
     @ViewBuilder private var tagView: some View {
         if let tag { ModeTag(tag.text, background: tag.background, foreground: tag.foreground).fixedSize() }
     }
 }
 
-/// A search field in a glass capsule, always visible at the top of a list.
+/// A search field in a white capsule, always visible at the top of a list.
 public struct ModeSearchField: View {
     private let prompt: String
     @Binding private var text: String
@@ -76,8 +83,8 @@ public struct ModeSearchField: View {
 
     public var body: some View {
         HStack(spacing: ModeSpacing.s) {
-            ModeIcon.search.image.foregroundStyle(ModeColor.textSecondary).accessibilityHidden(true)
-            TextField(text: $text) { Text(prompt) }
+            ModeIcon.search.image.font(ModeIconFont.small).foregroundStyle(ModeColor.textSecondary).accessibilityHidden(true)
+            TextField(text: $text) { Text(prompt).foregroundStyle(ModeColor.textSecondary) }
                 .modeText(.body)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -87,8 +94,9 @@ public struct ModeSearchField: View {
                     .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, ModeSpacing.l)
+        .padding(.horizontal, ModeSpacing.headerGap)
         .frame(minHeight: ModeSize.touch)
-        .glassEffect(.regular, in: .capsule)
+        .background(ModeColor.card, in: .capsule)
+        .modeShadow(in: Capsule())
     }
 }

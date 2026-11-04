@@ -34,16 +34,23 @@ final class HomeViewModel {
         case openConversation(String)
         case addKey
         case openSettings
+        case pauseToggle
+        case stop
+        case openRun
     }
 
     private(set) var state = State()
     private let presenter: HomePresenter
     private let navigate: (Route) -> Void
+    private let run: RunStatusViewModel?
+    private let openLive: () -> Void
     private var updates: Updates?
 
-    init(screens: Screens, navigate: @escaping (Route) -> Void) {
+    init(screens: Screens, run: RunStatusViewModel?, navigate: @escaping (Route) -> Void, openLive: @escaping () -> Void) {
         presenter = screens.home()
+        self.run = run
         self.navigate = navigate
+        self.openLive = openLive
         updates = observe(presenter.state) { [weak self] s in self?.state = Self.map(s) }
     }
 
@@ -53,6 +60,9 @@ final class HomeViewModel {
             if let conversation = presenter.ask(text: text, private: false) { navigate(.conversation(id: conversation)) }
         case let .openConversation(id): navigate(.conversation(id: id))
         case .addKey, .openSettings: navigate(.settings)
+        case .pauseToggle: run?.togglePause()
+        case .stop: run?.stop()
+        case .openRun: openLive()
         }
     }
 
@@ -61,7 +71,7 @@ final class HomeViewModel {
         presenter.close()
     }
 
-    private static func map(_ s: HomeUiState) -> State {
+    static func map(_ s: HomeUiState) -> State {
         State(
             greeting: L10n.Home.greeting(partOfDay(s.partOfDay), name: s.name),
             suggestions: s.suggestions.map { suggestion in
@@ -88,11 +98,10 @@ final class HomeViewModel {
 
     private static func leading(_ badge: TaskBadge?) -> ModeRowLeading {
         switch badge {
-        case .done: .success
-        case .failed: .failure
-        case .gaveUp: .icon(.warning, ModeColor.warning)
-        case .stopped, .notStarted: .icon(.stopped, ModeColor.textSecondary)
-        case nil: .progress
+        case .done: .mo(.done)
+        case .failed, .gaveUp: .mo(.stuck)
+        case .stopped, .notStarted: .mo(.sleep)
+        case nil: .mo(.working)
         }
     }
 

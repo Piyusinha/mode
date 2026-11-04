@@ -14,7 +14,8 @@ final class LiveViewModel {
         let paused: Bool
         let task: String
         let now: String
-        let steps: [String]
+        /// The last few steps as bars with labels: the latest is the one in progress.
+        let segments: [ModeSegments.Segment]
     }
 
     struct Finished: Equatable {
@@ -73,7 +74,7 @@ final class LiveViewModel {
                 paused: r.paused,
                 task: r.text,
                 now: r.paused ? String(localized: L10n.Run.paused) : (s.now ?? r.status),
-                steps: s.steps.map(\.reason).filter { !$0.isEmpty }
+                segments: Self.segments(s.steps.map(\.reason).filter { !$0.isEmpty })
             )
         }
         state.finished = s.finished.map {
@@ -82,4 +83,9 @@ final class LiveViewModel {
         }
     }
 
+    /// The last three steps: the earlier ones done, the latest in progress.
+    static func segments(_ steps: [String]) -> [ModeSegments.Segment] {
+        let shown = steps.suffix(3)
+        return shown.enumerated().map { index, step in .init(step, state: index == shown.count - 1 ? .now : .done) }
+    }
 }

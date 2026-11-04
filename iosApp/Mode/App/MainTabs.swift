@@ -34,35 +34,18 @@ struct MainTabs: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab(value: AppTab.home) { stack(.home) { navigate in HomeRoute(app: app, navigate: navigate) } }
-            Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, navigate: navigate, newTask: { showingAsk = true }) } }
+            Tab(value: AppTab.home) { stack(.home) { navigate in HomeRoute(app: app, run: run, navigate: navigate, openLive: { showingLive = true }) } }
+            Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, run: run, navigate: navigate, newTask: { showingAsk = true }) } }
             Tab(value: AppTab.memory) { stack(.memory) { navigate in MemoryRoute(app: app, navigate: navigate) } }
         }
         .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) {
             if paths[tab, default: []].isEmpty {
-                ModeTabBar(
-                    items: [
-                        ModeTabItem(AppTab.home, icon: .home, title: L10n.Tab.home),
-                        ModeTabItem(AppTab.tasks, icon: .tasks, title: L10n.Tab.tasks),
-                        ModeTabItem(AppTab.memory, icon: .memory, title: L10n.Tab.memory),
-                    ],
-                    selection: $tab,
-                    speakLabel: L10n.Tab.ask,
-                    onSpeak: { showingAsk = true }
-                ) {
-                    if let running = run.state.running {
-                        ModeMiniPlayer(
-                            title: running.title, status: running.status, paused: running.paused,
-                            pauseLabel: L10n.Run.pause, resumeLabel: L10n.Run.resume, stopLabel: L10n.Common.stop,
-                            onPauseToggle: run.togglePause, onStop: run.stop, onOpen: { showingLive = true }
-                        )
-                    }
-                }
-                .animation(ModeMotion.standard, value: run.state.running)
-                .padding(.bottom, ModeSpacing.xs)
+                // On Home the running task is the dark card in the page; elsewhere a white bar above the tabs.
+                MainBar(tab: $tab, running: tab == .home ? nil : run.state.running,
+                        onSpeak: { showingAsk = true }, onPauseToggle: run.togglePause, onStop: run.stop, onOpen: { showingLive = true })
             }
         }
-        .sheet(isPresented: $showingLive) { NavigationStack { LiveRoute(app: app) } }
+        .fullScreenCover(isPresented: $showingLive) { NavigationStack { LiveRoute(app: app) } }
         // Talking mode: "Start Mode", and a question in a spoken task (Mode came forward to ask it out loud).
         .fullScreenCover(isPresented: Binding(get: { showingListen || run.state.talking },
                                               set: { if !$0 { showingListen = false } })) {
@@ -117,6 +100,12 @@ struct MainTabs: View {
             talkEntry = id == nil ? "ask_mic" : "chat_mic"
             // One full-screen view at a time: from the Ask sheet, talking mode waits for it to close.
             if showingAsk { talkAfterAsk = true; showingAsk = false } else { showingListen = true }
+        case let .retry(taskId, conversationId):
+            // As What went wrong's Try again: the same task, in the same chat.
+            let presenter = app.screens.taskDebug(taskId: taskId)
+            _ = presenter.retry()
+            presenter.close()
+            if let conversationId { open(.conversation(id: conversationId)) }
         }
     }
 
@@ -153,8 +142,7 @@ struct MainTabs: View {
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
         case "activity":
-            ActivityPreview.yourTurn = parts.last == "yourturn"
-            previewActivity = ActivityPreview.yourTurn ? .waiting : ModeActivityAttributes.ContentState.Phase(rawValue: parts.last ?? "")
+            previewActivity = ActivityPreview.phase(for: parts.last ?? "")
         case "question": previewQuestion = ActivityPreview.sampleQuestion
         case "sample": sample = ScreenSample(id: parts.last ?? "")
         default: break
@@ -164,6 +152,44 @@ struct MainTabs: View {
 
     private func stack<Content: View>(_ tab: AppTab, @ViewBuilder content: @escaping (@escaping (Route) -> Void) -> Content) -> some View {
         TabRoot(app: app, path: Binding(get: { paths[tab, default: []] }, set: { paths[tab] = $0 }), content: content)
+    }
+}
+
+/// The bottom of the main screens: the running task (when given) above the tabs and the Speak button,
+/// over the page fading out.
+struct MainBar: View {
+    @Binding var tab: AppTab
+    let running: RunStatusViewModel.Running?
+    let onSpeak: () -> Void
+    let onPauseToggle: () -> Void
+    let onStop: () -> Void
+    let onOpen: () -> Void
+
+    var body: some View {
+        ModeTabBar(
+            items: [
+                ModeTabItem(AppTab.home, icon: .home, title: L10n.Tab.home),
+                ModeTabItem(AppTab.tasks, icon: .tasks, title: L10n.Tab.tasks),
+                ModeTabItem(AppTab.memory, icon: .memory, title: L10n.Tab.memory),
+            ],
+            selection: $tab,
+            speakLabel: L10n.Tab.ask,
+            onSpeak: onSpeak
+        ) {
+            if let running {
+                ModeMiniPlayer(
+                    title: running.title, status: running.status, paused: running.paused, compact: true,
+                    pauseLabel: L10n.Run.pause, resumeLabel: L10n.Run.resume, stopLabel: L10n.Common.stop,
+                    onPauseToggle: onPauseToggle, onStop: onStop, onOpen: onOpen
+                )
+            }
+        }
+        .animation(ModeMotion.standard, value: running)
+        // 28 from the bottom of the screen, as on the board (a little into the home indicator's area).
+        .padding(.bottom, ModeSpacing.xxs - ModeSpacing.s)
+        .background(alignment: .bottom) {
+            ModeEdgeFade(edge: .bottom).padding(.top, -ModeSpacing.xxxl).ignoresSafeArea(edges: .bottom).allowsHitTesting(false)
+        }
     }
 }
 

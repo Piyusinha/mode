@@ -12,20 +12,25 @@ struct MemoryScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                Text(L10n.Memory.subtitle).modeText(.callout, color: ModeColor.textSecondary)
-                ModeCard { ModeToggleRow(L10n.Memory.learn, isOn: Binding(get: { state.learn }, set: { onEvent(.learn($0)) })) }
-                Text(L10n.Memory.hubHint).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                ModeCard {
-                    ModeRow(String(localized: L10n.Memory.aboutYou), subtitle: state.aboutYouSummary, leading: .icon(.person), emphasis: .prominent,
-                            action: { open(.memoryAboutYou) }) { ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary) }
-                    ModeRow(String(localized: L10n.Memory.skills), subtitle: state.routinesSummary, leading: .icon(.skill), emphasis: .prominent,
-                            action: { open(.memoryRoutines(app: nil)) }) { ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary) }
-                    ModeRow(String(localized: L10n.Memory.tips), subtitle: state.appsSummary, leading: .icon(.tip), emphasis: .prominent,
-                            action: { open(.memoryApps) }) { ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary) }
+            VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                ModeMemoryHeader(String(localized: L10n.Tab.memory), subtitle: String(localized: L10n.Memory.subtitle))
+                    .padding(.top, ModeSpacing.memoryHeaderTop)
+                    .padding(.bottom, ModeSpacing.memoryCardGap - ModeSpacing.s)
+                ModeMemoryToggleCard(L10n.Memory.learn, isOn: Binding(get: { state.learn }, set: { onEvent(.learn($0)) }))
+                Text(L10n.Memory.hubHint).modeText(.footnote, color: ModeColor.textSecondary)
+                    .padding(.horizontal, ModeSpacing.xs).padding(.top, ModeSpacing.xs)
+                ModeCard(lifted: true) {
+                    ModeMemoryRow(String(localized: L10n.Memory.aboutYou), subtitle: state.aboutYouSummary,
+                                  leading: .icon(.profile, background: ModeColor.infoSoft, foreground: ModeColor.infoText)) { open(.memoryAboutYou) }
+                    ModeMemoryRow(String(localized: L10n.Memory.skills), subtitle: state.routinesSummary, leading: .mo) { open(.memoryRoutines(app: nil)) }
+                    ModeMemoryRow(String(localized: L10n.Memory.tips), subtitle: state.appsSummary,
+                                  leading: .icon(.tip, background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText)) { open(.memoryApps) }
                 }
+                .padding(.top, ModeSpacing.s)
                 if !state.isEmpty {
-                    ModeButton(L10n.Memory.forgetEverything, role: .destructive) { onEvent(.askForget) }.frame(maxWidth: .infinity)
+                    ModeButton(L10n.Memory.forgetEverything, role: .destructive) { onEvent(.askForget) }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, ModeSpacing.memoryCardGap)
                 }
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
@@ -34,7 +39,8 @@ struct MemoryScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
         .navigationTitle(Text(L10n.Tab.memory))
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(removing: .title)
     }
 }
 
@@ -53,25 +59,24 @@ struct MemoryCardsScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                Text(hint).modeText(.callout, color: ModeColor.textSecondary)
+            VStack(alignment: .leading, spacing: ModeSpacing.memoryCardGap) {
+                ModeMemoryHeader(title, subtitle: hint)
+                    .padding(.top, ModeSpacing.memorySubpageTop)
+                    .padding(.bottom, ModeSpacing.memoryCardGap - ModeSpacing.xs)
                 if sections.allSatisfy(\.cards.isEmpty) {
                     ModeEmptyState(icon: .memory, title: L10n.Memory.nothingHere, message: L10n.Memory.nothingHereMessage).frame(maxWidth: .infinity)
                 }
                 ForEach(sections) { section in
-                    if let header = section.header { ModeSectionHeader(LocalizedStringResource(stringLiteral: header)) }
+                    if let header = section.header {
+                        ModeSectionHeader(LocalizedStringResource(stringLiteral: header))
+                    }
                     ForEach(section.cards) { card in
-                        ModeMemoryCard(title: card.title, text: card.body, steps: card.steps, footer: card.footer, selected: selected(card)) {
-                            onEvent(.tap(card))
-                        }
+                        ModeMemoryCard(title: card.title, text: card.body, steps: card.steps, footer: card.footer, badge: card.badge,
+                                       selected: selected(card)) { onEvent(.tap(card)) }
                     }
                 }
                 if let link, !editing {
-                    ModeCard {
-                        ModeRow(link.title, subtitle: link.subtitle, leading: .icon(.skill), action: link.action) {
-                            ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary)
-                        }
-                    }
+                    ModeMemoryLinkCard(link.title, subtitle: link.subtitle, action: link.action)
                 }
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
@@ -80,19 +85,19 @@ struct MemoryCardsScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
         .navigationTitle(Text(title))
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(removing: .title)
         .toolbar {
             if !sections.allSatisfy(\.cards.isEmpty) {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { onEvent(.toggleEditing) } label: { Text(editing ? L10n.Common.done : L10n.Memory.edit) }
+                    ModeMemoryBarButton(editing ? L10n.Common.done : L10n.Memory.edit, prominent: editing) { onEvent(.toggleEditing) }
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .safeAreaInset(edge: .bottom) {
             if editing && hasSelection {
-                Button(role: .destructive) { onEvent(.deleteSelected) } label: { Text(deleteTitle).frame(maxWidth: .infinity) }
-                    .buttonStyle(.glassProminent)
-                    .tint(ModeColor.danger)
+                ModeMemoryDeleteButton(deleteTitle) { onEvent(.deleteSelected) }
                     .padding(.horizontal, ModeSpacing.screenEdge)
             }
         }
@@ -106,16 +111,16 @@ struct MemoryAppsScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                Text(L10n.Memory.appsHint).modeText(.callout, color: ModeColor.textSecondary)
+            VStack(alignment: .leading, spacing: ModeSpacing.memoryCardGap) {
+                ModeMemoryHeader(String(localized: L10n.Memory.tips), subtitle: String(localized: L10n.Memory.appsHint))
+                    .padding(.top, ModeSpacing.memorySubpageTop)
+                    .padding(.bottom, ModeSpacing.memoryCardGap - ModeSpacing.xs)
                 if apps.isEmpty {
                     ModeEmptyState(icon: .tip, title: L10n.Memory.nothingHere, message: L10n.Memory.nothingHereMessage).frame(maxWidth: .infinity)
                 } else {
-                    ModeCard {
+                    ModeCard(lifted: true) {
                         ForEach(apps) { app in
-                            ModeRow(app.name, subtitle: app.subtitle, leading: .initial(app.initial), action: { open(app.name) }) {
-                                ModeIcon.chevron.image.foregroundStyle(ModeColor.textSecondary)
-                            }
+                            ModeMemoryRow(app.name, subtitle: app.subtitle, leading: .initial(app.initial), compact: true) { open(app.name) }
                         }
                     }
                 }
@@ -126,7 +131,68 @@ struct MemoryAppsScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
         .navigationTitle(Text(L10n.Memory.tips))
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(removing: .title)
+    }
+}
+
+/// One app's tips, as on "What you taught, in Memory": the app's tile and name, its tips in one list
+/// (each says whose it is; swipe to edit or delete), and a link to its routines.
+struct MemoryAppScreen: View {
+    let name: String
+    let detail: MemoryViewModel.AppDetail?
+    let onEvent: (MemoryViewModel.Event) -> Void
+    let openRoutines: () -> Void
+
+    var body: some View {
+        List {
+            ModeMemoryAppHeader(letter: detail?.letter ?? "", title: name, subtitle: detail?.subtitle ?? "")
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: ModeSpacing.memorySubpageTop, leading: ModeSpacing.s, bottom: ModeSpacing.s, trailing: ModeSpacing.s))
+            if let detail, !detail.tips.isEmpty {
+                Section {
+                    ForEach(detail.tips) { card in
+                        ModeMemoryTipRow(text: card.body ?? card.title, badge: card.badge, footer: card.footer)
+                            .onTapGesture { onEvent(.tap(card)) }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) { onEvent(.remove(card)) } label: { Text(L10n.Common.delete) }
+                                Button { onEvent(.edit(card)) } label: { Text(L10n.Memory.edit) }.tint(ModeColor.info)
+                            }
+                            .listRowBackground(ModeColor.card)
+                            .listRowSeparatorTint(ModeColor.separator)
+                            .listRowInsets(EdgeInsets(top: ModeSpacing.none, leading: ModeSpacing.l, bottom: ModeSpacing.none, trailing: ModeSpacing.l))
+                    }
+                } header: {
+                    Text(L10n.Memory.tipsHeading).modeText(.section).textCase(nil)
+                        .listRowInsets(EdgeInsets(top: ModeSpacing.none, leading: ModeSpacing.xs, bottom: ModeSpacing.s, trailing: ModeSpacing.xs))
+                } footer: {
+                    Text(L10n.Memory.swipeHint).modeText(.footnote, color: ModeColor.textSecondary)
+                        .listRowInsets(EdgeInsets(top: ModeSpacing.s, leading: ModeSpacing.s, bottom: ModeSpacing.none, trailing: ModeSpacing.s))
+                }
+            } else {
+                ModeEmptyState(icon: .tip, title: L10n.Memory.nothingHere, message: L10n.Memory.nothingHereMessage)
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+            if let routines = detail?.routines {
+                Section {
+                    ModeMemoryRow(String(localized: L10n.Memory.routinesInApp), subtitle: routines, leading: .mo, compact: true, action: openRoutines)
+                        .listRowBackground(ModeColor.card)
+                        .listRowInsets(EdgeInsets(top: ModeSpacing.none, leading: ModeSpacing.l, bottom: ModeSpacing.none, trailing: ModeSpacing.l))
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .listSectionSpacing(ModeSpacing.l)
+        .contentMargins(.horizontal, ModeSpacing.screenEdge, for: .scrollContent)
+        .contentMargins(.top, ModeSpacing.none, for: .scrollContent)
+        .scrollEdgeEffectStyle(.soft, for: .all)
+        .modeScreen()
+        .navigationTitle(Text(name))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(removing: .title)
     }
 }
 
@@ -143,12 +209,16 @@ struct MemoryEditScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.l) {
-                ModeTextAreaCard(L10n.Memory.titleLabel, text: $draftTitle)
-                ModeTextAreaCard(textLabel, text: $draftText, minLines: 8)
-                if let learnedFrom { ModeNote(icon: .info, LocalizedStringResource(stringLiteral: learnedFrom)) }
-                if let worked { ModeNote(icon: .done, LocalizedStringResource(stringLiteral: worked)) }
-                ModeButton(L10n.Common.delete, icon: .trash, role: .destructive, fullWidth: true, action: onDelete)
+            VStack(alignment: .leading, spacing: ModeSpacing.memoryCardGap) {
+                ModeMemoryHeader(String(localized: title), subtitle: nil)
+                    .padding(.top, ModeSpacing.memorySubpageTop)
+                    .padding(.bottom, ModeSpacing.xs)
+                ModeMemoryField(L10n.Memory.titleLabel, text: $draftTitle)
+                ModeMemoryField(textLabel, text: $draftText, minHeight: ModeSize.memoryEditorMin)
+                if let learnedFrom { ModeMemoryNote(.learned, learnedFrom) }
+                if let worked { ModeMemoryNote(.worked, worked) }
+                ModeMemoryDeleteButton(String(localized: L10n.Common.delete), action: onDelete)
+                    .padding(.top, ModeSpacing.s)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
@@ -157,7 +227,11 @@ struct MemoryEditScreen: View {
         .modeScreen()
         .navigationTitle(Text(title))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button(action: onSave) { Text(L10n.Common.save) } } }
+        .toolbar(removing: .title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { ModeMemoryBarButton(L10n.Common.save, prominent: true, action: onSave) }
+                .sharedBackgroundVisibility(.hidden)
+        }
     }
 }
 
@@ -236,13 +310,7 @@ struct MemoryAppRoute: View {
     }
 
     var body: some View {
-        let detail = model.state.appDetails[name]
-        MemoryCardsScreen(title: name, hint: detail?.subtitle ?? "", sections: [.init(id: name, header: nil, cards: detail?.tips ?? [])],
-                          editing: model.editing, selected: model.isSelected, deleteTitle: model.deleteTitle,
-                          hasSelection: !model.selected.isEmpty, onEvent: model.send,
-                          link: detail?.routines.map { routines in
-                              (String(localized: L10n.Memory.routinesInApp), routines, { navigate(.memoryRoutines(app: name)) })
-                          })
+        MemoryAppScreen(name: name, detail: model.state.appDetails[name], onEvent: model.send) { navigate(.memoryRoutines(app: name)) }
     }
 }
 

@@ -74,13 +74,15 @@ public struct ModeFilterChip: View {
     public var body: some View {
         Button(action: action) {
             Text(title)
-                .modeText(.subheadline, color: selected ? ModeColor.onAccent : ModeColor.textPrimary)
-                .fontWeight(.semibold)
-                .padding(.horizontal, ModeSpacing.l)
-                .frame(minHeight: ModeSize.touch)
+                .modeText(.subheadlineEmphasis, color: selected ? ModeColor.onAccent : ModeColor.textPrimary)
+                .padding(.horizontal, ModeSpacing.headerGap)
+                .frame(minHeight: ModeSize.filterChip)
+                .background(selected ? ModeColor.accent : ModeColor.card, in: .capsule)
+                // Drawn 34 tall, as on the canvas; tapped anywhere in 44.
+                .padding(.vertical, (ModeSize.touch - ModeSize.filterChip) / 2)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .background(selected ? ModeColor.accent : ModeColor.card, in: .capsule)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }

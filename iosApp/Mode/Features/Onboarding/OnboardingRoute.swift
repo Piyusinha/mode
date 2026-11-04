@@ -20,6 +20,11 @@ struct OnboardingRoute: View {
     var body: some View {
         OnboardingScreen(state: model.state, callName: $model.callName, providers: providers.state, onProvider: providers.send, onEvent: model.send)
             .modifier(ProviderLinks(model: providers, app: app))
+            // A provider's sign-in page (Continue with ChatGPT) belongs to the Key step: its dots, and the way to OpenRouter.
+            .environment(\.setupStep, model.state.stepNumber.map { SetupStep(current: $0, total: model.state.stepTotal, label: model.state.stepLabel) })
+            .environment(\.setupUseOpenRouter) { [providers] in
+                if let id = providers.state.rows.first(where: { $0.kind == .openRouter })?.id { providers.send(.connect(id)) }
+            }
             .onChange(of: model.showingContactPicker) { _, showing in
                 guard showing else { return }
                 model.showingContactPicker = false
@@ -63,6 +68,20 @@ struct OnboardingRoute: View {
     }
 }
 
+/// A setup step, for pages setup opens over itself (a provider's sign-in page shows the Key step's dots).
+struct SetupStep: Equatable {
+    let current: Int
+    let total: Int
+    let label: String
+}
+
+extension EnvironmentValues {
+    /// The setup step a page belongs to; nil outside setup.
+    @Entry var setupStep: SetupStep? = nil
+    /// In setup: switch to OpenRouter (pick it and open its sign-in); nil outside setup.
+    @Entry var setupUseOpenRouter: (@MainActor () -> Void)? = nil
+}
+
 /// The model Mode steps up to when it gets stuck, or none.
 private struct StuckSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -83,7 +102,7 @@ private struct StuckSheet: View {
     }
 }
 
-/// Board SetupModelPicker: how hard the role thinks (plan providers), then its model.
+/// Board SetupModelPicker: a white sheet with how hard the role thinks (plan providers), then its model, and Done.
 private struct RolePickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let role: OnboardingViewModel.PickerRole
@@ -92,23 +111,31 @@ private struct RolePickerSheet: View {
 
     private var brain: Bool { role == .brain }
     private var recommended: String { role.recommendedEffort }
-    private var effort: Binding<String> {
-        Binding(get: { (brain ? state.brainEffort : state.phoneEffort) ?? recommended },
-                set: { onEvent(.chooseEffort(role, $0)) })
-    }
+    private var effort: String { (brain ? state.brainEffort : state.phoneEffort) ?? recommended }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !state.efforts.isEmpty && (!brain || state.brainCard != nil) {
-                    Section {
-                        ModeSegmented(state.efforts.map { ($0, LocalizedStringResource(stringLiteral: PlanModelsViewModel.effortName($0))) }, selection: effort)
-                        Text(L10n.Setup.effortHint(PlanModelsViewModel.effortName(recommended))).modeText(.footnote, color: ModeColor.textSecondary)
-                    } header: { Text(L10n.Setup.howHard) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: ModeSpacing.m + ModeSpacing.xxs) {
+                VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                    Text(brain ? L10n.Setup.whenStuck : L10n.Setup.phoneControl).modeText(.title2).accessibilityAddTraits(.isHeader)
+                    Text(L10n.Setup.pickerMessage(String(localized: brain ? L10n.Setup.stuckDetail : L10n.Setup.phoneDetail)))
+                        .modeText(.subheadline, color: ModeColor.textSecondary)
                 }
-                Section {
-                    ForEach(brain ? state.stuckChoices : state.phoneChoices) { choice in
-                        ChoiceRow(choice: choice) { onEvent(brain ? .chooseStuck(choice.id) : .chooseModel(choice.id)) }
+                if !state.efforts.isEmpty && (!brain || state.brainCard != nil) {
+                    label(L10n.Setup.howHard)
+                    ModeEffortPicker(options: state.efforts.map { (id: $0, title: PlanModelsViewModel.effortName($0)) }, selection: effort,
+                                     recommended: recommended, recommendedLabel: String(localized: L10n.Settings.recommended)) {
+                        onEvent(.chooseEffort(role, $0))
+                    }
+                    Text(L10n.Setup.effortGuide).modeText(.footnote, color: ModeColor.textSecondary).padding(.top, -ModeSpacing.s + ModeSpacing.xxs)
+                }
+                label(L10n.Setup.modelSection)
+                VStack(spacing: ModeSpacing.none) {
+                    let choices = brain ? state.stuckChoices : state.phoneChoices
+                    let more = brain || !state.onPlan
+                    ForEach(Array(choices.enumerated()), id: \.element.id) { index, choice in
+                        ChoiceRow(choice: choice, compact: true) { onEvent(brain ? .chooseStuck(choice.id) : .chooseModel(choice.id)) }
+                        if index < choices.count - 1 || more { Rectangle().fill(ModeColor.separator).frame(height: ModeSize.separator) }
                     }
                     if brain {
                         ModeRow(String(localized: L10n.Setup.stuckOff), action: { onEvent(.chooseStuck(nil)) }) { ModeRadio(selected: state.brainCard == nil) }
@@ -116,13 +143,28 @@ private struct RolePickerSheet: View {
                     if !state.onPlan {
                         ModeRow(String(localized: L10n.Setup.allModels), action: { dismiss(); onEvent(.openSearch) }) { ModeChevron() }
                     }
-                } header: { Text(L10n.Setup.modelSection) }
+                }
             }
-            .navigationTitle(Text(brain ? L10n.Setup.whenStuck : L10n.Setup.phoneControl))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { ModeToolbarButton(.done, label: L10n.Common.done) { dismiss() } } }
+            .padding(.horizontal, ModeSpacing.xl)
+            .padding(.top, ModeSpacing.xxl + ModeSpacing.xs)
+            .padding(.bottom, ModeSpacing.xl)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) {
+            ModeButton(L10n.Common.done, fullWidth: true) { dismiss() }
+                .padding(.horizontal, ModeSpacing.screenEdge)
+                .padding(.top, ModeSpacing.l)
+                .background(ModeColor.card)
+        }
+        .presentationBackground(ModeColor.card)
+        .presentationCornerRadius(ModeRadius.sheet)
+        .presentationDragIndicator(.visible)
         .presentationDetents([.large])
+    }
+
+    private func label(_ text: LocalizedStringResource) -> some View {
+        Text(text).textCase(.uppercase).modeText(.footnoteEmphasis, color: ModeColor.textSecondary).fontWeight(.bold)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

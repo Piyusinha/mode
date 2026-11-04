@@ -1,31 +1,65 @@
 import SwiftUI
 
-/// Your message: an accent bubble on the right, with an optional label above the text ("Spoken").
+/// Your message, as on the Chat board: an ink bubble on the right (22 · 22 · 6 · 22), with an optional
+/// label above the text ("Spoken"). [tone] .info is the blue question bubble of Ask about this task.
 public struct ModeUserBubble: View {
+    public enum Tone: Sendable { case ink, info }
+
     private let text: String
     private let tag: LocalizedStringResource?
     private let icon: ModeIcon
+    private let tone: Tone
 
     /// [tag]: how it was sent ("Spoken", "Typed", "You, while Mode worked") with its [icon].
-    public init(_ text: String, tag: LocalizedStringResource? = nil, icon: ModeIcon = .microphone) {
+    public init(_ text: String, tag: LocalizedStringResource? = nil, icon: ModeIcon = .microphone, tone: Tone = .ink) {
         self.text = text
         self.tag = tag
         self.icon = icon
+        self.tone = tone
     }
+
+    private var background: Color { tone == .ink ? ModeColor.accent : ModeColor.info }
+    private var foreground: Color { tone == .ink ? ModeColor.onAccent : ModeColor.onInfo }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.xs) {
             if let tag {
-                Label { Text(tag) } icon: { icon.image }
-                    .modeText(.footnote, color: ModeColor.onAccent.opacity(0.85))
+                HStack(spacing: ModeSpacing.xs) {
+                    icon.image.font(ModeIconFont.tag).accessibilityHidden(true)
+                    Text(tag)
+                }
+                .modeText(.caption, color: foreground.opacity(ModeOpacity.bubbleTag))
             }
-            Text(text).modeText(.body, color: ModeColor.onAccent)
+            Text(text).modeText(.callout, color: foreground)
         }
-        .padding(.horizontal, ModeSpacing.l)
-        .padding(.vertical, ModeSpacing.m)
-        .background(ModeColor.accent, in: UnevenRoundedRectangle(topLeadingRadius: ModeRadius.card, bottomLeadingRadius: ModeRadius.card, bottomTrailingRadius: ModeSpacing.xs, topTrailingRadius: ModeRadius.card))
+        .padding(.horizontal, ModeSpacing.chatGap)
+        .padding(.vertical, ModeSpacing.chatInline)
+        .background(background, in: UnevenRoundedRectangle(topLeadingRadius: ModeRadius.bubble, bottomLeadingRadius: ModeRadius.bubble,
+                                                            bottomTrailingRadius: ModeRadius.bubbleTail, topTrailingRadius: ModeRadius.bubble))
+        .frame(maxWidth: ModeSize.bubbleMaxWidth, alignment: .trailing)
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.leading, ModeSpacing.xxxl * 3)
+    }
+}
+
+/// Mode's reply in a chat: Mo (its face says how the task went) beside the reply's first lines.
+public struct ModeMoReply<Content: View>: View {
+    private let mood: ModeMo.Mood
+    private let size: CGFloat
+    private let content: Content
+
+    public init(mood: ModeMo.Mood, size: CGFloat = ModeSize.moRow, @ViewBuilder content: () -> Content) {
+        self.mood = mood
+        self.size = size
+        self.content = content()
+    }
+
+    public var body: some View {
+        HStack(alignment: .top, spacing: ModeSpacing.chatInline) {
+            ModeMo(mood, size: size).accessibilityHidden(true)
+            content
+                .padding(.top, ModeSpacing.xs)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
@@ -38,18 +72,18 @@ public struct ModeTimeTable: View {
     }
 
     public var body: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.l, verticalSpacing: ModeSpacing.s) {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: ModeSpacing.chatGap, verticalSpacing: ModeSpacing.chatTight) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    Text(row.time).modeText(.bodyEmphasis).monospacedDigit()
-                    Text(row.text).modeText(.body)
+                    Text(row.time).modeText(.calloutEmphasis).monospacedDigit()
+                    Text(row.text).modeText(.callout)
                 }
             }
         }
     }
 }
 
-/// "See all 11 screens": a small stack of screenshots and the count.
+/// "See all 11 screens": a white pill with a small stack of screenshots, the count and a chevron.
 public struct ModeScreensLink: View {
     private let title: String
     private let thumbnails: [Image]
@@ -61,33 +95,45 @@ public struct ModeScreensLink: View {
         self.action = action
     }
 
+    /// Before the screenshots load (or when there are none), three soft cards stand in.
+    private static let placeholders = [ModeColor.cardRaised, ModeColor.ring, ModeColor.tintSoft]
+
     public var body: some View {
         Button(action: action) {
-            HStack(spacing: ModeSpacing.m) {
-                ZStack(alignment: .leading) {
-                    ForEach(Array(thumbnails.prefix(3).enumerated()), id: \.offset) { index, image in
-                        image.resizable().scaledToFill()
-                            .frame(width: ModeSize.tile * 0.7, height: ModeSize.tile)
-                            .clipShape(.rect(cornerRadius: ModeSpacing.xs))
-                            .offset(x: CGFloat(index) * ModeSpacing.l)
-                    }
+            HStack(spacing: ModeSpacing.chatInline) {
+                HStack(spacing: -ModeSpacing.chatInline) {
                     if thumbnails.isEmpty {
-                        RoundedRectangle(cornerRadius: ModeSpacing.xs).fill(ModeColor.tintSoft).frame(width: ModeSize.tile, height: ModeSize.tile)
+                        ForEach(Array(Self.placeholders.enumerated()), id: \.offset) { _, color in thumb { color } }
+                    } else {
+                        ForEach(Array(thumbnails.prefix(3).enumerated()), id: \.offset) { _, image in thumb { image.resizable().scaledToFill() } }
                     }
                 }
-                .frame(width: ModeSize.tile * 1.4, alignment: .leading)
-                Text(title).modeText(.bodyEmphasis)
+                .accessibilityHidden(true)
+                Text(title).modeText(.subheadlineEmphasis)
                 ModeChevron()
             }
-            .padding(ModeSpacing.m)
-            .padding(.trailing, ModeSpacing.s)
+            .padding(.leading, ModeSpacing.s)
+            .padding(.trailing, ModeSpacing.chatGap)
+            .padding(.vertical, ModeSpacing.chatInline)
+            .frame(minHeight: ModeSize.screensLinkHeight)
             .background(ModeColor.card, in: .capsule)
+            .modeShadow(in: Capsule())
+            .contentShape(.capsule)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ModePressStyle())
+    }
+
+    private func thumb<V: View>(@ViewBuilder _ fill: () -> V) -> some View {
+        let shape = RoundedRectangle(cornerRadius: ModeRadius.thumb)
+        return fill()
+            .frame(width: ModeSize.screensThumbWidth, height: ModeSize.screensThumbHeight)
+            .clipShape(shape)
+            .padding(ModeSize.screensThumbBorder)
+            .background(ModeColor.card, in: RoundedRectangle(cornerRadius: ModeRadius.thumb + ModeSize.screensThumbBorder))
     }
 }
 
-/// "Remembered: …" with Undo, in a soft tint.
+/// "Remembered: …" with Undo: a soft orange pill, a white Undo pill at its end.
 public struct ModeRememberedChip: View {
     private let text: String
     private let undoTitle: LocalizedStringResource
@@ -100,26 +146,75 @@ public struct ModeRememberedChip: View {
     }
 
     public var body: some View {
-        HStack(spacing: ModeSpacing.s) {
-            ModeIcon.memory.image.foregroundStyle(ModeColor.tint).accessibilityHidden(true)
-            Text(text).modeText(.subheadline, color: ModeColor.tint).lineLimit(2)
-            Button(action: onUndo) {
-                Text(undoTitle).modeText(.bodyEmphasis, color: ModeColor.tint)
-                    .padding(.horizontal, ModeSpacing.m)
-                    .frame(minHeight: ModeSize.touch - ModeSpacing.s)
-                    .background(ModeColor.card, in: .capsule)
+        ModeChatPill(background: ModeColor.tintSoft) {
+            HStack(spacing: ModeSpacing.s) {
+                ModeIcon.memory.image.font(ModeIconFont.tag).accessibilityHidden(true)
+                Text(text).lineLimit(2)
             }
-            .buttonStyle(.plain)
+            .modeText(.footnote, color: ModeColor.tint)
+        } action: {
+            ModeChatPillButton(undoTitle, background: ModeColor.card, foreground: ModeColor.textPrimary, action: onUndo)
         }
-        .padding(.leading, ModeSpacing.l)
-        .padding(.trailing, ModeSpacing.xs)
-        .padding(.vertical, ModeSpacing.xs)
-        .background(ModeColor.tintSoft, in: .capsule)
     }
 }
 
-/// The message bar from the boards: a round + button, then a capsule with the
-/// text, the private switch and the accent Speak (or Send, once there's text).
+/// A soft pill in the chat with a small button at its end (Remembered … Undo, Also next time? Remember).
+public struct ModeChatPill<Label: View, Action: View>: View {
+    private let background: Color
+    private let label: Label
+    private let actionView: Action
+
+    public init(background: Color, @ViewBuilder label: () -> Label, @ViewBuilder action: () -> Action) {
+        self.background = background
+        self.label = label()
+        self.actionView = action()
+    }
+
+    public var body: some View {
+        HStack(spacing: ModeSpacing.s) {
+            label
+            actionView
+        }
+        .padding(.leading, ModeSpacing.m)
+        .padding(.trailing, ModeSpacing.chatTight)
+        .padding(.vertical, ModeSpacing.chatTight)
+        .background(background, in: .capsule)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The small button at the end of a chat pill: 30 tall to the eye, a full 44 to the finger.
+public struct ModeChatPillButton: View {
+    private let title: LocalizedStringResource
+    private let background: Color
+    private let foreground: Color
+    private let height: CGFloat
+    private let action: () -> Void
+
+    public init(_ title: LocalizedStringResource, background: Color, foreground: Color, height: CGFloat = ModeSize.chatPillButton, action: @escaping () -> Void) {
+        self.title = title
+        self.background = background
+        self.foreground = foreground
+        self.height = height
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) {
+            Text(title).modeText(.footnoteEmphasis, color: foreground)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, ModeSpacing.m)
+                .frame(minHeight: height)
+                .background(background, in: .capsule)
+                .contentShape(Rectangle().inset(by: (height - ModeSize.touch) / 2))
+        }
+        .buttonStyle(ModePressStyle())
+    }
+}
+
+/// The message bar from the Chat board: a white round + button, then a white capsule with the
+/// text, the private switch and the ink Speak (or Send, once there's text).
 public struct ModeMessageBar: View {
     public struct Labels {
         let prompt: LocalizedStringResource
@@ -148,9 +243,14 @@ public struct ModeMessageBar: View {
     private let onTogglePrivate: () -> Void
     private let onSend: () -> Void
     private let onSpeak: () -> Void
+    private let steering: Bool
 
-    public init<Menu: View>(text: Binding<String>, isPrivate: Bool, canSend: Bool, labels: Labels, onTogglePrivate: @escaping () -> Void,
+    /// [steering]: the chat's task is running, so the bar only steers it (board TeachSteer): just the
+    /// field and a round ink Speak beside it, no + and no private switch (they're for a new task).
+    public init<Menu: View>(text: Binding<String>, isPrivate: Bool, canSend: Bool, labels: Labels, steering: Bool = false,
+                            onTogglePrivate: @escaping () -> Void,
                             onSend: @escaping () -> Void, onSpeak: @escaping () -> Void, @ViewBuilder addMenu: () -> Menu) {
+        self.steering = steering
         self._text = text
         self.isPrivate = isPrivate
         self.canSend = canSend
@@ -170,51 +270,66 @@ public struct ModeMessageBar: View {
     }
 
     public var body: some View {
-        GlassEffectContainer(spacing: ModeSpacing.s) {
-            HStack(alignment: .bottom, spacing: ModeSpacing.s) {
+        HStack(alignment: .bottom, spacing: ModeSpacing.chatInline) {
+            if !steering {
                 Menu { addMenu } label: {
                     ModeIcon.add.image.font(ModeIconFont.regular).foregroundStyle(ModeColor.textPrimary)
                         .frame(width: ModeSize.composerHeight, height: ModeSize.composerHeight)
+                        .background(ModeColor.card, in: .circle)
+                        .modeShadow(in: Circle())
                 }
-                .glassEffect(.regular.interactive(), in: .circle)
                 .accessibilityLabel(Text(labels.add))
-                HStack(alignment: .bottom, spacing: ModeSpacing.xs) {
-                    TextField(text: $text, axis: .vertical) { Text(labels.prompt) }
-                        .modeText(.body)
-                        .lineLimit(1...5)
-                        .submitLabel(.send)
-                        // A multi-line field gets a new line from the keyboard's Send key: it sends instead.
-                        .onChange(of: text) { _, now in
-                            guard now.hasSuffix("\n") else { return }
-                            text = String(now.dropLast())
-                            if canSend { send() }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, ModeSpacing.s)
-                        .padding(.leading, ModeSpacing.l)
+            }
+            HStack(alignment: .bottom, spacing: ModeSpacing.s) {
+                TextField(text: $text, axis: .vertical) { Text(labels.prompt).foregroundStyle(ModeColor.textSecondary) }
+                    .modeText(.callout)
+                    .lineLimit(1...5)
+                    .submitLabel(.send)
+                    // A multi-line field gets a new line from the keyboard's Send key: it sends instead.
+                    .onChange(of: text) { _, now in
+                        guard now.hasSuffix("\n") else { return }
+                        text = String(now.dropLast())
+                        if canSend { send() }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: ModeSize.sendButton)
+                    .padding(.vertical, ModeSpacing.xxs)
+                if !steering {
                     Button(action: onTogglePrivate) {
                         (isPrivate ? ModeIcon.privateOn : ModeIcon.privateOff).image
+                            .font(ModeIconFont.regular)
                             .foregroundStyle(isPrivate ? ModeColor.tint : ModeColor.textSecondary)
-                            .frame(width: ModeSize.touch, height: ModeSize.touch)
+                            .frame(width: ModeSize.sendButton, height: ModeSize.sendButton)
+                            .contentShape(Rectangle().inset(by: (ModeSize.sendButton - ModeSize.touch) / 2))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(isPrivate ? labels.privateOn : labels.privateOff))
-                    Button(action: canSend ? send : onSpeak) {
-                        (canSend ? ModeIcon.send : ModeIcon.ask).image
-                            .font(ModeTextStyle.bodyEmphasis.font)
-                            .foregroundStyle(ModeColor.onAccent)
-                            .frame(width: ModeSize.touch, height: ModeSize.touch)
-                            .background(ModeColor.accent, in: .circle)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(canSend ? labels.send : labels.speak))
+                    speakOrSend(size: ModeSize.sendButton)
                 }
-                .padding(ModeSpacing.xs)
-                .frame(minHeight: ModeSize.composerHeight)
-                // A capsule's ends grow with its height and cut into several lines of text; a fixed radius doesn't.
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: ModeSize.composerHeight / 2))
             }
+            .padding(.leading, steering ? ModeSpacing.l + ModeSpacing.xxs : ModeSpacing.l)
+            .padding(.trailing, ModeSpacing.composerInset)
+            .padding(.vertical, ModeSpacing.composerInset)
+            .frame(minHeight: ModeSize.composerHeight)
+            // A capsule's ends grow with its height and cut into several lines of text; a fixed radius doesn't.
+            .background(ModeColor.card, in: .rect(cornerRadius: ModeSize.composerHeight / 2))
+            .modeShadow(in: RoundedRectangle(cornerRadius: ModeSize.composerHeight / 2))
+            if steering { speakOrSend(size: ModeSize.composerHeight) }
         }
+    }
+
+    /// The ink round button: Speak, or Send once there's text.
+    private func speakOrSend(size: CGFloat) -> some View {
+        Button(action: canSend ? send : onSpeak) {
+            (canSend ? ModeIcon.send : ModeIcon.microphone).image
+                .font(ModeIconFont.chatSend)
+                .foregroundStyle(ModeColor.onAccent)
+                .frame(width: size, height: size)
+                .background(ModeColor.accent, in: .circle)
+                .contentShape(Rectangle().inset(by: min(0, (size - ModeSize.touch) / 2)))
+        }
+        .buttonStyle(ModePressStyle())
+        .accessibilityLabel(Text(canSend ? labels.send : labels.speak))
     }
 }
 

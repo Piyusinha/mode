@@ -4,9 +4,11 @@ import SwiftUI
 
 // iOS gives a Live Activity about 160 pt of height on the Lock Screen and in the
 // expanded Dynamic Island; anything taller is cut. Every state below is laid out to
-// fit: one header row, at most two lines of text, one row of progress or buttons.
+// fit: one header row (Mo, then the status), at most two lines of text, one row of
+// progress or 36 pt buttons (14 + 30 + 8 + 44 + 8 + 36 + 14 = 154 pt).
 
-/// The Live Activity on the Lock Screen (and in the notification list and Smart Stack).
+/// The Live Activity on the Lock Screen (and in the notification list and Smart Stack): Mode's dark card,
+/// or white with a blue ring while Mode asks something.
 struct ModeActivityLockScreen: View {
     let conversationId: String?
     let state: ModeActivityAttributes.ContentState
@@ -15,67 +17,128 @@ struct ModeActivityLockScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            if stale && state.phase != .finished {
-                ModeActivityHeader { ModeBadge(ActivityL10n.stopped, icon: .stopped, tone: .neutral) }
-                Text(ActivityL10n.closed).modeText(.callout, color: ModeColor.textSecondary).lineLimit(2)
-            } else {
-                switch state.phase {
-                case .working:
-                    ModeActivityWorkingHeader(state: state)
-                    ModeActivityWorkingBody(state: state)
-                case .waiting:
-                    ModeActivityHeader { ModeActivityWaitingBadge(state: state) }
-                    ModeActivityWaitingBody(state: state)
-                case .finished:
-                    ModeActivityHeader { ModeActivityOutcome(state: state) }
-                    ModeActivityFinishedBody(state: state, conversationId: conversationId)
-                }
-            }
+            ModeActivityHeader(state: state, stale: stale, island: false)
+            ModeActivityBody(state: state, stale: stale, conversationId: conversationId, island: false)
         }
-        .padding(.horizontal, ModeSpacing.l)
-        .padding(.vertical, ModeSpacing.m)
-        .modeActivityTheme()
+        .padding(.horizontal, ModeSpacing.activityHorizontal)
+        .padding(.vertical, ModeSpacing.activityVertical)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .environment(\.colorScheme, state.asks(stale: stale) ? .light : .dark)
     }
 }
 
 extension View {
-    /// Live Activities sit on dark glass or the black island: always the dark palette.
+    /// The island is always black: the dark palette.
     func modeActivityTheme() -> some View {
         environment(\.colorScheme, .dark)
     }
 }
 
-/// The mark and "Mode", with something on the right.
-struct ModeActivityHeader<Trailing: View>: View {
-    @ViewBuilder let trailing: () -> Trailing
+extension ModeActivityAttributes.ContentState {
+    /// Mo's face for this moment.
+    func mood(stale: Bool = false) -> ModeMo.Mood {
+        if stale && phase != .finished { return .sleep }
+        switch phase {
+        case .working: return paused ? .sleep : .working
+        case .waiting: return .yourTurn
+        case .finished:
+            switch outcome {
+            case .done: return .done
+            case .stopped, .notStarted: return .sleep
+            case .gaveUp, .failed, nil: return .stuck
+            }
+        }
+    }
+
+    /// Mode is asking: the Lock Screen card turns white.
+    func asks(stale: Bool) -> Bool { phase == .waiting && !stale }
+
+    /// How much of the plan is done, for the ring beside the camera.
+    var planDone: Double {
+        guard !plan.isEmpty else { return 0 }
+        // Never full until it's done: the step being done counts as begun.
+        return Double(plan.filter { $0.state == .done }.count + 1) / Double(plan.count + 2)
+    }
+}
+
+/// The top row: Mo, then "Working · 0:24" and Stop, or "Mode" and how things stand.
+struct ModeActivityHeader: View {
+    let state: ModeActivityAttributes.ContentState
+    let stale: Bool
+    let island: Bool
 
     var body: some View {
         HStack(spacing: ModeSpacing.s) {
-            ModeMark(size: ModeSize.activityMark, alwaysLight: true)
-            Text(ActivityL10n.mode).modeText(.subheadline).fontWeight(.semibold)
+            ModeMo(state.mood(stale: stale), size: ModeSize.activityMo)
+            if state.phase == .working && !stale {
+                ModeActivityClock(state: state).modeText(.subheadline, color: ModeColor.onDarkSecondary)
+            } else {
+                Text(ActivityL10n.mode).modeText(.subheadlineEmphasis)
+            }
             Spacer(minLength: ModeSpacing.s)
-            trailing()
+            ModeActivityTrailing(state: state, stale: stale, island: island)
         }
+        .frame(height: ModeSize.activityHeader)
         .lineLimit(1)
     }
 }
 
-/// The mark, "Step 4 · 0:24" ticking (or Paused), and Stop.
-struct ModeActivityWorkingHeader: View {
+/// The right of the header: Stop while working, otherwise how things stand ("Needs you", "Done in 62 s").
+struct ModeActivityTrailing: View {
     let state: ModeActivityAttributes.ContentState
+    let stale: Bool
+    let island: Bool
 
     var body: some View {
-        HStack(spacing: ModeSpacing.s) {
-            ModeMark(size: ModeSize.activityMark, alwaysLight: true)
-            ModeActivityStepClock(state: state)
-            Spacer(minLength: ModeSpacing.s)
-            ModeActivityStopButton()
+        if stale && state.phase != .finished {
+            ModeActivityStatus(ActivityL10n.stopped, glyph: .stopped, color: ModeColor.onDarkSecondary)
+        } else {
+            switch state.phase {
+            case .working: ModeActivityStopButton()
+            case .waiting:
+                ModeActivityStatus(state.yourTurn ? ActivityL10n.yourTurn : ActivityL10n.needsYou, glyph: state.yourTurn ? .yourTurn : .needsYou,
+                                   color: state.yourTurn && island ? ModeColor.warning : ModeColor.infoText)
+            case .finished:
+                if let outcome = state.outcome { outcomeStatus(outcome) }
+            }
+        }
+    }
+
+    @ViewBuilder private func outcomeStatus(_ outcome: ModeActivityAttributes.ContentState.Outcome) -> some View {
+        switch outcome {
+        case .done: ModeActivityStatus(ActivityL10n.doneIn(state.seconds), glyph: .done, color: ModeColor.tagGreenText)
+        case .gaveUp: ModeActivityStatus(ActivityL10n.gaveUp, glyph: .couldntFinish, color: island ? ModeColor.danger : ModeColor.warning)
+        case .failed: ModeActivityStatus(ActivityL10n.failed, glyph: .couldntFinish, color: ModeColor.danger)
+        case .stopped: ModeActivityStatus(ActivityL10n.stopped, glyph: .needsYou, color: ModeColor.onDarkSecondary)
+        case .notStarted: ModeActivityStatus(ActivityL10n.notStarted, glyph: .needsYou, color: ModeColor.onDarkSecondary)
         }
     }
 }
 
+/// A status: a small mark and a word or two, in one colour.
+struct ModeActivityStatus: View {
+    let text: LocalizedStringResource
+    let glyph: ModeActivityGlyph
+    let color: Color
+
+    init(_ text: LocalizedStringResource, glyph: ModeActivityGlyph, color: Color) {
+        self.text = text
+        self.glyph = glyph
+        self.color = color
+    }
+
+    var body: some View {
+        HStack(spacing: ModeSpacing.activityBadgeGap) {
+            glyph.image.font(ModeIconFont.chevron)
+            Text(text)
+        }
+        .modeText(.footnoteEmphasis, color: color)
+        .fixedSize()
+    }
+}
+
 /// "Working · 0:24", the time ticking on its own; "Paused" while paused.
-struct ModeActivityStepClock: View {
+struct ModeActivityClock: View {
     let state: ModeActivityAttributes.ContentState
 
     var body: some View {
@@ -90,58 +153,125 @@ struct ModeActivityStepClock: View {
                 Text(ActivityL10n.workingNow)
             }
         }
-        .modeText(.subheadline, color: ModeColor.textSecondary)
         .monospacedDigit()
         .lineLimit(1)
     }
 }
 
-/// What Mode is doing now (two lines at most), and the plan's progress.
-struct ModeActivityWorkingBody: View {
+/// Under the header: what Mode is doing and the plan, the question and its answers, or the result and what next.
+struct ModeActivityBody: View {
     let state: ModeActivityAttributes.ContentState
+    let stale: Bool
+    let conversationId: String?
+    let island: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            Text(state.now).modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
-            if !state.plan.isEmpty { ModeSegments(state.plan) }
+        VStack(alignment: .leading, spacing: island ? ModeSpacing.islandGap : ModeSpacing.s) {
+            if stale && state.phase != .finished {
+                Text(ActivityL10n.closed).modeText(.callout, color: ModeColor.onDarkSecondary).lineLimit(2)
+            } else {
+                switch state.phase {
+                case .working:
+                    if island { ModeActivityClock(state: state).modeText(.footnote, color: ModeColor.onDarkSecondary) }
+                    ModeActivityTitle(state.now, island: island)
+                    if !state.plan.isEmpty { ModeActivityBars(state.plan) }
+                case .waiting:
+                    ModeActivityTitle(state.question ?? "", island: island)
+                    ModeActivityAnswers(state: state, island: island)
+                case .finished:
+                    if let line = state.reply.first.flatMap(\.line) { ModeActivityTitle(line, island: island) }
+                    HStack(spacing: ModeSpacing.s) {
+                        Link(destination: ModeLinks.conversation(conversationId)) {
+                            ModeActivityButtonLabel(state.more > 0 ? ActivityL10n.openChatMore(state.more) : ActivityL10n.openChat,
+                                                    style: island ? .islandGrey : .grey)
+                        }
+                        if let retry = state.retryTaskId {
+                            Link(destination: ModeLinks.retry(retry, conversationId: conversationId)) {
+                                ModeActivityButtonLabel(ActivityL10n.tryAgain, style: .light)
+                            }
+                        } else {
+                            Link(destination: ModeLinks.ask) { ModeActivityButtonLabel(ActivityL10n.anotherTask, style: .light) }
+                        }
+                    }
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// The question (two lines at most) and its answers right here: Allow / Don't allow, up to three
-/// options, or Reply (typed in Mode). The app being used stays in front.
-struct ModeActivityWaitingBody: View {
+/// The question's answers right here: Yes / No, up to three options, I've entered it / Stop, or Reply in Mode
+/// (typed in Mode). The app being used stays in front.
+struct ModeActivityAnswers: View {
+    let state: ModeActivityAttributes.ContentState
+    let island: Bool
+
+    private var quiet: ModeActivityButtonLabel.Style { island ? .islandGrey : .askQuiet }
+
+    var body: some View {
+        HStack(spacing: ModeSpacing.s) {
+            if let id = state.questionId, state.yourTurn {
+                Button(intent: StopTaskIntent()) {
+                    ModeActivityButtonLabel(ActivityL10n.stop, style: island ? .islandGrey : .stop)
+                }.buttonStyle(.plain)
+                Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.done)) {
+                    ModeActivityButtonLabel(ActivityL10n.entered, style: .ask)
+                }.buttonStyle(.plain)
+            } else if let id = state.questionId, state.yesNo {
+                Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.no)) {
+                    ModeActivityButtonLabel(ActivityL10n.dontAllow, style: quiet)
+                }.buttonStyle(.plain)
+                Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.yes)) {
+                    ModeActivityButtonLabel(ActivityL10n.allow, style: .ask)
+                }.buttonStyle(.plain)
+            } else if let id = state.questionId, !state.options.isEmpty {
+                ForEach(Array(state.options.prefix(ModeActivityAnswer.maxOptions).enumerated()), id: \.offset) { _, option in
+                    Button(intent: AnswerIntent(questionId: id, answer: option)) {
+                        ModeActivityButtonLabel(LocalizedStringResource(stringLiteral: option), style: option == state.recommended ? .ask : quiet)
+                    }.buttonStyle(.plain)
+                }
+            } else {
+                Link(destination: ModeLinks.open) { ModeActivityButtonLabel(ActivityL10n.reply, style: .ask) }
+            }
+        }
+    }
+}
+
+/// Beside the camera: the time ticking and a ring filling with the plan while working; pause; a mark when
+/// Mode needs you; how it ended.
+struct ModeIslandTrailing: View {
     let state: ModeActivityAttributes.ContentState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            Text(state.question ?? "").modeText(.headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
-            HStack(spacing: ModeSpacing.s) {
-                if let id = state.questionId, state.yourTurn {
-                    ModeActivityStopLabelButton()
-                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.done)) {
-                        ModeActivityButtonLabel(ActivityL10n.entered, icon: nil, prominent: true)
-                    }.buttonStyle(.plain)
-                } else if let id = state.questionId, state.yesNo {
-                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.no)) {
-                        ModeActivityButtonLabel(ActivityL10n.dontAllow, icon: nil, prominent: false)
-                    }.buttonStyle(.plain)
-                    Button(intent: AnswerIntent(questionId: id, answer: ModeActivityAnswer.yes)) {
-                        ModeActivityButtonLabel(ActivityL10n.allow, icon: nil, prominent: true)
-                    }.buttonStyle(.plain)
-                } else if let id = state.questionId, !state.options.isEmpty {
-                    ForEach(Array(state.options.prefix(ModeActivityAnswer.maxOptions).enumerated()), id: \.offset) { index, option in
-                        Button(intent: AnswerIntent(questionId: id, answer: option)) {
-                            ModeActivityButtonLabel(LocalizedStringResource(stringLiteral: option), icon: nil, prominent: index == 0)
-                        }.buttonStyle(.plain)
+        switch state.phase {
+        case .working:
+            if state.paused {
+                ModeActivityGlyph.paused.image.font(ModeIconFont.small).foregroundStyle(ModeColor.heroText)
+            } else {
+                HStack(spacing: ModeSpacing.activityBarGap) {
+                    if !state.plan.isEmpty { ModeIslandRing(fraction: state.planDone) }
+                    if let start = state.startedAt {
+                        // The time ticks on its own: visible progress even when collapsed.
+                        Text(timerInterval: start...Date.distantFuture, countsDown: false)
+                            .font(ModeActivityFont.clock)
+                            .foregroundStyle(ModeColor.brand)
+                            .lineLimit(1)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: ModeSize.islandClock)
                     }
-                } else {
-                    Link(destination: ModeLinks.open) { ModeActivityButtonLabel(ActivityL10n.reply, icon: nil, prominent: true) }
                 }
             }
+        case .waiting:
+            (state.yourTurn ? ModeActivityGlyph.yourTurn : ModeActivityGlyph.needsYou).image
+                .font(ModeIconFont.small)
+                .foregroundStyle(state.yourTurn ? ModeColor.warning : ModeColor.infoText)
+        case .finished:
+            switch state.outcome {
+            case .done: ModeActivityGlyph.done.image.font(ModeIconFont.small.weight(.bold)).foregroundStyle(ModeColor.tagGreenText)
+            case .gaveUp, .failed: ModeActivityGlyph.couldntFinish.image.font(ModeIconFont.small).foregroundStyle(ModeColor.danger)
+            case .stopped, .notStarted, nil: ModeActivityGlyph.stopped.image.font(ModeIconFont.small).foregroundStyle(ModeColor.onDarkSecondary)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -153,108 +283,68 @@ enum ModeActivityAnswer {
     static let maxOptions = 3
 }
 
-/// One line of the answer (two rows at most), then Open chat (with how much more is there) and Another
-/// task: with the header, that fits the 160 pt iOS gives a Live Activity, so nothing is cut.
-struct ModeActivityFinishedBody: View {
-    let state: ModeActivityAttributes.ContentState
-    let conversationId: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
-            if let line = state.reply.first.flatMap(\.line) {
-                ModeInlineText(line, style: .headline).lineLimit(2).minimumScaleFactor(ModeActivityScale.text)
-            }
-            HStack(spacing: ModeSpacing.s) {
-                Link(destination: ModeLinks.conversation(conversationId)) {
-                    ModeActivityButtonLabel(state.more > 0 ? ActivityL10n.openChatMore(state.more) : ActivityL10n.openChat, icon: nil, prominent: false)
-                }
-                Link(destination: ModeLinks.ask) { ModeActivityButtonLabel(ActivityL10n.anotherTask, icon: .ask, prominent: true) }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// "Mode needs you", or "Your turn" when only the user can do the next bit (a PIN, a password).
-struct ModeActivityWaitingBadge: View {
-    let state: ModeActivityAttributes.ContentState
-
-    var body: some View {
-        if state.yourTurn {
-            ModeBadge(ActivityL10n.yourTurn, icon: .lock, tone: .warning)
-        } else {
-            ModeBadge(ActivityL10n.needsYou, icon: .waiting, tone: .warning)
-        }
-    }
-}
-
-/// Stop as a capsule beside another answer (the red disc is for the working state).
-struct ModeActivityStopLabelButton: View {
-    var body: some View {
-        Button(intent: StopTaskIntent()) {
-            ModeActivityButtonLabel(ActivityL10n.stop, icon: nil, prominent: false)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// "✓ Done in 62 s" or how else it ended.
-struct ModeActivityOutcome: View {
-    let state: ModeActivityAttributes.ContentState
-
-    var body: some View {
-        if let badge = state.outcome?.badge(seconds: state.seconds) {
-            ModeBadge(badge.text, icon: badge.icon, tone: badge.tone)
-        }
-    }
-}
-
 /// The red Stop disc.
 struct ModeActivityStopButton: View {
     var body: some View {
-        Button(intent: StopTaskIntent()) {
-            ModeIcon.stop.image
-                .font(ModeTextStyle.caption.font)
-                .foregroundStyle(ModeColor.stopRed)
-                .frame(width: ModeSize.activityStop, height: ModeSize.activityStop)
-                .background(ModeColor.stopDisc, in: .circle)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(ActivityL10n.stop))
+        Button(intent: StopTaskIntent()) { ModeActivityStopDisc() }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(ActivityL10n.stop))
     }
 }
 
-/// A small capsule button's look: grey, or the accent for the main one.
+/// A capsule button's look, 36 pt tall so a whole state fits in 160 pt.
 struct ModeActivityButtonLabel: View {
-    let title: LocalizedStringResource
-    let icon: ModeIcon?
-    let prominent: Bool
+    enum Style {
+        /// On the dark Lock Screen card, and on the black island.
+        case grey, islandGrey
+        /// Paper on dark: Another task.
+        case light
+        /// The blue answer, and the soft blue one beside it on the white card.
+        case ask, askQuiet
+        /// Stop on the white card.
+        case stop
+    }
 
-    init(_ title: LocalizedStringResource, icon: ModeIcon?, prominent: Bool) {
+    let title: LocalizedStringResource
+    let style: Style
+
+    init(_ title: LocalizedStringResource, style: Style) {
         self.title = title
-        self.icon = icon
-        self.prominent = prominent
+        self.style = style
     }
 
     var body: some View {
-        HStack(spacing: ModeSpacing.xs) {
-            if let icon { icon.image }
-            Text(title)
+        Text(title)
+            .modeText(.subheadlineEmphasis, color: foreground)
+            .lineLimit(1)
+            .padding(.horizontal, ModeSpacing.activityButtonPadding)
+            .frame(maxWidth: .infinity, minHeight: ModeSize.activityButton)
+            .background(background, in: .capsule)
+    }
+
+    private var foreground: Color {
+        switch style {
+        case .grey, .islandGrey: ModeColor.textPrimary
+        case .light: ModeColor.onAccent
+        case .ask: ModeColor.onAsk
+        case .askQuiet: ModeColor.infoText
+        case .stop: ModeColor.danger
         }
-        .modeText(.footnote, color: prominent ? ModeColor.onAccent : ModeColor.textPrimary)
-        .fontWeight(.semibold)
-        .lineLimit(1)
-        .frame(maxWidth: .infinity, minHeight: ModeSize.activityButton)
-        .background(prominent ? ModeColor.accent : ModeColor.fill, in: .capsule)
+    }
+
+    private var background: Color {
+        switch style {
+        case .grey: ModeColor.onDarkFill
+        case .islandGrey: ModeColor.onIslandFill
+        case .light: ModeColor.accent
+        case .ask: ModeColor.info
+        case .askQuiet: ModeColor.infoSoft
+        case .stop: ModeColor.tileRed
+        }
     }
 }
 
-/// How far long lines may shrink before they're cut.
-enum ModeActivityScale {
-    static let text: CGFloat = 0.85
-}
-
-private extension ModeReplyBlock {
+extension ModeReplyBlock {
     /// The text of a paragraph or heading: the Live Activity's one line.
     var line: String? {
         switch self {

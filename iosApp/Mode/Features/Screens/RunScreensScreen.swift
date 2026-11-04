@@ -13,7 +13,7 @@ struct RunScreensScreen: View {
     let fixReply: String?
     let onFixSeen: () -> Void
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: ModeSize.gridSpacing), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: ModeSize.gridSpacing, alignment: .top), count: 3)
 
     var body: some View {
         Group {
@@ -22,9 +22,9 @@ struct RunScreensScreen: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if mode == .grid {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: ModeSpacing.l) {
-                        header
-                        LazyVGrid(columns: columns, spacing: ModeSize.gridSpacing) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.xl) {
+                        header.padding(.horizontal, ModeSpacing.xs)
+                        LazyVGrid(columns: columns, spacing: ModeSpacing.l) {
                             ForEach(state.shots) { shot in
                                 Button { onOpen(shot) } label: { cell(shot) }.buttonStyle(.plain)
                                     .contextMenu {
@@ -34,6 +34,7 @@ struct RunScreensScreen: View {
                         }
                     }
                     .padding(.horizontal, ModeSpacing.screenEdge)
+                    .padding(.top, ModeSpacing.s)
                     .padding(.bottom, ModeSpacing.xxxl * 2)
                 }
                 .scrollEdgeEffectStyle(.soft, for: .all)
@@ -60,7 +61,10 @@ struct RunScreensScreen: View {
         }
         .modeScreen()
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ModeToolbarButton(.share, label: L10n.Conversation.share, action: onShare) } }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { ModeIconButton(.share, label: L10n.Conversation.share, action: onShare) }
+                .sharedBackgroundVisibility(.hidden)
+        }
         .safeAreaInset(edge: .top) {
             if savingFix {
                 HStack(spacing: ModeSpacing.s) {
@@ -76,35 +80,21 @@ struct RunScreensScreen: View {
         .safeAreaInset(edge: .bottom) {
             if !state.shots.isEmpty {
                 ModeGlassSwitch([ModeTabItem(.grid, icon: .grid, title: L10n.Screens.grid), ModeTabItem(.play, icon: .play, title: L10n.Screens.play)], selection: $mode)
-                    .padding(.bottom, ModeSpacing.s)
+                    .padding(.bottom, ModeSpacing.xs)
+                    .frame(maxWidth: .infinity)
+                    .background(alignment: .bottom) {
+                        ModeEdgeFade(edge: .bottom).padding(.top, -ModeSize.edgeFadeBottom / 2).ignoresSafeArea(edges: .bottom).allowsHitTesting(false)
+                    }
             }
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-            Text(state.title).modeText(.title)
-            Text(state.subtitle).modeText(.subheadline, color: ModeColor.textSecondary)
-        }
+        ModeScreensHeader(mood: .done, title: state.title, subtitle: state.subtitle)
     }
 
     private func cell(_ shot: RunScreensViewModel.Shot) -> some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.xs) {
-            ZStack(alignment: .topLeading) {
-                Group {
-                    if let image = shot.image { Image(uiImage: image).resizable().scaledToFill() } else { ModeColor.fill }
-                }
-                .aspectRatio(ModeSize.screenAspect, contentMode: .fit)
-                .clipShape(.rect(cornerRadius: ModeRadius.chip))
-                Text(shot.number)
-                    .modeText(.captionEmphasis, color: ModeColor.onAccent)
-                    .padding(.horizontal, ModeSpacing.s)
-                    .padding(.vertical, ModeSpacing.xxs)
-                    .background(ModeColor.accent, in: .capsule)
-                    .padding(ModeSpacing.xs)
-            }
-            Text(shot.label).modeText(.caption, color: ModeColor.textSecondary).lineLimit(1)
-        }
+        ModeScreenCell(number: shot.number, label: shot.label, image: shot.image.map { Image(uiImage: $0) })
     }
 }
 
@@ -133,22 +123,11 @@ private struct FixStepSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.l) {
-            Text(L10n.Screens.whatInstead).modeText(.title2)
-            Text(L10n.Screens.stepLine(number, label)).modeText(.subheadline, color: ModeColor.textSecondary)
-            TextField(text: $text, axis: .vertical) { Text(L10n.Screens.whatInsteadPrompt) }
-                .modeText(.body)
-                .lineLimit(3...6)
-                .padding(ModeSpacing.l)
-                .background(ModeColor.field, in: .rect(cornerRadius: ModeRadius.field))
-            ModeSegmented([(false, L10n.Screens.justThisTime), (true, L10n.Screens.everyTime)], selection: $everyTime)
-            Text(everyTime ? L10n.Screens.everyTimeNote : L10n.Screens.justThisTimeNote).modeText(.footnote, color: ModeColor.textSecondary)
-            ModeButton(L10n.Common.save, fullWidth: true) { save(text, everyTime); dismiss() }
-                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-        .padding(ModeSpacing.screenEdge)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .modeScreen()
-        .presentationDetents([.medium, .large])
+        // Board TeachStep (the chat area's sheet).
+        ModeFixStepForm(title: L10n.Screens.whatInstead, stepLine: L10n.Screens.stepLine(number, label), prompt: L10n.Screens.whatInsteadPrompt,
+                        text: $text, everyTime: $everyTime, justThisTime: L10n.Screens.justThisTime, everyTimeTitle: L10n.Screens.everyTime,
+                        note: everyTime ? L10n.Screens.everyTimeNote : L10n.Screens.justThisTimeNote, saveTitle: L10n.Common.save,
+                        canSave: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { save(text, everyTime); dismiss() }
+            .presentationDetents([.height(ModeSize.fixSheet), .large])
     }
 }

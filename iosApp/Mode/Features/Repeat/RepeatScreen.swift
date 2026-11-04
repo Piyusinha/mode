@@ -9,37 +9,31 @@ struct RepeatScreen: View {
     let onCancel: () -> Void
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: ModeSpacing.l) {
-                    ModeTextField(L10n.Repeat.task, prompt: L10n.Repeat.taskPrompt, text: Binding(get: { state.text }, set: { onEvent(.text($0)) }))
-                    DatePicker(selection: Binding(get: { state.time }, set: { onEvent(.time($0)) }), displayedComponents: .hourAndMinute) {
-                        Text(L10n.Repeat.time).modeText(.body)
-                    }
-                    .datePickerStyle(.wheel)
-                    .frame(maxWidth: .infinity)
-                    .background(ModeColor.field, in: .rect(cornerRadius: ModeRadius.card))
-                    ModeSegmented(
-                        [(.everyDay, L10n.Repeat.everyDay), (.weekdays, L10n.Repeat.weekdays), (.weekends, L10n.Repeat.weekends), (.once, L10n.Repeat.once)],
-                        selection: Binding(get: { state.frequency }, set: { onEvent(.frequency($0)) })
-                    )
-                    if state.frequency != .once {
-                        ModeDayPicker(labels: dayLabels, selected: state.days) { onEvent(.toggleDay($0)) }
-                    }
-                    Text(state.note).modeText(.footnote, color: ModeColor.textSecondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: ModeSpacing.m + ModeSpacing.xxs) {
+                ModeRepeatHeader(L10n.Repeat.title, cancelTitle: L10n.Common.cancel, saveTitle: L10n.Common.save, canSave: state.canSave,
+                                onCancel: onCancel, onSave: { onEvent(.save) })
+                ModeRepeatNote(L10n.Repeat.moNote)
+                ModeTextField(L10n.Repeat.task, prompt: L10n.Repeat.taskPrompt, text: Binding(get: { state.text }, set: { onEvent(.text($0)) }))
+                ModeTimeWheel(hour: Binding(get: { state.hour }, set: { onEvent(.hour($0)) }),
+                              minute: Binding(get: { state.minute }, set: { onEvent(.minute($0)) }))
+                ModePillSegments(
+                    [(.everyDay, L10n.Repeat.everyDay), (.weekdays, L10n.Repeat.weekdays), (.weekends, L10n.Repeat.weekends), (.once, L10n.Repeat.once)],
+                    selection: Binding(get: { state.frequency }, set: { onEvent(.frequency($0)) }), compact: true
+                )
+                if state.frequency != .once {
+                    ModeDayPicker(labels: dayLabels, selected: state.days) { onEvent(.toggleDay($0)) }
                 }
-                .padding(ModeSpacing.screenEdge)
+                Text(state.note).modeText(.footnote, color: ModeColor.textSecondary)
+                    .padding(.horizontal, ModeSpacing.xs)
             }
-            .modeScreen()
-            .navigationTitle(Text(L10n.Repeat.title))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { ModeButton(L10n.Common.cancel, role: .plain, action: onCancel) }
-                ToolbarItem(placement: .confirmationAction) {
-                    ModeButton(L10n.Common.save) { onEvent(.save) }.disabled(!state.canSave)
-                }
-            }
+            .padding(.horizontal, ModeSpacing.screenEdge)
+            .padding(.top, ModeSpacing.xl)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .modeScreen()
+        .presentationDragIndicator(.visible)
+        .presentationBackground(ModeColor.page)
     }
 }
 

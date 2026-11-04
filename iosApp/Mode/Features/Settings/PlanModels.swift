@@ -100,12 +100,12 @@ final class PlanModelsViewModel {
             rows: s.models.map { m in
                 let tag: ModeChoiceRow.Tag? = m.tag.map { t in
                     switch t {
-                    case .bestForPhoneControl: .init(String(localized: L10n.Plan.bestForPhone), background: ModeColor.tintSoft, foreground: ModeColor.tint)
-                    case .bestForBrain: .init(String(localized: L10n.Plan.bestForBrain), background: ModeColor.tintSoft, foreground: ModeColor.tint)
-                    case .fastest: .init(String(localized: L10n.Plan.fastest), background: ModeColor.tagGreen, foreground: ModeColor.tagGreenText)
-                    case .mostAccurate: .init(String(localized: L10n.Plan.mostAccurate), background: ModeColor.tintSoft, foreground: ModeColor.tint)
-                    case .recommended: .init(String(localized: L10n.Settings.recommended), background: ModeColor.tintSoft, foreground: ModeColor.tint)
-                    case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.tintSoft, foreground: ModeColor.tint)
+                    case .bestForPhoneControl: .init(String(localized: L10n.Plan.bestForPhone), background: ModeColor.tagGreen, foreground: ModeColor.tagGreenText)
+                    case .bestForBrain: .init(String(localized: L10n.Plan.bestForBrain), background: ModeColor.tagGreen, foreground: ModeColor.tagGreenText)
+                    case .fastest: .init(String(localized: L10n.Plan.fastest), background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText)
+                    case .mostAccurate: .init(String(localized: L10n.Plan.mostAccurate), background: ModeColor.infoSoft, foreground: ModeColor.infoText)
+                    case .recommended: .init(String(localized: L10n.Settings.recommended), background: ModeColor.cardRaised, foreground: ModeColor.textPrimary)
+                    case .strongest: .init(String(localized: L10n.Settings.strongest), background: ModeColor.cardRaised, foreground: ModeColor.textPrimary)
                     }
                 }
                 // A model no call reached (not on the plan, refused) says why, in the provider's words.
@@ -150,17 +150,17 @@ struct PlanModelsScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                Label { Text(state.chip) } icon: { Circle().fill(ModeColor.success).frame(width: ModeSize.stepDot, height: ModeSize.stepDot) }
-                    .modeText(.footnote)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, ModeSpacing.m)
-                    .padding(.vertical, ModeSpacing.xs)
-                    .background(ModeColor.card, in: .capsule)
-                ModeSegmented([(PlanModelsViewModel.Role.phoneControl, L10n.Plan.phoneControl), (.brain, L10n.Plan.brain)],
-                              selection: Binding(get: { state.role }, set: { onEvent(.role($0)) }))
-                Text(L10n.Plan.roleHint).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                ModeCard {
+            VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                    ModePageTitle(L10n.Plan.title)
+                    ModeInfoChip(state.chip).padding(.leading, ModeSpacing.xs)
+                }
+                .padding(.bottom, ModeSpacing.s)
+                ModePillPicker([(PlanModelsViewModel.Role.phoneControl, String(localized: L10n.Plan.phoneControl)),
+                                (.brain, String(localized: L10n.Plan.brain))],
+                               selection: Binding(get: { state.role }, set: { onEvent(.role($0)) }))
+                ModeFootnote(L10n.Plan.roleHint).padding(.bottom, ModeSpacing.xxs)
+                ModeCard(lifted: true) {
                     ForEach(state.rows) { row in
                         if row.reserve {
                             Text(row.line)
@@ -172,12 +172,13 @@ struct PlanModelsScreen: View {
                             VStack(alignment: .leading, spacing: ModeSpacing.s) {
                                 ModeChoiceRow(row.name, tag: row.tag, detail: row.line, leading: row.leading, selected: row.selected) { onEvent(.choose(row.id)) }
                                 if row.selected && !row.effortOptions.isEmpty {
-                                    Text(L10n.Plan.effort).modeText(.footnote, color: ModeColor.textSecondary).fontWeight(.semibold)
-                                    ModeSegmented(row.effortOptions.map { ($0.id, LocalizedStringResource(stringLiteral: $0.title)) },
-                                                  selection: Binding(get: { row.effort ?? row.effortOptions[0].id }, set: { onEvent(.effort($0)) }))
+                                    Text(L10n.Plan.effort).modeText(.footnoteEmphasis, color: ModeColor.textSecondary)
+                                    ModePillPicker(row.effortOptions.map { ($0.id, $0.title) },
+                                                   selection: Binding(get: { row.effort ?? row.effortOptions[0].id }, set: { onEvent(.effort($0)) }),
+                                                   style: .soft)
                                     ModeEffortTable(headers: (String(localized: L10n.Plan.effort), String(localized: L10n.Plan.speed),
                                                               String(localized: L10n.Plan.accuracy)), rows: row.efforts)
-                                        .padding(.bottom, ModeSpacing.m)
+                                        .padding(.bottom, ModeSpacing.l)
                                 }
                             }
                         }
@@ -188,20 +189,20 @@ struct PlanModelsScreen: View {
                         ProgressView().tint(ModeColor.tint)
                         Text(measuring).modeText(.subheadline, color: ModeColor.textSecondary)
                     }
-                    .frame(maxWidth: .infinity, minHeight: ModeSize.touch)
+                    .frame(maxWidth: .infinity, minHeight: ModeSize.wideButton)
                 } else {
-                    ModeButton(L10n.Plan.measure, icon: .clock, role: .secondary, fullWidth: true) { onEvent(.measure) }
+                    ModeWideButton(L10n.Plan.measure, mood: .idle) { onEvent(.measure) }
+                        .padding(.top, ModeSpacing.xxs)
                 }
-                if let error = state.error { Text(error).modeText(.footnote, color: ModeColor.danger) }
-                Text(state.role == .brain ? L10n.Plan.brainMeasureNote : L10n.Plan.measureNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                if let error = state.error { Text(error).modeText(.footnote, color: ModeColor.danger).padding(.horizontal, ModeSpacing.noteInset) }
+                ModeFootnote(state.role == .brain ? L10n.Plan.brainMeasureNote : L10n.Plan.measureNote, style: .caption)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .navigationTitle(Text(L10n.Plan.title))
-        .navigationBarTitleDisplayMode(.large)
+        .modePageChrome(L10n.Plan.title)
     }
 }
 

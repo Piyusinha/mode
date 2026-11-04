@@ -27,6 +27,8 @@ final class ProviderDetailViewModel {
         var limits: [Limit] = []
         /// "11:32", "1 Nov, 18:05", "Updating…" or "Not yet".
         var usageUpdated = ""
+        /// Claude: where the numbers come from, and when they came.
+        var claudeNote = String(localized: L10n.Account.claudeNote)
         // OpenRouter: credits.
         var creditsValue: String?
         var creditsFraction = 0.0
@@ -37,6 +39,8 @@ final class ProviderDetailViewModel {
         // Models.
         var phoneModel = ""
         var brainModel = ""
+        /// A plan's models are listed on its page; OpenRouter's are picked from Settings' searchable list.
+        var showsModels: Bool { kind != .openRouter }
     }
 
     struct Pair: Equatable, Identifiable { var id: String { title }; let title: String; let value: String }
@@ -133,6 +137,11 @@ final class ProviderDetailViewModel {
                     return Calendar.current.isDateInToday(date) ? date.formatted(date: .omitted, time: .shortened)
                         : date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
                 } ?? String(localized: L10n.Account.notYet),
+            claudeNote: s.usageUpdatedAt.map { at in
+                let date = Date(timeIntervalSince1970: Double(at.int64Value) / 1000)
+                return L10n.Account.claudeNoteUpdated(Calendar.current.isDateInToday(date) ? date.formatted(date: .omitted, time: .shortened)
+                    : date.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
+            } ?? String(localized: L10n.Account.claudeNote),
             creditsValue: s.creditsLeft.map { Format.money($0.doubleValue) },
             creditsFraction: { () -> Double in
                 guard let left = s.creditsLeft?.doubleValue, let total = s.creditsTotal?.doubleValue, total > 0 else { return 0 }
@@ -158,31 +167,30 @@ struct ProviderDetailScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.s) {
                 ModeProviderHeader(logo: state.kind.logo, tileBackground: state.kind.tileBackground, tileForeground: state.kind.tileForeground,
-                                   title: state.title, status: state.status, good: state.connected)
-                    .padding(.bottom, ModeSpacing.s)
+                                   title: state.title, status: state.status, good: state.connected, mood: state.inUse ? .idle : .sleep)
 
-                ModeSectionHeader(L10n.Account.account)
-                ModeCard { ForEach(state.account) { ModeValueRow($0.title, value: $0.value) } }
+                ModeSectionHeader(L10n.Account.account).padding(.top, ModeSpacing.xxs)
+                ModeCard(lifted: true) { ForEach(state.account) { ModeValueRow($0.title, value: $0.value) } }
 
                 ModeSectionHeader(state.kind == .openRouter ? L10n.Account.credits : L10n.Account.usage)
                 usage
                 if let link {
-                    ModeButton(link.title, icon: .external, role: .secondary, fullWidth: true) { openLink(link.url) }
-                        .padding(.top, ModeSpacing.s)
+                    ModeWideButton(link.title, trailingIcon: .external) { openLink(link.url) }
                 }
                 if state.connected && !state.inUse {
-                    ModeButton(LocalizedStringResource(stringLiteral: L10n.Account.use(state.title)), fullWidth: true) { onEvent(.use) }
+                    ModeWideButton(verbatim: L10n.Account.use(state.title), style: .ink) { onEvent(.use) }
                 }
 
-                ModeSectionHeader(L10n.Account.models)
-                ModeCard {
-                    modelRow(L10n.Plan.phoneControl, state.phoneModel) { onEvent(.openModels(brain: false)) }
-                    modelRow(L10n.Plan.brain, state.brainModel) { onEvent(.openModels(brain: true)) }
+                if state.showsModels {
+                    ModeSectionHeader(L10n.Account.models)
+                    ModeCard(lifted: true) {
+                        modelRow(L10n.Plan.phoneControl, state.phoneModel) { onEvent(.openModels(brain: false)) }
+                        modelRow(L10n.Plan.brain, state.brainModel) { onEvent(.openModels(brain: true)) }
+                    }
                 }
                 if state.connected {
-                    ModeButton(signOutTitle, role: .destructive) { onEvent(.disconnect) }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, ModeSpacing.m)
+                    ModeWideButton(signOutTitle, style: .danger) { onEvent(.disconnect) }
+                        .padding(.top, ModeSpacing.xs)
                 }
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
@@ -191,44 +199,50 @@ struct ProviderDetailScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .refreshable { onEvent(.refresh) }
         .modeScreen()
-        .navigationBarTitleDisplayMode(.inline)
+        .modePageChrome(LocalizedStringResource(stringLiteral: state.title))
     }
 
     @ViewBuilder private var usage: some View {
         switch state.kind {
         case .chatGPT:
-            ModeCard {
-                VStack(alignment: .leading, spacing: ModeSpacing.m) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(L10n.Account.thisWeek).modeText(.bodyEmphasis)
-                        Spacer(minLength: ModeSpacing.m)
-                        Text(state.weekSteps).modeText(.footnote, color: ModeColor.textSecondary)
+            ModeCard(lifted: true) {
+                // The week and today read as one block: no line between them.
+                VStack(spacing: ModeSpacing.none) {
+                    VStack(alignment: .leading, spacing: ModeSpacing.m - ModeSpacing.xxs) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(L10n.Account.thisWeek).modeText(.subheadlineEmphasis)
+                            Spacer(minLength: ModeSpacing.m)
+                            Text(state.weekSteps).modeText(.footnote, color: ModeColor.textSecondary)
+                        }
+                        ModeWeekBars(values: state.days, labels: Calendar.current.veryShortStandaloneWeekdaySymbols.mondayFirst, today: state.today)
                     }
-                    ModeWeekBars(values: state.days, labels: Calendar.current.veryShortStandaloneWeekdaySymbols.mondayFirst, today: state.today)
+                    .padding(.top, ModeSpacing.headerGap)
+                    .padding(.bottom, ModeSpacing.m)
+                    ModeValueRow(String(localized: L10n.Account.today), value: state.todayLine)
                 }
-                .padding(.vertical, ModeSpacing.m)
-                ModeValueRow(String(localized: L10n.Account.today), value: state.todayLine)
                 ModeValueRow(String(localized: L10n.Account.tasksThisWeek), value: state.tasksLine)
                 ModeValueRow(String(localized: L10n.Account.planLimit), value: state.limitLine,
                              dot: state.limitReached ? ModeColor.warning : ModeColor.success)
             }
-            Text(L10n.Account.chatGPTNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+            ModeFootnote(L10n.Account.chatGPTNote, style: .caption)
         case .claude:
-            ModeCard {
+            ModeCard(lifted: true) {
                 ForEach(state.limits) { l in
                     ModeUsageBar(l.title, value: l.value, fraction: l.fraction, tint: l.fraction < 0.7 ? ModeColor.success : ModeColor.warning, footnote: l.footnote)
                 }
-                ModeValueRow(String(localized: L10n.Account.updated), value: state.usageUpdated)
                 ModeValueRow(String(localized: L10n.Account.modeToday), value: state.todayLine)
             }
-            Text(L10n.Account.claudeNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+            ModeFootnote(verbatim: state.claudeNote, style: .caption)
         case .openRouter:
-            ModeCard {
-                if let credits = state.creditsValue {
-                    ModeUsageBar(String(localized: L10n.Account.creditsLeft), value: credits, fraction: state.creditsFraction,
-                                 tint: ModeColor.accent, footnote: state.creditsFootnote)
+            ModeCard(lifted: true) {
+                // Credits left and today's spend read as one block: no line between them.
+                VStack(spacing: ModeSpacing.none) {
+                    if let credits = state.creditsValue {
+                        ModeUsageBar(String(localized: L10n.Account.creditsLeft), value: credits, fraction: state.creditsFraction,
+                                     tint: ModeColor.brand, footnote: state.creditsFootnote, prominent: true)
+                    }
+                    ModeValueRow(String(localized: L10n.Account.spentToday), value: state.spentToday)
                 }
-                ModeValueRow(String(localized: L10n.Account.spentToday), value: state.spentToday)
                 ModeValueRow(String(localized: L10n.Account.week), value: state.spentWeek)
                 if let perTask = state.limitPerTask { ModeValueRow(String(localized: L10n.Account.limitPerTask), value: perTask) }
             }
@@ -236,7 +250,7 @@ struct ProviderDetailScreen: View {
     }
 
     private func modelRow(_ title: LocalizedStringResource, _ value: String, action: @escaping () -> Void) -> some View {
-        ModeValueRow(String(localized: title), value: value, action: action).frame(minHeight: ModeSize.rowMin)
+        ModeValueRow(String(localized: title), value: value, action: action)
     }
 }
 

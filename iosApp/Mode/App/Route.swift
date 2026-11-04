@@ -41,6 +41,8 @@ enum DeepLink: Equatable {
     case listen
     /// A mic in the app: talking mode, adding to [conversationId]'s chat (nil: a new chat).
     case talk(conversationId: String?)
+    /// Try again on the Live Activity: run a task that couldn't finish again, then show its chat.
+    case retry(taskId: String, conversationId: String?)
 
     /// For the trace: which kind of link (never the conversation's id).
     var traceName: String {
@@ -50,6 +52,7 @@ enum DeepLink: Equatable {
         case .open: "open"
         case .listen: "siri"
         case let .talk(id): id == nil ? "ask_mic" : "chat_mic"
+        case .retry: "retry"
         }
     }
 
@@ -59,6 +62,10 @@ enum DeepLink: Equatable {
         case "conversation": self = url.pathComponents.dropFirst().first.map { .conversation(id: $0) } ?? .open
         case "ask": self = .ask
         case "open": self = .open
+        case "retry":
+            let parts = Array(url.pathComponents.dropFirst())
+            guard let taskId = parts.first else { return nil }
+            self = .retry(taskId: taskId, conversationId: parts.dropFirst().first)
         default: return nil
         }
     }

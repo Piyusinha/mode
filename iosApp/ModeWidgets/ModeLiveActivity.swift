@@ -3,103 +3,49 @@ import ModeDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// The running task on the Lock Screen and the Dynamic Island.
+/// The running task on the Lock Screen and the Dynamic Island, with Mo showing how it's going.
 struct ModeLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ModeActivityAttributes.self) { context in
+            let asks = context.state.asks(stale: context.isStale)
             ModeActivityLockScreen(conversationId: context.attributes.conversationId, state: context.state, stale: context.isStale)
-                .activityBackgroundTint(ModeColor.lockScreen)
-                .activitySystemActionForegroundColor(ModeColor.onAccent)
+                // A question turns the card white, ringed in blue, so it stands out on the Lock Screen.
+                .overlay {
+                    if asks { ContainerRelativeShape().strokeBorder(ModeColor.lockScreenAskRing, lineWidth: ModeSize.activityAskRing) }
+                }
+                .activityBackgroundTint(asks ? ModeColor.lockScreenAsk : ModeColor.lockScreen)
+                .activitySystemActionForegroundColor(asks ? ModeColor.lockScreenAskRing : ModeColor.heroText)
                 .widgetURL(ModeLinks.conversation(context.attributes.conversationId))
         } dynamicIsland: { context in
             let state = context.state
             let conversation = context.attributes.conversationId
             return DynamicIsland {
-                // The sides beside the camera are narrow: just the mark and Stop (or how it ended).
+                // The sides beside the camera are narrow: Mo, and Stop or how things stand.
                 DynamicIslandExpandedRegion(.leading) {
-                    ModeMark(size: ModeSize.activityMark, alwaysLight: true)
-                        .padding(.leading, ModeSpacing.xs)
+                    ModeMo(state.mood(stale: context.isStale), size: ModeSize.islandExpandedMo)
+                        .padding(.leading, ModeSpacing.islandHorizontal)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Group {
-                        switch state.phase {
-                        case .working: ModeActivityStopButton()
-                        case .waiting: ModeActivityWaitingBadge(state: state)
-                        case .finished: ModeActivityOutcome(state: state)
-                        }
-                    }
-                    .padding(.trailing, ModeSpacing.xs)
-                    .modeActivityTheme()
+                    ModeActivityTrailing(state: state, stale: context.isStale, island: true)
+                        .frame(height: ModeSize.islandExpandedMo)
+                        .padding(.trailing, ModeSpacing.islandHorizontal)
+                        .modeActivityTheme()
                 }
                 // Everything else gets the full width below.
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: ModeSpacing.s) {
-                        switch state.phase {
-                        case .working:
-                            ModeActivityStepClock(state: state)
-                            ModeActivityWorkingBody(state: state)
-                        case .waiting:
-                            ModeActivityWaitingBody(state: state)
-                        case .finished:
-                            ModeActivityFinishedBody(state: state, conversationId: conversation)
-                        }
-                    }
-                    .padding(.horizontal, ModeSpacing.xs)
-                    .modeActivityTheme()
+                    ModeActivityBody(state: state, stale: context.isStale, conversationId: conversation, island: true)
+                        .padding(.horizontal, ModeSpacing.islandHorizontal)
+                        .modeActivityTheme()
                 }
             } compactLeading: {
-                ModeMark(size: ModeSize.islandMark, alwaysLight: true)
+                ModeMo(state.mood(stale: context.isStale), size: ModeSize.islandCompactMo)
             } compactTrailing: {
                 ModeIslandTrailing(state: state).modeActivityTheme()
             } minimal: {
-                ModeIslandMinimal(state: state).modeActivityTheme()
+                ModeMo(state.mood(stale: context.isStale), size: ModeSize.islandMinimalMo)
             }
             .widgetURL(ModeLinks.conversation(conversation))
-            .keylineTint(ModeColor.accent)
-        }
-    }
-}
-
-/// Beside the camera: the ticking time while working; how it ended once done.
-private struct ModeIslandTrailing: View {
-    let state: ModeActivityAttributes.ContentState
-
-    var body: some View {
-        switch state.phase {
-        case .working:
-            if state.paused {
-                ModeIcon.pause.image.foregroundStyle(ModeColor.textSecondary)
-            } else if let start = state.startedAt {
-                // The time ticks on its own: visible progress even when collapsed, with no step count.
-                Text(timerInterval: start...Date.distantFuture, countsDown: false)
-                    .modeText(.subheadline, color: ModeColor.tint)
-                    .fontWeight(.semibold)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: ModeSize.islandTimer)
-            } else {
-                ModeIcon.running.image.foregroundStyle(ModeColor.tint)
-            }
-        case .waiting:
-            (state.yourTurn ? ModeIcon.lock : ModeIcon.waiting).image.foregroundStyle(ModeColor.warning)
-        case .finished:
-            if let badge = state.outcome?.badge(seconds: state.seconds) {
-                badge.icon.image.foregroundStyle(badge.tone == .success ? ModeColor.success : ModeColor.warning)
-            }
-        }
-    }
-}
-
-/// Sharing the island with another app: the mark, or how it ended.
-private struct ModeIslandMinimal: View {
-    let state: ModeActivityAttributes.ContentState
-
-    var body: some View {
-        if state.phase == .finished, let badge = state.outcome?.badge(seconds: state.seconds) {
-            badge.icon.image.foregroundStyle(badge.tone == .success ? ModeColor.success : ModeColor.warning)
-        } else {
-            ModeMark(size: ModeSize.islandMark, alwaysLight: true)
+            .keylineTint(ModeColor.brand)
         }
     }
 }

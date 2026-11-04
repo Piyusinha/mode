@@ -17,8 +17,10 @@ final class MemoryViewModel {
         let title: String
         let body: String?
         let steps: [String]
-        let footer: String
-        /// For the editor: the full text as kept, and where it was learned.
+        /// The quiet line under it ("Learned today · used 3 times"), and its tag ("Worked 3 of 3 times").
+        let footer: String?
+        let badge: ModeMemoryBadge?
+        /// For the editor: the full text as kept, and its notes (where it was learned, how often it worked).
         let text: String
         let learnedFrom: String
         let worked: String?
@@ -39,6 +41,8 @@ final class MemoryViewModel {
 
     struct AppDetail: Equatable {
         let name: String
+        /// Its tile's letter (Mode has no app icons).
+        let letter: String
         let subtitle: String
         let tips: [Card]
         /// The app's routines by title, for the link to them; nil when it has none.
@@ -70,6 +74,9 @@ final class MemoryViewModel {
         case deleteSelected
         case save
         case delete
+        /// Swiped on a tip: open it in the editor, or delete it.
+        case edit(Card)
+        case remove(Card)
     }
 
     private(set) var state = State()
@@ -113,6 +120,8 @@ final class MemoryViewModel {
             if draftText != card.text || draftTitle != card.title { presenter.edit(id: id, text: draftText, title: draftTitle) }
         case .delete:
             if let id = draftId { presenter.delete(id: id) }
+        case let .edit(card): openEditor(card.id)
+        case let .remove(card): presenter.delete(id: card.id)
         }
     }
 
@@ -133,21 +142,52 @@ final class MemoryViewModel {
         presenter.close()
     }
 
+    /// How Mode records a tip taught in a chat (Teacher.kt): 'Taught by you in chat: "…"'.
+    private static let inChat = "in chat:"
+
     private static func map(_ s: MemoryUiState) -> State {
-        func card(_ e: MemoryEntry, _ kind: Kind) -> Card {
-            let worked = e.uses > 0 ? L10n.Memory.worked(Int(e.successes), of: Int(e.uses)) : nil
-            // What the user taught says so: theirs, not something Mode picked up.
-            let when = Format.day(e.learned).lowercased()
-            let footer = [e.taught ? L10n.Memory.taughtOn(when) : L10n.Memory.learnedOn(when), worked].compactMap { $0 }.joined(separator: " · ")
-            return Card(id: e.id, kind: kind, title: e.title, body: e.body.isEmpty ? nil : e.body, steps: e.steps, footer: footer,
-                        text: e.text, learnedFrom: L10n.Memory.learnedFrom(e.evidence), worked: worked)
+        /// [marked]: one app's tips: every tip says whose it is (taught by the user, or learned by Mode).
+        func card(_ e: MemoryEntry, _ kind: Kind, marked: Bool = false) -> Card {
+            let day = Format.day(e.learned)
+            // "Learned today", but "Learned 1 Nov" and "Learned Monday".
+            let inline = [String(localized: L10n.Day.today), String(localized: L10n.Day.yesterday)].contains(day) ? day.lowercased() : day
+            let uses = Int(e.uses), successes = Int(e.successes)
+            let footer: String?
+            let badge: ModeMemoryBadge?
+            switch kind {
+            case _ where e.taught && kind == .fact:
+                // What the user said about themselves: theirs, not something Mode picked up.
+                footer = L10n.Memory.youToldMode
+                badge = nil
+            case _ where e.taught:
+                // Where it was taught: "Today, in chat", "Today, step 8".
+                let step = e.evidence.firstMatch(of: /\(step (\d+)\)/).flatMap { Int($0.1) }
+                footer = step.map { L10n.Memory.taughtAtStep(day, $0) } ?? (e.evidence.contains(Self.inChat) ? L10n.Memory.taughtInChat(day) : day)
+                badge = .taught(L10n.Memory.youTaughtThis)
+            case .tip where marked:
+                footer = [day, uses > 0 ? L10n.Memory.usedTimes(uses) : nil].compactMap { $0 }.joined(separator: " · ")
+                badge = .learned(L10n.Memory.modeLearned)
+            case .routine:
+                // A routine shows how often it worked; until it's used, when it was learned.
+                footer = uses > 0 ? nil : L10n.Memory.learnedOn(inline)
+                badge = uses > 0 ? .worked(L10n.Memory.workedBadge(successes, of: uses)) : nil
+            case .fact, .tip:
+                let source = uses > 0 ? L10n.Memory.usedTimes(uses) : kind == .fact ? e.app.map(L10n.Memory.fromTask) : nil
+                footer = [L10n.Memory.learnedOn(inline), source].compactMap { $0 }.joined(separator: " · ")
+                badge = nil
+            }
+            let learnedFrom = e.taught ? L10n.Memory.taughtNote(inline)
+                : e.app.map { L10n.Memory.learnedFromTask($0, inline) } ?? L10n.Memory.learnedNote(inline)
+            return Card(id: e.id, kind: kind, title: e.title, body: e.body.isEmpty ? nil : e.body, steps: e.steps, footer: footer, badge: badge,
+                        text: e.text, learnedFrom: learnedFrom, worked: uses > 0 ? L10n.Memory.usedNote(uses, worked: successes) : nil)
         }
         let tipCount = Int(s.tipCount)
         var details: [String: AppDetail] = [:]
         for group in s.apps + s.routines where details[group.name] == nil {
             let tips = L10n.Memory.tipsCount(group.tips.count)
             details[group.name] = AppDetail(
-                name: group.name, subtitle: L10n.Memory.appTipsHint(tips), tips: group.tips.map { card($0, .tip) },
+                name: group.name, letter: String(group.name.prefix(1)).uppercased(), subtitle: L10n.Memory.appTipsSubtitle(tips, app: group.name),
+                tips: group.tips.map { card($0, .tip, marked: true) },
                 routines: group.routines.isEmpty ? nil : group.routines.map(\.title).joined(separator: ", ")
             )
         }

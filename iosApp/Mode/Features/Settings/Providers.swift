@@ -28,6 +28,8 @@ final class ProvidersViewModel {
         var activeKind: Kind = .chatGPT
         var activeConnected = false
         var summary = ""
+        /// Settings → Limits on a plan: no cost per task.
+        var planNote = ""
         var openRouterSigningIn = false
         var openRouterError: String?
         var claudeAwaitingCode = false
@@ -163,6 +165,7 @@ final class ProvidersViewModel {
         return State(
             rows: rows, activeTitle: title(active), activeKind: active, activeConnected: s.activeConnected,
             summary: s.activeConnected ? L10n.Providers.connectedCount(Int(s.connectedCount)) : String(localized: L10n.Providers.notConnectedYet),
+            planNote: L10n.Providers.planNote(title(active)),
             openRouterSigningIn: s.openRouterSigningIn, openRouterError: s.openRouterError,
             claudeAwaitingCode: s.claude.awaitingCode, claudeSigningIn: s.claude.signingIn, claudeError: s.claude.error
         )
@@ -180,18 +183,24 @@ extension ProvidersViewModel.Kind {
 
     var tileBackground: Color {
         switch self {
-        case .chatGPT: ModeColor.textPrimary
+        case .chatGPT: ModeColor.cardRaised
         case .claude: ModeColor.tileOrange
-        case .openRouter: ModeColor.tintSoft
+        case .openRouter: ModeColor.infoSoft
         }
     }
 
     var tileForeground: Color {
         switch self {
-        case .chatGPT: ModeColor.page
+        case .chatGPT: ModeColor.textPrimary
         case .claude: ModeColor.tileOrangeText
-        case .openRouter: ModeColor.tint
+        case .openRouter: ModeColor.infoText
         }
+    }
+
+    /// The AI in use on Settings: ChatGPT's tile in ink there, as on the board; the others as everywhere.
+    var inUseTile: ModeRowLeading {
+        self == .chatGPT ? .logoTile(logo, background: ModeColor.textPrimary, foreground: ModeColor.page)
+            : .logoTile(logo, background: tileBackground, foreground: tileForeground)
     }
 }
 
@@ -205,13 +214,14 @@ struct ProviderList: View {
     var onOpen: ((String) -> Void)?
 
     var body: some View {
-        ModeCard {
+        ModeCard(lifted: true) {
             ForEach(rows) { row in
                 ModeProviderRow(
                     title: row.title, status: row.status, logo: row.kind.logo,
                     tileBackground: row.kind.tileBackground, tileForeground: row.kind.tileForeground,
                     tag: setup ? (row.kind == .chatGPT ? String(localized: L10n.Providers.recommended) : nil)
                         : (row.inUse && row.connected ? String(localized: L10n.Providers.inUse) : nil),
+                    tagColors: setup ? nil : (ModeColor.tagGreen, ModeColor.tagGreenText),
                     selected: row.inUse, connected: row.connected, connectTitle: String(localized: L10n.Providers.connect),
                     radio: setup ? .leading : .trailing,
                     onSelect: { onEvent(.select(row.id)) }, onConnect: { onEvent(.connect(row.id)) },
@@ -249,11 +259,25 @@ struct ProvidersSheet: View {
                     }
                 }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.fraction(ModeSheetHeight.providers), .large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(ModeColor.page)
+        .presentationCornerRadius(ModeRadius.sheet)
     }
 
     private var content: some View {
+        ProvidersSheetContent(state: state, onEvent: onEvent, onDone: onDone) { path.append(.providerDetail(id: $0)) }
+    }
+}
+
+/// What the "AI providers" sheet shows: its heading and Done, every provider, and the notes under them.
+struct ProvidersSheetContent: View {
+    let state: ProvidersViewModel.State
+    let onEvent: (ProvidersViewModel.Event) -> Void
+    let onDone: () -> Void
+    let onOpen: (String) -> Void
+
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.m) {
                 HStack(alignment: .top, spacing: ModeSpacing.m) {
@@ -262,18 +286,15 @@ struct ProvidersSheet: View {
                         Text(L10n.Providers.sheetMessage).modeText(.subheadline, color: ModeColor.textSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Button(action: onDone) {
-                        Text(L10n.Common.done).modeText(.subheadline).fontWeight(.semibold)
-                            .padding(.horizontal, ModeSpacing.l).frame(minHeight: ModeSize.badge)
-                    }
-                    .buttonStyle(.glass)
+                    ModeCapsuleButton(L10n.Common.done, action: onDone)
                 }
-                ProviderList(rows: state.rows, setup: false, onEvent: onEvent) { path.append(.providerDetail(id: $0)) }
-                Text(L10n.Providers.switchNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                ModeNote(icon: .lock, L10n.Providers.keychainNote)
+                .padding(.horizontal, ModeSpacing.xs)
+                ProviderList(rows: state.rows, setup: false, onEvent: onEvent, onOpen: onOpen)
+                ModeFootnote(L10n.Providers.switchNote)
+                ModeFootnote(L10n.Providers.keychainNote, icon: .lock).padding(.top, ModeSpacing.xxs)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
-            .padding(.top, ModeSpacing.xl)
+            .padding(.top, ModeSpacing.xxl)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .modeScreen()
@@ -288,12 +309,19 @@ struct ProviderSheetHeader: View {
 
     var body: some View {
         HStack(spacing: ModeSpacing.m) {
-            ModeLeadingView(.logoTile(kind.logo, background: kind.tileBackground, foreground: kind.tileForeground))
+            kind.logo.image.resizable().scaledToFit()
+                .frame(width: ModeSize.iconLarge, height: ModeSize.iconLarge)
+                .foregroundStyle(kind.tileForeground)
+                .frame(width: ModeSize.wideButton, height: ModeSize.wideButton)
+                .background(kind.tileBackground, in: .rect(cornerRadius: ModeSpacing.headerGap))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                 Text(title).modeText(.title2)
                 Text(message).modeText(.subheadline, color: ModeColor.textSecondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.horizontal, ModeSpacing.xs)
     }
 }
 
@@ -311,28 +339,37 @@ struct OpenRouterLinkSheet: View {
                 ProviderSheetHeader(kind: .openRouter, title: L10n.Providers.connectOpenRouter, message: L10n.Providers.openRouterMessage)
                 ModeButton(L10n.Providers.signInOpenRouter, icon: .link, fullWidth: true) { onEvent(.signInOpenRouter) }
                     .disabled(state.openRouterSigningIn)
-                Text(L10n.Setup.connectNote).modeText(.footnote, color: ModeColor.textSecondary).multilineTextAlignment(.center).frame(maxWidth: .infinity)
-                if let error = state.openRouterError { Text(error).modeText(.footnote, color: ModeColor.danger) }
-                ModeOrDivider(L10n.Setup.or)
-                ModeFieldCard(L10n.Setup.keyLabel, prompt: L10n.Setup.keyPrompt, text: $key, secure: true, buttonTitle: L10n.Setup.paste) { onEvent(.pasteKey) }
+                Text(L10n.Setup.connectNote).modeText(.footnote, color: ModeColor.textSecondary).multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity).padding(.horizontal, ModeSpacing.noteInset)
+                if let error = state.openRouterError {
+                    Text(error).modeText(.footnote, color: ModeColor.danger).padding(.horizontal, ModeSpacing.noteInset)
+                }
+                ModeOrDivider(L10n.Setup.or).padding(.horizontal, ModeSpacing.noteInset)
+                ModeKeyField(String(localized: L10n.Setup.keyLabel), prompt: L10n.Setup.keyPrompt, text: $key, phase: .editing,
+                             pasteLabel: L10n.Setup.paste) { onEvent(.pasteKey) }
+                    .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.banner))
                 if !key.isEmpty { ModeButton(L10n.Settings.saveKey, role: .secondary, fullWidth: true) { onEvent(.saveKey) } }
                 Button { useOnceConnected.toggle() } label: {
-                    HStack(spacing: ModeSpacing.s) {
+                    HStack(spacing: ModeSpacing.m - ModeSpacing.xxs) {
                         ModeRadio(selected: useOnceConnected)
                         Text(L10n.Providers.useOpenRouterOnceConnected).modeText(.subheadline)
                     }
+                    .frame(minHeight: ModeSize.touch)
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, ModeSpacing.xs)
-                ModeNote(icon: .lock, L10n.Setup.keyNote)
+                .padding(.horizontal, ModeSpacing.noteInset)
+                ModeFootnote(L10n.Setup.keyNote, icon: .lock)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
-            .padding(.top, ModeSpacing.xl)
+            .padding(.top, ModeSpacing.xxl)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .modeScreen()
-        .presentationDetents([.large])
+        .presentationDetents([.fraction(ModeSheetHeight.connect), .large])
         .presentationDragIndicator(.visible)
+        .presentationBackground(ModeColor.page)
+        .presentationCornerRadius(ModeRadius.sheet)
     }
 }
 

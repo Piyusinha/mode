@@ -17,12 +17,13 @@ struct SettingsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                ModePageTitle(L10n.Common.settings)
                 ModeSectionHeader(L10n.Settings.you)
                 ModeCard {
                     ModeRow(String(localized: L10n.Settings.name)) {
                         TextField(text: $name) { Text(L10n.Settings.addName) }
                             .multilineTextAlignment(.trailing)
-                            .modeText(.body, color: ModeColor.textSecondary)
+                            .modeText(.callout, color: ModeColor.textSecondary)
                             .submitLabel(.done)
                             .onSubmit { onEvent(.saveName) }
                     }
@@ -30,66 +31,26 @@ struct SettingsScreen: View {
 
                 ModeSectionHeader(L10n.Voice.section)
                 ModeCard {
-                    ModeRow(String(localized: L10n.Voice.modesVoice), leading: (VoiceService(id: state.speaker) ?? .apple).tile, action: { onEvent(.openVoice) }) {
-                        HStack(spacing: ModeSpacing.s) {
-                            if let tag = VoiceService(id: state.speaker)?.recommendation {
-                                ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint)
-                            }
-                            Text(state.voiceName).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
-                            ModeChevron()
-                        }
-                    }
-                    if let problem = state.speakProblem { problemLine(problem) { onEvent(.openVoice) } }
-                    ModeRow(String(localized: L10n.Voice.listeningRow), leading: (VoiceService(id: state.listener) ?? .apple).tile, action: { onEvent(.openListening) }) {
-                        HStack(spacing: ModeSpacing.s) {
-                            Text(state.listenerLabel).modeText(.body, color: ModeColor.textSecondary).lineLimit(1)
-                            ModeChevron()
-                        }
-                    }
-                    if let problem = state.listenProblem { problemLine(problem) { onEvent(.openListening) } }
+                    ModeLogoValueRow(String(localized: L10n.Voice.modesVoice), value: state.voiceValue, logo: state.speakerLogo,
+                                     tag: state.speakerTag, problem: state.speakProblem) { onEvent(.openVoice) }
+                    ModeLogoValueRow(String(localized: L10n.Voice.listeningRow), value: state.listenerLabel, logo: state.listenerLogo,
+                                     problem: state.listenProblem) { onEvent(.openListening) }
                     ModeToggleRow(L10n.Voice.talkBack, subtitle: L10n.Voice.talkBackDetail, isOn: Binding(get: { state.talkBack }, set: { onEvent(.talkBack($0)) }))
                 }
-                Text(L10n.Voice.sectionNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                ModeFootnote(state.voiceNote).padding(.top, ModeSpacing.xxs)
 
                 ModeSectionHeader(L10n.Settings.ai)
                 ModeCard {
-                    HStack(spacing: ModeSpacing.m) {
-                        Button { onEvent(.openProvider) } label: {
-                        HStack(spacing: ModeSpacing.m) {
-                            ModeLeadingView(.logoTile(providers.activeKind.logo, background: providers.activeKind.tileBackground,
-                                                      foreground: providers.activeKind.tileForeground))
-                            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                                Text(L10n.Providers.aiInUse).modeText(.caption, color: ModeColor.textSecondary)
-                                Text(providers.activeTitle).modeText(.bodyEmphasis)
-                                HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
-                                    Circle().fill(providers.activeConnected ? ModeColor.success : ModeColor.separator)
-                                        .frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
-                                    Text(providers.summary).modeText(.footnote, color: ModeColor.textSecondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                        Button { onEvent(.showProviders) } label: {
-                            Text(L10n.Providers.change).modeText(.subheadline).fontWeight(.semibold)
-                                .padding(.horizontal, ModeSpacing.m)
-                                .frame(minHeight: ModeSize.badge)
-                                .background(ModeColor.fill, in: .capsule)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.vertical, ModeSpacing.m)
+                    aiInUse
                     valueRow(L10n.Settings.mainModel, value: state.modelName) { onEvent(.openPicker(stuck: false)) }
                     valueRow(L10n.Settings.whenStuckShort, value: state.stuckName) { onEvent(.openPicker(stuck: true)) }
                 }
 
                 ModeSectionHeader(L10n.Access.section)
                 ModeCard {
-                    ModeRow(String(localized: L10n.Access.howModeActs), leading: .icon(.shield), action: { onEvent(.openAccess) }) {
-                        HStack(spacing: ModeSpacing.s) {
-                            Text(state.fullAccess ? L10n.Access.full : L10n.Access.askFirstShort).modeText(.body, color: ModeColor.textSecondary)
+                    ModeRow(String(localized: L10n.Access.howModeActs), leading: .mo(.idle), action: { onEvent(.openAccess) }) {
+                        HStack(spacing: ModeSpacing.m) {
+                            Text(state.fullAccess ? L10n.Access.full : L10n.Access.askFirstShort).modeText(.callout, color: ModeColor.textSecondary)
                             ModeChevron()
                         }
                     }
@@ -105,7 +66,10 @@ struct SettingsScreen: View {
                             ModeRow(String(localized: L10n.Settings.dailyCap), subtitle: state.dailyCapLabel)
                         }
                     } else {
-                        Text(L10n.Providers.planNote).modeText(.footnote, color: ModeColor.textSecondary).padding(.vertical, ModeSpacing.m)
+                        Text(providers.planNote).modeText(.footnote, color: ModeColor.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, ModeSpacing.m)
+                            .padding(.bottom, ModeSpacing.headerGap)
                     }
                 }
 
@@ -118,22 +82,43 @@ struct SettingsScreen: View {
                     ModeRow(String(localized: L10n.Health.row), leading: .icon(.wrench), action: { onEvent(.openHealth) }) { ModeChevron() }
                     ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }
                 }
-                .padding(.top, ModeSpacing.l)
+                .padding(.top, ModeSpacing.xl)
 
                 ModeButton(resetting ? L10n.Settings.resetting : L10n.Settings.resetMode, role: .destructive, fullWidth: true) {
                     onEvent(.askReset)
                 }
                 .disabled(resetting)
-                .padding(.top, ModeSpacing.l)
+                .padding(.top, ModeSpacing.m)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .navigationTitle(Text(L10n.Common.settings))
-        .navigationBarTitleDisplayMode(.large)
+        .modePageChrome(L10n.Common.settings)
         .onDisappear { onEvent(.saveName) }
+    }
+
+    /// The AI in use: its tile, "AI in use", its name and how it's connected (opens its page), and Change.
+    private var aiInUse: some View {
+        HStack(spacing: ModeSpacing.m) {
+            Button { onEvent(.openProvider) } label: {
+                HStack(spacing: ModeSpacing.m) {
+                    ModeLeadingView(providers.activeKind.inUseTile)
+                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
+                        Text(L10n.Providers.aiInUse).modeText(.footnote, color: ModeColor.textSecondary)
+                        Text(providers.activeTitle).modeText(.headline)
+                        ModeStatusLine(providers.summary, dot: providers.activeConnected ? ModeColor.success : ModeColor.ring)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            ModeButton(L10n.Providers.change, role: .pill) { onEvent(.showProviders) }
+                .frame(minHeight: ModeSize.touch)
+        }
+        .padding(.vertical, ModeSpacing.m)
     }
 
     private func valueRow(_ title: LocalizedStringResource, value: String, action: @escaping () -> Void) -> some View {
@@ -153,7 +138,9 @@ struct ModelPickerScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: ModeSpacing.m) {
+            VStack(alignment: .leading, spacing: ModeSpacing.s) {
+                ModePageTitle(stuck ? L10n.Settings.whenStuckShort : L10n.Settings.mainModel)
+                    .padding(.bottom, ModeSpacing.s)
                 ModeSearchField(L10n.Settings.searchCount(state.modelCount), text: $query)
                     .onChange(of: query) { onEvent(.search) }
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -165,9 +152,11 @@ struct ModelPickerScreen: View {
                             ModeFilterChip(SettingsViewModel.makerName(maker), selected: filter == .maker(maker)) { onEvent(.filter(.maker(maker))) }
                         }
                     }
+                    .padding(.horizontal, ModeSpacing.screenEdge)
                 }
+                .padding(.horizontal, -ModeSpacing.screenEdge)
                 .scrollClipDisabled()
-                ModeCard {
+                ModeCard(lifted: true) {
                     if stuck {
                         ModeChoiceRow(String(localized: L10n.Settings.never), tag: nil, detail: String(localized: L10n.Settings.neverDetail),
                                       leading: .none, selected: state.neverStuck) { onEvent(.chooseStuck(nil)) }
@@ -179,11 +168,9 @@ struct ModelPickerScreen: View {
                         }
                     }
                 }
-                if listed.isEmpty {
-                    Text(L10n.Settings.noModels).modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
-                }
-                Text(state.showsCost ? L10n.Settings.pickerNote : L10n.Settings.pickerPlanNote)
-                    .modeText(.footnote, color: ModeColor.textSecondary).padding(.horizontal, ModeSpacing.xs)
+                if listed.isEmpty { ModeFootnote(L10n.Settings.noModels) }
+                ModeFootnote(state.showsCost ? L10n.Settings.pickerNote : L10n.Settings.pickerPlanNote, style: .caption)
+                    .padding(.top, ModeSpacing.xxs)
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
@@ -191,8 +178,7 @@ struct ModelPickerScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .all)
         .scrollDismissesKeyboard(.interactively)
         .modeScreen()
-        .navigationTitle(Text(stuck ? L10n.Settings.whenStuckShort : L10n.Settings.mainModel))
-        .navigationBarTitleDisplayMode(.large)
+        .modePageChrome(stuck ? L10n.Settings.whenStuckShort : L10n.Settings.mainModel)
     }
 
     private func chip(_ title: LocalizedStringResource, _ value: SettingsViewModel.Filter) -> some View {
@@ -251,18 +237,5 @@ struct ModelPickerRoute: View {
 
     var body: some View {
         ModelPickerScreen(state: model.state, listed: model.listed, filter: model.filter, stuck: stuck, query: $model.query, onEvent: model.send)
-    }
-}
-
-private extension SettingsScreen {
-    /// The chosen voice or listener failed last time: why, in orange, opening its page to fix it.
-    func problemLine(_ text: String, open: @escaping () -> Void) -> some View {
-        Button(action: open) {
-            Label { Text(text).frame(maxWidth: .infinity, alignment: .leading) } icon: { ModeIcon.warning.image }
-                .modeText(.subheadline, color: ModeColor.warning)
-                .padding(.vertical, ModeSpacing.s)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
     }
 }

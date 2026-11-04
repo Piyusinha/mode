@@ -14,6 +14,9 @@ final class TasksViewModel {
         let title: String
         let subtitle: String
         let leading: ModeRowLeading
+        /// When the running task started, for its ticking time.
+        var since: Date?
+        var paused = false
     }
 
     struct RepeatRow: Identifiable, Equatable {
@@ -90,19 +93,20 @@ final class TasksViewModel {
         }
     }
 
-    private static func map(_ s: TasksUiState) -> State {
+    static func map(_ s: TasksUiState) -> State {
         let running = s.running.flatMap { r in r.question == nil ? r : nil }
         let waiting = s.running.flatMap { r in r.question != nil ? r : nil }
         return State(
             running: running.map { r in
-                Row(id: r.taskId, title: r.text, subtitle: r.paused ? String(localized: L10n.Run.paused) : r.status, leading: .progress)
+                Row(id: r.taskId, title: r.text, subtitle: RunStatusViewModel.status(r), leading: .mo(.working),
+                    since: r.startedAtMs.map { Date(timeIntervalSince1970: TimeInterval(truncating: $0) / 1000) }, paused: r.paused)
             },
             waiting: waiting.map { r in
-                Row(id: r.taskId, title: r.text, subtitle: r.question?.text ?? "", leading: .iconTile(.lockFilled, background: ModeColor.tileOrange, foreground: ModeColor.tileOrangeText))
+                Row(id: r.taskId, title: r.text, subtitle: r.question?.text ?? "", leading: .mo(.yourTurn))
             },
             upNext: s.upNext.map { q in
                 Row(id: q.taskId, title: q.text, subtitle: [Format.day(q.day), Format.timeOfDay(epochMs: q.queuedAtMs)].joined(separator: " "),
-                    leading: .symbol(.clock, ModeColor.textSecondary))
+                    leading: .icon(.clock, ModeColor.textSecondary))
             },
             repeats: s.repeats.map { r in
                 let days = r.isoDays.isEmpty ? String(localized: L10n.Repeat.once) : daysLabel(Set(r.isoDays.map { Int(truncating: $0) }))
@@ -119,10 +123,9 @@ final class TasksViewModel {
 
     private static func leading(_ badge: TaskBadge) -> ModeRowLeading {
         switch badge {
-        case .done: .success
-        case .failed: .failure
-        case .gaveUp: .icon(.warning, ModeColor.warning)
-        case .stopped, .notStarted: .icon(.stopped, ModeColor.textSecondary)
+        case .done: .mo(.done)
+        case .failed, .gaveUp: .mo(.stuck)
+        case .stopped, .notStarted: .mo(.sleep)
         }
     }
 

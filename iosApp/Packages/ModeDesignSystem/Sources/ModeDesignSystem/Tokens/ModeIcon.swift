@@ -23,6 +23,8 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case running = "circle.dotted"
     case skill = "point.topleft.down.to.point.bottomright.curvepath"
     case tip = "lightbulb"
+    /// How hard the model thinks (the effort tag in setup).
+    case effort = "chart.bar.fill"
     case person = "person.fill"
     case screens = "rectangle.stack"
     case sparkle = "sparkles"

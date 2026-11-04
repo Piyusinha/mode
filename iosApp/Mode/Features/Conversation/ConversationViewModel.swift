@@ -25,10 +25,16 @@ final class ConversationViewModel {
         let screens: (label: String, taskId: String)?
         /// A task that couldn't finish: What went wrong opens its check (board TaskFailedChat).
         var debugTaskId: String? = nil
+        /// Mo's face beside the reply: done, couldn't finish, still working, or just answering.
+        var mood: ModeMo.Mood = .idle
+
+        /// The reply's first block sits beside Mo; the rest (and "See all N screens" between) below it.
+        var lead: [ModeReplyBlock] { Array(blocks.prefix(1)) }
+        var rest: [ModeReplyBlock] { Array(blocks.dropFirst()) }
 
         static func == (a: Message, b: Message) -> Bool {
             a.id == b.id && a.text == b.text && a.blocks == b.blocks && a.status?.text.key == b.status?.text.key
-                && a.screens?.label == b.screens?.label
+                && a.screens?.label == b.screens?.label && a.mood == b.mood
         }
     }
 
@@ -38,6 +44,8 @@ final class ConversationViewModel {
         var messages: [Message] = []
         /// What Mode is doing now, while this conversation's task runs, and since when.
         var working: String?
+        /// The request the running task came from: its working card sits under it (board TeachSteer).
+        var workingAfterId: String?
         var workingSince: Date?
         var remembered: [Remembered] = []
         var isPrivate = false
@@ -152,10 +160,11 @@ final class ConversationViewModel {
     }
 
     private static func map(_ s: ConversationUiState) -> State {
-        State(
+        let started = s.turns.first.map { [Format.day($0.day), Format.timeOfDay(epochMs: $0.atMs)].joined(separator: " ") } ?? ""
+        return State(
             title: s.title,
-            when: s.turns.first.map { [Format.day($0.day), Format.timeOfDay(epochMs: $0.atMs)].joined(separator: " ") } ?? "",
-            messages: s.turns.map { t in
+            when: s.running != nil && !started.isEmpty ? L10n.Conversation.whenWorking(started) : started,
+            messages: s.turns.enumerated().map { index, t in
                 Message(
                     id: t.id,
                     fromUser: t.fromUser,
@@ -165,15 +174,17 @@ final class ConversationViewModel {
                     blocks: t.parts.map(ModeReplyBlock.init),
                     status: t.badge.flatMap { $0 == .done ? nil : Format.badge($0) },
                     screens: t.screens > 0 ? t.taskId.map { (L10n.Conversation.seeScreens(Int(t.screens)), $0) } : nil,
-                    debugTaskId: t.badge.flatMap { $0 == .done ? nil : t.taskId }
+                    debugTaskId: t.badge.flatMap { $0 == .done ? nil : t.taskId },
+                    mood: mood(t, after: index > 0 ? s.turns[index - 1] : nil, running: s.running != nil)
                 )
             },
             working: s.running.map { $0.paused ? String(localized: L10n.Run.paused) : $0.status },
+            workingAfterId: s.running == nil ? nil : s.turns.last { $0.fromUser && !$0.steered }?.id,
             workingSince: s.running?.startedAtMs.map { Date(timeIntervalSince1970: TimeInterval(truncating: $0) / 1000) },
             remembered: s.remembered.map { Remembered(id: $0.itemId, text: L10n.Conversation.remembered($0.text)) },
             isPrivate: s.privateNext,
             lessons: s.lessons.map { l in
-                Lesson(id: l.itemId, context: [l.app, l.title].compactMap { $0 }.joined(separator: " · "), text: l.text, afterTurnId: l.afterTurnId)
+                Lesson(id: l.itemId, context: [l.app, L10n.Conversation.nextTimeAbout(l.title)].compactMap { $0 }.joined(separator: " · "), text: l.text, afterTurnId: l.afterTurnId)
             },
             offerRemember: s.offerRemember != nil, teaching: s.teaching, running: s.running != nil,
             voiceNotice: s.voiceNotice.map { n in
@@ -182,5 +193,13 @@ final class ConversationViewModel {
             },
             voiceNoticeHearing: s.voiceNotice?.hearing ?? false
         )
+    }
+
+    /// Mo's face for a reply: done when its task worked, stuck when it didn't, working while
+    /// answering a steer to the running task, otherwise just listening.
+    private static func mood(_ t: TurnItem, after previous: TurnItem?, running: Bool) -> ModeMo.Mood {
+        if let badge = t.badge { return badge == .done ? .done : .stuck }
+        if running && previous?.steered == true { return .working }
+        return .idle
     }
 }

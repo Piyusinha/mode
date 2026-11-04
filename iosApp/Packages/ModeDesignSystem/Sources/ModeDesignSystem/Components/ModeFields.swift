@@ -97,9 +97,11 @@ public struct ModeDayPicker: View {
                 let on = selected.contains(day)
                 Button { toggle(day) } label: {
                     Text(label)
-                        .modeText(.calloutEmphasis, color: on ? ModeColor.onAccent : ModeColor.textPrimary)
+                        .modeText(.subheadlineEmphasis, color: on ? ModeColor.onAccent : ModeColor.textPrimary)
                         .frame(width: ModeSize.dayButton, height: ModeSize.dayButton)
-                        .background(on ? ModeColor.accent : ModeColor.cardRaised, in: .circle)
+                        .background(on ? ModeColor.accent : ModeColor.card, in: .circle)
+                        .frame(minHeight: ModeSize.touch)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(on ? .isSelected : [])

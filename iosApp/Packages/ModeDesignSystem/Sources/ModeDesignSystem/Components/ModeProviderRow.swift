@@ -13,6 +13,8 @@ public struct ModeProviderRow: View {
     private let tileBackground: Color
     private let tileForeground: Color
     private let tag: String?
+    /// The tag's colours: Mo's soft orange unless given ("In use" is green).
+    private let tagColors: (background: Color, foreground: Color)?
     private let selected: Bool
     private let connected: Bool
     private let connectTitle: String
@@ -23,7 +25,7 @@ public struct ModeProviderRow: View {
     private let onOpen: (() -> Void)?
 
     public init(title: String, status: String, logo: ModeLogo, tileBackground: Color, tileForeground: Color, tag: String? = nil,
-                selected: Bool, connected: Bool, connectTitle: String, radio: RadioPlacement = .trailing,
+                tagColors: (background: Color, foreground: Color)? = nil, selected: Bool, connected: Bool, connectTitle: String, radio: RadioPlacement = .trailing,
                 onSelect: @escaping () -> Void, onConnect: @escaping () -> Void, onOpen: (() -> Void)? = nil) {
         self.onOpen = onOpen
         self.title = title
@@ -32,6 +34,7 @@ public struct ModeProviderRow: View {
         self.tileBackground = tileBackground
         self.tileForeground = tileForeground
         self.tag = tag
+        self.tagColors = tagColors
         self.selected = selected
         self.connected = connected
         self.connectTitle = connectTitle
@@ -47,15 +50,14 @@ public struct ModeProviderRow: View {
                     if radio == .leading { ModeRadio(selected: selected) }
                     ModeLeadingView(.logoTile(logo, background: tileBackground, foreground: tileForeground))
                     VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                        HStack(spacing: ModeSpacing.s) {
-                            Text(title).modeText(.bodyEmphasis).lineLimit(1).fixedSize()
-                            if let tag { ModeTag(tag, background: ModeColor.tintSoft, foreground: ModeColor.tint).fixedSize() }
+                        HStack(spacing: ModeSpacing.xs + ModeSpacing.xxs) {
+                            Text(title).modeText(.calloutEmphasis).lineLimit(1).fixedSize()
+                            if let tag {
+                                ModeTag(tag, background: tagColors?.background ?? ModeColor.tintSoft, foreground: tagColors?.foreground ?? ModeColor.tint)
+                                    .fixedSize()
+                            }
                         }
-                        HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
-                            Circle().fill(connected ? ModeColor.success : ModeColor.separator)
-                                .frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
-                            Text(status).modeText(.footnote, color: ModeColor.textSecondary).lineLimit(2)
-                        }
+                        ModeStatusLine(status, dot: connected ? ModeColor.success : ModeColor.ring).lineLimit(2)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -65,17 +67,23 @@ public struct ModeProviderRow: View {
             .accessibilityAddTraits(selected ? [.isSelected] : [])
             if !connected {
                 Button(action: onConnect) {
-                    Text(connectTitle).modeText(.subheadline, color: ModeColor.onAccent).fontWeight(.semibold)
-                        .padding(.horizontal, ModeSpacing.m)
-                        .frame(minHeight: ModeSize.badge)
+                    Text(connectTitle).modeText(.subheadlineEmphasis, color: ModeColor.onAccent)
+                        .lineLimit(1)
+                        .padding(.horizontal, ModeSpacing.headerGap)
+                        .frame(minHeight: ModeSize.pillButton)
+                        .background(ModeColor.accent, in: .capsule)
+                        .frame(minHeight: ModeSize.touch)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(ModePressStyle())
+            } else if radio == .trailing {
+                Button(action: onSelect) {
+                    ModeRadio(selected: selected).frame(minWidth: ModeSize.touch, minHeight: ModeSize.touch, alignment: .trailing).contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .background(ModeColor.accent, in: .capsule)
-            } else if radio == .trailing {
-                Button(action: onSelect) { ModeRadio(selected: selected) }.buttonStyle(.plain)
             }
         }
         .padding(.vertical, ModeSpacing.m)
-        .frame(minHeight: ModeSize.tile + ModeSpacing.xxl)
+        .frame(minHeight: ModeSize.tileRow)
     }
 }

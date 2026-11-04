@@ -62,6 +62,10 @@ enum L10n {
         static let paused = LocalizedStringResource("run.paused", defaultValue: "Paused")
         static let shrink = LocalizedStringResource("run.shrink", defaultValue: "Shrink to the Dynamic Island")
 
+        static func stepStatus(_ step: Int, _ status: String) -> String {
+            String(localized: "run.stepStatus", defaultValue: "Step \(step) · \(status)")
+        }
+
         static func liveBadge(step: Int) -> String {
             String(localized: "run.liveBadge", defaultValue: "Live · step \(step) ·")
         }
@@ -124,7 +128,7 @@ enum L10n {
         static let remember = LocalizedStringResource("conversation.remember", defaultValue: "Remember")
         static let saving = LocalizedStringResource("conversation.saving", defaultValue: "Saving it for next time…")
         static let steerPrompt = LocalizedStringResource("conversation.steerPrompt", defaultValue: "Tell Mode what to do differently…")
-        static let teachPrompt = LocalizedStringResource("conversation.teachPrompt", defaultValue: "Ask for more, or teach Mode")
+        static let teachPrompt = LocalizedStringResource("conversation.teachPrompt", defaultValue: "Ask for more")
         static let editLesson = LocalizedStringResource("conversation.editLesson", defaultValue: "Edit the tip")
         static let editLessonPrompt = LocalizedStringResource("conversation.editLessonPrompt", defaultValue: "What Mode should do next time")
         static let working = LocalizedStringResource("conversation.working", defaultValue: "Working on it")
@@ -149,6 +153,14 @@ enum L10n {
 
         static func remembered(_ text: String) -> String {
             String(localized: "conversation.remembered", defaultValue: "Remembered: \(text)")
+        }
+        /// On a saved tip: when Mode uses it ("Next time you ask about Dark Mode").
+        static func nextTimeAbout(_ topic: String) -> String {
+            String(localized: "conversation.nextTimeAbout", defaultValue: "Next time you ask about \(topic)")
+        }
+        /// Under the title while the chat's task runs: "Today 20:39 · working".
+        static func whenWorking(_ when: String) -> String {
+            String(localized: "conversation.whenWorking", defaultValue: "\(when) · working")
         }
     }
 
@@ -197,7 +209,20 @@ enum L10n {
         static let weekends = LocalizedStringResource("repeat.weekends", defaultValue: "Weekends")
         static let once = LocalizedStringResource("repeat.once", defaultValue: "Once")
 
-        static func note(_ first: String) -> String {
+        static let moNote = LocalizedStringResource("repeat.moNote", defaultValue: "Mo will do this for you on a schedule.")
+        static let onEveryDay = LocalizedStringResource("repeat.onEveryDay", defaultValue: "every day")
+        static let onWeekdays = LocalizedStringResource("repeat.onWeekdays", defaultValue: "on weekdays")
+        static let onWeekends = LocalizedStringResource("repeat.onWeekends", defaultValue: "on weekends")
+
+        static func onDays(_ days: String) -> String {
+            String(localized: "repeat.onDays", defaultValue: "on \(days)")
+        }
+
+        static func note(time: String, days: String) -> String {
+            String(localized: "repeat.note.repeating", defaultValue: "Runs at \(time) \(days) while Mode is open. If it isn't, you'll get a notification at \(time): tap it and Mode does the task.")
+        }
+
+        static func noteOnce(_ first: String) -> String {
             String(localized: "repeat.note", defaultValue: "First run \(first). If Mode isn't open then, you'll get a notification: tap it and Mode does the task.")
         }
     }
@@ -218,8 +243,8 @@ enum L10n {
         static let whatInsteadPrompt = LocalizedStringResource("screens.whatInsteadPrompt", defaultValue: "Search Settings for “Dark Mode” instead")
         static let justThisTime = LocalizedStringResource("screens.justThisTime", defaultValue: "Just this time")
         static let everyTime = LocalizedStringResource("screens.everyTime", defaultValue: "Every time")
-        static let everyTimeNote = LocalizedStringResource("screens.everyTimeNote", defaultValue: "Mode keeps it as a tip for that app and uses it on the next task.")
-        static let justThisTimeNote = LocalizedStringResource("screens.justThisTimeNote", defaultValue: "Mode does it that way now: in the task if it's still running, or by running it again.")
+        static let everyTimeNote = LocalizedStringResource("screens.everyTimeNote", defaultValue: "Every time: Mode keeps it as a tip for that app and uses it on the next task.")
+        static let justThisTimeNote = LocalizedStringResource("screens.justThisTimeNote", defaultValue: "Just this time: Mode does it that way now, in the task if it's still running or by running it again.")
         static let savingFix = LocalizedStringResource("screens.savingFix", defaultValue: "Saving it…")
         static let ok = LocalizedStringResource("screens.ok", defaultValue: "OK")
         static func stepLine(_ number: String, _ label: String) -> String {
@@ -313,6 +338,60 @@ enum L10n {
         static func taughtOn(_ day: String) -> String {
             String(localized: "memory.taughtOn", defaultValue: "You taught this \(day)")
         }
+
+        // The Mo theme boards: footers, tags and the editor's notes.
+        static let youToldMode = String(localized: "memory.youToldMode", defaultValue: "You told Mode")
+        static let youTaughtThis = String(localized: "memory.youTaughtThis", defaultValue: "You taught this")
+        static let modeLearned = String(localized: "memory.modeLearned", defaultValue: "Mode learned")
+        static let tipsHeading = LocalizedStringResource("memory.tipsHeading", defaultValue: "Tips")
+        static let swipeHint = LocalizedStringResource("memory.swipeHint", defaultValue: "Swipe a tip to edit or delete it. What you teach in a chat shows up here.")
+
+        static func appTipsSubtitle(_ tips: String, app: String) -> String {
+            String(localized: "memory.appTipsSubtitle", defaultValue: "\(tips) · used on every \(app) task")
+        }
+
+        static func taughtInChat(_ day: String) -> String {
+            String(localized: "memory.taughtInChat", defaultValue: "\(day), in chat")
+        }
+
+        static func taughtAtStep(_ day: String, _ step: Int) -> String {
+            String(localized: "memory.taughtAtStep", defaultValue: "\(day), step \(step)")
+        }
+
+        static func usedTimes(_ n: Int) -> String {
+            n == 1 ? String(localized: "memory.usedTimes.one", defaultValue: "used once") : String(localized: "memory.usedTimes", defaultValue: "used \(n) times")
+        }
+
+        static func fromTask(_ app: String) -> String {
+            String(localized: "memory.fromTask", defaultValue: "from a \(app) task")
+        }
+
+        static func workedBadge(_ successes: Int, of uses: Int) -> String {
+            String(localized: "memory.workedBadge", defaultValue: "Worked \(successes) of \(uses) times")
+        }
+
+        static func learnedFromTask(_ app: String, _ day: String) -> String {
+            String(localized: "memory.learnedFromTask", defaultValue: "Learned from a \(app) task, \(day).")
+        }
+
+        static func learnedNote(_ day: String) -> String {
+            String(localized: "memory.learnedNote", defaultValue: "Learned \(day).")
+        }
+
+        static func taughtNote(_ day: String) -> String {
+            String(localized: "memory.taughtNote", defaultValue: "You taught this \(day).")
+        }
+
+        /// "Used 2 times, worked both times."
+        static func usedNote(_ uses: Int, worked successes: Int) -> String {
+            switch (uses, successes) {
+            case (1, 1): String(localized: "memory.usedNote.onceWorked", defaultValue: "Used once, it worked.")
+            case (1, _): String(localized: "memory.usedNote.onceFailed", defaultValue: "Used once, it didn’t work.")
+            case (2, 2): String(localized: "memory.usedNote.bothWorked", defaultValue: "Used 2 times, worked both times.")
+            case let (n, s) where n == s: String(localized: "memory.usedNote.allWorked", defaultValue: "Used \(n) times, worked every time.")
+            case let (n, s): String(localized: "memory.usedNote", defaultValue: "Used \(n) times, worked \(s).")
+            }
+        }
     }
 
     enum Providers {
@@ -346,11 +425,13 @@ enum L10n {
         static let openRouterMessage = LocalizedStringResource("providers.openRouterMessage", defaultValue: "Pay as you go, any model. Usually under a cent a task.")
         static let signInOpenRouter = LocalizedStringResource("providers.signInOpenRouter", defaultValue: "Sign in with OpenRouter")
         static let connectClaude = LocalizedStringResource("providers.connectClaude", defaultValue: "Connect Claude")
-        static let planNote = LocalizedStringResource("providers.planNote", defaultValue: "Tasks run on your plan, so there is no cost per task. Set how much of your plan Mode may use in that provider's own settings.")
+        static func planNote(_ provider: String) -> String {
+            String(localized: "providers.planNote", defaultValue: "\(provider) runs on your plan, so there is no cost per task. With OpenRouter, a cost limit per task and per day shows here.")
+        }
 
         static func connectedCount(_ n: Int) -> String {
             n == 1 ? String(localized: "providers.connectedCount.one", defaultValue: "Connected")
-                : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers connected")
+                : String(localized: "providers.connectedCount", defaultValue: "Connected · \(n) providers")
         }
 
         static func keyEnding(_ ending: String) -> String {
@@ -480,6 +561,10 @@ enum L10n {
         static let chatGPTNote = LocalizedStringResource("account.chatGPTNote", defaultValue: "Plus shares one 5-hour limit across every app that uses your plan. OpenAI doesn't tell apps what is left: Mode shows what it used, and says so when the limit is reached.")
         static let claudeNote = LocalizedStringResource("account.claudeNote", defaultValue: "From Claude, for your whole plan (Claude apps and Mode together).")
         static let updated = LocalizedStringResource("account.updated", defaultValue: "Updated")
+        /// Claude's usage note, with when its numbers came: "… together). Updated 11:32."
+        static func claudeNoteUpdated(_ at: String) -> String {
+            String(localized: "account.claudeNoteUpdated", defaultValue: "From Claude, for your whole plan (Claude apps and Mode together). Updated \(at).")
+        }
         static let updating = LocalizedStringResource("account.updating", defaultValue: "Updating…")
         static let notYet = LocalizedStringResource("account.notYet", defaultValue: "Not yet")
         static let session = LocalizedStringResource("account.session", defaultValue: "Current session · 5 hours")
@@ -541,6 +626,7 @@ enum L10n {
         static let failed = LocalizedStringResource("chatgpt.failed", defaultValue: "Couldn't connect")
         static let check = LocalizedStringResource("chatgpt.check", defaultValue: "Check again")
         static let signOut = LocalizedStringResource("chatgpt.signOut", defaultValue: "Sign out of ChatGPT")
+        static let useOpenRouter = LocalizedStringResource("chatgpt.useOpenRouter", defaultValue: "Use OpenRouter")
         static let usageNote = LocalizedStringResource("chatgpt.usageNote", defaultValue: "Change how much of your plan Mode may use in ChatGPT → Settings → Usage.")
     }
 
@@ -567,7 +653,7 @@ enum L10n {
 
     enum Debug {
         static let couldntFinish = LocalizedStringResource("debug.couldntFinish", defaultValue: "Couldn’t finish")
-        static let cardDetail = LocalizedStringResource("debug.cardDetail", defaultValue: "Mode can check what went wrong and repair what it can.")
+        static let cardDetail = LocalizedStringResource("debug.cardDetail", defaultValue: "Mode can check what went wrong on this iPhone and repair what it can.")
         static let whatWentWrong = LocalizedStringResource("debug.whatWentWrong", defaultValue: "What went wrong")
         static let title = LocalizedStringResource("debug.title", defaultValue: "What went wrong")
         static let found = LocalizedStringResource("debug.found", defaultValue: "What Mode found")
@@ -577,7 +663,7 @@ enum L10n {
         static let repair = LocalizedStringResource("debug.repair", defaultValue: "Repair what Mode can")
         static let onDevice = LocalizedStringResource("debug.onDevice", defaultValue: "Checked on this iPhone from the task’s steps and trace. Nothing left your iPhone.")
         static let ask = LocalizedStringResource("debug.ask", defaultValue: "Ask about it")
-        static let askTitle = LocalizedStringResource("debug.askTitle", defaultValue: "Ask about it")
+        static let askTitle = LocalizedStringResource("debug.askTitle", defaultValue: "Ask about this task")
         static func answeredWith(_ provider: String) -> LocalizedStringResource {
             LocalizedStringResource("debug.answeredWith", defaultValue: "Answered with your \(provider) plan")
         }
@@ -586,9 +672,18 @@ enum L10n {
         static let whatToChange = LocalizedStringResource("debug.whatToChange", defaultValue: "What should I change?")
         static let willWork = LocalizedStringResource("debug.willWork", defaultValue: "Will it work if I try again?")
         static let thinking = LocalizedStringResource("debug.thinking", defaultValue: "Reading the steps…")
-        static let askPrompt = LocalizedStringResource("debug.askPrompt", defaultValue: "Ask about this task")
+        static let repaired = LocalizedStringResource("debug.repaired", defaultValue: "Repaired")
+        /// "today 01:36", in What went wrong's line.
+        static func today(_ time: String) -> LocalizedStringResource {
+            LocalizedStringResource("debug.today", defaultValue: "today \(time)")
+        }
+        /// "Order Tres Leches · today 01:36. Checked on this iPhone."
+        static func subtitle(_ task: String) -> LocalizedStringResource {
+            LocalizedStringResource("debug.subtitle", defaultValue: "\(task). Checked on this iPhone.")
+        }
+        static let askPrompt = LocalizedStringResource("debug.askPrompt", defaultValue: "Ask about this task…")
         static func whatIsSent(_ provider: String) -> LocalizedStringResource {
-            LocalizedStringResource("debug.whatIsSent", defaultValue: "The task’s steps go to \(provider) to answer. Screenshots and keys stay on this iPhone.")
+            LocalizedStringResource("debug.whatIsSent", defaultValue: "The task’s steps go to \(provider) with your question. Screenshots and keys stay on this iPhone.")
         }
     }
 
@@ -613,11 +708,17 @@ enum L10n {
         static let checking = LocalizedStringResource("health.checking", defaultValue: "Checking…")
         static let repairing = LocalizedStringResource("health.repairing", defaultValue: "Repairing…")
         static let checkingDetail = LocalizedStringResource("health.checkingDetail", defaultValue: "Mode checks each part on this iPhone.")
-        static func needAttention(_ n: Int) -> LocalizedStringResource {
-            LocalizedStringResource("health.needAttention", defaultValue: "\(n) need attention")
+        static func needAttention(_ n: Int) -> String {
+            n == 1 ? String(localized: "health.needAttention.one", defaultValue: "1 thing needs attention")
+                : String(localized: "health.needAttention", defaultValue: "\(n) things need attention")
         }
-        static func canRepair(_ n: Int) -> LocalizedStringResource {
-            LocalizedStringResource("health.canRepair", defaultValue: "Mode can repair \(n) itself.")
+        /// [repairable] and [rest] spelled out ("one", "two").
+        static func canRepair(_ repairable: String, rest: String, restCount: Int) -> String {
+            switch restCount {
+            case 0: String(localized: "health.canRepair", defaultValue: "Mode can repair \(repairable) itself.")
+            case 1: String(localized: "health.canRepairRest.one", defaultValue: "Mode can repair \(repairable); \(rest) needs you.")
+            default: String(localized: "health.canRepairRest", defaultValue: "Mode can repair \(repairable); \(rest) need you.")
+            }
         }
         static let needsYou = LocalizedStringResource("health.needsYou", defaultValue: "Each one shows where to fix it.")
         static let repair = LocalizedStringResource("health.repair", defaultValue: "Repair")
@@ -644,6 +745,13 @@ enum L10n {
         static let download = LocalizedStringResource("language.download", defaultValue: "Downloads once, then works offline")
         static let needsCloud = LocalizedStringResource("language.needsCloud", defaultValue: "Apple can’t hear it yet: choose Soniox or Deepgram")
         static func cloud(_ listener: String) -> LocalizedStringResource { LocalizedStringResource("language.cloud", defaultValue: "With \(listener)") }
+        /// The example under the choices: what you say, what Mode works on, what it says back.
+        static let exampleYouSay = LocalizedStringResource("language.example.youSay", defaultValue: "You say")
+        static let exampleWorksOn = LocalizedStringResource("language.example.worksOn", defaultValue: "Mode works on")
+        static let exampleSays = LocalizedStringResource("language.example.says", defaultValue: "Mode says")
+        static let exampleSaid = LocalizedStringResource("language.example.said", defaultValue: "“डार्क मोड चालू करो”")
+        static let exampleTask = LocalizedStringResource("language.example.task", defaultValue: "“Turn on Dark Mode”")
+        static let exampleReply = LocalizedStringResource("language.example.reply", defaultValue: "“डार्क मोड चालू हो गया”")
     }
 
     enum Talk {
@@ -673,15 +781,18 @@ enum L10n {
         static let ifNeeded = LocalizedStringResource("talk.ifNeeded", defaultValue: "If Mode needs you, it comes back here and asks out loud. You answer by voice and it carries on.")
         static let sayOrTap = LocalizedStringResource("talk.sayOrTap", defaultValue: "Say your answer, or tap one.")
         static let sayAnswer = LocalizedStringResource("talk.sayAnswer", defaultValue: "Say your answer.")
-        static let leavesSoon = LocalizedStringResource("talk.leavesSoon", defaultValue: "Mode goes back to the app by itself in a moment.")
+        static let leavesSoon = LocalizedStringResource("talk.leavesSoon", defaultValue: "Mode leaves this screen by itself in a moment.")
         static let modeLabel = LocalizedStringResource("talk.modeLabel", defaultValue: "MODE")
         static let modeSpeaking = LocalizedStringResource("talk.modeSpeaking", defaultValue: "MODE · SPEAKING")
         static let micTitle = LocalizedStringResource("talk.micTitle", defaultValue: "Let Mode hear you")
         static let micMessage = LocalizedStringResource("talk.micMessage", defaultValue: "Allow the microphone once. Mode listens only after you say “Start Mode” or tap the mic, and Apple turns your words into text on this iPhone.")
-        static let micModel = LocalizedStringResource("talk.micModel", defaultValue: "First time only: Apple downloads its speech model.")
+        static let micModel = LocalizedStringResource("talk.micModel", defaultValue: "First time only: Apple downloads its speech model (about 150 MB).")
         static let micDenied = LocalizedStringResource("talk.micDenied", defaultValue: "The microphone is off for Mode. Turn it on in iPhone Settings → Mode.")
         static let allowMic = LocalizedStringResource("talk.allowMic", defaultValue: "Allow microphone")
         static let openSettings = LocalizedStringResource("talk.openSettings", defaultValue: "Open Settings")
+        static let starting = LocalizedStringResource("talk.starting", defaultValue: "Starting")
+        static let couldntHearYou = LocalizedStringResource("talk.couldntHearYou", defaultValue: "Mode couldn’t hear you")
+        static let tryAgain = LocalizedStringResource("talk.tryAgain", defaultValue: "Try again")
         static let typeInstead = LocalizedStringResource("talk.typeInstead", defaultValue: "Type instead")
         static let typeTask = LocalizedStringResource("talk.typeTask", defaultValue: "Type what you want done")
         static let typeAnswer = LocalizedStringResource("talk.typeAnswer", defaultValue: "Type your answer")
@@ -722,7 +833,9 @@ enum L10n {
         static let off = LocalizedStringResource("voice.off", defaultValue: "Off")
         static let talkBack = LocalizedStringResource("voice.talkBack", defaultValue: "Talk back")
         static let talkBackDetail = LocalizedStringResource("voice.talkBackDetail", defaultValue: "On tasks you start by voice")
-        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Mode speaks and listens with the ones you choose. Apple’s are free, private and work offline.")
+        static let sectionNote = LocalizedStringResource("voice.sectionNote", defaultValue: "Mode speaks and listens with the ones you pick. Apple’s are free, private and need no key.")
+        /// Under Settings → Voice when the chosen voice or listener failed.
+        static let sectionNoteFailed = LocalizedStringResource("voice.sectionNoteFailed", defaultValue: "Mode speaks and listens with the ones you pick. When one can’t, Mode says so here instead of switching on its own.")
         static let defaultVoice = LocalizedStringResource("voice.defaultVoice", defaultValue: "Default voice")
         // Mode's voice
         static let voiceSubtitle = LocalizedStringResource("voice.voiceSubtitle", defaultValue: "What Mode sounds like when it talks back.")
@@ -754,7 +867,7 @@ enum L10n {
         static let appleSpeech = LocalizedStringResource("voice.appleSpeech", defaultValue: "Free · on this iPhone · works offline")
         static let elevenFree = LocalizedStringResource("voice.elevenFree", defaultValue: "Free plan: 10,000 credits a month")
         static let fishFree = LocalizedStringResource("voice.fishFree", defaultValue: "Free plan: about 7 minutes of speech a month")
-        static let appleHearing = LocalizedStringResource("voice.appleHearing", defaultValue: "On this iPhone · private · free")
+        static let appleHearing = LocalizedStringResource("voice.appleHearing", defaultValue: "Free · private, stays on this iPhone")
         static let sonioxFree = LocalizedStringResource("voice.sonioxFree", defaultValue: "Free credit to start · strong with Hinglish")
         static let deepgramFree = LocalizedStringResource("voice.deepgramFree", defaultValue: "$200 free credit to start")
         static func withKey(_ line: String, _ ending: String) -> String {
@@ -764,19 +877,19 @@ enum L10n {
         static let listeningSubtitle = LocalizedStringResource("voice.listeningSubtitle", defaultValue: "How Mode turns what you say into a task.")
         static let turnOnApple = LocalizedStringResource("voice.turnOnApple", defaultValue: "Allow the microphone and Mode downloads Apple’s speech model.")
         static let micOff = LocalizedStringResource("voice.micOff", defaultValue: "The microphone is off for Mode in iPhone Settings.")
-        static let listeningNote = LocalizedStringResource("voice.listeningNote", defaultValue: "Mode listens with the one you pick, and only that one. Apple’s words show while you speak either way.")
+        static let listeningNote = LocalizedStringResource("voice.listeningNote", defaultValue: "Mode listens with the one you pick. Tap a connected one to edit or remove its key.")
         static let privacy = LocalizedStringResource("voice.privacy", defaultValue: "Your privacy")
         static let privacyListen = LocalizedStringResource("voice.privacyListen", defaultValue: "Mode listens only after you say “Start Mode” or tap the mic, and stops when you stop talking.")
-        static let privacyWhere = LocalizedStringResource("voice.privacyWhere", defaultValue: "With Apple, nothing leaves your iPhone. With Soniox or Deepgram, the clip goes to them only.")
+        static let privacyWhere = LocalizedStringResource("voice.privacyWhere", defaultValue: "With Apple, nothing leaves your iPhone. With Deepgram or Soniox, the clip goes to them only.")
         static let privacyType = LocalizedStringResource("voice.privacyType", defaultValue: "If nothing can listen, you type the task instead.")
         // Choose a voice
         static let chooseVoice = LocalizedStringResource("voice.chooseVoice", defaultValue: "Choose a voice")
         static let searchVoices = LocalizedStringResource("voice.searchVoices", defaultValue: "Search voices")
         static let all = LocalizedStringResource("voice.all", defaultValue: "All")
         static let popular = LocalizedStringResource("voice.popular", defaultValue: "Popular")
-        static let appleBanner = LocalizedStringResource("voice.appleBanner", defaultValue: "Free and private. These voices run on your iPhone, even offline. Get more in iPhone Settings → Accessibility → Spoken Content → Voices.")
-        static let elevenBanner = LocalizedStringResource("voice.elevenBanner", defaultValue: "Free plan: 10,000 credits a month, about 10 minutes of Mode talking. For personal use. Voices from your ElevenLabs library.")
-        static let fishBanner = LocalizedStringResource("voice.fishBanner", defaultValue: "Free plan: 8,000 credits a month, about 7 minutes of Mode talking. Voices shared by the Fish Audio community, including Hindi.")
+        static let appleBanner = LocalizedStringResource("voice.appleBanner", defaultValue: "**Free and private.** These voices run on your iPhone, even offline. Get more in iPhone Settings → Accessibility → Spoken Content → Voices.")
+        static let elevenBanner = LocalizedStringResource("voice.elevenBanner", defaultValue: "**Free plan: 10,000 credits a month,** about 10 minutes of Mode talking. For personal use. Voices from your ElevenLabs library.")
+        static let fishBanner = LocalizedStringResource("voice.fishBanner", defaultValue: "**Voices shared by the Fish Audio community,** including Hindi and Hinglish. **Free plan:** 8,000 credits a month, about 7 minutes of Mode talking.")
         static func needsKey(_ provider: String) -> String {
             String(localized: "voice.needsKey", defaultValue: "Add your \(provider) key to see its voices. The free plan is enough.")
         }
@@ -843,7 +956,7 @@ enum L10n {
         static func troubleNoKeyLong(_ p: String) -> String { String(localized: "voice.troubleNoKeyLong", defaultValue: "There’s no \(p) key on this iPhone. Add one, or use Apple.") }
         static let troubleNotReadyLong = LocalizedStringResource("voice.troubleNotReadyLong", defaultValue: "Apple’s voice or listening isn’t ready on this iPhone yet.")
         static func troubleUnreachableLong(_ p: String) -> String { String(localized: "voice.troubleUnreachableLong", defaultValue: "\(p) didn’t answer, so Mode stayed quiet. Check the internet, update the key, or use Apple.") }
-        static func keyRejected(_ p: String) -> String { String(localized: "voice.keyRejected", defaultValue: "\(p) said the key is not valid. Copy it again — keys are long and easy to cut short.") }
+        static func keyRejected(_ p: String, site: String) -> String { String(localized: "voice.keyRejected", defaultValue: "\(p) said the key is not valid. Copy it again from \(site) — keys are long and easy to cut short.") }
         static func keyPlan(_ p: String) -> String { String(localized: "voice.keyPlan", defaultValue: "\(p) knows the key, but its plan doesn’t allow this. Check your plan on \(p).") }
         static let keyEmpty = LocalizedStringResource("voice.keyEmpty", defaultValue: "Paste the key first.")
         static func keyUnreachable(_ p: String) -> String { String(localized: "voice.keyUnreachable", defaultValue: "Couldn’t reach \(p) to check the key. Check the internet and try again.") }
@@ -860,10 +973,31 @@ enum L10n {
         static let editKey = LocalizedStringResource("voice.editKey", defaultValue: "Edit key")
         static func speakWith(_ p: String) -> String { String(localized: "voice.speakWith", defaultValue: "Speak with \(p)") }
         static func listenWith(_ p: String) -> String { String(localized: "voice.listenWith", defaultValue: "Listen with \(p)") }
-        static func removeNote(_ p: String) -> String { String(localized: "voice.removeNote", defaultValue: "Removing the key here leaves your \(p) account as it is. Apple takes over if it was in use.") }
+        static func removeNoteSpeak(_ p: String) -> String { String(localized: "voice.removeNoteSpeak", defaultValue: "After you remove the key, pick who speaks instead. Your \(p) account stays as it is.") }
+        static func removeNoteHear(_ p: String) -> String { String(localized: "voice.removeNoteHear", defaultValue: "After you remove the key, pick who listens instead. Your \(p) account stays as it is.") }
         static func editKeyTitle(_ p: String) -> String { String(localized: "voice.editKeyTitle", defaultValue: "Edit \(p) key") }
         static func inUseNowKey(_ masked: String) -> String { String(localized: "voice.inUseNowKey", defaultValue: "In use now: \(masked). Paste a new key to replace it.") }
-        static func savedConnected(_ p: String) -> String { String(localized: "voice.savedConnected", defaultValue: "Saved · \(p) is connected and in use") }
+        static func savedConnected(_ p: String) -> String { String(localized: "voice.savedConnected", defaultValue: "Saved · \(p) is connected") }
+        static func nowSpeaks(_ p: String) -> String { String(localized: "voice.nowSpeaks", defaultValue: "Mode now speaks with \(p). Pick Apple any time to switch back.") }
+        static func nowListens(_ p: String) -> String { String(localized: "voice.nowListens", defaultValue: "Mode now listens with \(p). Pick Apple any time to switch back.") }
+        // Mo theme boards: a provider's page, the key sheet
+        static let inUseCouldntSpeak = LocalizedStringResource("voice.inUseCouldntSpeak", defaultValue: "In use · couldn’t speak")
+        static let inUseCouldntHear = LocalizedStringResource("voice.inUseCouldntHear", defaultValue: "In use · couldn’t hear")
+        static let planSection = LocalizedStringResource("voice.planSection", defaultValue: "Plan")
+        static func seeUsage(_ site: String) -> String { String(localized: "voice.seeUsage", defaultValue: "See usage on \(site)") }
+        static func getFreeKey(_ site: String) -> String { String(localized: "voice.getFreeKey", defaultValue: "Get a free key at \(site)") }
+        static func openKeys(_ p: String) -> String { String(localized: "voice.openKeys", defaultValue: "Open \(p) API keys") }
+        static func openSite(_ site: String) -> String { String(localized: "voice.openSite", defaultValue: "Open \(site)") }
+        static func newKeyField(_ p: String) -> String { String(localized: "voice.newKeyField", defaultValue: "New \(p) API key") }
+        static let remove = LocalizedStringResource("voice.remove", defaultValue: "Remove")
+        static let tapConnected = LocalizedStringResource("voice.tapConnected", defaultValue: "Tap a connected one to edit or remove its key.")
+        static let pasteHere = LocalizedStringResource("voice.pasteHere", defaultValue: "Paste it here")
+        static let paste = LocalizedStringResource("voice.paste", defaultValue: "Paste")
+        static let blurbSpeech = LocalizedStringResource("voice.blurbSpeech", defaultValue: "Lifelike voices for Mode’s replies. The free plan is enough.")
+        static let blurbDeepgram = LocalizedStringResource("voice.blurbDeepgram", defaultValue: "Listens well in noise and with names. Free credit to start.")
+        static let blurbSoniox = LocalizedStringResource("voice.blurbSoniox", defaultValue: "Listens in many languages. Free credit to start.")
+        static let blurbApple = LocalizedStringResource("voice.blurbApple", defaultValue: "Free and private, on this iPhone.")
+        static func troubleUnreachableHearLong(_ p: String) -> String { String(localized: "voice.troubleUnreachableHearLong", defaultValue: "\(p) didn’t answer, so Mode didn’t start anything.") }
         static let keyDidntWork = LocalizedStringResource("voice.keyDidntWork", defaultValue: "That key didn’t work")
         static func checkingKey(_ p: String) -> String { String(localized: "voice.checkingKey", defaultValue: "Checking your key with \(p)…") }
         static let checking = LocalizedStringResource("voice.checking", defaultValue: "Checking…")
@@ -994,6 +1128,22 @@ enum L10n {
         static let paste = LocalizedStringResource("setup.key.paste", defaultValue: "Paste")
         static let keyNote = LocalizedStringResource("setup.key.note", defaultValue: "Your key stays in this iPhone's Keychain. It only goes to OpenRouter, never to us.")
         static let keyLooksWrong = LocalizedStringResource("setup.key.looksWrong", defaultValue: "OpenRouter keys start with sk-or-")
+        static let hiMo = LocalizedStringResource("setup.name.hiMo", defaultValue: "Hi, I'm Mo.")
+        static let chatGPTSetupDetail = LocalizedStringResource("setup.key.chatgptDetail", defaultValue: "Your Plus or Pro plan · no cost per task")
+        static let claudeSetupDetail = LocalizedStringResource("setup.key.claudeDetail", defaultValue: "Your Claude account · experimental")
+        static let openRouterSetupDetail = LocalizedStringResource("setup.key.openrouterDetail", defaultValue: "Pay as you go · any model")
+        static func keyConnectedHint(_ name: String) -> String {
+            String(localized: "setup.key.connectedHint", defaultValue: "\(name) is connected and selected. You can connect the others now or later in Settings.")
+        }
+        static func providerConnected(_ name: String) -> String {
+            String(localized: "setup.model.providerConnected", defaultValue: "\(name) · connected")
+        }
+        static let whyLead = LocalizedStringResource("setup.model.whyLead", defaultValue: "Why these:")
+        static let whyRest = LocalizedStringResource("setup.model.whyRest", defaultValue: "a quick model on Medium for every step, and a thorough one on High for the hard ones.")
+        static func pickerMessage(_ detail: String) -> String {
+            String(localized: "setup.model.pickerMessage", defaultValue: "\(detail). Mode recommends what’s marked.")
+        }
+        static let effortGuide = LocalizedStringResource("setup.model.effortGuide", defaultValue: "Medium: quick and careful. High is slower; Low can miss small buttons.")
 
         // Model
         static let modelTitle = LocalizedStringResource("setup.model.title", defaultValue: "Pick how Mode thinks")

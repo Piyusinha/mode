@@ -13,10 +13,13 @@ struct LiveScreen: View {
                 Image(uiImage: screen)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(.rect(cornerRadius: ModeRadius.sheet))
-                    .shadow(color: ModeColor.scrim, radius: ModeSpacing.l, y: ModeSpacing.s)
-                    .frame(maxHeight: .infinity)
+                    .clipShape(.rect(cornerRadius: ModeRadius.card))
+                    .padding(ModeSpacing.l)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ModeColor.card, in: .rect(cornerRadius: ModeRadius.liveScreen))
+                    .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.liveScreen))
                     .padding(.horizontal, ModeSpacing.xl)
+                    .padding(.top, ModeSpacing.s)
             } else if state.running == nil {
                 if let finished = state.finished {
                     ScrollView {
@@ -32,25 +35,31 @@ struct LiveScreen: View {
                     ModeEmptyState(icon: .running, title: L10n.Live.idleTitle, message: L10n.Live.idleMessage).frame(maxHeight: .infinity)
                 }
             } else {
-                ProgressView().tint(ModeColor.tint).frame(maxHeight: .infinity)
+                ProgressView().tint(ModeColor.brand).frame(maxHeight: .infinity)
             }
             if let running = state.running {
-                ModeLivePanel(
-                    task: running.task, now: running.now, steps: running.steps, paused: running.paused,
+                ModeRunPanel(
+                    task: running.task, now: running.now, segments: running.segments, paused: running.paused,
                     pauseLabel: L10n.Run.pause, resumeLabel: L10n.Run.resume, stopLabel: L10n.Common.stop,
                     onPauseToggle: { onEvent(.togglePause) }, onStop: { onEvent(.stop) }
                 )
                 .padding(.horizontal, ModeSpacing.s)
+                .padding(.bottom, ModeSpacing.s)
             }
         }
+        .ignoresSafeArea(edges: state.running == nil ? [] : .bottom)
         .modeScreen()
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden()
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { ModeToolbarButton(.back, label: L10n.Common.back) { onEvent(.close) } }
+            ToolbarItem(placement: .topBarLeading) { ModeIconButton(.back, label: L10n.Common.back) { onEvent(.close) } }
+                .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .principal) {
-                if let running = state.running { ModeLiveBadge(running.badge, since: running.startedAt, paused: running.paused) }
+                if let running = state.running { ModeRunBadge(running.badge, since: running.startedAt, paused: running.paused) }
             }
-            ToolbarItem(placement: .topBarTrailing) { ModeToolbarButton(.shrink, label: L10n.Run.shrink) { onEvent(.close) } }
+            .sharedBackgroundVisibility(.hidden)
+            ToolbarItem(placement: .topBarTrailing) { ModeIconButton(.shrink, label: L10n.Run.shrink) { onEvent(.close) } }
+                .sharedBackgroundVisibility(.hidden)
         }
     }
 }

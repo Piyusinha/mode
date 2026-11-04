@@ -28,11 +28,15 @@ struct ModeActivityAttributes: ActivityAttributes {
         var options: [String] = []
         /// Something only the user can do (a UPI PIN, a password): "Your turn", with "I've entered it".
         var yourTurn = false
+        /// The option the agent suggests, if any: the highlighted button.
+        var recommended: String?
         /// Finished: how it ended, how long it took, the start of the answer, how much more is in the chat.
         var outcome: Outcome?
         var seconds = 0
         var reply: [ModeReplyBlock] = []
         var more = 0
+        /// A task that couldn't finish: Try again runs it again (the same task, in the same chat).
+        var retryTaskId: String?
     }
 
     /// What was asked, and where the answer goes.
@@ -49,6 +53,11 @@ enum ModeLinks {
     }
 
     static let ask = URL(string: "\(scheme)://ask")!
+
+    /// Try again: the task that couldn't finish, run again in its chat, which then opens.
+    static func retry(_ taskId: String, conversationId: String?) -> URL {
+        URL(string: "\(scheme)://retry/\(taskId)" + (conversationId.map { "/\($0)" } ?? "")) ?? open
+    }
     static let open = URL(string: "\(scheme)://open")!
 
     /// Where each provider shows its own usage or credits.

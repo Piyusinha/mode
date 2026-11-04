@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A provider's page heading: its large logo tile, its name, and a status line with a dot.
+/// A provider's page heading: its big logo tile, its name, a status line with a dot, and Mo on the right
+/// (awake when the provider is in use, asleep when not).
 public struct ModeProviderHeader: View {
     private let logo: ModeLogo
     private let tileBackground: Color
@@ -8,32 +9,33 @@ public struct ModeProviderHeader: View {
     private let title: String
     private let status: String
     private let good: Bool
+    private let mood: ModeMo.Mood?
 
-    public init(logo: ModeLogo, tileBackground: Color, tileForeground: Color, title: String, status: String, good: Bool) {
+    public init(logo: ModeLogo, tileBackground: Color, tileForeground: Color, title: String, status: String, good: Bool,
+                mood: ModeMo.Mood? = nil) {
         self.logo = logo
         self.tileBackground = tileBackground
         self.tileForeground = tileForeground
         self.title = title
         self.status = status
         self.good = good
+        self.mood = mood
     }
 
     public var body: some View {
-        HStack(spacing: ModeSpacing.l) {
+        HStack(spacing: ModeSpacing.headerGap) {
             logo.image.resizable().scaledToFit()
-                .frame(width: ModeSize.iconLarge + ModeSpacing.xs, height: ModeSize.iconLarge + ModeSpacing.xs)
+                .frame(width: ModeSize.iconLarge, height: ModeSize.iconLarge)
                 .foregroundStyle(tileForeground)
-                .frame(width: ModeSize.contactAvatar, height: ModeSize.contactAvatar)
-                .background(tileBackground, in: .rect(cornerRadius: ModeRadius.chip + ModeSpacing.xxs))
+                .frame(width: ModeSize.providerTile, height: ModeSize.providerTile)
+                .background(tileBackground, in: .rect(cornerRadius: ModeSize.providerTileRadius))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
-                Text(title).modeText(.title)
-                HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.xs) {
-                    Circle().fill(good ? ModeColor.success : ModeColor.separator).frame(width: ModeSize.stepDot, height: ModeSize.stepDot)
-                    Text(status).modeText(.footnote, color: ModeColor.textSecondary)
-                }
+            VStack(alignment: .leading, spacing: ModeSpacing.xs) {
+                Text(title).modeText(.title).lineLimit(1).minimumScaleFactor(ModeTextScale.title).accessibilityAddTraits(.isHeader)
+                ModeStatusLine(status, dot: good ? ModeColor.success : ModeColor.ring)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            if let mood { ModeMo(mood, size: ModeSize.moProvider) }
         }
     }
 }
@@ -63,21 +65,21 @@ public struct ModeValueRow: View {
 
     private var content: some View {
         HStack(spacing: ModeSpacing.m) {
-            Text(title).modeText(.body).fixedSize()
+            Text(title).modeText(.callout).fixedSize()
             Spacer(minLength: ModeSpacing.m)
-            HStack(spacing: ModeSpacing.xs) {
-                if let dot { Circle().fill(dot).frame(width: ModeSize.stepDot, height: ModeSize.stepDot) }
-                Text(value).modeText(.body, color: ModeColor.textSecondary).lineLimit(2).multilineTextAlignment(.trailing)
+            HStack(spacing: ModeSpacing.xs + ModeSpacing.xxs) {
+                if let dot { Circle().fill(dot).frame(width: ModeSize.statusDot, height: ModeSize.statusDot) }
+                Text(value).modeText(.callout, color: ModeColor.textSecondary).lineLimit(2).multilineTextAlignment(.trailing)
             }
             if action != nil { ModeChevron() }
         }
         .padding(.vertical, ModeSpacing.s)
-        .frame(minHeight: ModeSize.rowMin - ModeSpacing.xs)
+        .frame(minHeight: action == nil ? ModeSize.valueRow : ModeSize.rowMin)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Steps per day for a week: one bar a day, today in the accent.
+/// Steps per day for a week: one bar a day on a faint track colour, today in Mo's orange.
 public struct ModeWeekBars: View {
     private let values: [Int]
     private let labels: [String]
@@ -91,13 +93,13 @@ public struct ModeWeekBars: View {
 
     public var body: some View {
         let top = max(values.max() ?? 0, 1)
-        HStack(alignment: .bottom, spacing: ModeSpacing.s) {
+        HStack(alignment: .bottom, spacing: ModeSpacing.xs + ModeSpacing.xxs) {
             ForEach(values.indices, id: \.self) { i in
                 VStack(spacing: ModeSpacing.xs) {
-                    RoundedRectangle(cornerRadius: ModeSpacing.xs)
-                        .fill(i == today ? ModeColor.accent : ModeColor.accent.opacity(ModeOpacity.muted))
-                        .frame(height: max(ModeSpacing.xs, ModeSize.tile * 1.2 * CGFloat(values[i]) / CGFloat(top)))
-                        .frame(height: ModeSize.tile * 1.2, alignment: .bottom)
+                    RoundedRectangle(cornerRadius: ModeRadius.bar)
+                        .fill(i == today ? ModeColor.brand : ModeColor.track)
+                        .frame(height: max(ModeSpacing.xs, ModeSize.weekBars * CGFloat(values[i]) / CGFloat(top)))
+                        .frame(height: ModeSize.weekBars, alignment: .bottom)
                     Text(i < labels.count ? labels[i] : "").modeText(.caption, color: ModeColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -107,37 +109,41 @@ public struct ModeWeekBars: View {
     }
 }
 
-/// A limit or balance: a title, how much (on the right), a bar, and a line under it.
+/// A limit or balance: a title, how much (on the right; [prominent] sets it large, for credits left), a bar,
+/// and a line under it.
 public struct ModeUsageBar: View {
     private let title: String
     private let value: String
     private let fraction: Double
     private let tint: Color
     private let footnote: String?
+    private let prominent: Bool
 
-    public init(_ title: String, value: String, fraction: Double, tint: Color, footnote: String?) {
+    public init(_ title: String, value: String, fraction: Double, tint: Color, footnote: String?, prominent: Bool = false) {
         self.title = title
         self.value = value
         self.fraction = fraction
         self.tint = tint
         self.footnote = footnote
+        self.prominent = prominent
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+        VStack(alignment: .leading, spacing: prominent ? ModeSpacing.s : ModeSpacing.xs + ModeSpacing.xxs) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).modeText(.bodyEmphasis)
+                Text(title).modeText(.subheadlineEmphasis)
                 Spacer(minLength: ModeSpacing.m)
-                Text(value).modeText(.bodyEmphasis)
+                Text(value).modeText(prominent ? .title2 : .subheadlineEmphasis)
             }
-            Capsule().fill(ModeColor.fill)
-                .frame(height: ModeSpacing.s)
+            Capsule().fill(ModeColor.track)
+                .frame(height: ModeSize.usageBar)
                 .overlay(alignment: .leading) {
                     GeometryReader { g in Capsule().fill(tint).frame(width: g.size.width * min(max(fraction, 0), 1)) }
                 }
+                .clipShape(.capsule)
             if let footnote { Text(footnote).modeText(.footnote, color: ModeColor.textSecondary) }
         }
-        .padding(.vertical, ModeSpacing.m)
+        .padding(.vertical, prominent ? ModeSpacing.headerGap : ModeSpacing.m)
         .accessibilityElement(children: .combine)
     }
 }
@@ -167,35 +173,33 @@ public struct ModeEffortTable: View {
         self.rows = rows
     }
 
-    /// The speed and accuracy columns' width, so their values line up under their headings.
-    private let column = ModeSize.thumbnailWidth * 0.62
-
     public var body: some View {
         VStack(spacing: ModeSpacing.xxs) {
-            line(Text(headers.0).modeText(.caption, color: ModeColor.textSecondary),
-                 Text(headers.1).modeText(.caption, color: ModeColor.textSecondary),
-                 Text(headers.2).modeText(.caption, color: ModeColor.textSecondary))
+            line(Text(headers.0), Text(headers.1), Text(headers.2))
+                .modeText(.caption, color: ModeColor.textSecondary)
+                .padding(.bottom, ModeSpacing.xs)
             ForEach(rows) { row in
                 line(HStack(spacing: ModeSpacing.xs) {
-                         Text(row.label).modeText(row.selected ? .bodyEmphasis : .body)
-                         if row.selected { ModeIcon.checkmark.image.font(ModeTextStyle.captionEmphasis.font).foregroundStyle(ModeColor.tint) }
+                         Text(row.label).modeText(row.selected ? .subheadlineEmphasis : .subheadline)
+                         if row.selected { ModeIcon.checkmark.image.font(ModeIconFont.chevron.weight(.bold)).foregroundStyle(ModeColor.success) }
                      },
                      Text(row.speed).modeText(.subheadline, color: ModeColor.textSecondary),
                      Text(row.accuracy).modeText(.subheadline, color: ModeColor.textSecondary))
                     .padding(.vertical, ModeSpacing.s)
-                    .background(row.selected ? ModeColor.tintSoft : .clear, in: .rect(cornerRadius: ModeRadius.chip))
+                    .background(row.selected ? ModeColor.card : .clear, in: .rect(cornerRadius: ModeRadius.tableRow))
                     .accessibilityElement(children: .combine)
             }
         }
-        .padding(ModeSpacing.xs)
-        .background(ModeColor.fill, in: .rect(cornerRadius: ModeRadius.field))
+        .padding(.horizontal, ModeSpacing.xs)
+        .padding(.vertical, ModeSpacing.m - ModeSpacing.xxs)
+        .background(ModeColor.cardRaised, in: .rect(cornerRadius: ModeRadius.table))
     }
 
     private func line(_ a: some View, _ b: some View, _ c: some View) -> some View {
-        HStack(spacing: ModeSpacing.s) {
-            a.frame(maxWidth: .infinity, alignment: .leading)
-            b.frame(width: column, alignment: .trailing)
-            c.frame(width: column, alignment: .trailing)
+        HStack(spacing: ModeSpacing.m) {
+            a.lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity, alignment: .leading)
+            b.lineLimit(1).minimumScaleFactor(0.8).frame(width: ModeSize.effortColumn, alignment: .trailing)
+            c.lineLimit(1).minimumScaleFactor(0.8).frame(width: ModeSize.effortColumn + ModeSpacing.m, alignment: .trailing)
         }
         .padding(.horizontal, ModeSpacing.m)
     }
