@@ -619,6 +619,7 @@ class Agent(
                     val label = (op as? Op.Tap)?.let { nearestText(it.x, it.y, screen) }
                     val target = (op as? Op.Tap)?.let { rowLabel(it.x, it.y, screen) ?: label } ?: described
                     val changes = op is Op.Tap && Changes.isChange(reason, label)
+                    val kind = Changes.kindOf(reason, label)
                     if (op is Op.Tap && Changes.isChangeButton(label) && Changes.isChecking(reason)) {
                         stuck.badReply()
                         record("$described (not done)", reason, ADD_IS_NOT_A_CHECK)
@@ -721,9 +722,9 @@ class Agent(
                         // Apps often confirm a change only for a moment ("Added", a check): read the
                         // screen right away, twice, so the proof is not lost before the next look.
                         if (changes) {
-                            val appeared = flashed(screen)
-                            val proof = Changes.proof(appeared)
-                            ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof)
+                            val appeared = flashed(screen, kind)
+                            val proof = Changes.proof(appeared, kind)
+                            ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof, kind, label)
                             "ok" + appeared.takeIf { it.isNotEmpty() }?.let { a -> "; right after it the screen showed: " + a.joinToString(", ") { "\"$it\"" } }.orEmpty() +
                                 if (proof != null) DONE_IT else CHECK_IT
                         } else if (op is Op.Scroll && stuck.scrollsSameWay() >= SCROLLS_BEFORE_HINT - 1) {
@@ -868,8 +869,9 @@ class Agent(
      * Text that appeared right after a change and was not there before ("Food logged!"). Read
      * twice, at once and a moment later, since some apps confirm late; text only, no model cost.
      */
-    private suspend fun flashed(before: Screen): List<String> {
-        val had = before.texts.map { it.first.trim() }.toSet()
+    private suspend fun flashed(before: Screen, kind: Changes.Kind): List<String> {
+        // Normalised: OCR reads "ADDED ×" one moment and "ADDED x" the next; neither is new.
+        val had = before.texts.map { ChangeLedger.norm(it.first) }.toSet()
         val seen = mutableListOf<String>()
         for (wait in FLASH_READS_MS) {
             delay(wait)
@@ -877,11 +879,13 @@ class Agent(
             now.filter { (text, _, y) ->
                 val t = text.trim()
                 // Nothing in the status bar is proof of a change (the clock, the island).
-                t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
+                t.isNotEmpty() && ChangeLedger.norm(t) !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
             }.forEach { if (it.first.trim() !in seen) seen += it.first.trim() }
-            if (Changes.proof(seen) != null) break
+            if (Changes.proof(seen, kind) != null) break
         }
-        return seen.take(FLASH_TEXTS)
+        // The proof first: a cart bar at the bottom ("1 item added") must not be cut by the limit.
+        val proof = Changes.proof(seen, kind)
+        return (listOfNotNull(proof) + seen.filter { it != proof }).take(FLASH_TEXTS)
     }
 
     /** The numbered lines of a learned route ("1. open Settings"), without the numbers and the extra notes. */
