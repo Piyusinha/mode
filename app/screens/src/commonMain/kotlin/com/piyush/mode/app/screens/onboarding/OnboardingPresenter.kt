@@ -366,7 +366,7 @@ public class OnboardingPresenter(
         set { it.copy(checking = true) }
         scope.launch {
             phoneChecks.run { results -> set { it.copy(checks = results) } }
-            session.disconnect()
+            session.disconnectAndRelease()
             set { it.copy(checking = false) }
         }
     }
@@ -525,7 +525,7 @@ public class OnboardingPresenter(
         } catch (e: Exception) {
             e.message ?: e.toString()
         }
-        session.disconnect()
+        session.disconnectAndRelease()
         set { it.copy(connectError = error) }
     }
 

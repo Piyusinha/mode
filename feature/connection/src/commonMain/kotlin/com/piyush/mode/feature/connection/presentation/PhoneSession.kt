@@ -77,6 +77,24 @@ public class PhoneSession(
     }
 
     /**
+     * Mode is done with the phone for now (after checks or a repair): like [disconnect], but turns Mode's VPN
+     * off even when no session was open, since the checks and a failed connect bring it up too. An idle VPN
+     * stays in the status bar. Does not unpair.
+     */
+    public suspend fun disconnectAndRelease(): Unit = telemetry.trace(Operation.PhoneDisconnect) {
+        val had = lock.withLock {
+            val open = current != null
+            close()
+            mutableState.value = ConnectionState.Disconnected
+            open
+        }
+        // A session's goodbye travels through the VPN: let it out first.
+        if (had) delay(releaseDelay)
+        runCatching { link.release() }
+        AppLog.log("phone", "done with the phone: session closed, VPN off")
+    }
+
+    /**
      * The user's "Stop session": closes the session if there is one and always
      * releases the link (Mode's VPN), even if Mode thinks it is not connected.
      * Unlike iOS's own Stop, it does not unpair Mode.

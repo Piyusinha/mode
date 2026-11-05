@@ -69,6 +69,18 @@ class PhoneSessionTest {
     }
 
     @Test
+    fun doneWithThePhoneReleasesTheVpnEvenWithoutASession() = runTest {
+        val link = FakeLink()
+        val session = PhoneSession(link, Duration.ZERO)
+        session.disconnectAndRelease()
+        assertEquals(1, link.releases, "checks and failed connects bring the VPN up without a session")
+        session.phone()
+        session.disconnectAndRelease()
+        assertEquals(2, link.releases)
+        assertEquals(ConnectionState.Disconnected, session.state.value)
+    }
+
+    @Test
     fun stopSessionAlwaysReleasesTheVpn() = runTest {
         val link = FakeLink()
         val session = PhoneSession(link, Duration.ZERO)

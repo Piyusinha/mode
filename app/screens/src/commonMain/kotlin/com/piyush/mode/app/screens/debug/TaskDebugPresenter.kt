@@ -107,7 +107,7 @@ public class TaskDebugPresenter(
             val done = mutableListOf<String>()
             if (kinds.any { it in PHONE }) {
                 // Proves the connection works, then closes it: an open session keeps iOS's indicator and the screen on.
-                runCatching { try { session.reconnect() } finally { session.disconnect() } }
+                runCatching { try { session.reconnect() } finally { session.disconnectAndRelease() } }
                     .onSuccess { done += "Reconnected phone control" }
                     .onFailure { if (it is CancellationException) throw it }
             }

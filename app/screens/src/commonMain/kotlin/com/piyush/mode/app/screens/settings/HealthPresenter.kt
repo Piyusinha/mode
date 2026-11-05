@@ -87,6 +87,7 @@ public class HealthPresenter(
         job = scope.launch {
             mutableState.value = HealthUiState(checking = true)
             runChecks()
+            doneWithThePhone()
             mutableState.value = mutableState.value.copy(checking = false)
         }
     }
@@ -102,8 +103,7 @@ public class HealthPresenter(
                 AppLog.log("health", "repair ${item.name}: ${if (worked) "done" else "did not help"}")
             }
             runChecks()
-            // Repairing reconnects; with no task to use it, close it again (it keeps iOS's indicator and the screen on).
-            if (!runner.state.value.running) session.disconnect()
+            doneWithThePhone()
             val now = mutableState.value.rows
             repaired += todo.filter { item -> now.first { it.item == item }.state == HealthState.Ok }
             mutableState.value = mutableState.value.copy(
@@ -111,6 +111,14 @@ public class HealthPresenter(
                 rows = now.map { if (it.item in repaired && it.state == HealthState.Ok) it.copy(state = HealthState.Repaired) else it },
             )
         }
+    }
+
+    /**
+     * Checks and repairs bring up Mode's VPN and the session; with no task to use them, both go off again
+     * (an open session keeps iOS's indicator and the screen on; an idle VPN stays in the status bar).
+     */
+    private suspend fun doneWithThePhone() {
+        if (!runner.state.value.running) session.disconnectAndRelease()
     }
 
     /** One repair; true when it did something. */

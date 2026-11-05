@@ -183,7 +183,7 @@ public class Screens(
                 try {
                     session.reconnect()
                 } finally {
-                    session.disconnect()
+                    session.disconnectAndRelease()
                 }
             }
             permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
