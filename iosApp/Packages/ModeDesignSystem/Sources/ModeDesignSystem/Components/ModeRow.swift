@@ -7,6 +7,8 @@ public enum ModeRowLeading: Equatable, Sendable {
     case icon(ModeIcon, Color = ModeColor.textPrimary)
     /// Mo, in a mood (a recent task, How Mode acts).
     case mo(ModeMo.Mood)
+    /// Mo with a small badge on its corner (What Mode knows about you: Mo with a brain).
+    case moBadge(ModeMo.Mood, ModeIcon)
     /// A round badge with a letter, for people.
     case initial(String)
     /// A numbered step (Welcome).
@@ -103,6 +105,16 @@ public struct ModeLeadingView: View {
                 .accessibilityHidden(true)
         case let .mo(mood):
             ModeMo(mood, size: ModeSize.moRow)
+        case let .moBadge(mood, icon):
+            ZStack(alignment: .bottomTrailing) {
+                ModeMo(mood, size: ModeSize.moRow)
+                icon.image.font(ModeIconFont.moBadge).foregroundStyle(ModeColor.onAccent)
+                    .frame(width: ModeSize.moRowBadge, height: ModeSize.moRowBadge)
+                    .background(ModeColor.accent, in: .circle)
+                    .overlay(Circle().stroke(ModeColor.card, lineWidth: ModeSize.moRowBadgeRing))
+                    .offset(x: ModeSpacing.xs, y: ModeSpacing.xxs)
+            }
+            .accessibilityHidden(true)
         case let .initial(letter):
             Text(letter)
                 .modeText(.title3)

@@ -35,8 +35,8 @@ struct MainTabs: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab(value: AppTab.home) { stack(.home) { navigate in HomeRoute(app: app, run: run, navigate: navigate, openLive: { showingLive = true }) } }
-            Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, run: run, navigate: navigate, newTask: { showingAsk = true }) } }
-            Tab(value: AppTab.memory) { stack(.memory) { navigate in MemoryRoute(app: app, navigate: navigate) } }
+            Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, run: run, navigate: navigate) } }
+            Tab(value: AppTab.settings) { stack(.settings) { navigate in SettingsRoute(app: app, navigate: navigate) } }
         }
         .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) {
             if paths[tab, default: []].isEmpty {
@@ -118,16 +118,17 @@ struct MainTabs: View {
         switch parts.first {
         case "tasks": tab = .tasks
         case "memory":
-            tab = .memory
+            tab = .settings
+            paths[.settings] = [.memory]
             switch parts.count > 1 ? parts.last : nil {
-            case "aboutyou": paths[.memory] = [.memoryAboutYou]
-            case "routines": paths[.memory] = [.memoryRoutines(app: nil)]
-            case "apps": paths[.memory] = [.memoryApps]
-            case let name?: paths[.memory] = name.hasPrefix("edit=") ? [.memoryEdit(id: String(name.dropFirst(5)))] : [.memoryApps, .memoryApp(name: name)]
+            case "aboutyou": paths[.settings] = [.memory, .memoryAboutYou]
+            case "routines": paths[.settings] = [.memory, .memoryRoutines(app: nil)]
+            case "apps": paths[.settings] = [.memory, .memoryApps]
+            case let name?: paths[.settings] = name.hasPrefix("edit=") ? [.memory, .memoryEdit(id: String(name.dropFirst(5)))] : [.memory, .memoryApps, .memoryApp(name: name)]
             default: break
             }
         case "live": showingLive = true
-        case "settings": paths[.home] = [.settings]
+        case "settings": tab = .settings
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "plan": paths[.home] = [.settings, .planModels(brain: parts.last == "brain")]
         case "access": paths[.home] = [.settings, .access]
@@ -171,7 +172,7 @@ struct MainBar: View {
             items: [
                 ModeTabItem(AppTab.home, icon: .home, title: L10n.Tab.home),
                 ModeTabItem(AppTab.tasks, icon: .tasks, title: L10n.Tab.tasks),
-                ModeTabItem(AppTab.memory, icon: .memory, title: L10n.Tab.memory),
+                ModeTabItem(AppTab.settings, icon: .settings, title: L10n.Tab.settings),
             ],
             selection: $tab,
             speakLabel: L10n.Tab.ask,

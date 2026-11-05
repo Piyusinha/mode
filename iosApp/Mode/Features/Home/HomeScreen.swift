@@ -83,12 +83,6 @@ struct HomeScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ModeIconButton(.profile, label: L10n.Home.profile) { onEvent(.openSettings) }
-            }
-            .sharedBackgroundVisibility(.hidden)
-        }
     }
 
     /// A section heading: 16 above it (with the gap after what came before), 10 below.

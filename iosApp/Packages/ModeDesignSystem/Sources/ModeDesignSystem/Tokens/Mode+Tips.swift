@@ -54,6 +54,17 @@ public extension ModeSize {
     static let tipToast: CGFloat = 56
 }
 
+public extension ModeSize {
+    /// The badge on a row's Mo (What Mode knows about you), and its ring.
+    static let moRowBadge: CGFloat = 19
+    static let moRowBadgeRing: CGFloat = 2
+}
+
+public extension ModeIconFont {
+    /// The icon in a row's Mo badge.
+    static let moBadge = Font.system(size: 10.5, weight: .bold)
+}
+
 public extension ModeRadius {
     static let tipBanner: CGFloat = 26
 }

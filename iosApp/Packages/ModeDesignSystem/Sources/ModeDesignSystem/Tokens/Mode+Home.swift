@@ -48,3 +48,13 @@ public extension ModeRadius {
     static let screenCell: CGFloat = 22
     static let note: CGFloat = 22
 }
+
+public extension ModeSize {
+    /// Tasks rows, a little roomier than other lists (Up next, Repeats, Done).
+    static let tasksRow: CGFloat = 72
+    /// Mo on an empty Tasks page.
+    static let moTasksEmpty: CGFloat = 112
+    /// A suggested task: its height, and its dot.
+    static let tryRow: CGFloat = 56
+    static let tryDot: CGFloat = 9
+}

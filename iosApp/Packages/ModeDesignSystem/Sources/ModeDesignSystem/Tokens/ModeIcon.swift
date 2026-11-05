@@ -14,6 +14,8 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case close = "xmark"
     case stop = "stop.fill"
     case settings = "gearshape"
+    /// What Mode knows about you (memory), on Mo's badge.
+    case brain = "brain"
     case repeatTask = "repeat"
     case clock = "clock"
     case done = "checkmark.circle.fill"

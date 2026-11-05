@@ -7,6 +7,7 @@ enum L10n {
         static let home = LocalizedStringResource("tab.home", defaultValue: "Home")
         static let tasks = LocalizedStringResource("tab.tasks", defaultValue: "Tasks")
         static let memory = LocalizedStringResource("tab.memory", defaultValue: "Memory")
+        static let settings = LocalizedStringResource("tab.settings", defaultValue: "Settings")
         static let ask = LocalizedStringResource("tab.ask", defaultValue: "Ask")
     }
 
@@ -28,6 +29,7 @@ enum L10n {
     enum Day {
         static let today = LocalizedStringResource("day.today", defaultValue: "Today")
         static let yesterday = LocalizedStringResource("day.yesterday", defaultValue: "Yesterday")
+        static let tomorrow = LocalizedStringResource("day.tomorrow", defaultValue: "Tomorrow")
     }
 
     enum Badge {
@@ -165,6 +167,26 @@ enum L10n {
     }
 
     enum Tasks {
+        static let nothingYet = LocalizedStringResource("tasks.nothingYet", defaultValue: "Nothing here yet")
+        static let nothingYetMessage = LocalizedStringResource("tasks.nothingYetMessage", defaultValue: "Hold the mic and tell me what to do. Everything I do for you shows up here.")
+        static let tryOne = LocalizedStringResource("tasks.tryOne", defaultValue: "Try one of these")
+        static let today = LocalizedStringResource("tasks.today", defaultValue: "Today")
+        static let yesterday = LocalizedStringResource("tasks.yesterday", defaultValue: "Yesterday")
+        static let nothingScheduled = LocalizedStringResource("tasks.nothingScheduled", defaultValue: "Nothing scheduled")
+        static let nothingScheduledMessage = LocalizedStringResource("tasks.nothingScheduledMessage", defaultValue: "After a task, tap Repeat in its chat and Mo runs it again when you want.")
+        static let nothingDone = LocalizedStringResource("tasks.nothingDone", defaultValue: "Nothing done yet")
+        static let nothingDoneMessage = LocalizedStringResource("tasks.nothingDoneMessage", defaultValue: "What Mo did today and yesterday shows up here.")
+        static let pause = LocalizedStringResource("tasks.pause", defaultValue: "Pause")
+        static let resume = LocalizedStringResource("tasks.resume", defaultValue: "Turn back on")
+        static let paused = String(localized: "tasks.paused", defaultValue: "Paused")
+        /// "42 s", "1 min 40 s".
+        static func duration(_ seconds: Int) -> String {
+            seconds < 60 ? String(localized: "tasks.durationSeconds", defaultValue: "\(seconds) s")
+                : seconds % 60 == 0 ? String(localized: "tasks.durationMinutes", defaultValue: "\(seconds / 60) min")
+                : String(localized: "tasks.durationMinutesSeconds", defaultValue: "\(seconds / 60) min \(seconds % 60) s")
+        }
+        static func took(_ duration: String) -> String { String(localized: "tasks.took", defaultValue: "took \(duration)") }
+        static func stoppedAt(_ duration: String) -> String { String(localized: "tasks.stoppedAt", defaultValue: "stopped at \(duration)") }
         static let now = LocalizedStringResource("tasks.now", defaultValue: "Now")
         static let scheduled = LocalizedStringResource("tasks.scheduled", defaultValue: "Scheduled")
         static let running = LocalizedStringResource("tasks.running", defaultValue: "Running")
@@ -1031,6 +1053,7 @@ enum L10n {
     }
 
     enum Settings {
+        static let whatModeKnows = LocalizedStringResource("settings.whatModeKnows", defaultValue: "What Mode knows about you")
         static let resetMode = LocalizedStringResource("settings.resetMode", defaultValue: "Reset Mode")
         static let resetting = LocalizedStringResource("settings.resetting", defaultValue: "Resetting…")
         static let resetConfirm = LocalizedStringResource("settings.resetConfirm", defaultValue: "Reset Mode and delete everything?")

@@ -25,8 +25,20 @@ public data class TasksUiState(
     val running: RunningTask? = null,
     val upNext: List<QueuedTask> = emptyList(),
     val repeats: List<RepeatingTask> = emptyList(),
+    /** Finished today and yesterday, newest first. */
     val done: List<FinishedTask> = emptyList(),
+    /** Easy first tasks, for an empty Now. */
+    val tryThese: List<String> = TRY_THESE,
 ) {
+    public companion object {
+        /** Small, read-only or easy to undo, and work on any iPhone. */
+        public val TRY_THESE: List<String> = listOf(
+            "Turn on Do Not Disturb",
+            "Tell me about everything on my calendar today",
+            "Catch me up on today's unread WhatsApp messages",
+        )
+    }
+
     val isEmpty: Boolean get() = running == null && upNext.isEmpty() && repeats.isEmpty() && done.isEmpty()
 }
 
@@ -52,6 +64,12 @@ public data class FinishedTask(
     val day: RelativeDay,
     val steps: Int?,
     val source: TaskSource,
+    /** When it ended (epoch ms). */
+    val endedAtMs: Long,
+    /** How long it ran, in seconds; null when it never started. */
+    val seconds: Long?,
+    /** Why it didn't finish, in a few words ("Couldn't sign in"); null when done or too long to show. */
+    val why: String?,
 )
 
 /** Tasks: what runs now, waits, repeats, and has finished. */
@@ -76,7 +94,15 @@ public class TasksPresenter(
                     },
                     done = recent.mapNotNull { t ->
                         val badge = t.status.badge() ?: return@mapNotNull null
-                        FinishedTask(t.id, t.text, t.conversationId, badge, clock.relativeDay(t.endedAt ?: t.createdAt), t.steps, t.source)
+                        val ended = t.endedAt ?: t.createdAt
+                        val day = clock.relativeDay(ended)
+                        if (day != RelativeDay.Today && day != RelativeDay.Yesterday) return@mapNotNull null
+                        FinishedTask(
+                            t.id, t.text, t.conversationId, badge, day, t.steps, t.source,
+                            endedAtMs = ended,
+                            seconds = t.startedAt?.let { s -> t.endedAt?.let { e -> ((e - s) / 1000).coerceAtLeast(0) } },
+                            why = if (badge == TaskBadge.Done) null else shortWhy(t.summary),
+                        )
                     },
                 )
             }.collect { mutableState.value = it }
@@ -86,6 +112,9 @@ public class TasksPresenter(
     public fun setFilter(f: TaskFilter) {
         filter.value = f
     }
+
+    /** One of the suggested tasks: it runs like any task; returns its chat, to open. */
+    public fun tryTask(text: String): String? = queue.submit(text, TaskSource.App, null, false)?.conversationId
 
     public fun cancel(taskId: String) {
         queue.cancel(taskId)
@@ -110,6 +139,13 @@ public class TasksPresenter(
     private val filter = kotlinx.coroutines.flow.MutableStateFlow(TaskFilter.Now)
 
     private companion object {
-        const val MAX_DONE = 30L
+        const val MAX_DONE = 60L
+        const val WHY_MAX = 32
+
+        /** The reason's first short sentence, when it fits on the row ("Couldn't sign in"). */
+        fun shortWhy(summary: String?): String? {
+            val first = summary?.trim()?.split(Regex("(?<=[.!?])\\s|\\n"))?.firstOrNull()?.trim()?.trimEnd('.', '!')
+            return first?.takeIf { it.isNotEmpty() && it.length <= WHY_MAX }
+        }
     }
 }

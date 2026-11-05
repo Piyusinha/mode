@@ -470,3 +470,29 @@ private struct ModeTimePicker: UIViewRepresentable {
         }
     }
 }
+
+/// A suggested task to try (Tasks, nothing yet): a dot in Mo's colour and the task, on a capsule.
+public struct ModeTryRow: View {
+    private let text: String
+    private let action: () -> Void
+
+    public init(_ text: String, action: @escaping () -> Void) {
+        self.text = text
+        self.action = action
+    }
+
+    public var body: some View {
+        Button(action: action) {
+            HStack(spacing: ModeSpacing.m) {
+                Circle().fill(ModeColor.brand).frame(width: ModeSize.tryDot, height: ModeSize.tryDot)
+                Text(text).modeText(.calloutEmphasis).multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, ModeSpacing.l + ModeSpacing.xxs)
+            .padding(.vertical, ModeSpacing.m)
+            .frame(minHeight: ModeSize.tryRow)
+            .background(ModeColor.card, in: .capsule)
+        }
+        .buttonStyle(ModePressStyle())
+    }
+}

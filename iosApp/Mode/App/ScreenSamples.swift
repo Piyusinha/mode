@@ -81,6 +81,9 @@ struct ScreenSample: Identifiable {
         case "tasks": shell(.tasks, running: Self.running) {
             TasksScreen(state: Self.tasks, progress: Self.running.progress, filter: .constant(.now), onEvent: { _ in })
         }
+        case "tasks-empty": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksEmpty, progress: nil, filter: .constant(.now), onEvent: { _ in }) }
+        case "tasks-scheduled": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksScheduled, progress: nil, filter: .constant(.scheduled), onEvent: { _ in }) }
+        case "tasks-done": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksDone, progress: nil, filter: .constant(.done), onEvent: { _ in }) }
         case "repeat":
             ModeColor.page.ignoresSafeArea().sheet(isPresented: .constant(true)) {
                 RepeatScreen(state: Self.repeatState, dayLabels: Format.shortDays, onEvent: { _ in }, onCancel: {})
@@ -259,10 +262,30 @@ struct ScreenSample: Identifiable {
     /// Board Tasks.
     static let tasks = TasksViewModel.State(
         running: .init(id: "r", title: "Ordering my usual dinner", subtitle: "Step 9 · checking the cart", leading: .mo(.working), since: Date().addingTimeInterval(-72)),
-        waiting: .init(id: "w", title: "Pay electricity bill", subtitle: "Your bank app needs Face ID", leading: .mo(.yourTurn)),
-        upNext: [.init(id: "u1", title: "Remind Sonali about dinner", subtitle: "Today 19:00", leading: .icon(.clock, ModeColor.textSecondary)),
-                 .init(id: "u2", title: "Book a cab to the office", subtitle: "Tomorrow 9:00", leading: .icon(.clock, ModeColor.textSecondary))],
-        repeats: [.init(id: "s1", title: "Read me today's calendar", subtitle: "8:00 · Weekdays", enabled: true)]
+        waiting: .init(id: "w", title: "Pay electricity bill", subtitle: "Your bank app needs Face ID", leading: .mo(.yourTurn))
+    )
+
+    /// Board Tasks · empty: easy tasks to try.
+    static let tasksEmpty = TasksViewModel.State(tryThese: ["Turn on Do Not Disturb", "Tell me about everything on my calendar today", "Catch me up on today's unread WhatsApp messages"])
+
+    /// Board Tasks · scheduled.
+    static let tasksScheduled = TasksViewModel.State(
+        scheduled: [.init(id: "o1", title: "Remind Priya about dinner", subtitle: "Today 19:00", icon: .clock, enabled: true),
+                    .init(id: "o2", title: "Book a cab to the office", subtitle: "Tomorrow 9:00", icon: .clock, enabled: true),
+                    .init(id: "o3", title: "Check where the parcel is", subtitle: "Thu 7 Nov · 10:00", icon: .clock, enabled: true)],
+        repeats: [.init(id: "s1", title: "Read today's calendar", subtitle: "Weekdays 8:00", icon: .repeatTask, enabled: true),
+                  .init(id: "s2", title: "Book the office cab", subtitle: "Weekdays 8:40", icon: .repeatTask, enabled: true)]
+    )
+
+    /// Board Tasks · done: today and yesterday.
+    static let tasksDone = TasksViewModel.State(
+        doneToday: [.init(id: "d1", title: "Texted Priya", subtitle: "17:42 · took 42 s", leading: .mo(.done), conversationId: nil),
+                    .init(id: "d2", title: "Moved the dentist to Thursday", subtitle: "12:10 · took 58 s", leading: .mo(.done), conversationId: nil),
+                    .init(id: "d3", title: "Pay electricity bill · Couldn't sign in", subtitle: "10:25 · stopped at 31 s", leading: .mo(.stuck), conversationId: nil),
+                    .init(id: "d4", title: "Read your calendar", subtitle: "8:00 · took 20 s", leading: .mo(.done), conversationId: nil)],
+        doneYesterday: [.init(id: "d5", title: "Ordered your usual from Swiggy", subtitle: "20:05 · took 1 min 40 s", leading: .mo(.done), conversationId: nil),
+                        .init(id: "d6", title: "Booked a cab to the office", subtitle: "8:41 · took 36 s", leading: .mo(.done), conversationId: nil),
+                        .init(id: "d7", title: "Read your calendar", subtitle: "8:00 · took 18 s", leading: .mo(.done), conversationId: nil)]
     )
 
     /// Board Repeat.

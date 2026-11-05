@@ -27,6 +27,9 @@ struct SettingsScreen: View {
                             .submitLabel(.done)
                             .onSubmit { onEvent(.saveName) }
                     }
+                    ModeRow(String(localized: L10n.Settings.whatModeKnows), leading: .moBadge(.idle, .brain), action: { onEvent(.openMemory) }) {
+                        ModeChevron()
+                    }
                 }
 
                 ModeSectionHeader(L10n.Voice.section)
@@ -74,11 +77,6 @@ struct SettingsScreen: View {
                     }
                 }
 
-                ModeSectionHeader(L10n.Settings.memory)
-                ModeCard {
-                    ModeToggleRow(L10n.Memory.learn, isOn: Binding(get: { state.learn }, set: { onEvent(.learn($0)) }))
-                    ModeRow(String(localized: L10n.Tab.memory), action: { onEvent(.openMemory) }) { ModeChevron() }
-                }
                 ModeCard {
                     ModeRow(String(localized: L10n.Health.row), leading: .icon(.wrench), action: { onEvent(.openHealth) }) { ModeChevron() }
                     ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }

@@ -83,5 +83,5 @@ final class AppLinks {
 
 /// The tabs, plus Ask (the floating button beside them).
 enum AppTab: Hashable {
-    case home, tasks, memory, ask
+    case home, tasks, settings, ask
 }
