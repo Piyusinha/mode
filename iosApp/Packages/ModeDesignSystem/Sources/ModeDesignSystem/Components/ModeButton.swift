@@ -15,6 +15,21 @@ public struct ModeButton: View {
         case pill
         /// A small ink pill (the chosen provider's Connect).
         case pillProminent
+        // Mode v2: 52-point capsules, as wide as they're given (the loop sheet, guides, first run).
+        /// The main action: ink.
+        case main
+        /// Another action on a card: raised grey.
+        case other
+        /// Another action straight on the page: white.
+        case otherOnPage
+        /// Stop: raised grey with red words.
+        case stop
+        /// An answer Mode is waiting for: blue, used nowhere else.
+        case answer
+        /// Another answer beside it: white with blue words.
+        case answerQuiet
+        /// Stop on a soft red, under a blue answer.
+        case stopSoft
     }
 
     private let title: LocalizedStringResource
@@ -39,6 +54,7 @@ public struct ModeButton: View {
     }
 
     private var isPill: Bool { role == .pill || role == .pillProminent }
+    private var isLarge: Bool { [.main, .other, .otherOnPage, .stop, .answer, .answerQuiet, .stopSoft].contains(role) }
 
     private var height: CGFloat {
         switch role {
@@ -46,6 +62,7 @@ public struct ModeButton: View {
         case .secondary: ModeSize.secondaryButton
         case .pill, .pillProminent: ModeSize.pillButton
         case .plain, .destructive: ModeSize.touch
+        case .main, .other, .otherOnPage, .stop, .answer, .answerQuiet, .stopSoft: ModeSize.loopButton
         }
     }
 
@@ -54,7 +71,11 @@ public struct ModeButton: View {
         case .primary, .pillProminent: ModeColor.onAccent
         case .secondary, .pill: ModeColor.textPrimary
         case .plain: ModeColor.textPrimary
-        case .destructive: ModeColor.danger
+        case .destructive, .stop, .stopSoft: ModeColor.danger
+        case .main: ModeColor.onAccent
+        case .other, .otherOnPage: ModeColor.textPrimary
+        case .answer: ModeColor.onAsk
+        case .answerQuiet: ModeColor.infoText
         }
     }
 
@@ -63,6 +84,11 @@ public struct ModeButton: View {
         case .primary, .pillProminent: ModeColor.accent
         case .secondary, .pill: ModeColor.cardRaised
         case .plain, .destructive: .clear
+        case .main: ModeColor.accent
+        case .other, .stop: ModeColor.cardRaised
+        case .otherOnPage, .answerQuiet: ModeColor.card
+        case .answer: ModeColor.info
+        case .stopSoft: ModeColor.tileRed
         }
     }
 
@@ -75,7 +101,7 @@ public struct ModeButton: View {
         .lineLimit(1)
         .minimumScaleFactor(0.85)
         .padding(.horizontal, isPill ? ModeSpacing.m + ModeSpacing.xxs : ModeSpacing.xl)
-        .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: height)
+        .frame(maxWidth: fullWidth || isLarge ? .infinity : nil, minHeight: height)
         .background(background, in: .capsule)
         .contentShape(.capsule)
     }

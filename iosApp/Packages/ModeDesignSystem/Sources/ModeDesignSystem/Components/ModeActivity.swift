@@ -63,6 +63,8 @@ public struct ModeIslandRing: View {
 public enum ModeActivityGlyph: String, Sendable {
     case needsYou = "exclamationmark.circle"
     case yourTurn = "lock"
+    /// The iPhone is locked: the task waits for it to unlock.
+    case locked = "lock.fill"
     case done = "checkmark"
     case couldntFinish = "exclamationmark.triangle"
     case stopped = "stop.circle"

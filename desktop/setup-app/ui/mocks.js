@@ -37,6 +37,7 @@
     onPhoneConfirmed: { screen: 'onPhone', phone, ownVpn: true, phoneTestConfirmed: true, phonePresenceKnown: true, cableDisconnected: true },
     ready: { screen: 'ready', phone, readiness: 'ready', record: rec({}) },
     readyPaid: { screen: 'ready', phone, readiness: 'ready', record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
+    unlockVoice: { screen: 'unlockVoice', phone, readiness: 'ready', record: rec({}) },
     device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },
     deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     deviceOK: { screen: 'device', phone, phones: [], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({}) },

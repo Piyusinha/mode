@@ -33,6 +33,10 @@ enum class Operation(val wireName: String) {
 }
 
 enum class Event(val wireName: String) {
+    /** Unlock by voice's check; Field.Outcome: works, never_locked or stayed_locked. */
+    UnlockTest("mode.unlock.test"),
+    /** A task came in on a locked iPhone; Field.Outcome: started (after the unlock), cancelled or timed_out. */
+    WaitedForUnlock("mode.queue.waited_for_unlock"),
     FirstAction("mode.task.first_action"), AppStarted("mode.app.started"),
     /** The agent asked to give up; Field.Outcome: accepted or refused; Field.EndReason: what blocked it. */
     AgentGiveUp("mode.agent.give_up"),

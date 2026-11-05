@@ -3,6 +3,11 @@ import Foundation
 /// The Live Activity's words, shared by the app and the widget extension.
 enum ActivityL10n {
     static let mode = LocalizedStringResource("activity.mode", defaultValue: "Mode")
+    static let unlockToStart = LocalizedStringResource("activity.unlockToStart", defaultValue: "Unlock to start")
+    static let unlockOrSay = LocalizedStringResource("activity.unlockOrSay", defaultValue: "Unlock, or say your phrase")
+    static let unlock = LocalizedStringResource("activity.unlock", defaultValue: "Unlock your iPhone")
+    static let startsOnUnlock = LocalizedStringResource("activity.startsOnUnlock", defaultValue: "Mo starts the moment your iPhone unlocks.")
+    static let cancel = LocalizedStringResource("activity.cancel", defaultValue: "Cancel")
     static let stop = LocalizedStringResource("activity.stop", defaultValue: "Stop")
     static let paused = LocalizedStringResource("activity.paused", defaultValue: "Paused")
     static let needsYou = LocalizedStringResource("activity.needsYou", defaultValue: "Needs you")

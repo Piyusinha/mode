@@ -70,6 +70,7 @@ final class SettingsViewModel {
         case learn(Bool)
         case openDeveloper
         case openHealth
+        case openUnlockVoice
         case openMemory
         case openPicker(stuck: Bool)
         case showProviders
@@ -146,6 +147,7 @@ final class SettingsViewModel {
         case let .learn(on): presenter.setLearn(on: on)
         case .openDeveloper: navigate(.developer)
         case .openHealth: navigate(.health)
+        case .openUnlockVoice: navigate(.unlockVoice)
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(state.showsCost ? .modelPicker(stuck: stuck) : .planModels(brain: stuck))
         case .openProvider: navigate(.providerDetail(id: activeProvider))

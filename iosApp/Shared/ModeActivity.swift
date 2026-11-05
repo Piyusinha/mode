@@ -9,7 +9,7 @@ import ModeDesignSystem
 struct ModeActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         enum Phase: String, Codable, Hashable, Identifiable {
-            case working, waiting, finished
+            case working, waiting, finished, locked
             var id: Self { self }
         }
         enum Outcome: String, Codable, Hashable { case done, gaveUp, stopped, failed, notStarted }
@@ -37,6 +37,11 @@ struct ModeActivityAttributes: ActivityAttributes {
         var more = 0
         /// A task that couldn't finish: Try again runs it again (the same task, in the same chat).
         var retryTaskId: String?
+        /// Locked: the task waiting for an unlock (an activity already showing keeps its first task's name),
+        /// and whether the user set up Unlock by voice ("or say your phrase"; the phrase itself never shows).
+        var lockedTaskId: String?
+        var lockedTask: String?
+        var voiceUnlock = false
     }
 
     /// What was asked, and where the answer goes.
@@ -84,6 +89,25 @@ struct StopTaskIntent: LiveActivityIntent {
     }
 }
 
+/// Cancel, on "Unlock to start": the task waiting for the iPhone to unlock is dropped.
+struct CancelWaitingIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Cancel the waiting task"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Task") var taskId: String
+
+    init() {}
+
+    init(taskId: String) {
+        self.taskId = taskId
+    }
+
+    func perform() async throws -> some IntentResult {
+        await ModeActivityActions.cancelWaiting(taskId)
+        return .result()
+    }
+}
+
 /// An answer to the agent's question, tapped on the Live Activity (Allow, Don't allow, an option).
 struct AnswerIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Answer Mode"
@@ -110,6 +134,11 @@ struct AnswerIntent: LiveActivityIntent {
 enum ModeActivityActions {
     static var onStop: (() -> Void)?
     static var onAnswer: ((String, String) -> Void)?
+    static var onCancelWaiting: ((String) -> Void)?
+
+    static func cancelWaiting(_ taskId: String) {
+        onCancelWaiting?(taskId)
+    }
 
     static func stop() {
         onStop?()

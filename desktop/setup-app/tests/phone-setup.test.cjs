@@ -234,3 +234,19 @@ test('the dashboard stays as it was while this computer’s copy is still instal
   assert.doesNotMatch(f.app.innerHTML, /Not installed/);
   assert.match(f.app.innerHTML, /data-act="renewNow"/);
 });
+
+test('Done on Ready offers the optional Unlock by voice step, which skips or finishes to the dashboard', async () => {
+  const f = fixture();
+  f.run(`Object.assign(S, { screen: 'ready', record: { mode: { version: '1.0' }, paid: true, ownVpn: true } }); render();`);
+  await f.click('unlockVoice');
+  assert.equal(f.run('S.screen'), 'unlockVoice');
+  assert.match(f.app.innerHTML, /Unlock by voice/);
+  assert.match(f.app.innerHTML, /Run Custom Gesture/);
+  assert.match(f.app.innerHTML, /Mode never sees your passcode/);
+  assert.doesNotMatch(f.app.innerHTML, /passcode is/i, 'no passcode is ever asked for or shown');
+  await f.click('readyBack');
+  assert.equal(f.run('S.screen'), 'ready');
+  await f.click('unlockVoice');
+  await f.click('device');
+  assert.equal(f.run('S.screen'), 'device');
+});

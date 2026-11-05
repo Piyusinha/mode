@@ -62,6 +62,11 @@ public data class ModeSettings(
     val suggestRoutines: Boolean = false,
     /** Talk over Mode: while it speaks, the microphone listens, and the user's words cut the line short. */
     val bargeIn: Boolean = true,
+    /**
+     * The user set up "Unlock by voice" (an iOS Voice Control command they made themselves) and told Mode so.
+     * Mode never sees or keeps the phrase or the passcode; this only changes what Mode says on a locked iPhone.
+     */
+    val voiceUnlock: Boolean = false,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

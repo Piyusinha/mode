@@ -28,6 +28,7 @@ final class LiveActivityController {
         presenter = screens.liveActivity()
         ModeActivityActions.onStop = { [presenter] in presenter.stop() }
         ModeActivityActions.onAnswer = { [presenter] id, answer in presenter.answer(questionId: id, text: answer) }
+        ModeActivityActions.onCancelWaiting = { [presenter] id in presenter.cancelWaiting(taskId: id) }
         // A task from an earlier launch can't still be running.
         for old in Activity<ModeActivityAttributes>.activities {
             Updates { await old.end(nil, dismissalPolicy: .immediate) }
@@ -69,6 +70,14 @@ final class LiveActivityController {
                 phase: .waiting, question: w.question, questionId: w.questionId, yesNo: w.yesNo, options: w.options, yourTurn: w.yourTurn,
                 recommended: w.recommended
             ))
+        case let .waitingForUnlock(w):
+            let content = Content(phase: .locked, lockedTaskId: w.taskId, lockedTask: w.task, voiceUnlock: w.voiceUnlock)
+            // From the background iOS won't start a new activity, but one already showing (the task before)
+            // can change: it becomes "Unlock to start" for this one.
+            if let activity, activity.activityState == .active, taskId != w.taskId {
+                taskId = w.taskId
+            }
+            show(taskId: w.taskId, task: w.task, conversationId: nil, content: content)
         case let .finished(f):
             finish(taskId: f.taskId, content: Content(
                 phase: .finished,

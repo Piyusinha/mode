@@ -49,6 +49,8 @@ public extension ModeColor {
     /// A grey button on the black island (a little brighter than on the Lock Screen card).
     static let onIslandFill = Color.white.opacity(0.16)
     /// Quiet words on a dark card: the clock, a step's name.
+    /// Words and marks on the Live Activity's dark card and the Dynamic Island.
+    static let onDark = Color.white
     static let onDarkSecondary = Color.white.opacity(0.7)
     static let onDarkLabel = Color.white.opacity(0.66)
     /// The step being done now: Mo's orange, softer.

@@ -52,6 +52,11 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case link = "link"
     case lock = "lock"
     case lockFilled = "lock.fill"
+    case faceID = "faceid"
+    /// The Mo tab.
+    case moFace = "face.smiling"
+    case actionButton = "iphone.gen3"
+    case swipeUp = "arrow.up.to.line.compact"
     case contact = "person.crop.square"
     case vpn = "shield"
     case bell = "bell"

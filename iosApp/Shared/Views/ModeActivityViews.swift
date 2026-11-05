@@ -41,6 +41,7 @@ extension ModeActivityAttributes.ContentState {
         switch phase {
         case .working: return paused ? .sleep : .working
         case .waiting: return .yourTurn
+        case .locked: return .idle
         case .finished:
             switch outcome {
             case .done: return .done
@@ -51,7 +52,7 @@ extension ModeActivityAttributes.ContentState {
     }
 
     /// Mode is asking: the Lock Screen card turns white.
-    func asks(stale: Bool) -> Bool { phase == .waiting && !stale }
+    func asks(stale: Bool) -> Bool { (phase == .waiting || phase == .locked) && !stale }
 
     /// How much of the plan is done, for the ring beside the camera.
     var planDone: Double {
@@ -72,6 +73,8 @@ struct ModeActivityHeader: View {
             ModeMo(state.mood(stale: stale), size: ModeSize.activityMo)
             if state.phase == .working && !stale {
                 ModeActivityClock(state: state).modeText(.subheadline, color: ModeColor.onDarkSecondary)
+            } else if state.phase == .locked {
+                Text(ActivityL10n.unlockToStart).modeText(.subheadlineEmphasis)
             } else {
                 Text(ActivityL10n.mode).modeText(.subheadlineEmphasis)
             }
@@ -95,6 +98,7 @@ struct ModeActivityTrailing: View {
         } else {
             switch state.phase {
             case .working: ModeActivityStopButton()
+            case .locked: ModeActivityGlyph.locked.image.font(ModeIconFont.chevron).foregroundStyle(island ? ModeColor.onDarkSecondary : ModeColor.textSecondary)
             case .waiting:
                 ModeActivityStatus(state.yourTurn ? ActivityL10n.yourTurn : ActivityL10n.needsYou, glyph: state.yourTurn ? .yourTurn : .needsYou,
                                    color: state.yourTurn && island ? ModeColor.warning : ModeColor.infoText)
@@ -178,6 +182,9 @@ struct ModeActivityBody: View {
                 case .waiting:
                     ModeActivityTitle(state.question ?? "", island: island)
                     ModeActivityAnswers(state: state, island: island)
+                case .locked:
+                    ModeActivityTitle(state.lockedTask ?? "", island: island)
+                    ModeActivityUnlock(state: state, island: island)
                 case .finished:
                     if let line = state.reply.first.flatMap(\.line) { ModeActivityTitle(line, island: island) }
                     HStack(spacing: ModeSpacing.s) {
@@ -197,6 +204,30 @@ struct ModeActivityBody: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// "Unlock, or say your phrase" and Cancel, under the waiting task.
+struct ModeActivityUnlock: View {
+    let state: ModeActivityAttributes.ContentState
+    let island: Bool
+
+    var body: some View {
+        HStack(spacing: ModeSpacing.s) {
+            VStack(alignment: .leading, spacing: ModeSpacing.none) {
+                Text(state.voiceUnlock ? ActivityL10n.unlockOrSay : ActivityL10n.unlock).modeText(.footnoteEmphasis)
+                Text(ActivityL10n.startsOnUnlock).modeText(.caption, color: island ? ModeColor.onDarkSecondary : ModeColor.textSecondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(ModeTextScale.title)
+            Spacer(minLength: ModeSpacing.xs)
+            if let id = state.lockedTaskId {
+                Button(intent: CancelWaitingIntent(taskId: id)) {
+                    ModeActivityButtonLabel(ActivityL10n.cancel, style: island ? .islandGrey : .askQuiet)
+                }.buttonStyle(.plain)
+                .fixedSize()
+            }
+        }
     }
 }
 
@@ -261,6 +292,8 @@ struct ModeIslandTrailing: View {
                     }
                 }
             }
+        case .locked:
+            ModeActivityGlyph.locked.image.font(ModeIconFont.small).foregroundStyle(ModeColor.onDarkSecondary)
         case .waiting:
             (state.yourTurn ? ModeActivityGlyph.yourTurn : ModeActivityGlyph.needsYou).image
                 .font(ModeIconFont.small)

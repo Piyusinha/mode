@@ -568,4 +568,71 @@ class TaskRunnerTest {
         f.runner.runTask("Turn off dark mode", quick, conversationId = f.runner.state.value.conversationId)
         assertFalse("CUT SHORT" in model.lastUserText, model.lastUserText)
     }
+
+    private fun Fixture.lockedQueue(scope: CoroutineScope, lock: com.piyush.mode.core.platform.DeviceLock) =
+        TaskQueue(runner, tasks, conversations, scope, lock = lock)
+
+    // These read tasks with get(id), never a database flow: waiting on a flow lets the test clock jump an hour.
+    @Test
+    fun aTaskOnALockedIPhoneWaitsAndStartsTheMomentItUnlocks() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "x", "summary" to "Wi-Fi is off.")))
+        val lock = com.piyush.mode.core.platform.ManualDeviceLock(locked = true)
+        val q = f.lockedQueue(this, lock)
+        val task = q.submit("turn off wi-fi", TaskSource.Siri)!!
+        testScheduler.advanceTimeBy(10 * 60_000L)
+        testScheduler.runCurrent()
+        assertEquals("turn off wi-fi", q.waitingForUnlock.value?.text)
+        assertEquals(TaskStatus.Queued, f.tasks.get(task.id)?.status)
+        assertEquals(0, f.link.connects, "nothing touches the phone while it is locked")
+        lock.unlock()
+        testScheduler.advanceUntilIdle()
+        assertEquals(null, q.waitingForUnlock.value)
+        assertEquals("Wi-Fi is off.", f.tasks.get(task.id)?.summary)
+    }
+
+    @Test
+    fun cancellingATaskThatWaitsForAnUnlockDropsItAndTheNextStillWaits() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "x", "summary" to "B done")))
+        val lock = com.piyush.mode.core.platform.ManualDeviceLock(locked = true)
+        val q = f.lockedQueue(this, lock)
+        val a = q.submit("A", TaskSource.Siri)!!
+        val b = q.submit("B", TaskSource.App)!!
+        testScheduler.runCurrent()
+        assertEquals(a.id, q.waitingForUnlock.value?.id)
+        q.cancel(a.id)
+        testScheduler.runCurrent()
+        assertEquals(TaskStatus.Stopped, f.tasks.get(a.id)?.status)
+        assertEquals(b.id, q.waitingForUnlock.value?.id, "the next task now waits for the unlock")
+        lock.unlock()
+        testScheduler.advanceUntilIdle()
+        assertEquals("B done", f.tasks.get(b.id)?.summary)
+    }
+
+    @Test
+    fun aTaskThatWaitedAnHourForAnUnlockIsNotStarted() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "x", "summary" to "never")))
+        val lock = com.piyush.mode.core.platform.ManualDeviceLock(locked = true)
+        val q = f.lockedQueue(this, lock)
+        val task = q.submit("order lunch", TaskSource.App)!!
+        testScheduler.advanceTimeBy(TaskQueue.MAX_WAIT_MS + 1_000)
+        testScheduler.runCurrent()
+        val saved = f.tasks.get(task.id)!!
+        assertEquals(TaskStatus.Stopped, saved.status)
+        assertTrue("stayed locked" in saved.summary.orEmpty(), saved.summary)
+        assertEquals(null, q.waitingForUnlock.value)
+        lock.unlock()
+        testScheduler.advanceUntilIdle()
+        assertEquals(TaskStatus.Stopped, f.tasks.get(task.id)?.status, "it never runs late")
+    }
+
+    @Test
+    fun anUnlockedIPhoneRunsTasksAtOnce() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "x", "summary" to "Done.")))
+        val q = f.lockedQueue(this, com.piyush.mode.core.platform.ManualDeviceLock(locked = false))
+        val task = q.submit("check the weather", TaskSource.App)!!
+        testScheduler.runCurrent()
+        assertEquals(null, q.waitingForUnlock.value)
+        testScheduler.advanceUntilIdle()
+        assertEquals("Done.", f.tasks.get(task.id)?.summary)
+    }
 }

@@ -54,6 +54,7 @@ struct SettingsScreen: View {
                             ModeChevron()
                         }
                     }
+                    ModeRow(String(localized: L10n.UnlockVoice.title), leading: .icon(.lock), action: { onEvent(.openUnlockVoice) }) { ModeChevron() }
                 }
 
                 ModeSectionHeader(L10n.Settings.limits)

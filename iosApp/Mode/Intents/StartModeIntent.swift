@@ -9,6 +9,9 @@ struct StartModeIntent: AppIntent {
     static let description = IntentDescription("Tell Mode what to do on your iPhone, in your own words.")
     /// Mode opens to start: its keep-awake can't start from the background yet (docs/status.md "Last").
     static let openAppWhenRun = true
+    /// On a locked iPhone Siri keeps the words, asks for Face ID (or the passcode, or the user's own
+    /// "Unlock by voice" phrase), then carries on: the task starts the moment it unlocks, never said twice.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Task", requestValueDialog: IntentDialog("What should Mode do?"))
     var task: String
@@ -41,6 +44,7 @@ struct StartListeningIntent: AppIntent {
     static let title: LocalizedStringResource = "Start Mode"
     static let description = IntentDescription("Open Mode and tell it what to do.")
     static let openAppWhenRun = true
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @MainActor
     func perform() async throws -> some IntentResult {

@@ -165,3 +165,25 @@ section.group { display: flex; flex-direction: column; gap: 10px; } section.grou
 .note { display: flex; gap: 8px; font-size: 13px; color: var(--sec); margin: 0; }
 .wait { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sec); }
 .custom { display: flex; gap: 8px; padding: 0 0 12px 38px; } .custom input { flex: 1; height: 36px; border-radius: 18px; border: 1.5px solid var(--sep); background: var(--field); padding: 0 14px; color: var(--text); font-size: 13px; }
+/* Unlock by voice (optional, after Ready) */
+.optional { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.label-sm { padding: 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--sec); }
+h1 .tag { font: 600 16px/1 var(--body, system-ui); letter-spacing: 0; color: var(--sec); }
+ol.numbered.ink .n { background: var(--raised); color: var(--text); width: 22px; height: 22px; }
+ol.numbered.ink li { padding: 7px 0; }
+.phone-col { flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.phone-col .caption { font-size: 12px; color: var(--sec); }
+.ios-list { border-radius: 10px; background: var(--card); overflow: hidden; }
+.ios-list > div { display: flex; justify-content: space-between; gap: 6px; padding: 7px 9px; font-size: 10px; }
+.ios-list > div + div { border-top: 1px solid var(--sep); }
+.ios-list span { color: var(--sec); } .ios-list b { font-weight: 600; text-align: right; }
+.keys { margin-top: 4px; display: grid; grid-template-columns: repeat(3, 1fr); row-gap: 6px; justify-items: center; }
+.keys .key { width: 26px; height: 26px; border-radius: 13px; border: 1.5px solid var(--ring); background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+.keys .key.none { border-color: transparent; background: transparent; }
+.unlock-voice .head p { max-width: 580px; }
+ol.numbered.ink li { padding: 6px 0; }
+ol.numbered.ink b { font-size: 14px; line-height: 19px; } ol.numbered.ink span span { font-size: 12px; line-height: 16px; }
+.phone-col .phone { transform: scale(0.94); transform-origin: top center; margin-bottom: -21px; }
+.keys { row-gap: 4px; } .keys .key { width: 24px; height: 24px; }
+.ios-list > div { padding: 6px 9px; }
+ol.numbered.ink li { padding: 5px 0; }

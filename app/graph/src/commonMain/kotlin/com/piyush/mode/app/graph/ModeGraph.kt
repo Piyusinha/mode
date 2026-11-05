@@ -71,6 +71,8 @@ class PlatformServices(
     val telemetry: Telemetry = Telemetry.None,
     /** Links, the calendar and contacts from the app itself (None where the platform has nothing). */
     val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
+    /** Whether the iPhone is locked: tasks wait for an unlock, and Unlock by voice is tested with it. */
+    val deviceLock: com.piyush.mode.core.platform.DeviceLock = com.piyush.mode.core.platform.DeviceLock.None,
 )
 
 /**
@@ -144,7 +146,8 @@ class ModeGraph(platform: PlatformServices) {
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
-    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope).also { queue ->
+    val deviceLock: com.piyush.mode.core.platform.DeviceLock = platform.deviceLock
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope, lock = platform.deviceLock, background = platform.background, telemetry = telemetry).also { queue ->
         tasks.onFollowUp = { text, conversation -> queue.submit(text, com.piyush.mode.feature.tasks.domain.TaskSource.Voice, conversation, false) }
     }
 
@@ -178,6 +181,8 @@ class ModeGraph(platform: PlatformServices) {
         claudeModels = claudeModels,
         voices = voices,
         telemetry = telemetry,
+        deviceLock = platform.deviceLock,
+        background = platform.background,
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
     )
 

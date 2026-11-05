@@ -61,6 +61,7 @@ val iosModeGraph: ModeGraph by lazy {
             files = files,
             notifier = IosNotifier(),
             background = IosBackgroundWork(),
+            deviceLock = com.piyush.mode.core.platform.IosDeviceLock(),
             lifecycle = lifecycle,
             appInfo = IosAppInfo(),
             http = darwinHttpClient(),

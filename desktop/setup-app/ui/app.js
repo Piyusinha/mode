@@ -26,6 +26,8 @@ const P = {
   win: '<rect x="3" y="3" width="8" height="8" rx="1"></rect><rect x="13" y="3" width="8" height="8" rx="1"></rect><rect x="3" y="13" width="8" height="8" rx="1"></rect><rect x="13" y="13" width="8" height="8" rx="1"></rect>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path>',
   store: '<path d="M8 17l4-10 4 10M6.5 13h11"></path><circle cx="12" cy="12" r="9.5"></circle>',
+  mic: '<rect x="9" y="3" width="6" height="10" rx="3"></rect><path d="M6 10.5a6 6 0 0 0 12 0M12 16.5V20"></path>',
+  warn: '<path d="M12 3l9.5 17h-19z"></path><path d="M12 10v4M12 17.5h.01"></path>',
 };
 const svg = (name, size = 16, sw = 2.2) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;
@@ -60,7 +62,7 @@ const radioMark = on => on
   : '<span class="mark-off" aria-hidden="true"></span>';
 const radio = (title, sub, on, action, right = '', lead = '') =>
   `<button type="button" role="radio" aria-checked="${on}" class="radio" data-act="${action}">${lead}<span class="t"><b>${esc(title)}</b><span>${sub}</span></span>${right}${radioMark(on)}</button>`;
-const head = (title, sub = '', top = '') => `<header class="head">${top}<h1>${esc(title)}</h1>${sub ? `<p>${sub}</p>` : ''}</header>`;
+const head = (title, sub = '', top = '', tag = '') => `<header class="head">${top}<h1>${esc(title)}${tag ? ` <small class="tag">${esc(tag)}</small>` : ''}</h1>${sub ? `<p>${sub}</p>` : ''}</header>`;
 const kv = (k, v, right = '') => `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${v}</span>${right}</div>`;
 const fmtDate = iso => { if (!iso) return 'unknown'; const d = new Date(iso); return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined }); };
 const daysLeft = iso => iso ? Math.ceil((new Date(iso) - new Date()) / 86400000) : null;
@@ -92,6 +94,10 @@ function stepsNav(current, doneUpto = current, failed = null) {
     const ic = kind === 'done' ? icon('done') : kind === 'failed' ? icon('fail') : `<span class="num">${i + 1}</span>`;
     return `<li class="${kind}"${kind === 'current' || kind === 'failed' ? ' aria-current="step"' : ''}>${ic}${esc(s)}</li>`;
   }).join('')}</ol>`;
+}
+// After Ready: every step done, then the optional one (Unlock by voice) as the current step.
+function optionalNav() {
+  return stepsNav(5, 5) + `<div class="optional"><span class="label-sm">Optional</span><ol class="steps"><li class="current" aria-current="step">${svg('mic', 18)}Unlock by voice</li></ol></div>`;
 }
 function deviceChip() {
   const p = S.phone;
@@ -306,9 +312,27 @@ const screens = {
           + kv('Phone control', r.ownVpn ? 'Mode’s own VPN · test confirmed by you' : 'LocalDevVPN · test confirmed by you', pill(r.ownVpn ? 'No extra app' : 'Working', 'green')))
         + (r.sidestore ? callout('Keep LocalDevVPN connected and your iPhone on Wi-Fi once a week, so SideStore can renew Mode.', '', 'wifi')
           : paid ? callout(`Renewing takes a minute with your iPhone connected. Due by ${esc(fmtDate(r.mode?.expires))}.`, '', 'renew') : ''),
-      left: btn('See this iPhone', 'device'), right: btn('Done', 'device', 'primary'),
+      left: btn('See this iPhone', 'device'), right: btn('Done', 'unlockVoice', 'primary'),
     });
   },
+
+  // Optional, after Ready: the iPhone's own Voice Control command that unlocks it. Mode never sees the
+  // passcode; this window only shows the steps (the iPhone app has the same guide, and checks it).
+  unlockVoice: () => page({
+    nav: optionalNav(), tight: true,
+    body: head('Unlock by voice', 'Say a phrase and your iPhone unlocks, so tasks from Siri start straight away. You set it up on the iPhone, in Voice Control. Mode never sees your passcode.', '', 'optional')
+      + `<div class="side-by-side"><div class="grow"><ol class="numbered ink">${[
+        ['Settings → Accessibility → Voice Control', 'Turn Voice Control on.'],
+        ['Commands → Create New Command', 'At the top of the list.'],
+        ['Type your phrase', 'Something nobody says by accident, like “Mango sunrise”.'],
+        ['Action → Run Custom Gesture', 'A blank screen opens to record on.'],
+        ['Draw the unlock', 'Swipe up, then tap your passcode where the keys sit (right).'],
+        ['Save, then try it', 'Mode checks it with you: Mo tab → Start Mo.']].map(([t, d], i) =>
+        `<li><span class="n">${i + 1}</span><span><b>${t}</b><span>${d}</span></span></li>`).join('')}</ol>
+        ${callout('Anyone near your iPhone who says the phrase can unlock it, so pick something unusual. Voice Control also listens all the time and uses some battery.', 'orange', 'warn')}</div>
+        <div class="phone-col">${phoneVoiceCommand()}<span class="caption">Where the keys sit for step 5</span></div></div>`,
+    left: btn('Back', 'readyBack'), right: btn('Skip', 'device') + btn('I’ve set it up', 'device', 'primary'),
+  }),
 
   device: () => {
     const r = S.record || {};
@@ -390,6 +414,17 @@ function phoneDevMode() {
     <span style="font-size:9px;line-height:12px;color:var(--sec)">Turning on Developer Mode needs a restart.</span>
     <div style="margin-top:70px;border-radius:12px;background:var(--card);text-align:center;overflow:hidden"><div style="padding:9px;font-size:10.5px;font-weight:700">Turn On Developer Mode?</div>
     <div style="border-top:1px solid var(--sep);height:26px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#0A84FF">Turn On</div></div></div></div>`;
+}
+
+function phoneVoiceCommand() {
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ''].map(k =>
+    `<span class="key${k ? '' : ' none'}">${k}</span>`).join('');
+  return `<div class="phone" aria-hidden="true"><span class="island"></span><div style="position:absolute;left:10px;right:10px;top:34px;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#0A84FF"><span>‹ Commands</span><b>Save</b></div>
+    <b style="font-size:15px">New Command</b>
+    <div class="ios-list"><div><span>Phrase</span><b>Mango sunrise</b></div><div><span>Action</span><b>Run Custom Gesture</b></div><div><span>Application</span><b>Any</b></div></div>
+    <span style="font-size:9px;line-height:12px;color:var(--sec)">Record: swipe up, then tap your passcode.</span>
+    <div class="keys">${keys}</div></div></div>`;
 }
 
 // ---- what each screen does when it opens --------------------------------------------------------------
@@ -702,6 +737,8 @@ document.addEventListener('click', async e => {
       }
       break;
     case 'device': S.prefs = await call('prefs'); go('device'); break;
+    case 'unlockVoice': go('unlockVoice'); break;
+    case 'readyBack': go('ready'); break;
     case 'settings': S.returnTo = S.screen; go('settings'); break;
     case 'back': go(S.returnTo && S.returnTo !== 'settings' ? S.returnTo : S.record ? 'device' : 'welcome'); break;
     case 'helper': { const h = (S.helpers.length ? S.helpers : [{ url: 'https://ani.iloader.app' }, { url: 'https://ani.sidestore.io' }])[+arg]; S.helper = h.url; S.editingHelper = false; call('set_helper', { url: h.url }); render(); break; }

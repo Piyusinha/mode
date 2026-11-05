@@ -32,6 +32,8 @@ public enum ModeColor {
     public static let hero = named("Hero")
     public static let heroText = named("HeroText")
     public static let heroSecondary = named("HeroSecondary")
+    /// Buttons and the empty bars on the running card.
+    public static let heroFill = named("HeroFill")
     public static let success = named("Success")
     public static let warning = named("Warning")
     public static let danger = named("Danger")
@@ -41,6 +43,13 @@ public enum ModeColor {
     public static let infoSoft = named("InfoSoft")
     /// Mo's lines and dark parts: the same ink whatever the theme, because Mo is always orange.
     public static let moInk = Color(red: 0.102, green: 0.102, blue: 0.122)
+    /// Mo's colours to choose from (Mo's personality): Coral (the brand), Mango, Mint, Lilac. Same in both themes.
+    public static let moCoral = Color(red: 1.0, green: 0.420, blue: 0.239)
+    public static let moMango = Color(red: 1.0, green: 0.690, blue: 0.125)
+    public static let moMint = Color(red: 0.176, green: 0.745, blue: 0.549)
+    public static let moLilac = Color(red: 0.545, green: 0.486, blue: 1.0)
+    /// An iPhone's frame in a drawing (the keypad map): the same near-black in both themes.
+    public static let deviceFrame = Color(red: 0.110, green: 0.110, blue: 0.118)
     /// The highlights on Mo: a "done" sparkle and a "stuck" drop.
     public static let moSparkle = Color(red: 0.949, green: 0.718, blue: 0.020)
     public static let moDrop = Color(red: 0.498, green: 0.698, blue: 1.0)
@@ -64,6 +73,8 @@ public enum ModeColor {
     public static let tagGreenText = named("TagGreenText")
     public static let tileOrange = named("TileOrange")
     public static let tileOrangeText = named("TileOrangeText")
+    /// The hairline between notes on a soft orange.
+    public static let warningSeparator = named("WarningSeparator")
     public static let tileRed = named("TileRed")
     public static let tileGray = named("TileGray")
     /// Secondary buttons (No, Pause), the Paste button: the same as a raised card.
@@ -75,6 +86,8 @@ public enum ModeColor {
 
     /// Behind sheets and dialogs.
     public static let scrim = named("Scrim")
+    /// Behind the loop sheet: the page dims (40% black, 55% in dark).
+    public static let loopDim = named("LoopDim")
     /// Behind the Live Activity on the Lock Screen: Mode's dark card whatever the phone's appearance.
     public static let lockScreen = Color(red: 0.165, green: 0.165, blue: 0.192)
     /// The Stop button's red disc on dark (the hero card, the Dynamic Island).

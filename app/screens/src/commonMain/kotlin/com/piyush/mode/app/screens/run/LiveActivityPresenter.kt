@@ -34,6 +34,16 @@ public sealed interface ActivityUiState {
         val conversationId: String?,
     ) : ActivityUiState
 
+    /**
+     * A task came in on a locked iPhone: it waits and starts the moment the iPhone unlocks.
+     * [voiceUnlock]: the user set up Unlock by voice, so "or say your phrase" (never the phrase itself).
+     */
+    public data class WaitingForUnlock(
+        val taskId: String,
+        val task: String,
+        val voiceUnlock: Boolean,
+    ) : ActivityUiState
+
     /** The user stopped it (or it ended without an answer): the activity goes away at once. */
     public data class Ended(val taskId: String) : ActivityUiState
 
@@ -74,13 +84,18 @@ public class LiveActivityPresenter(
     parent: CoroutineScope,
     private val runner: TaskRunner,
     private val tasks: TaskRepository,
+    private val queue: com.piyush.mode.feature.tasks.presentation.TaskQueue? = null,
+    private val settings: com.piyush.mode.feature.settings.data.SettingsRepository? = null,
 ) : Presenter<ActivityUiState>(parent, ActivityUiState.Hidden) {
 
     init {
         scope.launch {
             var said = ""
-            runner.state.collect { s ->
-                val state = map(s)
+            val held = queue?.waitingForUnlock ?: kotlinx.coroutines.flow.MutableStateFlow(null)
+            kotlinx.coroutines.flow.combine(runner.state, held) { s, waiting -> s to waiting }.collect { (s, waiting) ->
+                val state = waiting?.takeIf { !s.running }?.let {
+                    ActivityUiState.WaitingForUnlock(it.id, it.text, settings?.settings?.value?.voiceUnlock == true)
+                } ?: map(s)
                 // One line per change of phase or step, to see in the logs what the activity was given.
                 val line = when (state) {
                     is ActivityUiState.Working -> "working, step ${state.step}"
@@ -96,6 +111,11 @@ public class LiveActivityPresenter(
     /** Stop, from the Dynamic Island. */
     public fun stop() {
         runner.stop()
+    }
+
+    /** Cancel, on the "Unlock to start" activity: the waiting task is dropped. */
+    public fun cancelWaiting(taskId: String) {
+        queue?.cancel(taskId)
     }
 
     /** An answer tapped on the Live Activity. */

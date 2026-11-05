@@ -65,6 +65,9 @@ public class Screens(
     private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
     /** The last lines of Mode's log (Health → Share report, debugging a task). */
     private val logTail: () -> String = { "" },
+    /** Whether the iPhone is locked (Unlock by voice's check). */
+    private val deviceLock: com.piyush.mode.core.platform.DeviceLock = com.piyush.mode.core.platform.DeviceLock.None,
+    private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -167,7 +170,24 @@ public class Screens(
     public fun liveRun(): LiveRunPresenter = LiveRunPresenter(scope, runner, tasks)
 
     /** The Live Activity: one for the app's lifetime. */
-    public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks)
+    public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks, queue, settings)
+
+    /** The first run: Welcome, Connect your AI, a first job (asking for the VPN and notifications as it starts). */
+    public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter =
+        com.piyush.mode.app.screens.firstrun.FirstRunPresenter(scope, settings, connectChatGpt(), queue) {
+            if (!phoneChecks.vpnAllowed()) {
+                try {
+                    session.reconnect()
+                } finally {
+                    session.disconnect()
+                }
+            }
+            permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
+        }
+
+    /** Settings → Unlock by voice: the guide, and the check that it works. */
+    public fun unlockVoice(): com.piyush.mode.app.screens.start.UnlockVoicePresenter =
+        com.piyush.mode.app.screens.start.UnlockVoicePresenter(scope, settings, deviceLock, background, telemetry)
 
     public fun runScreens(taskId: String): RunScreensPresenter = RunScreensPresenter(scope, taskId, runs, tasks, runner, queue, teacher)
 

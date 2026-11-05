@@ -31,6 +31,8 @@ enum Route: Hashable {
     case memoryApps
     case memoryApp(name: String)
     case memoryEdit(id: String)
+    /// Settings → Unlock by voice: the guide, and the check that it works.
+    case unlockVoice
 }
 
 /// A mode:// link from the Live Activity (or anywhere): open a conversation, Ask, or just Mode.

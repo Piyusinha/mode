@@ -19,7 +19,7 @@ struct RootView: View {
 
     @ViewBuilder private var content: some View {
         if app.needsOnboarding {
-            OnboardingRoute(app: app)
+            FirstRunRoute(app: app)
         } else {
             MainTabs(app: app)
         }

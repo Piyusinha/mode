@@ -9,6 +9,12 @@ public enum ModeTextStyle: CaseIterable, Sendable {
     case largeTitle
     /// 32 heavy display: a setup step or a page's headline.
     case title
+    /// 30 heavy display: the Mo tab's name.
+    case tabTitle
+    /// 24 bold display: the words heard while holding the talk button.
+    case heard
+    /// 28 heavy display: a v2 page's heading (Start Mo, Unlock by voice, Trust).
+    case heading
     /// 26 heavy display: a conversation's title, a sheet's title.
     case title2
     /// 20 bold display: the running task's name, Mo's line on a card.
@@ -37,6 +43,9 @@ public enum ModeTextStyle: CaseIterable, Sendable {
         switch self {
         case .largeTitle: (34, 800, .largeTitle)
         case .title: (32, 800, .title)
+        case .tabTitle: (30, 800, .largeTitle)
+        case .heard: (24, 700, .title2)
+        case .heading: (28, 800, .title)
         case .title2: (26, 800, .title2)
         case .title3: (20, 700, .title3)
         case .section: (18, 700, .headline)
