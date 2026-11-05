@@ -46,7 +46,8 @@ class SetupTipsTest {
         val named = setUp.copy(userName = "Piyush")
         assertEquals(SetupTip.entries.toList() - SetupTip.Name, SetupTips.banner(named, start)!!.tips, "a name is set: four tips")
         val allDone = setUp.copy(
-            voices = mapOf("elevenlabs" to VoiceChoice("v1", "Rachel")), language = "hi", fullAccess = true, voiceUnlock = true, userName = "Piyush",
+            voices = mapOf("elevenlabs" to VoiceChoice("v1", "Rachel")), hearingOrder = listOf("deepgram", "apple", "soniox"),
+            fullAccess = true, voiceUnlock = true, userName = "Piyush",
         )
         assertNull(SetupTips.banner(allDone, start), "nothing left to tell")
     }
@@ -90,5 +91,31 @@ class SetupTipsTest {
         assertNotNull(p.state.awaitState { it.tips != null }.tips)
         p.showTip(SetupTip.Name)
         assertEquals(SetupTip.Name, p.state.awaitState { it.tips?.showing == SetupTip.Name }.tips!!.showing)
+    }
+
+    @Test
+    fun eachTipGoesOnlyWhenItsOwnSettingChanges() {
+        fun tips(s: ModeSettings) = SetupTips.banner(s, start)!!.tips
+
+        // Voice: another provider speaking, or a voice picked (even one of Apple's).
+        assertFalse(SetupTip.Voice in tips(setUp.copy(speechOrder = listOf("elevenlabs", "apple", "fish"))))
+        assertFalse(SetupTip.Voice in tips(setUp.copy(voices = mapOf("apple" to VoiceChoice("ava", "Ava")))))
+        assertTrue(SetupTip.Voice in tips(setUp.copy(speechOrder = listOf("apple", "elevenlabs", "fish"))), "reordering below Apple changes nothing")
+
+        // Dictation: another listener in use; the language alone doesn't count.
+        assertFalse(SetupTip.Listening in tips(setUp.copy(hearingOrder = listOf("deepgram", "apple", "soniox"))))
+        assertTrue(SetupTip.Listening in tips(setUp.copy(language = "hi")))
+
+        // Unlock by voice set up: only that tip goes.
+        val unlocked = tips(setUp.copy(voiceUnlock = true))
+        assertEquals(SetupTip.entries.toList() - SetupTip.StartWithoutOpening, unlocked)
+    }
+
+    @Test
+    fun theCloseButtonAndFiveDaysStayWhenSomeTipsAreDone() {
+        val some = setUp.copy(voiceUnlock = true, voices = mapOf("apple" to VoiceChoice("ava", "Ava")))
+        assertFalse(SetupTips.banner(some, start + day)!!.closable)
+        assertTrue(SetupTips.banner(some, start + 2 * day)!!.closable)
+        assertNull(SetupTips.banner(some, start + 5 * day))
     }
 }

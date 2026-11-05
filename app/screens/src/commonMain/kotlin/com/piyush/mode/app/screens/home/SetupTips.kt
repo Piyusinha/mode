@@ -2,7 +2,6 @@ package com.piyush.mode.app.screens.home
 
 import com.piyush.mode.feature.settings.domain.ModeSettings
 import com.piyush.mode.feature.settings.domain.RiskConfirmation
-import com.piyush.mode.feature.settings.domain.SpeechLanguage
 import com.piyush.mode.feature.settings.domain.VoiceKind
 
 /**
@@ -26,9 +25,14 @@ public enum class SetupTip {
     /** The user's name. */
     Name;
 
+    /**
+     * The user changed this away from the default, so the tip is no longer shown (only this one):
+     * a voice picked or a voice other than Apple's speaking; a listener other than Apple's in use;
+     * Unlock by voice set up; and so on.
+     */
     internal fun done(s: ModeSettings): Boolean = when (this) {
-        Voice -> s.voices.isNotEmpty() || s.speechOrder != VoiceKind.speechDefault()
-        Listening -> s.hearingOrder != VoiceKind.hearingDefault() || s.language != SpeechLanguage.Auto.id
+        Voice -> s.voices.isNotEmpty() || s.speechOrder.firstOrNull() != VoiceKind.Apple.id
+        Listening -> s.hearingOrder.firstOrNull() != VoiceKind.Apple.id
         Access -> s.fullAccess || s.askBeforeRisky != RiskConfirmation.OnlyVeryRisky
         StartWithoutOpening -> s.voiceUnlock
         Name -> !s.userName.isNullOrBlank()
