@@ -94,6 +94,7 @@ class ResponsesClient(
                 // Mode's tools are in the chat-completions shape {"type":"function","function":{…}}.
                 put("tools", buildJsonArray {
                     tools.forEach { t ->
+                        if (WebSearchTool.isMarker(t)) { add(buildJsonObject { put("type", "web_search") }); return@forEach }
                         val f = t.jsonObject["function"]?.jsonObject ?: return@forEach
                         add(buildJsonObject {
                             put("type", "function")
@@ -103,7 +104,8 @@ class ResponsesClient(
                         })
                     }
                 })
-                put("tool_choice", "required")
+                // A lookup with only the web search wants text back, not a function call.
+                if (WebSearchTool.functions(tools).isNotEmpty()) put("tool_choice", "required")
             }
         }
 

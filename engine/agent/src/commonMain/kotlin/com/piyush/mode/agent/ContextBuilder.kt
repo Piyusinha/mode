@@ -25,6 +25,7 @@ object ContextBuilder {
     const val MAX_ANSWERS = 5
     const val MAX_PLAN_CHARS = 1500
     const val MAX_NOTES = 30
+    const val MAX_FACTS = 20
     const val MAX_NOTE_CHARS = 200
     const val MAX_TEXTS = 80
     const val MAX_TIP_CHARS = 400
@@ -47,6 +48,8 @@ object ContextBuilder {
         val brief: String? = null,
         val context: TaskContext,
         val step: Int,
+        /** Key facts found so far ("flight: 6E223"), kept for the task. */
+        val facts: List<String> = emptyList(),
         val maxSteps: Int,
         val answers: List<Pair<String, String>>,
         val plan: String?,
@@ -104,6 +107,13 @@ object ContextBuilder {
             c.recentTasks.take(MAX_RECENT_TASKS).forEach { append("- ").append(it.clip(MAX_TURN_CHARS)).append('\n') }
             append('\n')
         }
+        c.resumed?.let { r ->
+            append("AN EARLIER ATTEMPT AT THIS SAME TASK WAS CUT SHORT: Mode was closed at step ${r.step}. Carry on from where ")
+            append("it got to: read the screen first, keep what it noted, and never redo a change it recorded as done.\n")
+            if (r.notes.isNotEmpty()) append("It had noted:\n").append(r.notes.joinToString("\n") { "- " + it.clip(MAX_TURN_CHARS) }).append('\n')
+            if (r.lastSteps.isNotEmpty()) append("Its last steps:\n").append(r.lastSteps.joinToString("\n") { "- " + it.clip(MAX_TURN_CHARS) }).append('\n')
+            append('\n')
+        }
         if (c.earlierTurns.isNotEmpty()) {
             append("EARLIER IN THIS CONVERSATION (context only; the task below is what to do now):\n")
             c.earlierTurns.takeLast(MAX_EARLIER_TURNS).forEach {
@@ -128,6 +138,11 @@ object ContextBuilder {
         if (input.done.isNotEmpty()) {
             append("DONE SO FAR (Mode's record of what you changed for the user; trust it over how the screen looks now, and never repeat a confirmed one):\n")
             input.done.forEach { append("- ").append(it).append('\n') }
+            append('\n')
+        }
+        if (input.facts.isNotEmpty()) {
+            append("TASK FACTS (found so far; use them, do not look for them again; they belong in your reply):\n")
+            input.facts.takeLast(MAX_FACTS).forEach { append("- ").append(it.clip(MAX_NOTE_CHARS)).append('\n') }
             append('\n')
         }
         if (input.notes.isNotEmpty()) {

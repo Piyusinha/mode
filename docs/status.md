@@ -80,6 +80,17 @@ In this order; everything else below waits until these are done.
    transcript while you talk, then send. Per D17, the mic must stop before the agent
    drives. The Watch app reuses it through the watch's own dictation.
 7. **Mac setup app:** one-click install and pairing (Launch item 8 below).
+8. **The agent fights to finish** (built 2026-11-05 on branch `harness-fixes`, worktree
+   `~/piyush/mode-harness`; JVM-tested, simulator-built, **not yet on the phone**):
+   A1–A13 (the harness bugs from the 3 Nov runs, the per-action check, the step
+   budget, the recovery ladder, anomaly recovery, the give-up gate, two-phase commit,
+   facts, direct routes, lookup, skill packages), C1–C4 (usuals, ask-once, the profile
+   budget, routines suggested behind a setting) and B1–B3 (talking over Mode).
+   Next: merge into `main`, install, run `docs/eval-suite.md`. Still pending: talking
+   over the narration (D17) and the Live Activity "Speak" button; Settings rows for
+   `suggestRoutines` and `bargeIn`; the Compare-tab runner for the eval suite; the
+   on-phone checks of `open_url` from the background, `read_calendar`/`find_contact`
+   permissions, and `lookup` on the ChatGPT plan.
 
 After that: Apple Watch app, landing page and demo video, then "Last".
 

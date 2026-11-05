@@ -69,6 +69,8 @@ class PlatformServices(
     /** Each stage of reaching this iPhone, for the Diagnose screen. */
     val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks,
     val telemetry: Telemetry = Telemetry.None,
+    /** Links, the calendar and contacts from the app itself (None where the platform has nothing). */
+    val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
 )
 
 /**
@@ -138,13 +140,20 @@ class ModeGraph(platform: PlatformServices) {
         telemetry = telemetry,
         narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),
         translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
+        device = platform.device,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
-    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope)
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope).also { queue ->
+        tasks.onFollowUp = { text, conversation -> queue.submit(text, com.piyush.mode.feature.tasks.domain.TaskSource.Voice, conversation, false) }
+    }
 
     /** Tasks that repeat; due ones go to the inbox, with a notification for when Mode is closed. */
     val scheduler: Scheduler = Scheduler(ScheduleRepository(database), inbox, platform.notifier, scope)
+
+    /** A routine about due is suggested (never run) when Mode comes to the front, if the setting is on. */
+    val routines: com.piyush.mode.feature.tasks.presentation.RoutineSuggester =
+        com.piyush.mode.feature.tasks.presentation.RoutineSuggester(taskHistory, settings, platform.notifier, platform.prefs)
 
     private val claudeModels = com.piyush.mode.feature.settings.data.ClaudeModels(platform.prefs, list = { claudeClient.models() })
 
@@ -210,6 +219,8 @@ class ModeGraph(platform: PlatformServices) {
         // Tasks left from the last session: interrupted ones are marked, fresh ones run.
         inbox.recover()
         scheduler.start(platform.lifecycle)
+        platform.lifecycle.onForeground { runCatching { routines.check() } }
+        runCatching { routines.check() }
         scope.launch {
             runCatching { runs.backfill() }
                 .onSuccess { if (it > 0) AppLog.log("runs", "listed $it earlier runs") }

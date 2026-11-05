@@ -38,6 +38,8 @@ targets:
           - audio
         NSLocalNetworkUsageDescription: Mode connects to this iPhone's own developer services to see the screen and tap for you. Nothing leaves the phone.
         NSMicrophoneUsageDescription: Mode listens when you speak a task, and stops before it starts working in your apps.
+        NSCalendarsFullAccessUsageDescription: Mode reads your calendar when a task needs it (your flight tomorrow, your next meeting), instead of tapping through the Calendar app.
+        NSContactsUsageDescription: Mode looks up a person's number or email when a task needs it, instead of tapping through Contacts.
         # The running task on the Dynamic Island and the Lock Screen.
         NSSupportsLiveActivities: true
         # Mode updates the activity at every step while it works.

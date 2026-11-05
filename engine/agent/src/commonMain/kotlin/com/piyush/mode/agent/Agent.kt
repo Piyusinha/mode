@@ -3,6 +3,8 @@ package com.piyush.mode.agent
 import com.piyush.mode.core.telemetry.Telemetry
 import com.piyush.mode.core.telemetry.Operation
 import com.piyush.mode.core.telemetry.Field
+import com.piyush.mode.core.telemetry.Event
+import com.piyush.mode.core.telemetry.currentContext
 import com.piyush.mode.core.telemetry.trace
 
 import com.piyush.mode.llm.ModelProvider
@@ -12,7 +14,10 @@ import com.piyush.mode.llm.ChatResult
 import com.piyush.mode.llm.ToolCall
 import com.piyush.mode.llm.LlmClient
 import com.piyush.mode.llm.LlmFailed
+import com.piyush.mode.ops.DeviceData
 import com.piyush.mode.ops.Op
+import com.piyush.mode.core.common.AppLog
+import kotlinx.serialization.json.buildJsonArray
 import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.wireName
 import kotlinx.coroutines.async
@@ -46,6 +51,8 @@ data class AgentConfig(
     /** Used for one step after the cheap model makes no progress twice; null to never step up. */
     val strongModel: String? = DEFAULT_STRONG_MODEL,
     val maxSteps: Int = 30,
+    /** Steps are added while the task makes progress (StepBudget), never beyond this. */
+    val budgetCeiling: Int = 60,
     /** Longer side of the screenshot sent to the model, in pixels. */
     val imageMaxSide: Int = 1000,
     /** Pause after each action before checking that the screen is still. */
@@ -68,6 +75,8 @@ data class AgentConfig(
     val askAboveAmount: Double? = null,
     /** The agent may read one-time codes from Messages or a notification and type them (never kept). */
     val readCodes: Boolean = true,
+    /** Offer lookup (the provider's web search) for facts; a plan without it answers 400 and the tool bows out. */
+    val webLookup: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_MODEL = "anthropic/claude-haiku-5.5"
@@ -147,7 +156,7 @@ class AgentResult(
  * tool, and the agent carries it out through the [PhoneBackend].
  */
 class Agent(
-    private val phone: PhoneBackend,
+    phone: PhoneBackend,
     private val llm: LlmClient,
     private val gate: UserGate,
     private val config: AgentConfig = AgentConfig(),
@@ -163,8 +172,90 @@ class Agent(
     /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
     private val onPlan: (List<PlanItem>) -> Unit = {},
     private val telemetry: Telemetry = Telemetry.None,
+    /** Brings phone control back when it stops answering (ops silently dropped); null: nothing to do. */
+    private val recoverPhone: (suspend () -> PhoneBackend)? = null,
+    /** What Mode's own app can do without a screen: links, the calendar, contacts. */
+    private val device: DeviceData? = null,
 ) {
     /** One-time codes seen on screen: masked in everything recorded. */
+    private var phone: PhoneBackend = phone
+    /** Key facts the model found ("flight" → "6E223"), kept for the task and shown every step. */
+    private val facts = LinkedHashMap<String, String>()
+    /** The provider answered a web lookup with a 400 this task: the plan has no web search. */
+    private var lookupUnsupported = false
+    // The loop's state lives on the agent (one agent runs one task): a suspend loop spills every local at each
+    // await, and with sixty locals the method outgrew the JVM's limit.
+    /** Grows when an opened app brings tips with it. */
+    private var context: TaskContext = TaskContext.Empty
+    private val history = mutableListOf<String>()
+    private var cost: Double = 0.0
+    private var lastScreen: String? = null
+    private var lastWasPhoneAction: Boolean = false
+    private var stuck = StuckDetector(false)
+    private var budget = StepBudget(1, 1)
+    private var ladder = RecoveryLadder()
+    /** Questions put to the user this task (a give-up on their call needs one first). */
+    private var askedUser: Int = 0
+    /** The last reported state of each commit entry, for the trace. */
+    private val commitStates = mutableMapOf<ChangeLedger.Entry, String>()
+    /** The same action done again and again: how many times the last one was (StuckDetector.repeated). */
+    private var repeats: Int = 0
+    /** How the last phone action was described, for the routes list. */
+    private var lastDescribed: String? = null
+    /** The last frame as bytes, and frames in a row identical to the one before an action. */
+    private var lastJpeg: ByteArray? = null
+    private var identicalFrames: Int = 0
+    private var lastActionKinds: ArrayDeque<String> = ArrayDeque()
+    private var planDoneSeen: Int = 0
+    /** The app the agent last opened, to return to after the user answers a question. */
+    private var lastApp: String? = null
+    private var plan: String? = null
+    /** A new task starts its app on its home page (a learned route starts there too). */
+    private var freshPending: Boolean = false
+    private var inMode: Boolean = false
+    /** The user's answers, shown on their own every step so they are not lost in the history. */
+    private val answers = mutableListOf<Pair<String, String>>()
+    /** The user answered and the agent has not acted since: another question would repeat it. */
+    private var answeredSinceAction: Boolean = false
+    /**
+     * Text seen while scrolling one list, in order. Seen on the phone: picking "the highest rated"
+     * means comparing across several screens; with only one screen in view the agent scrolled up and
+     * down again and again (the strong model too). Mode remembers the list for it.
+     */
+    private val scrolled = LinkedHashSet<String>()
+    /** The screen text as of the last look, for the brain's decisions. */
+    private var screenNow: List<String> = emptyList()
+    private var routineAt: Int = 0
+    private var routineHinted: JustInTime.Hint? = null
+    /** Where the last tap landed (screen points), and whether a tap on the focused field was refused already. */
+    private var lastTapAt: Pair<Double, Double>? = null
+    /** The text the last tap landed on, to tell a form's label from its value. */
+    private var lastTapLabel: String? = null
+    private var focusTapRefused: Boolean = false
+    /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
+    private var lastOp: String? = null
+    /** The last phone action was a scroll up (nothing new then means the top of the page). */
+    private var lastScrollUp: Boolean = false
+    private var lastPage: List<String> = emptyList()
+    /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
+    private var ledger = ChangeLedger()
+    /** Memory lookups made, by query, and the step they were made at. */
+    private val recalled = mutableMapOf<String, Int>()
+    private var stepUps: Int = 0
+    /** What the last strong-model step cost, to judge whether the budget allows another. */
+    private var lastStrongCost: Double? = null
+    /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
+    private var lastTyped: String? = null
+    /** Facts the model kept on the way; shown every step for the rest of the task. */
+    private val notes = mutableListOf<String>()
+    private val appsOpened = mutableListOf<String>()
+    private var finalScreen: ByteArray? = null
+    /** What the last phone action was expected to do; shown on the next step only. */
+    private var expectation: String? = null
+    /** Actions in a row that did not do what the model expected (ExpectCheck). */
+    private var expectMisses: Int = 0
+    /** A successful done was sent back once to be checked; the next one is accepted. */
+    private var doneFlags = DoneFlags()
     private val codes = OneTimeCodes()
     private val trace: AgentTrace = RedactingTrace(trace, codes)
 
@@ -189,8 +280,7 @@ class Agent(
     }
 
     private suspend fun runSteps(task: String, startsInMode: Boolean, startContext: TaskContext): AgentResult {
-        /** Grows when an opened app brings tips with it. */
-        var context = startContext
+        context = startContext
         val started = clock.markNow()
         val ops = phone.ops()
         val brain = config.brainModel?.let { Brain(llm, it) }
@@ -207,40 +297,44 @@ class Agent(
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
-        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null)
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device, lookup = config.webLookup)
+        lookupUnsupported = false
+        facts.clear()
+        // "If it goes wrong" rules from the skills memory offered, shown only when their trigger is on screen.
+        val playbook = (listOfNotNull(startContext.knownRoute) + startContext.skills).flatMap { Playbook.rules(it) }.distinctBy { it.trigger.lowercase() }
         val schema = AgentTools.schema(tools)
-        val history = mutableListOf<String>()
-        var cost = brief?.costUsd ?: 0.0
-        var lastScreen: String? = null
-        var lastWasPhoneAction = false
-        val stuck = StuckDetector(canStepUp = config.strongModel != null)
-        /** The app the agent last opened, to return to after the user answers a question. */
-        var lastApp: String? = null
+        history.clear()
+        cost = brief?.costUsd ?: 0.0
+        lastScreen = null
+        lastWasPhoneAction = false
+        stuck = StuckDetector(canStepUp = config.strongModel != null)
+        budget = StepBudget(config.maxSteps, config.budgetCeiling)
+        ladder = RecoveryLadder()
+        askedUser = 0
+        commitStates.clear()
+        repeats = 0
+        lastDescribed = null
+        lastJpeg = null
+        identicalFrames = 0
+        lastActionKinds = ArrayDeque<String>()
+        planDoneSeen = 0
+        lastApp = null
         /** The model's own plan for multi-part tasks, shown back to it every step; the brain's steps first. */
         val firstSteps = brief?.brief?.steps ?: routeSteps
-        var plan: String? = firstSteps?.mapIndexed { i, s -> "${i + 1}. $s" }?.joinToString("\n")
+        plan = firstSteps?.mapIndexed { i, s -> "${i + 1}. $s" }?.joinToString("\n")
         firstSteps?.let { steps -> onPlan(steps.map { PlanItem(it, false) }) }
-        /** A new task starts its app on its home page (a learned route starts there too). */
-        var freshPending = brief?.brief?.fresh == true || routeSteps != null
-        var inMode = startsInMode
-        /** The user's answers, shown on their own every step so they are not lost in the history. */
-        val answers = mutableListOf<Pair<String, String>>()
-        /** The user answered and the agent has not acted since: another question would repeat it. */
-        var answeredSinceAction = false
-        /**
-         * Text seen while scrolling one list, in order. Seen on the phone: picking "the highest rated"
-         * means comparing across several screens; with only one screen in view the agent scrolled up and
-         * down again and again (the strong model too). Mode remembers the list for it.
-         */
-        val scrolled = LinkedHashSet<String>()
-        /** The screen text as of the last look, for the brain's decisions. */
-        var screenNow: List<String> = emptyList()
+        freshPending = brief?.brief?.fresh == true || routeSteps != null
+        inMode = startsInMode
+        answers.clear()
+        answeredSinceAction = false
+        scrolled.clear()
+        screenNow = emptyList()
         /** Asks the brain to choose; its answer (or why it could not) for the history. Adds its cost. */
         suspend fun askBrain(question: String): String {
             val b = brain ?: return "no planning mind is set: choose yourself from what you have seen"
             onStatus(WORKING)
             val d = telemetry.trace(Operation.BrainDecide) { span ->
-                b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow)
+                b.decide(question, task, brief?.brief?.text(), scrolled.toList().takeLast(MAX_SEEN_LINES), screenNow, factLines())
                     .also { if (it.error != null) span.failed(if (it.callFailed) "ModelRequestFailed" else "InvalidDecision") }
             }
             cost += d.costUsd
@@ -249,37 +343,26 @@ class Agent(
         }
         /** The routine that worked before for this kind of task, step by step, and the next step to look for. */
         val routine = JustInTime.steps(startContext.knownRoute ?: startContext.skills.firstOrNull { it.startsWith("SKILL:") })
-        var routineAt = 1
-        var routineHinted: JustInTime.Hint? = null
-        /** Where the last tap landed (screen points), and whether a tap on the focused field was refused already. */
-        var lastTapAt: Pair<Double, Double>? = null
-        /** The text the last tap landed on, to tell a form's label from its value. */
-        var lastTapLabel: String? = null
-        var focusTapRefused = false
-        /** The last phone action and the page it was made on, to tell a real page change from a moving banner. */
-        var lastOp: String? = null
-        /** The last phone action was a scroll up (nothing new then means the top of the page). */
-        var lastScrollUp = false
-        var lastPage: List<String> = emptyList()
-        /** What the agent changed for the user, with proof: never repeated, each checked before the next. */
-        val ledger = ChangeLedger()
-        /** Memory lookups made, by query, and the step they were made at. */
-        val recalled = mutableMapOf<String, Int>()
-        var stepUps = 0
-        /** What the last strong-model step cost, to judge whether the budget allows another. */
-        var lastStrongCost: Double? = null
-        /** The text typed last, shown to the user when Mode confirms a risky tap such as Send. */
-        var lastTyped: String? = null
-        /** Facts the model kept on the way; shown every step for the rest of the task. */
-        val notes = mutableListOf<String>()
-        val appsOpened = mutableListOf<String>()
-        var finalScreen: ByteArray? = null
-        /** What the last phone action was expected to do; shown on the next step only. */
-        var expectation: String? = null
-        /** A successful done was sent back once to be checked; the next one is accepted. */
-        var verifyAsked = false
+        routineAt = 1
+        routineHinted = null
+        lastTapAt = null
+        lastTapLabel = null
+        focusTapRefused = false
+        lastOp = null
+        lastScrollUp = false
+        lastPage = emptyList()
+        ledger = ChangeLedger()
+        recalled.clear()
+        stepUps = 0
+        lastStrongCost = null
+        lastTyped = null
+        notes.clear()
+        appsOpened.clear()
+        finalScreen = null
+        expectation = null
+        expectMisses = 0
+        doneFlags = DoneFlags()
         /** Giving up was questioned once already (by the planning mind when there is one). */
-        var giveUpQuestioned = false
 
         fun result(outcome: AgentOutcome, step: Int) = AgentResult(
             outcome, step, cost, started.elapsedNow().inWholeMilliseconds,
@@ -291,8 +374,17 @@ class Agent(
         /** " Last: tap "Send"." for a stop message, from the latest step. */
         fun lastAction() = history.lastOrNull()?.let { " Last: ${it.substringAfter(". ").substringBefore(" — ")}." }.orEmpty()
 
-        for (step in 1..config.maxSteps) {
+        var stepCount = 0
+        while (true) {
+            val step = ++stepCount
+            if (step > budget.limit) {
+                // Never stop one action from done: typed, and the submit is in view.
+                val submitVisible = lastOp == "type_text" && screenNow.any { SUBMIT.containsMatchIn(it) }
+                if (!budget.grace(step, submitVisible)) break
+                if (history.isNotEmpty()) history[history.lastIndex] += " (${StepBudget.GRACE} more steps: submit what you typed, then finish)"
+            }
             currentCoroutineContext().ensureActive()
+            budget.warning(step)?.let { if (history.isNotEmpty()) history[history.lastIndex] += " [$it]" }
             config.maxCostUsd?.let { limit ->
                 if (cost >= limit) {
                     return result(
@@ -318,7 +410,21 @@ class Agent(
             val stepStarted = clock.markNow()
             onStatus(WORKING)
             val lookStarted = clock.markNow()
-            val screen = telemetry.trace(Operation.ScreenLook) { look() }
+            var screen = telemetry.trace(Operation.ScreenLook) { look() }
+            // A frame identical to the one before the action is stale or the phone stalled: look once more.
+            if (lastWasPhoneAction && lastJpeg?.contentEquals(screen.jpeg) == true) {
+                delay(RECAPTURE_MS)
+                screen = telemetry.trace(Operation.ScreenLook) { look() }
+                identicalFrames = if (lastJpeg?.contentEquals(screen.jpeg) == true) identicalFrames + 1 else 0
+            } else identicalFrames = 0
+            // Phone control silently dropping every op: the same frame after actions that cannot all do nothing.
+            if (identicalFrames >= DEADLOCK_FRAMES && lastActionKinds.any { it in MOVING_KINDS } && lastActionKinds.toSet().size >= 2) {
+                identicalFrames = 0
+                val (fresh, note) = recoverStalledPhone()
+                if (fresh != null) { screen = fresh; budget.refund() }
+                if (history.isNotEmpty()) history[history.lastIndex] += note
+            }
+            lastJpeg = screen.jpeg
             // A screen showing a one-time code is not kept as the task's last screen.
             finalScreen = screen.jpeg.takeIf { screen.texts.none { OneTimeCodes.codesIn(it.first).isNotEmpty() } }
             onScreen(screen.jpeg)
@@ -340,7 +446,7 @@ class Agent(
             if (changed != null) {
                 // Progress: a scroll that moved, or a different page. A tap that left the same page is not.
                 val moved = changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")
-                if (moved && !endOfList) stuck.progressed() else stuck.stalled()
+                if (moved && !endOfList) { stuck.progressed(); budget.progressed(); ladder.progressed() } else stuck.stalled()
             }
             if (changed != null && history.isNotEmpty()) {
                 history[history.lastIndex] += when {
@@ -353,6 +459,14 @@ class Agent(
                     samePage && lastOp == "tap" -> " → same page (only small parts changed)" + labelHint(lastTapLabel, screen.layout)
                     else -> " → screen changed"
                 }
+                // What the model said the action would do, checked against the screen (no model call): a miss
+                // says what shows instead and the usual causes, so the next step is not the same tap again.
+                ExpectCheck.check(expectation, screen.pageTexts(), changed, screen.keyboardUp, history.last().substringAfter(". ").substringBefore(" — "))
+                    ?.takeIf { it.missed }?.let { miss ->
+                        history[history.lastIndex] += miss.hint
+                        expectMisses++
+                        stuck.stalled()
+                    } ?: run { if (expectation != null) expectMisses = 0 }
             }
             lastScreen = screen.signature
             screenNow = screen.pageTexts()
@@ -370,7 +484,19 @@ class Agent(
                 navigated = lastOp != "scroll" && lastOp != "wait",
                 rightAfter = lastWasPhoneAction && ledger.entries.lastOrNull()?.step == step - 1,
             )
-            if (ledger.entries.count { it.confirmed } > confirmedBefore) stuck.progressed()
+            if (ledger.entries.count { it.confirmed } > confirmedBefore) { stuck.progressed(); budget.progressed(); ladder.progressed() }
+            // Orders, payments, bookings and sends: each change of state goes to the trace.
+            ledger.entries.filter { it.kind == Changes.Kind.Commit }.forEach { e ->
+                val state = when { e.confirmed -> "verified"; e.noEffect -> "no_effect"; e.checked -> "unclear"; else -> "tapped" }
+                if (commitStates[e] != state) {
+                    commitStates[e] = state
+                    telemetry.event(Event.AgentCommit, telemetry.currentContext(), mapOf(Field.Outcome to state))
+                }
+            }
+            // A plan step done is progress too; one that drags on gets the plan rewritten (tier 3 below).
+            val planDoneNow = plan?.let { PlanItem.parse(it).count { item -> item.done } } ?: 0
+            if (planDoneNow > planDoneSeen) { planDoneSeen = planDoneNow; stuck.progressed(); budget.progressed(); ladder.progressed() }
+            val planStepDragging = plan != null && budget.planStep(planDoneNow)
             val verdict = stuck.looked(screen.signature, changed)
             if (verdict is StuckDetector.Verdict.Stop) {
                 trace.stuck(step, verdict.why)
@@ -382,7 +508,19 @@ class Agent(
             // No progress for a few steps: the brain decides from what was seen (text only, ~$0.005).
             if (verdict is StuckDetector.Verdict.Decide && brain != null && history.isNotEmpty()) {
                 history[history.lastIndex] += " (no progress in the last few steps; " +
-                    askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\"). What should it do now?") + ")"
+                    askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\").${ladder.routesTried()} What should it do now?") + ")"
+            }
+            // The recovery ladder: another way to act, another route, a new plan, then the user.
+            if (history.isNotEmpty()) {
+                ladder.climb(
+                    repeats, stuck.visits, changed, expectMisses, planStepDragging, lastDescribed,
+                    history.last().substringAfter(" — "), plan,
+                ) { q -> askBrain(q) }?.let { rung ->
+                    telemetry.event(Event.AgentRecovery, telemetry.currentContext(), mapOf(Field.Outcome to "tier${ladder.tier}"))
+                    history[history.lastIndex] += rung.note
+                    rung.plan?.let { items -> plan = RecoveryLadder.render(items); onPlan(items) }
+                    if (rung.critical) stuck.critical()
+                }
             }
             // The strong model costs ~20× a step: at most a few per task, and only with budget to spare.
             val wantsStrong = verdict is StuckDetector.Verdict.StepUp || (verdict is StuckDetector.Verdict.Decide && brain == null)
@@ -406,7 +544,8 @@ class Agent(
                     brief = brief?.brief?.text(),
                     context = context,
                     step = step,
-                    maxSteps = config.maxSteps,
+                    facts = factLines(),
+                    maxSteps = budget.limit,
                     answers = answers,
                     plan = plan,
                     notes = notes,
@@ -416,7 +555,7 @@ class Agent(
                     expectation = expectation,
                     done = ledger.lines(),
                     seenWhileScrolling = scrolled.map { it.trim() }.filter { it.length > 1 }.distinct().takeLast(MAX_SEEN_LINES),
-                    tipsNow = if (inMode) emptyList() else JustInTime.tips(context.appNotes, screen.pageTexts(), lastApp),
+                    tipsNow = if (inMode) emptyList() else JustInTime.tips(context.appNotes, screen.pageTexts(), lastApp) + Playbook.applicable(playbook, screen.pageTexts()),
                     routeHint = (if (inMode) null else JustInTime.hint(routine, routineAt, screen.layout)).also { routineHinted = it }?.text(),
                     screen = ContextBuilder.Screen(
                         screen.jpeg, screen.geometry.imageWidth, screen.geometry.imageHeight, screen.layout, keyboardUp = screen.keyboardUp,
@@ -458,6 +597,11 @@ class Agent(
                 continue
             }
             val reason = AgentTools.reasonOf(call)
+            AgentTools.factsOf(call).forEach { fact ->
+                val key = fact.substringBefore(':').trim().lowercase()
+                val value = fact.substringAfter(':', "").trim()
+                if (key.isNotEmpty() && value.isNotEmpty() && OneTimeCodes.codesIn(value).isEmpty()) facts[key] = codes.mask(value)
+            }
             AgentTools.noteOf(call)?.let { note ->
                 // Seen on the phone: the same note kept again a few steps later.
                 if (notes.none { it.equals(note, ignoreCase = true) }) {
@@ -467,46 +611,16 @@ class Agent(
             }
             when (call.name) {
                 "done" -> {
-                    val summary = codes.mask(call.arguments.string("summary").orEmpty())
-                    val success = call.arguments["success"]?.jsonPrimitive?.booleanOrNull ?: true
-                    val evidence = call.arguments.string("evidence")?.trim().orEmpty()
-                    val lastUnchanged = history.lastOrNull()?.contains(UNCHANGED) == true
-                    // Catch "I tapped Send" when nothing was sent: once per task, ask for a check.
-                    if (success && !verifyAsked && (evidence.isEmpty() || lastUnchanged)) {
-                        verifyAsked = true
-                        val why = if (lastUnchanged) "your last action did not change the screen" else "you did not say what on the screen shows it"
-                        trace.verifyRejected(step, why)
-                        record(
-                            "done (not accepted yet)", summary,
-                            "not accepted yet: $why. Look at the screen and check the task really happened; if it did, " +
-                                "call done again and say what on the screen shows it",
-                        )
-                        continue
-                    }
-                    // Seen on the phone: tasks given up with routes left (a closed shop with a later slot, a flight
-                    // number in Mail): once per task, the planning mind looks for another way before Mode gives up.
-                    if (!success && !giveUpQuestioned && step < config.maxSteps - GIVE_UP_RESERVE) {
-                        giveUpQuestioned = true
-                        val why = evidence.ifBlank { summary }.take(MAX_GIVE_UP_CHARS)
-                        val advice = if (brain != null) askBrain(
-                            "I am about to give up because: $why. Before I do: is there another way to still get this done " +
-                                "(another app, another place the information would be such as Mail, Messages, Wallet, Calendar " +
-                                "or the app's own orders, scheduling it for later, the same thing from somewhere else, a close " +
-                                "alternative)? If it needs the user's choice, give the question to ask them with 2–3 concrete options."
-                        ) else "look for another way first (see: When something is in the way)"
-                        trace.giveUpQuestioned(step, why, advice)
-                        record(
-                            "done (not given up yet)", summary,
-                            "before giving up: $advice. Try that now, or ask_user with concrete options; give up only if nothing can work",
-                        )
-                        continue
-                    }
-                    record("done", summary, (if (success) "finished" else "gave up") + evidence.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
-                    val spoken = call.arguments.string("spoken")?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)
-                    return result(AgentOutcome.Done(summary, success, spoken), step)
+                    val outcome = finishOrRefuse(
+                        call, step, doneFlags, history, ledger, ladder.routes.size, askedUser, budget.limit, screenNow, notes,
+                        brain != null, { a, r, o -> record(a, r, o) }, { q -> askBrain(q) },
+                    )
+                    if (outcome != null) return result(outcome, step)
+                    continue
                 }
                 "ask_user" -> {
                     val question = call.arguments.string("question").orEmpty()
+                    askedUser++
                     val options = AgentTools.optionsOf(call)
                     val recommended = call.arguments.string("recommended")?.trim()?.takeIf { it in options }
                     // Seen on the phone: four questions in a row about the same message,
@@ -568,6 +682,77 @@ class Agent(
                         record("plan", "", "plan saved; it is shown to you every step: now do the next open item")
                     }
                 }
+                "open_url", "run_shortcut" -> {
+                    val url = if (call.name == "open_url") call.arguments.string("url").orEmpty().trim()
+                        else AgentTools.shortcutUrl(call.arguments.string("name").orEmpty().trim(), call.arguments.string("input"))
+                    val what = if (call.name == "open_url") "open $url" else "run shortcut \"${call.arguments.string("name").orEmpty()}\""
+                    if (url.isBlank() || url.startsWith("shortcuts://run-shortcut?name=&")) {
+                        stuck.badReply(); record("$what (not done)", reason, "not done: it needs the URL or the Shortcut's name"); continue
+                    }
+                    actionStarted = clock.markNow()
+                    val opened = if ("url.open" in ops) runCatching { phone.send(Op.OpenUrl(url)); true }.getOrDefault(false)
+                        else device?.let { runCatching { it.openUrl(url) }.getOrDefault(false) } ?: false
+                    lastWasPhoneAction = true
+                    answeredSinceAction = false
+                    lastOp = call.name
+                    lastPage = screen.pageTexts()
+                    stuck.acted()
+                    expectation = AgentTools.expectOf(call)
+                    if (opened) settle()
+                    record(what, reason, if (opened) "ok: read the screen now" else "failed: the phone could not open it. Open the app and find it by its screen instead", url)
+                }
+                "lookup" -> {
+                    val question = call.arguments.string("question")?.trim().orEmpty()
+                    stuck.thought()
+                    when {
+                        question.isEmpty() -> { stuck.badReply(); record("lookup (not done)", reason, "not done: it needs the question") }
+                        lookupUnsupported -> record("lookup \"$question\"", reason, LOOKUP_UNAVAILABLE)
+                        else -> {
+                            onStatus(WORKING)
+                            val answer = try {
+                                withTimeoutOrNull(LOOKUP_MS) {
+                                    llm.chat(
+                                        config.model,
+                                        listOf(ChatMessage("system", LOOKUP_SYSTEM), ChatMessage("user", question)),
+                                        buildJsonArray { add(com.piyush.mode.llm.WebSearchTool.MARKER) },
+                                    )
+                                }?.also { cost += it.usage.costUsd }?.text?.trim()?.takeIf { it.isNotEmpty() }
+                            } catch (e: LlmFailed) {
+                                if (e.status400) lookupUnsupported = true
+                                AppLog.log("agent", "lookup failed: ${e.message}")
+                                null
+                            }
+                            record(
+                                "lookup \"$question\"", reason,
+                                when {
+                                    answer != null -> "found: " + answer.take(LOOKUP_CHARS)
+                                    lookupUnsupported -> LOOKUP_UNAVAILABLE
+                                    else -> "the lookup did not answer in time: try once more, or open the page with open_url or Safari"
+                                },
+                            )
+                        }
+                    }
+                }
+                "read_calendar" -> {
+                    val days = (call.arguments["days"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1).coerceIn(1, MAX_CALENDAR_DAYS)
+                    val events = device?.let { runCatching { it.calendar(days) }.getOrDefault(emptyList()) }.orEmpty()
+                    stuck.thought()
+                    record(
+                        "read calendar ($days day${if (days == 1) "" else "s"})", reason,
+                        if (events.isEmpty()) "nothing in the calendar for then (or no access: then look in the Calendar app)"
+                        else "events:\n" + events.take(MAX_DEVICE_LINES).joinToString("\n"),
+                    )
+                }
+                "find_contact" -> {
+                    val name = call.arguments.string("name").orEmpty().trim()
+                    val found = if (name.isEmpty()) emptyList() else device?.let { runCatching { it.contacts(name) }.getOrDefault(emptyList()) }.orEmpty()
+                    stuck.thought()
+                    record(
+                        "find contact \"$name\"", reason,
+                        if (found.isEmpty()) "no contact matches (or no access: then look in the Contacts app)"
+                        else "contacts:\n" + found.take(MAX_DEVICE_LINES).joinToString("\n") { codes.mask(it) },
+                    )
+                }
                 "decide" -> {
                     val question = call.arguments.string("question")?.trim().orEmpty().ifBlank { reason.ifBlank { task } }
                     val answer = askBrain(question)
@@ -619,6 +804,7 @@ class Agent(
                     val label = (op as? Op.Tap)?.let { nearestText(it.x, it.y, screen) }
                     val target = (op as? Op.Tap)?.let { rowLabel(it.x, it.y, screen) ?: label } ?: described
                     val changes = op is Op.Tap && Changes.isChange(reason, label)
+                    val kind = Changes.kindOf(reason, label)
                     if (op is Op.Tap && Changes.isChangeButton(label) && Changes.isChecking(reason)) {
                         stuck.badReply()
                         record("$described (not done)", reason, ADD_IS_NOT_A_CHECK)
@@ -663,7 +849,12 @@ class Agent(
                     }
                     // Replacing what a field holds (a quantity's 1): seen on the phone, the agent pressed delete,
                     // tapped the field and pressed digits one at a time for ten steps.
-                    if (call.name == "type_text" && call.arguments["clear"]?.jsonPrimitive?.booleanOrNull == true) {
+                    val clearing = call.name == "type_text" && call.arguments["clear"]?.jsonPrimitive?.booleanOrNull == true
+                    if (clearing) {
+                        // A field's own × clears all of it at once; deletes alone left "boarding pass" in Mail's
+                        // search and the agent typed "4 November" after it (seen on the phone).
+                        AgentTools.focusPoint(call, screen.geometry)?.let { (fx, fy) -> clearControl(fx, fy, screen) }
+                            ?.let { (cx, cy) -> runCatching { phone.send(Op.Tap(cx, cy)) }; delay(FOCUS_MS) }
                         repeat(CLEAR_KEYS) { runCatching { phone.send(Op.PressKey("delete")) } }
                     }
                     if (op is Op.Scroll) {
@@ -689,6 +880,14 @@ class Agent(
                         // What was typed has been shown once; a later confirmation names only newer typing.
                         lastTyped = null
                     }
+                    // Before an order, payment or booking: what it is for, from the screen, kept in the notes (so a
+                    // later check or the reply has the amount, the item and the slot even if the app moves on).
+                    if (changes && kind == Changes.Kind.Commit) {
+                        val facts = screen.pageTexts().filter { RiskGuard.amountIn(it) != null || DATE_SLOT.containsMatchIn(it) }
+                            .map { it.trim() }.distinct().take(COMMIT_FACTS)
+                        if (facts.isNotEmpty()) notes += codes.mask("Before \"${label ?: described}\": " + facts.joinToString("; "))
+                        telemetry.event(Event.AgentCommit, telemetry.currentContext(), mapOf(Field.Outcome to "tapped"))
+                    }
                     actionStarted = clock.markNow()
                     val outcome = try {
                         val result = phone.send(op)
@@ -706,6 +905,10 @@ class Agent(
                         lastOp = call.name
                         lastPage = screen.pageTexts()
                         stuck.acted()
+                        repeats = stuck.repeated("${call.name}|${label ?: described}")
+                        lastDescribed = described
+                        lastActionKinds.addLast(call.name)
+                        if (lastActionKinds.size > DEADLOCK_FRAMES) lastActionKinds.removeFirst()
                         stuck.scrolled(if (op is Op.Scroll) call.arguments.string("direction") else null)
                         lastScrollUp = op is Op.Scroll && call.arguments.string("direction") == "up"
                         if (op is Op.LaunchApp) {
@@ -721,9 +924,9 @@ class Agent(
                         // Apps often confirm a change only for a moment ("Added", a check): read the
                         // screen right away, twice, so the proof is not lost before the next look.
                         if (changes) {
-                            val appeared = flashed(screen)
-                            val proof = Changes.proof(appeared)
-                            ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof)
+                            val appeared = flashed(screen, kind)
+                            val proof = Changes.proof(appeared, kind)
+                            ledger.add(step, target, reason, ChangeLedger.page(screen.pageTexts()), proof, kind, label)
                             "ok" + appeared.takeIf { it.isNotEmpty() }?.let { a -> "; right after it the screen showed: " + a.joinToString(", ") { "\"$it\"" } }.orEmpty() +
                                 if (proof != null) DONE_IT else CHECK_IT
                         } else if (op is Op.Scroll && stuck.scrollsSameWay() >= SCROLLS_BEFORE_HINT - 1) {
@@ -736,17 +939,39 @@ class Agent(
                     }
                     // Never look (or tap) while the screen is still moving.
                     if (lastWasPhoneAction) settle()
+                    // Seen on the phone (Mail, four times): open_app said "ok" while Mode's own chat stayed in front,
+                    // and eleven steps were lost. The phone cannot say which app is in front, but Mode's screen
+                    // shows the task's own words: then Home, open the app again, and say what happened.
+                    val launchNote = (op as? Op.LaunchApp)?.takeIf { lastWasPhoneAction }?.let { launch ->
+                        val now = runCatching { screenTexts(screen.geometry).map { it.first } }.getOrNull().orEmpty()
+                        if (!looksLikeMode(now, task)) return@let ""
+                        runCatching { phone.send(Op.Home) }
+                        settle()
+                        runCatching { phone.send(launch) }
+                        settle()
+                        val again = runCatching { screenTexts(screen.geometry).map { it.first } }.getOrNull().orEmpty()
+                        stuck.stalled()
+                        if (looksLikeMode(again, task)) "; but Mode is still in front: ${launch.name} did not open. Try home, then open it again, or open_url"
+                        else " (Mode was in front; opened ${launch.name} again)"
+                    }.orEmpty()
                     // Typing is checked: does the text now show? (A field that wasn't focused takes nothing.)
                     val typedNote = (op as? Op.TypeText)?.takeIf { lastWasPhoneAction && call.arguments["submit"]?.jsonPrimitive?.booleanOrNull != true }?.let { t ->
                         val now = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
-                        if (now.any { it.first.contains(t.text.take(TYPED_PROBE), ignoreCase = true) }) "; the field shows \"${t.text.take(TYPED_PROBE)}\""
-                        else "; \"${t.text.take(TYPED_PROBE)}\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
+                        val probe = t.text.take(TYPED_PROBE)
+                        val shown = now.firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim()
+                        when {
+                            shown == null -> "; \"$probe\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
+                            // Seen on the phone: "4 November" typed after "boarding pass" that clear did not remove.
+                            clearing && shown.length > t.text.length + STALE_SLACK ->
+                                "; the field shows \"${shown.take(TYPED_SHOWN)}\": the old text was not cleared. Tap the field's ×, or select all and delete, then type again"
+                            else -> "; the field shows \"${shown.take(TYPED_SHOWN)}\""
+                        }
                     }.orEmpty()
-                    record(described, reason, outcome + typedNote, op.toString())
+                    record(described, reason, outcome + launchNote + typedNote, op.toString())
                 }
             }
         }
-        return result(AgentOutcome.Stopped("Reached the limit of ${config.maxSteps} steps"), config.maxSteps)
+        return result(AgentOutcome.Stopped("Reached the limit of ${budget.limit} steps"), budget.limit)
     }
 
     private class Answer(val reply: ChatResult, val model: String)
@@ -868,20 +1093,23 @@ class Agent(
      * Text that appeared right after a change and was not there before ("Food logged!"). Read
      * twice, at once and a moment later, since some apps confirm late; text only, no model cost.
      */
-    private suspend fun flashed(before: Screen): List<String> {
-        val had = before.texts.map { it.first.trim() }.toSet()
+    private suspend fun flashed(before: Screen, kind: Changes.Kind): List<String> {
+        // Normalised: OCR reads "ADDED ×" one moment and "ADDED x" the next; neither is new.
+        val had = before.texts.map { ChangeLedger.norm(it.first) }.toSet()
         val seen = mutableListOf<String>()
-        for (wait in FLASH_READS_MS) {
+        for (wait in if (kind == Changes.Kind.Commit) FLASH_READS_COMMIT_MS else FLASH_READS_MS) {
             delay(wait)
             val now = runCatching { screenTexts(before.geometry) }.getOrNull() ?: continue
             now.filter { (text, _, y) ->
                 val t = text.trim()
                 // Nothing in the status bar is proof of a change (the clock, the island).
-                t.isNotEmpty() && t !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
+                t.isNotEmpty() && ChangeLedger.norm(t) !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
             }.forEach { if (it.first.trim() !in seen) seen += it.first.trim() }
-            if (Changes.proof(seen) != null) break
+            if (Changes.proof(seen, kind) != null) break
         }
-        return seen.take(FLASH_TEXTS)
+        // The proof first: a cart bar at the bottom ("1 item added") must not be cut by the limit.
+        val proof = Changes.proof(seen, kind)
+        return (listOfNotNull(proof) + seen.filter { it != proof }).take(FLASH_TEXTS)
     }
 
     /** The numbered lines of a learned route ("1. open Settings"), without the numbers and the extra notes. */
@@ -894,7 +1122,7 @@ class Agent(
      * Servings" and "Serving Size" tapped again and again while "1" and "6 pieces" sat beside them.
      */
     private fun labelHint(tapped: String?, layout: ScreenLayout): String {
-        val value = tapped?.let(layout::rightOf)?.firstOrNull() ?: return ""
+        val value = tapped?.let(layout::valueOf) ?: return ""
         return ": \"$tapped\" is a label; its value is [${value.id}] \"${value.text}\" on the right of the same row. " +
             "Tap that (or type_text with id ${value.id})"
     }
@@ -970,6 +1198,132 @@ class Agent(
         is Op.Drag -> "swipe"
         Op.Home -> "home"
         else -> call.name
+    }
+
+    /**
+     * Mode's own screen, told by the task's words in its chat: a line of four or more words that starts the task.
+     * Nothing about Mode's layout or language is assumed.
+     */
+    private fun looksLikeMode(texts: List<String>, task: String): Boolean {
+        val t = ChangeLedger.norm(task)
+        if (t.length < MODE_MARK_MIN) return false
+        return texts.any { line ->
+            val l = ChangeLedger.norm(line)
+            l.length >= MODE_MARK_MIN && l.split(' ').size >= MODE_MARK_WORDS && t.startsWith(l)
+        }
+    }
+
+    /** The field's clear control (×, ⓧ, "Clear") on its row, to its right, in screen points. */
+    private fun clearControl(fx: Double, fy: Double, screen: Screen): Pair<Double, Double>? {
+        val g = screen.geometry
+        val py = g.toPixelsY(fy)
+        val half = g.toPixelsY(ROW_HALF_PT)
+        return screen.texts
+            .filter { abs(it.third - py) <= half && it.second > g.toPixelsX(fx) && CLEAR_MARKS.matches(it.first.trim()) }
+            .minByOrNull { it.second }
+            ?.let { g.x(it.second.toDouble()) to g.y(it.third.toDouble()) }
+    }
+
+    /** The facts as "name: value" lines, newest last. */
+    private fun factLines(): List<String> = facts.map { (k, v) -> "$k: $v" }
+
+    /** Once-per-task flags of the done handling. */
+    private class DoneFlags {
+        var verifyAsked = false
+        var commitVerifyAsked = false
+        var giveUpRefusals = 0
+        var giveUpQuestioned = false
+        /** The last refusal's text: the same reason is not refused twice (that only costs a step). */
+        var lastRefusal: String? = null
+    }
+
+    /**
+     * The done call: accepted (the outcome) or sent back (null) with a reason recorded. Once each per task: a
+     * "done" with no evidence or after an unchanged screen; a success with an order or payment the screen never
+     * confirmed; then the give-up gate (GiveUpGate) up to twice; then the planning mind's other-way question.
+     */
+    private suspend fun finishOrRefuse(
+        call: ToolCall, step: Int, flags: DoneFlags, history: List<String>, ledger: ChangeLedger, routesFailed: Int,
+        askedUser: Int, limit: Int, screenNow: List<String>, notes: List<String>, hasBrain: Boolean,
+        record: (String, String, String) -> Unit, askBrain: suspend (String) -> String,
+    ): AgentOutcome? {
+        val summary = codes.mask(call.arguments.string("summary").orEmpty())
+        val success = call.arguments["success"]?.jsonPrimitive?.booleanOrNull ?: true
+        val evidence = call.arguments.string("evidence")?.trim().orEmpty()
+        val lastUnchanged = history.lastOrNull()?.contains(UNCHANGED) == true
+        // Catch "I tapped Send" when nothing was sent: once per task, ask for a check.
+        if (success && !flags.verifyAsked && (evidence.isEmpty() || lastUnchanged)) {
+            flags.verifyAsked = true
+            val why = if (lastUnchanged) "your last action did not change the screen" else "you did not say what on the screen shows it"
+            trace.verifyRejected(step, why)
+            record(
+                "done (not accepted yet)", summary,
+                "not accepted yet: $why. Look at the screen and check the task really happened; if it did, " +
+                    "call done again and say what on the screen shows it",
+            )
+            return null
+        }
+        // An order or payment the screen never confirmed is not "done": once, send the agent to check.
+        val unconfirmedCommit = ledger.entries.lastOrNull { it.kind == Changes.Kind.Commit && !it.confirmed && !it.retried }
+        if (success && !flags.commitVerifyAsked && unconfirmedCommit != null) {
+            flags.commitVerifyAsked = true
+            trace.verifyRejected(step, "an order or payment is not confirmed")
+            record(
+                "done (not accepted yet)", summary,
+                "not accepted yet: your change at step ${unconfirmedCommit.step} (\"${unconfirmedCommit.button ?: unconfirmedCommit.target}\") " +
+                    "was never confirmed on screen. Check the app's Orders, Bookings or History: if it is there, call done and quote " +
+                    "it (an order number, a status); if it is not, say so plainly and do not claim it",
+            )
+            return null
+        }
+        // The give-up gate: a blocker that is the user's call needs a question first; a login or payment is a
+        // hand-over, not a give-up; with steps left, more than one route must have been tried; the evidence must
+        // quote the screen.
+        if (!success) {
+            val blockedBy = call.arguments.string("blocked_by")
+            val tried = AgentTools.routesTriedOf(call)
+            val stepsLeft = step < limit - GIVE_UP_RESERVE
+            val refusal = GiveUpGate.refuse(blockedBy, tried.size + routesFailed, evidence, askedUser > 0, stepsLeft, screenNow, notes)
+            val reason = blockedBy.orEmpty().ifEmpty { "unsaid" }
+            if (refusal != null && flags.giveUpRefusals < MAX_GIVE_UP_REFUSALS && refusal != flags.lastRefusal) {
+                flags.giveUpRefusals++
+                flags.lastRefusal = refusal
+                telemetry.event(Event.AgentGiveUp, telemetry.currentContext(), mapOf(Field.Outcome to "refused", Field.EndReason to reason))
+                record("done (not accepted)", summary, refusal)
+                return null
+            }
+            if (refusal == null) telemetry.event(Event.AgentGiveUp, telemetry.currentContext(), mapOf(Field.Outcome to "accepted", Field.EndReason to reason))
+            // Seen on the phone: tasks given up with routes left (a closed shop with a later slot, a flight number
+            // in Mail): once per task, the planning mind looks for another way before Mode gives up.
+            if (!flags.giveUpQuestioned && stepsLeft) {
+                flags.giveUpQuestioned = true
+                val why = evidence.ifBlank { summary }.take(MAX_GIVE_UP_CHARS)
+                val advice = if (hasBrain) askBrain(
+                    "I am about to give up because: $why. Before I do: is there another way to still get this done " +
+                        "(another app, another place the information would be such as Mail, Messages, Wallet, Calendar " +
+                        "or the app's own orders, scheduling it for later, the same thing from somewhere else, a close " +
+                        "alternative)? If it needs the user's choice, give the question to ask them with 2–3 concrete options."
+                ) else "look for another way first (see: When something is in the way)"
+                trace.giveUpQuestioned(step, why, advice)
+                record(
+                    "done (not given up yet)", summary,
+                    "before giving up: $advice. Try that now, or ask_user with concrete options; give up only if nothing can work",
+                )
+                return null
+            }
+        }
+        record("done", summary, (if (success) "finished" else "gave up") + evidence.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
+        val spoken = call.arguments.string("spoken")?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)
+        return AgentOutcome.Done(summary, success, spoken)
+    }
+
+    /** Phone control stopped answering: reconnected and looked afresh (the new screen), or not (null), with the note. */
+    private suspend fun recoverStalledPhone(): Pair<Screen?, String> {
+        val fixed = recoverPhone?.let { recover -> runCatching { phone = recover(); true }.getOrDefault(false) } ?: false
+        if (!fixed) return null to " (the phone is not responding to actions: try home, then open the app again)"
+        settle()
+        val fresh = telemetry.trace(Operation.ScreenLook) { look() }
+        return fresh to " (phone control had stopped responding: reconnected; look afresh)"
     }
 
     private fun pixel(x: Double, y: Double, screen: Screen): String =
@@ -1084,6 +1438,12 @@ class Agent(
         private const val MAX_ROUTE_STEPS = 8
         /** Deletes pressed to empty a field before typing (quantities, short entries). */
         private const val CLEAR_KEYS = 12
+        private val CLEAR_MARKS = Regex("[×✕✖xXⓧ⊗⊠]|clear", RegexOption.IGNORE_CASE)
+        /** A shown field this much longer than what was typed still holds old text. */
+        private const val STALE_SLACK = 2
+        private const val TYPED_SHOWN = 40
+        private const val MODE_MARK_MIN = 16
+        private const val MODE_MARK_WORDS = 4
         /** A scroll showing fewer new lines than this has reached the end. */
         private const val MIN_NEW_LINES = 2
         private const val BACK_DID_NOTHING =
@@ -1125,6 +1485,17 @@ class Agent(
                 "look for the item where it would show: the list this page adds to (close this page with X, Back or Done)."
         /** When the screen is read after a change, from the tap: at once, then a moment later. */
         private val FLASH_READS_MS = listOf(400L, 800L)
+        /** An order's confirmation (a toast, a new page) can take a moment longer. */
+        private val FLASH_READS_COMMIT_MS = listOf(400L, 800L, 2500L)
+        private const val COMMIT_FACTS = 4
+        private const val MAX_GIVE_UP_REFUSALS = 2
+        private const val MAX_CALENDAR_DAYS = 31
+        private const val LOOKUP_MS = 25_000L
+        private const val LOOKUP_CHARS = 900
+        private const val LOOKUP_UNAVAILABLE = "lookup is not available on this plan: open the page instead (open_url with a search URL, or Safari)"
+        private const val LOOKUP_SYSTEM = "Answer the question with the facts, in a few lines, as of today; name the source. If the web search is not available, say so."
+        private const val MAX_DEVICE_LINES = 25
+        private val DATE_SLOT = Regex("\\b(\\d{1,2}:\\d{2}|\\d{1,2}\\s?(am|pm)|today|tomorrow|tonight|mon|tue|wed|thu|fri|sat|sun)\\b", RegexOption.IGNORE_CASE)
         /** A row: half its height, and the gap between its text and the icon tapped (screen points). */
         private const val ROW_HALF_PT = 28.0
         private const val ROW_GAP_PT = 8.0
@@ -1136,6 +1507,12 @@ class Agent(
         private const val MAX_RECALL_CHARS = 1200
         /** Steps kept for acting on the planning mind's other way before giving up is accepted anyway. */
         private const val GIVE_UP_RESERVE = 3
+        private const val RECAPTURE_MS = 700L
+        /** Identical frames after this many actions that cannot all do nothing: phone control has stalled. */
+        private const val DEADLOCK_FRAMES = 3
+        private val MOVING_KINDS = setOf("scroll", "back", "home", "open_app", "press_key")
+        private val SUBMIT = Regex("\\b(search|submit|go|done|send|next|continue|find|sign in|log in|pay|book|order)\\b", RegexOption.IGNORE_CASE)
+
         private const val MAX_GIVE_UP_CHARS = 300
 
         val SYSTEM_PROMPT = """

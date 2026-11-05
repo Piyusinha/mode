@@ -2,6 +2,7 @@ package com.piyush.mode.agent
 
 import com.piyush.mode.core.common.SecretFilter
 import com.piyush.mode.llm.ToolCall
+import com.piyush.mode.ops.DeviceData
 import com.piyush.mode.ops.Op
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -54,6 +55,9 @@ object AgentTools {
         val items: String? = null,
     )
 
+    /** Tools that reach a result without the screen (offered when the platform has them). */
+    val DIRECT = setOf("open_url", "run_shortcut", "read_calendar", "find_contact", "lookup")
+
     private val reason = Param(
         "reason", "string",
         "Shown to the user as live progress: a few plain words on what you are doing for them (\"Searching for " +
@@ -66,6 +70,13 @@ object AgentTools {
         "Optional. A fact from this screen to keep for the rest of the task: an event, a time, a name, a price, " +
             "anything the user asked to know. Never a password, code or card number.",
         required = false,
+    )
+    /** Offered on every action: key facts, kept and shown every step, so nothing found is looked for twice. */
+    private val facts = Param(
+        "facts", "array",
+        "Optional. Key facts you found, each as \"name: value\" (\"flight: 6E223\", \"PNR: ABC123\", \"total: ₹521\"). " +
+            "Kept for the task and shown every step: use them instead of looking again. Never a password, code or card number.",
+        required = false, items = "string",
     )
     /** Offered on phone actions: the model states what should happen, and checks it on the next screen. */
     /** The plan item an action works on: progress on the Dynamic Island, without a step of its own. */
@@ -195,6 +206,33 @@ object AgentTools {
             listOf(Param("what", "string", "What they should do, in a few words: \"Enter your UPI PIN in PhonePe\"."), reason),
         ),
         Tool(
+            "open_url", "Open a link or an app's own URL directly, with no navigation: a web page, a search or product " +
+                "page in an app that has a URL scheme, a map, or shortcuts://run-shortcut?name=… Surer and shorter than " +
+                "finding it by taps. Then read the screen.", null,
+            listOf(Param("url", "string", "The full URL (https://…, or an app scheme such as zomato://, maps://, tel:, mailto:)."), reason),
+        ),
+        Tool(
+            "run_shortcut", "Run one of the user's Shortcuts by name, with optional text input; then read the screen.", null,
+            listOf(
+                Param("name", "string", "The Shortcut's exact name."),
+                Param("input", "string", "Optional. Text to hand the Shortcut.", required = false),
+                reason,
+            ),
+        ),
+        Tool(
+            "read_calendar", "Read the user's calendar events from now, without opening the Calendar app.", null,
+            listOf(Param("days", "integer", "How many days ahead to read (1 for today, 7 for the week)."), reason),
+        ),
+        Tool(
+            "find_contact", "Look up a person in the user's contacts: their number and email, without opening Contacts.", null,
+            listOf(Param("name", "string", "Their name, or part of it."), reason),
+        ),
+        Tool(
+            "lookup", "Look a fact up on the web through your AI (a flight's status, a shop's hours, a price, an address, " +
+                "today's date for a holiday) in one step, without opening Safari. For facts, not for doing things in apps.", null,
+            listOf(Param("question", "string", "The question, specific (\"IndiGo 6E223 status today\")."), reason),
+        ),
+        Tool(
             "done", "The task is complete, or cannot be done. Check the screen first.", null,
             listOf(
                 Param(
@@ -212,7 +250,21 @@ object AgentTools {
                 Param(
                     "evidence", "string",
                     "What on the current screen shows it is done (\"Dark Mode switch is off\", \"message shows Delivered\"), " +
-                        "or why it cannot be done.",
+                        "or why it cannot be done: quote the screen.",
+                ),
+                Param(
+                    "blocked_by", "string",
+                    "When success is false: what blocks it. closed or unavailable (the place or item), needs_info or " +
+                        "needs_choice (the user must say), login_or_payment (only they can do it; use wait_for_user instead), " +
+                        "app_broken, not_possible.",
+                    required = false,
+                    enum = listOf("closed", "unavailable", "needs_info", "needs_choice", "login_or_payment", "app_broken", "not_possible"),
+                ),
+                Param(
+                    "routes_tried", "array",
+                    "When success is false: each route you tried and what happened (\"Zomato search: closed until 11\", " +
+                        "\"Mail search 'IndiGo': nothing\").",
+                    required = false, items = "string",
                 ),
             ),
         ),
@@ -220,8 +272,9 @@ object AgentTools {
         when {
             tool.name == "done" -> tool
             tool.name == "plan" -> Tool(tool.name, tool.description, tool.needs, tool.params + note)
-            tool.needs != null -> Tool(tool.name, tool.description, tool.needs, tool.params + note + item + expect)
-            else -> Tool(tool.name, tool.description, tool.needs, tool.params + note + item)
+            tool.needs != null -> Tool(tool.name, tool.description, tool.needs, tool.params + note + facts + item + expect)
+            tool.name in DIRECT -> Tool(tool.name, tool.description, tool.needs, tool.params + note + facts + item + expect)
+            else -> Tool(tool.name, tool.description, tool.needs, tool.params + note + facts + item)
         }
     }
 
@@ -231,11 +284,45 @@ object AgentTools {
      * With a brief, plan is left out: the brief's steps are the plan (seen on the phone: nine re-plans
      * instead of one choice).
      */
-    fun available(phoneOps: Set<String>, recall: Boolean = false, brain: Boolean = false, briefed: Boolean = false): List<Tool> =
-        ALL.filter {
+    fun available(
+        phoneOps: Set<String>, recall: Boolean = false, brain: Boolean = false, briefed: Boolean = false,
+        device: DeviceData? = null, lookup: Boolean = false,
+    ): List<Tool> {
+        val urls = "url.open" in phoneOps || device?.canOpenUrl == true
+        return ALL.filter {
             (it.needs == null || it.needs in phoneOps) && (recall || it.name != "recall") &&
-                (brain || it.name != "decide") && !(briefed && it.name == "plan")
+                (brain || it.name != "decide") && !(briefed && it.name == "plan") &&
+                when (it.name) {
+                    "open_url", "run_shortcut" -> urls
+                    "read_calendar" -> device?.hasCalendar == true
+                    "find_contact" -> device?.hasContacts == true
+                    "lookup" -> lookup
+                    else -> true
+                }
         }
+    }
+
+    /** The direct routes on offer, for the brief ("open_url, read_calendar"). */
+    fun directRoutes(phoneOps: Set<String>, device: DeviceData?, lookup: Boolean = false): List<String> =
+        available(phoneOps, device = device, lookup = lookup).map { it.name }.filter { it in DIRECT }
+
+    /** The Shortcuts app's URL to run [name], with [input] as text when given. */
+    fun shortcutUrl(name: String, input: String?): String =
+        "shortcuts://run-shortcut?name=" + percent(name) + (input?.takeIf { it.isNotBlank() }?.let { "&input=text&text=" + percent(it) }.orEmpty())
+
+    private fun percent(s: String): String = buildString {
+        for (b in s.encodeToByteArray()) {
+            val c = b.toInt() and 0xff
+            if (c in 0x30..0x39 || c in 0x41..0x5a || c in 0x61..0x7a || c == 0x2d || c == 0x2e || c == 0x5f || c == 0x7e) append(c.toChar())
+            else append('%').append(((c shr 4) and 0xf).toString(16).uppercase()).append((c and 0xf).toString(16).uppercase())
+        }
+    }
+
+
+    /** The facts a call carries, as "name: value" lines. */
+    fun factsOf(call: ToolCall): List<String> =
+        (call.arguments["facts"] as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf { f -> f.isNotEmpty() } }
 
     /** OpenAI-style function-calling schema for [tools]. */
     fun schema(tools: List<Tool>): JsonArray = buildJsonArray {
@@ -337,6 +424,8 @@ object AgentTools {
             // The iOS back gesture: from the very left edge, across, at mid height.
             "back" -> Op.Drag(1.0, g.screenHeight * 0.45, g.screenWidth * 0.75, g.screenHeight * 0.45, duration = 0.25)
             "open_app" -> Op.LaunchApp(str("name"), fresh = call.arguments["fresh"]?.jsonPrimitive?.booleanOrNull == true)
+            "open_url" -> Op.OpenUrl(str("url"))
+            "run_shortcut" -> Op.OpenUrl(shortcutUrl(str("name"), call.arguments["input"]?.jsonPrimitive?.contentOrNull))
             else -> throw IllegalArgumentException("unknown action '${call.name}'")
         }
     }
@@ -348,6 +437,10 @@ object AgentTools {
 
     /** The fact the model asked to keep with this action, if any. */
     /** The choices offered with a question, in order; empty when it is a free question. */
+    fun routesTriedOf(call: ToolCall): List<String> =
+        (call.arguments["routes_tried"] as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }.distinct()
+
     fun optionsOf(call: ToolCall): List<String> =
         (call.arguments["options"] as? kotlinx.serialization.json.JsonArray).orEmpty()
             .mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf(String::isNotEmpty) }

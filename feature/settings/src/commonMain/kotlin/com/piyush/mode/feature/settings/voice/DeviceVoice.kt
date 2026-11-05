@@ -34,6 +34,8 @@ public object DeviceVoice {
     public var transcribe: ((String, (String?) -> Unit) -> Unit)? = null
     public var deleteRecording: (String) -> Unit = {}
     public var cancel: () -> Unit = {}
+    /** Stops what Mode is saying at once, and nothing else: the microphone, if open, stays open (talking over Mode). */
+    public var hush: () -> Unit = {}
     /** Asks for the microphone and installs Apple's speech model: only when the user turns Apple hearing on. */
     public var prepare: () -> Unit = {}
 
@@ -51,7 +53,9 @@ public object DeviceVoice {
         cancel: () -> Unit,
         prepare: () -> Unit,
         listen: (Long, Long, Boolean, (String) -> Unit, (String?, String?, String) -> Unit) -> Unit,
+        hush: () -> Unit = {},
     ) {
+        this.hush = hush
         this.speechReady = speechReady
         this.hearingState = hearingState
         this.speak = speak

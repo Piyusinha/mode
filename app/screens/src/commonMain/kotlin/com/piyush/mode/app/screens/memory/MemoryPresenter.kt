@@ -73,7 +73,7 @@ public class MemoryPresenter(
                 }
                 MemoryUiState(
                     learn = s.learnFromTasks,
-                    aboutYou = items.filter { it.kind == MemoryKind.Fact }.map { it.entry(it.title, it.app) },
+                    aboutYou = items.filter { it.kind == MemoryKind.Fact || it.kind == MemoryKind.Usual }.map { it.entry(it.title, it.app) },
                     routines = groups.filter { it.routines.isNotEmpty() },
                     apps = groups.filter { it.tips.isNotEmpty() }.sortedByDescending { it.tips.size },
                 )

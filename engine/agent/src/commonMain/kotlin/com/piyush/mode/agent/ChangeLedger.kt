@@ -25,20 +25,31 @@ internal class ChangeLedger {
         var escalated: Boolean = false,
         /** The page right after it was the same page, nothing new on it: the tap most likely missed. */
         var noEffect: Boolean = false,
+        val kind: Changes.Kind = Changes.Kind.Other,
+        /** The button tapped ("Place Order •"): for an order, seeing it again on the same page means it did not go through. */
+        val button: String? = null,
+        /** It had no effect and the same change was tried again: a later entry stands for it now. */
+        var retried: Boolean = false,
     ) {
         val confirmed: Boolean get() = proof != null
     }
 
     val entries = mutableListOf<Entry>()
 
-    fun add(step: Int, target: String, what: String, page: Set<String>, proof: String?): Entry =
-        Entry(step, target, what, page, proof).also { entries += it }
+    fun add(
+        step: Int, target: String, what: String, page: Set<String>, proof: String?,
+        kind: Changes.Kind = Changes.Kind.Other, button: String? = null,
+    ): Entry {
+        // A retry of a change that had no effect supersedes it: only the retry is checked from here on.
+        entries.lastOrNull { it.noEffect && !it.confirmed && !it.retried && same(it.target, target) }?.retried = true
+        return Entry(step, target, what, page, proof, kind = kind, button = button).also { entries += it }
+    }
 
     /**
      * The latest change still waiting for a check, if any. One that had no effect still waits, as far as
      * other changes go: a silent add looks the same as a missed tap, so only the same item may be retried.
      */
-    fun pending(): Entry? = entries.lastOrNull { !it.confirmed && (!it.checked || it.noEffect) }
+    fun pending(): Entry? = entries.lastOrNull { !it.confirmed && !it.retried && (!it.checked || it.noEffect) }
 
     /** A confirmed change of this same target. */
     fun confirmedFor(target: String): Entry? = entries.lastOrNull { it.confirmed && same(it.target, target) }
@@ -52,7 +63,16 @@ internal class ChangeLedger {
     fun looked(page: Set<String>, texts: List<String>, navigated: Boolean, rightAfter: Boolean = false) {
         val entry = pending() ?: return
         // Only what was not already on the page it was made on ("Recently added" headers don't count).
-        Changes.proof(texts.filter { norm(it) !in entry.page })?.let { entry.proof = it; return }
+        Changes.proof(texts.filter { norm(it) !in entry.page }, entry.kind)?.let { entry.proof = it; return }
+        // Seen on the phone (Zomato): "Place Order" tapped, a "Scheduling your order" sheet, then the same checkout
+        // with Place Order back. An order, payment or booking whose button is on the same page again did not go through.
+        if (entry.kind == Changes.Kind.Commit && entry.button != null && !entry.noEffect &&
+            similarity(entry.page, page) >= SAME_PAGE && texts.any { same(it, entry.button) }
+        ) {
+            entry.noEffect = true
+            entry.checked = true
+            return
+        }
         // Seen on the phone: a tap that missed (off by a coordinate convention) held every retry back, nine
         // times. Right after the change, the very same page with nothing new means it most likely did nothing.
         if (rightAfter && !entry.noEffect && similarity(entry.page, page) >= NO_EFFECT) {
@@ -62,7 +82,8 @@ internal class ChangeLedger {
         }
         if (navigated && similarity(entry.page, page) < SAME_PAGE) {
             entry.checked = true
-            entry.noEffect = false
+            // An order that visibly did not go through stays that way; a silent add may still show up in the list.
+            if (entry.kind != Changes.Kind.Commit) entry.noEffect = false
         }
     }
 
@@ -73,7 +94,13 @@ internal class ChangeLedger {
     fun lines(): List<String> = entries.map { e ->
         val status = when {
             e.confirmed -> "confirmed: \"${e.proof}\""
+            e.retried -> "it did NOT go through; you tried it again at a later step (see that one)"
+            e.noEffect && e.kind == Changes.Kind.Commit ->
+                "it did NOT go through (the same page came back with \"${e.button}\" still there): try it once more, or check the app's orders"
             e.noEffect -> "it had no effect (the page stayed the same): you may try it once more"
+            e.checked && e.kind == Changes.Kind.Commit ->
+                "not confirmed: before anything else, check the app's Orders, Bookings or History (profile or account tab) " +
+                    "for it; never tap \"${e.button ?: e.target}\" again meanwhile"
             e.checked -> "not confirmed; you left that page, so check the list you are on"
             else -> "NOT confirmed yet: check it before any other change"
         }
@@ -91,7 +118,7 @@ internal class ChangeLedger {
         fun similarity(a: Set<String>, b: Set<String>): Double =
             if (a.isEmpty() && b.isEmpty()) 1.0 else a.intersect(b).size.toDouble() / a.union(b).size
 
-        private fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() || it == ' ' }.trim()
+        fun norm(s: String) = s.lowercase().filter { it.isLetterOrDigit() || it == ' ' }.trim()
 
         /** Same thing tapped: equal once case and punctuation are set aside, or one names the other. */
         fun same(a: String, b: String): Boolean {

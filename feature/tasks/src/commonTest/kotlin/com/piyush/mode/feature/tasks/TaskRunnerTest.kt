@@ -528,4 +528,44 @@ class TaskRunnerTest {
         testScheduler.advanceUntilIdle()
         assertEquals(0, model.reflections)
     }
+
+    @Test
+    fun aTaskCutShortByModeClosingIsCarriedOnFromItsNotes() = runTest {
+        // 3 Nov 19:22: a hotel search died at step 17 with run.json left "running"; at the next launch the task is
+        // marked failed ("Mode was closed…"). Try again, with the same words in the same chat, carries on from it.
+        val model = ScriptedModel(
+            call("done", "evidence" to "on screen", "summary" to "warm-up"),
+            call("done", "evidence" to "on screen", "summary" to "Found it"),
+        )
+        val f = Fixture(this, model)
+        f.runner.runTask("warm up", quick)
+        val conversation = f.runner.state.value.conversationId!!
+        val cut = f.tasks.create("Find a hotel near Terminal 1 for tonight", com.piyush.mode.feature.tasks.domain.TaskSource.App, conversation)
+        f.tasks.markRunning(cut.id, "2026-11-03T19-22-40")
+        f.files.append(
+            "runs/2026-11-03T19-22-40/steps.jsonl",
+            listOf(
+                """{"event":"act","step":16,"action":"tap \"Hotels\"","outcome":"ok"}""",
+                """{"event":"note","step":17,"text":"Taj Bangalore shows ₹9,800 for tonight, 2.1 km from Terminal 1"}""",
+                """{"event":"act","step":17,"action":"tap \"Taj Bangalore\"","outcome":"ok"}""",
+            ).joinToString("\n", postfix = "\n"),
+        )
+        f.tasks.tidyAfterRelaunch(60_000)
+        assertEquals(TaskStatus.Failed, f.tasks.get(cut.id)!!.status)
+
+        f.runner.runTask("Find a hotel near Terminal 1 for tonight", quick, conversationId = conversation)
+        val prompt = model.lastUserText
+        assertTrue("WAS CUT SHORT: Mode was closed at step 17" in prompt, prompt)
+        assertTrue("Taj Bangalore shows ₹9,800" in prompt, prompt)
+        assertTrue("17. tap \"Taj Bangalore\" — ok" in prompt, prompt)
+    }
+
+    @Test
+    fun aFreshTaskWithTheSameWordsDoesNotCarryOnFromADoneOne() = runTest {
+        val model = ScriptedModel(call("done", "evidence" to "x", "summary" to "ok"), call("done", "evidence" to "x", "summary" to "ok"))
+        val f = Fixture(this, model)
+        f.runner.runTask("Turn off dark mode", quick)
+        f.runner.runTask("Turn off dark mode", quick, conversationId = f.runner.state.value.conversationId)
+        assertFalse("CUT SHORT" in model.lastUserText, model.lastUserText)
+    }
 }

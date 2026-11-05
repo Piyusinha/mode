@@ -24,6 +24,9 @@ import com.piyush.mode.agent.UserGate
 import com.piyush.mode.feature.settings.domain.AccessRules
 import com.piyush.mode.core.common.ActivityTracker
 import com.piyush.mode.core.common.AppLog
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import com.piyush.mode.core.common.startOfTodayMillis
 import com.piyush.mode.core.platform.AppInfo
 import com.piyush.mode.core.platform.BackgroundWork
@@ -97,9 +100,13 @@ public class TaskRunner(
     private val narrator: Narrator? = null,
     /** Turns a request in another language into English before the task starts (null: as said). */
     private val translator: Translator? = null,
+    /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
+    private val device: com.piyush.mode.ops.DeviceData? = null,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
+    /** What to do with words said over Mode's spoken answer: a follow-up task in that chat (set by the graph). */
+    public var onFollowUp: ((text: String, conversationId: String?) -> Unit)? = null
 
     /** The spoken question being asked now (Later cancels it). */
     private var voiceJob: kotlinx.coroutines.Job? = null
@@ -302,7 +309,11 @@ public class TaskRunner(
                 budget.copy(fullAccess = true, askAboveAmount = settings.settings.value.askAboveAmount)
             } else budget
             val useMemory = !private && tag == null
-            val base = TaskContext(userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today())
+            val base = TaskContext(
+                userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today(),
+                resumed = resumedFrom(saved),
+                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device),
+            )
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
                 phone = phone,
@@ -317,6 +328,8 @@ public class TaskRunner(
                 memory = prepared?.agentMemory,
                 pause = gate,
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
+                recoverPhone = { session.reconnect() },
+                device = device,
             )
             // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
             val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null
@@ -337,7 +350,9 @@ public class TaskRunner(
             if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
                 // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
                 val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
-                runCatching { voices?.speak(said) }
+                // Talking over the answer ("and also tell Rahul"): a follow-up task in the same chat.
+                val over = runCatching { voices?.speakOrHear(said) }.getOrNull()
+                if (over is Heard.Words) onFollowUp?.invoke(over.text, conversation)
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
@@ -416,6 +431,29 @@ public class TaskRunner(
     }
 
     /** Each earlier task in the conversation with Mode's reply to it. */
+    /**
+     * The attempt this task carries on from: the newest task in the same chat with the same words that Mode's
+     * closing cut short (seen on the phone: a hotel search died at step 17 and was never picked up). Its notes
+     * and last steps come from its run's record, so nothing new is written while a task runs.
+     */
+    private fun resumedFrom(task: Task): TaskContext.Resumed? {
+        val conversation = task.conversationId ?: return null
+        val cut = tasks.latest(RESUME_LOOKBACK).firstOrNull {
+            it.id != task.id && it.conversationId == conversation && it.text == task.text &&
+                it.status == TaskStatus.Failed && it.summary?.startsWith(INTERRUPTED_SUMMARY) == true && it.runId != null
+        } ?: return null
+        val events = runCatching { runs.events(cut.runId!!) }.getOrDefault(emptyList())
+        if (events.isEmpty()) return null
+        fun JsonObject.str(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+        val step = events.maxOfOrNull { it.str("step")?.toIntOrNull() ?: 0 } ?: 0
+        val notes = events.filter { it.str("event") == "note" }.mapNotNull { it.str("text")?.trim()?.takeIf(String::isNotEmpty) }.distinct().takeLast(RESUME_NOTES)
+        val acts = events.filter { it.str("event") == "act" }.takeLast(RESUME_STEPS).map { e ->
+            "${e.str("step")}. ${e.str("action")} — ${e.str("outcome").orEmpty().take(RESUME_OUTCOME_CHARS)}"
+        }
+        AppLog.log("agent", "carrying on from task ${cut.id} (cut short at step $step)")
+        return TaskContext.Resumed(step, notes, acts)
+    }
+
     private fun earlierTurns(conversationId: String, excluding: String): List<TaskContext.EarlierTurn> {
         val turns = conversations.turnsNow(conversationId).filter { it.taskId != excluding }
         return turns.mapIndexedNotNull { i, turn ->
@@ -566,7 +604,9 @@ public class TaskRunner(
             // A tap on an option, or an answer from the notification, closes the microphone at once.
             val stopListening = pending.answer.invokeOnCompletion { voices?.stop() }
             try {
-                voices?.speak(pending.text)
+                // Talking over the question is the answer.
+                val over = voices?.speakOrHear(pending.text) { words -> turn { it.copy(phase = VoiceTurnPhase.Listening, heard = words) } }
+                if (over is Heard.Words) answer(pending.id, over.text)
                 if (!pending.answer.isCompleted) {
                     turn { it.copy(phase = VoiceTurnPhase.Listening) }
                     val heard = voices?.hear { words -> turn { it.copy(heard = words) } }
@@ -631,3 +671,10 @@ private const val GOT_IT = "Got it. Going back."
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */
 private const val ANSWERED_PAUSE_MS = 900L
+
+/** Matches the summary tidyAfterRelaunch writes (Task.sq interruptRunning). */
+private const val INTERRUPTED_SUMMARY = "Mode was closed"
+private const val RESUME_LOOKBACK = 50L
+private const val RESUME_NOTES = 8
+private const val RESUME_STEPS = 5
+private const val RESUME_OUTCOME_CHARS = 120

@@ -94,9 +94,13 @@ class OpenRouterClient(
     /** Models that refused having their reasoning turned off with a 400 this session. */
     private val mustReason = mutableSetOf<String>()
 
-    override suspend fun chat(model: String, messages: List<ChatMessage>, tools: JsonArray): ChatResult {
+    override suspend fun chat(model0: String, messages: List<ChatMessage>, tools0: JsonArray): ChatResult {
         val key = apiKey()?.takeIf { it.isNotBlank() } ?: throw LlmFailed("No OpenRouter API key: add it in Settings.")
-        val forced = forcedToolChoiceAllowed(model) && model !in noForcedToolChoice
+        // The web search is OpenRouter's ":online" variant of the model, with the marker taken out of the tools.
+        val model = if (WebSearchTool.wanted(tools0) && !model0.endsWith(":online")) "$model0:online" else model0
+        val tools = WebSearchTool.functions(tools0)
+        // A lookup with only the web search wants text back; otherwise as before.
+        val forced = forcedToolChoiceAllowed(model) && model !in noForcedToolChoice && !(WebSearchTool.wanted(tools0) && tools.isEmpty())
         return try {
             postQuick(key, model, messages, tools, if (forced) "required" else "auto")
         } catch (e: LlmFailed) {

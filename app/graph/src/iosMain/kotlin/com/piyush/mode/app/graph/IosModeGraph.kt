@@ -69,6 +69,7 @@ val iosModeGraph: ModeGraph by lazy {
             database = IosDatabaseFactory(),
             permissions = com.piyush.mode.core.platform.IosPermissions(),
             phoneChecks = com.piyush.mode.feature.connection.data.CoreDevicePhoneChecks(),
+            device = IosDeviceData(),
         ),
     )
 }

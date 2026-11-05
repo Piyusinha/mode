@@ -43,10 +43,26 @@ class StuckDetector(private val canStepUp: Boolean) {
     private var heldReversal = false
     /** Screens seen right after phone actions, newest last. */
     private val recent = ArrayDeque<String>()
+    /** Phone actions (kind and target), newest last, for the same action done again and again. */
+    private val actions = ArrayDeque<String>()
+    /** How many times the last looked-at screen was seen in the window. */
+    var visits: Int = 0
+        private set
+
+    /**
+     * Each phone action: how many times this same action (kind and target) was taken in the last
+     * [ACTION_WINDOW], this one included. Seen on the phone: back, escape, back… eleven times between two
+     * screens; each stop looked a little different, so the same-screen count never saw it.
+     */
+    fun repeated(signature: String): Int {
+        actions.addLast(signature)
+        if (actions.size > ACTION_WINDOW) actions.removeFirst()
+        return actions.count { it == signature }
+    }
 
     /** Each look at the screen; [changed] is null when the step before was not a phone action. */
     fun looked(signature: String, changed: Boolean?): Verdict {
-        var visits = 0
+        visits = 0
         if (changed != null) {
             recent.addLast(signature)
             if (recent.size > WINDOW) recent.removeFirst()
@@ -145,11 +161,12 @@ class StuckDetector(private val canStepUp: Boolean) {
     fun waited(): Int { stalls++; return ++waits }
 
     private fun stepUp(note: String?): Verdict {
+        // Without a strong model the step-up is declined: the counters keep counting towards a stop.
+        if (!canStepUp) return if (note != null) Verdict.StepUp(note) else Verdict.Fine
         sinceStepUp = 0
         badReplies = 0
         waits = 0
         plans = 0
-        if (!canStepUp) return if (note != null) Verdict.StepUp(note) else Verdict.Fine
         steppedUp = true
         return Verdict.StepUp(note)
     }
@@ -162,7 +179,11 @@ class StuckDetector(private val canStepUp: Boolean) {
         const val STOP_VISITS = 6
         /** Steps without progress before the brain decides, and before the run stops. */
         const val DECIDE_STALLS = 3
-        const val STOP_STALLS = 6
+        /** Room for the recovery ladder (another way, another route, a new plan, a question) before a stop. */
+        const val STOP_STALLS = 10
+        const val ACTION_WINDOW = 8
+        /** The same action this many times in the window: the route is not working. */
+        const val REPEAT_ROUTE = 3
         /** Changes of scroll direction in a row before the strong model takes over. */
         const val MAX_REVERSALS = 3
     }

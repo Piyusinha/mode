@@ -34,6 +34,12 @@ enum class Operation(val wireName: String) {
 
 enum class Event(val wireName: String) {
     FirstAction("mode.task.first_action"), AppStarted("mode.app.started"),
+    /** The agent asked to give up; Field.Outcome: accepted or refused; Field.EndReason: what blocked it. */
+    AgentGiveUp("mode.agent.give_up"),
+    /** An order, payment, booking or send: Field.Outcome: tapped, verified, no_effect or unclear. */
+    AgentCommit("mode.agent.commit"),
+    /** A rung of the recovery ladder; Field.Outcome: the tier. */
+    AgentRecovery("mode.agent.recovery"),
     Foreground("mode.app.foreground"), Background("mode.app.background"),
     /** Siri or Shortcuts ran "Start Mode" (listen) or "Ask Mode" (a task in words); Field.Outcome says what Mode did. */
     IntentStartListening("mode.intent.start_listening"), IntentAsk("mode.intent.ask"),
@@ -43,6 +49,8 @@ enum class Event(val wireName: String) {
     ListenStarted("mode.voice.listen_started"), TaskSent("mode.voice.task_sent"),
     /** In a voice session: no microphone or speech access; nothing understood after every try. */
     MicBlocked("mode.voice.mic_blocked"), NothingHeard("mode.voice.nothing_heard"),
+    /** The user talked over Mode and it stopped mid-line; Field.Words: how many of theirs were heard. */
+    BargeIn("mode.voice.barge_in"),
 }
 
 /** Only these fields may cross the telemetry boundary. No arbitrary attribute keys or log bodies. */
