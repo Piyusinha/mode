@@ -30,13 +30,19 @@ const P = {
 const svg = (name, size = 16, sw = 2.2) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]}</svg>`;
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const mark = (size = 32) => `<span class="mark" aria-hidden="true" style="width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.29)}px"><svg width="${Math.round(size * 0.53)}" height="${Math.round(size * 0.53)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="8.3" y="5" width="7.4" height="14" rx="2.2"></rect></svg></span>`;
-const tile = (icon, kind = '', size = 36) => `<span class="tile ${kind}" aria-hidden="true" style="width:${size}px;height:${size}px;border-radius:${Math.round(size * 0.28)}px">${svg(icon, Math.round(size * 0.52))}</span>`;
+// Mo, Mode's character (the canvas's Mo component, 120-unit grid). The face says what Mode is doing.
+const MO_FACES = {
+  idle: '<ellipse cx="47" cy="58" rx="5" ry="8" fill="#1A1A1F"></ellipse><ellipse cx="73" cy="58" rx="5" ry="8" fill="#1A1A1F"></ellipse><path d="M52 76 Q60 83 68 76" fill="none" stroke="#1A1A1F" stroke-width="4" stroke-linecap="round"></path>',
+  done: '<path d="M40 61 Q47 51 54 61" fill="none" stroke="#1A1A1F" stroke-width="5" stroke-linecap="round"></path><path d="M66 61 Q73 51 80 61" fill="none" stroke="#1A1A1F" stroke-width="5" stroke-linecap="round"></path><path d="M47 73 Q60 89 73 73 Z" fill="#1A1A1F"></path><path d="M103 12 L106 21 L115 24 L106 27 L103 36 L100 27 L91 24 L100 21 Z" fill="#F2B705"></path>',
+};
+const mo = (mood = 'idle', size = 32) => `<svg class="mo" width="${size}" height="${size}" viewBox="0 0 120 120" aria-hidden="true"><ellipse cx="60" cy="113" rx="30" ry="4" fill="#1A1A1F" fill-opacity="0.12"></ellipse><path d="M60 12 C90 12 106 30 106 60 C106 92 88 108 60 108 C32 108 14 92 14 60 C14 30 30 12 60 12 Z" fill="#FF6B3D"></path><ellipse cx="42" cy="32" rx="12" ry="6.5" transform="rotate(-24 42 32)" fill="#FFFFFF" fill-opacity="0.38"></ellipse>${MO_FACES[mood]}</svg>`;
+const mark = (size = 32) => mo('idle', size);
+const tile = (icon, kind = '', size = 36) => `<span class="tile ${kind}" aria-hidden="true" style="width:${size}px;height:${size}px">${svg(icon, Math.round(size * 0.52))}</span>`;
 const btn = (text, action, kind = '', attrs = '') => `<button type="button" class="btn ${kind}" data-act="${action}" ${attrs}>${esc(text)}</button>`;
 const btnIcon = (text, icon, action, kind = '') => `<button type="button" class="btn ${kind}" data-act="${action}">${svg(icon, 15)}${esc(text)}</button>`;
 const link = (text, url) => `<button type="button" class="link" data-url="${esc(url)}">${esc(text)}${svg('ext', 12)}</button>`;
 const pill = (text, kind = '') => `<span class="pill ${kind}">${esc(text)}</span>`;
-const spinner = (size = 22) => `<svg class="spin" style="width:${size}px;height:${size}px" viewBox="0 0 24 24" role="img" aria-label="In progress"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--fill)" stroke-width="2.6"></circle><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"></path></svg>`;
+const spinner = (size = 22) => `<svg class="spin" style="width:${size}px;height:${size}px" viewBox="0 0 24 24" role="img" aria-label="In progress"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--track)" stroke-width="2.6"></circle><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="var(--brand)" stroke-width="2.6" stroke-linecap="round"></path></svg>`;
 const icon = kind => ({
   done: `<span class="ic done" role="img" aria-label="Done">${svg('check', 14, 3)}</span>`,
   wait: spinner(),
@@ -50,7 +56,7 @@ const box = (inner, cls = '') => `<div class="box ${cls}">${inner}</div>`;
 const callout = (html, kind = '', ic = null, action = '') => `<div class="callout ${kind}">${ic ? svg(ic, 16) : ''}<span class="t">${html}</span>${action}</div>`;
 const bar = f => { const pct = Math.round(Math.max(0, Math.min(1, f)) * 100); return `<span class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span class="track"><i style="width:${pct}%"></i></span><span>${pct}%</span></span>`; };
 const radioMark = on => on
-  ? '<svg class="mark-on" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="var(--accent)"></circle><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>'
+  ? '<svg class="mark-on" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="var(--accent)"></circle><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="var(--onAccent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>'
   : '<span class="mark-off" aria-hidden="true"></span>';
 const radio = (title, sub, on, action, right = '', lead = '') =>
   `<button type="button" role="radio" aria-checked="${on}" class="radio" data-act="${action}">${lead}<span class="t"><b>${esc(title)}</b><span>${sub}</span></span>${right}${radioMark(on)}</button>`;
@@ -108,7 +114,7 @@ function page({ nav, body, left = '', right = '', tight = false, chip = true }) 
 const screens = {
   welcome: () => page({
     nav: stepsNav(-1, 0),
-    body: head('Set up Mode on your iPhone', 'Mode is an assistant that uses your iPhone for you. This app installs it and gets it ready. It takes about 10 minutes, once.', mark(52))
+    body: head('Set up Mode on your iPhone', 'Mode is an assistant that uses your iPhone for you. This app installs it and gets it ready. It takes about 10 minutes, once.', mo('idle', 60))
       + `<div style="display:flex;flex-direction:column;gap:10px"><h2 class="label">You’ll need</h2>${box(
         row('', 'An iPhone and its cable', 'iOS 17.4 or later. Setup needs the cable once.', '', false, tile('phone', '', 32))
         + row('', 'An Apple account', 'A free one works. Mode is signed with it so it can run on your iPhone.', '', false, tile('key', '', 32))
@@ -292,7 +298,7 @@ const screens = {
     const paid = r.paid;
     return page({
       nav: stepsNav(4, 5),
-      body: head('Mode is ready', 'Mode works on its own now. Ask it something on your iPhone.', `<span class="donemark">${svg('check', 28, 3)}</span>`)
+      body: head('Mode is ready', 'Mode works on its own now. Ask it something on your iPhone.', mo('done', 60))
         + box(kv('Mode', esc(r.mode?.version ?? ''), pill('Installed', 'green'))
           + kv('Signed until', `${esc(fmtDate(r.mode?.expires))} · ${esc(r.teamName ?? '')}`)
           + kv('Renewing', paid ? 'Once a year, from this computer' : r.sidestore ? 'SideStore renews it every week on your iPhone' : 'Connect here once a week and press Renew',
@@ -317,9 +323,9 @@ const screens = {
     const missing = !!apps && !!r.mode?.bundleId && !(apps.modes ?? []).some(m => m.bundleId === r.mode.bundleId);
     const others = missing ? (apps.modes ?? []) : [];
     const soon = !missing && days != null && days <= (r.paid ? 30 : 2);
-    const tc = (ic, kind, title, value, sub, action) => `<div class="tilecard"><div class="h">${tile(ic, kind, 30)}${esc(title)}</div><span class="v">${value}</span><span class="s">${sub}</span><span style="display:flex;gap:8px">${action}</span></div>`;
+    const tc = (ic, kind, title, value, sub, action) => `<div class="tilecard"><div class="h">${tile(ic, kind, 30)}${esc(title)}</div><span class="v">${value}</span><span class="s">${sub}</span><span class="acts">${action}</span></div>`;
     return `<div class="drag"></div><nav class="side"><div class="brand">${mark(32)}<span><b>Mode Setup</b><small>for iPhone</small></span></div>
-      <div style="display:flex;flex-direction:column;gap:4px"><span class="group-label">IPHONES</span>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="group-label">iPhones</span>
       <button type="button" class="devnav" aria-current="page">${svg('phone', 18)}<span><b>${esc(r.phone ?? S.phone?.name ?? 'iPhone')}</b><small><i class="dot ${connected ? 'green' : ''}"></i>${connected ? 'Connected by cable' : 'Not connected'}</small></span></button>
       <button type="button" class="navlink tint" data-act="welcome"><span style="font-size:18px;width:18px;text-align:center">+</span>Set up another iPhone</button></div>
       <div class="spacer"></div><button type="button" class="navlink" data-act="settings">${svg('gear', 16)}Settings</button></nav>

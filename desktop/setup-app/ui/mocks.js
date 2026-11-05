@@ -3,7 +3,7 @@
 'use strict';
 (function () {
   const phone = { udid: '00008150-0012345678901234', name: 'Piyush’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
-  const free = { id: 'ABCDE12345', name: 'Personal Team', kind: 'free' };
+  const free = { id: 'FGHIJ67890', name: 'Personal Team', kind: 'free' };
   const paid = { id: 'ABCDE12345', name: 'Acme Labs', kind: 'paid' };
   const mode = { bundleId: 'com.piyush.mode.ABCDE12345', name: 'Mode', version: '1.4', teamId: 'ABCDE12345', expires: '2026-11-10T08:20:00Z' };
   const rec = (o) => Object.assign({ phone: phone.name, teamId: free.id, teamName: free.name, paid: false, ownVpn: false, mode, sidestore: { version: '0.6' } }, o);
