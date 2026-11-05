@@ -34,6 +34,34 @@ As of 2026-11-01.
 | Agent: "Turn off dark mode" | ✅ 7 steps, 37 s, $0.0036 (Claude Haiku 5.5) |
 | Agent: send a WhatsApp message, then read today's calendar | ✅ 11 steps, 62 s, $0.0065, no questions |
 
+## Mode v2: in now, and later one at a time (2026-11-05)
+
+The full v2 UI was built and tried on the phone, then rolled back to v1 because it felt unstable (hold to talk
+especially). All of it is saved: `git stash` "Mode v2 UI + unlock by voice (2026-11-05)…" and
+`~/piyush/mode-backups/mode-v2-2026-11-05.patch`.
+
+In now (on v1):
+- The first run: Welcome → Connect your AI → First job (three small jobs, or type your own). The job runs in
+  its chat like any task; the VPN and notifications are asked as it starts. Name, models, voice and
+  dictation are set up later, after the first task.
+- Unlock by voice: Settings → Unlock by voice (the guide and its check), tasks on a locked iPhone wait and
+  start on unlock ("Unlock to start" on the Live Activity), Siri asks for Face ID, and the Mac Setup step.
+
+Later, one at a time, each tested on the phone before the next:
+1. Three tabs (Home, Tasks, Mo) with the talk bar (hold to talk, or type).
+2. The loop sheet: say it → plan → working → your turn → done (Undo) / couldn't finish / stopped.
+3. Home v2: needs you, running now, try these, done today, the trust offer.
+4. Tasks v2: week card, Now / Scheduled / Done, weekly Recap with one idea, the new Repeat sheet.
+5. Task page: "What I did" and "Next time" (make it a repeat, ask about it).
+6. What went wrong v2: steps, where and why it stopped, last screen, "I'll finish it in <app>".
+7. Mo tab pages: What Mo knows, Trust, Personality, Your AI (and the limit card), one Voice page, Health.
+8. Plan before acting (waits for Go when it sends, orders or pays).
+9. Trust levels per kind (reading, settings, messages, orders); paying always asks.
+10. Approval cards with the real message or bill, and Edit before sending.
+11. "Always <option>" on a choice, kept as a usual.
+12. After the first task: offer to set up Mo's voice and dictation.
+13. Next app update: the Home Screen widget and the Watch app.
+
 ## Roadmap
 
 ### Telemetry, diagnostics, and backup (started 2026-11-03)
