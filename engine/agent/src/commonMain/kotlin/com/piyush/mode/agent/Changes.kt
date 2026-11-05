@@ -68,7 +68,18 @@ internal object Changes {
     }
 
     fun isChange(reason: String, label: String?): Boolean =
-        !isNavigation(label) && (isChangeButton(label) || (VERBS.containsMatchIn(reason) && !isChecking(reason)))
+        !isNavigation(label) && (isChangeButton(label) || (startsWithChange(reason) && !isChecking(reason)))
+
+    /**
+     * The agent's words for the step begin with the change itself ("Adding it to Dinner", "Placing the order",
+     * "Booking the ride"). Seen on the phone (Gmail, 5 Nov): "Finding the booking confirmation" and "Searching
+     * flight booking emails" were taken as changes because they mention a booking, and a lookup task was told
+     * its "change" was never confirmed.
+     */
+    fun startsWithChange(reason: String): Boolean {
+        val first = reason.trim().split(Regex("[\\s,:;]+"), limit = 2).firstOrNull().orEmpty()
+        return first.isNotEmpty() && (VERBS.matches(first) || COMMIT.matches(first) || SEND.matches(first) || ADD.matches(first) || DELETE.matches(first))
+    }
 
     /** "Continue", "View cart", "Checkout": the tap only moves on (seen as a repeat order and refused). */
     fun isNavigation(label: String?): Boolean = label?.trim()?.let { it.length <= 24 && NAVIGATION.matches(it) } == true
@@ -84,11 +95,13 @@ internal object Changes {
                 ADD.containsMatchIn(l) || l in PLUS -> return Kind.Add
             }
         }
+        // From the agent's words only when they begin with the change ("Placing…", "Sending…").
+        val first = reason.trim().split(Regex("[\\s,:;]+"), limit = 2).firstOrNull().orEmpty()
         return when {
-            COMMIT.containsMatchIn(reason) -> Kind.Commit
-            SEND.containsMatchIn(reason) -> Kind.Send
-            DELETE.containsMatchIn(reason) -> Kind.Delete
-            ADD.containsMatchIn(reason) -> Kind.Add
+            COMMIT.matches(first) -> Kind.Commit
+            SEND.matches(first) -> Kind.Send
+            DELETE.matches(first) -> Kind.Delete
+            ADD.matches(first) -> Kind.Add
             else -> Kind.Other
         }
     }

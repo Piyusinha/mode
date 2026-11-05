@@ -88,8 +88,9 @@ public class Narrator(
         /** The agent never waits for an update, so it may take a while to write. */
         public const val BUDGET_MS: Long = 6_000
         public const val FIRST_AFTER_MS: Long = 8_000
-        public const val GAP_MS: Long = 15_000
-        public const val MAX_UPDATES: Int = 6
+        public const val GAP_MS: Long = 20_000
+        /** A long task (up to 15 minutes) is kept company throughout: about one line every 20–40 s. */
+        public const val MAX_UPDATES: Int = 20
         private const val MAX_WORDS = 18
         private const val TOOL = "say"
         private const val LANGUAGE_RULE = "Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English."

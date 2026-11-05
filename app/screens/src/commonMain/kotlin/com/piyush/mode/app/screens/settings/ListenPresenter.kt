@@ -274,12 +274,10 @@ public class ListenPresenter(
         own.value = own.value.copy(sent = true)
         val reply = written.await() ?: replyLine(task)
         own.value = own.value.copy(reply = reply)
-        // Talking over the acknowledgement ("use Flightradar"): the running task takes it at its next step.
-        val over = voices.speakOrHear(reply) { words -> own.value = own.value.copy(partial = words) }
-        if (over is Heard.Words) {
-            own.value = own.value.copy(partial = "")
-            if (!runner.steer(over.text)) queue.submit(over.text, TaskSource.Voice, conversationId, false)
-        }
+        // Spoken with the microphone off: the task is already connecting, and a microphone opened beside the
+        // screen stream records only silence (seen on the phone, 5 Nov). Talking over Mode works for the greeting
+        // and for its questions, where the stream is off or paused.
+        voices.speak(reply)
     }
 
     @OptIn(ExperimentalTime::class)

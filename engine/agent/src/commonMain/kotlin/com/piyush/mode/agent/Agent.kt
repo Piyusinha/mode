@@ -181,6 +181,8 @@ class Agent(
     private var phone: PhoneBackend = phone
     /** Key facts the model found ("flight" → "6E223"), kept for the task and shown every step. */
     private val facts = LinkedHashMap<String, String>()
+    /** The highest plan item an action has worked on: the items before it are done. */
+    private var maxPlanItem = 0
     /** The provider answered a web lookup with a 400 this task: the plan has no web search. */
     private var lookupUnsupported = false
     // The loop's state lives on the agent (one agent runs one task): a suspend loop spills every local at each
@@ -318,6 +320,7 @@ class Agent(
         identicalFrames = 0
         lastActionKinds = ArrayDeque<String>()
         planDoneSeen = 0
+        maxPlanItem = 0
         lastApp = null
         /** The model's own plan for multi-part tasks, shown back to it every step; the brain's steps first. */
         val firstSteps = brief?.brief?.steps ?: routeSteps
@@ -446,7 +449,7 @@ class Agent(
             if (changed != null) {
                 // Progress: a scroll that moved, or a different page. A tap that left the same page is not.
                 val moved = changed == true && (!samePage || lastOp == "scroll" || lastOp == "type_text")
-                if (moved && !endOfList) { stuck.progressed(); budget.progressed(); ladder.progressed() } else stuck.stalled()
+                if (moved && !endOfList) { stuck.progressed(); budget.progressed(); ladder.progressed(); stuck.forgetLastAction(); repeats = 0 } else stuck.stalled()
             }
             if (changed != null && history.isNotEmpty()) {
                 history[history.lastIndex] += when {
@@ -494,7 +497,9 @@ class Agent(
                 }
             }
             // A plan step done is progress too; one that drags on gets the plan rewritten (tier 3 below).
-            val planDoneNow = plan?.let { PlanItem.parse(it).count { item -> item.done } } ?: 0
+            // Plan items done: the model's own [done] marks, or the item its actions have moved on to (a brief's
+            // steps are never re-marked; seen on the phone: "one step has taken 12 steps" on a plan that was moving).
+            val planDoneNow = maxOf(plan?.let { PlanItem.parse(it).count { item -> item.done } } ?: 0, maxPlanItem - 1)
             if (planDoneNow > planDoneSeen) { planDoneSeen = planDoneNow; stuck.progressed(); budget.progressed(); ladder.progressed() }
             val planStepDragging = plan != null && budget.planStep(planDoneNow)
             val verdict = stuck.looked(screen.signature, changed)
@@ -510,6 +515,11 @@ class Agent(
                 history[history.lastIndex] += " (no progress in the last few steps; " +
                     askBrain("The assistant has made no progress for a few steps (latest: \"${history.last().take(160)}\").${ladder.routesTried()} What should it do now?") + ")"
             }
+            // A task that reads (no change waiting to be checked) and has kept notes: is the answer already in hand?
+            // Seen on the phone (Gmail, 5 Nov): the flight, date and PNR were noted at step 6; twenty more steps followed.
+            if (history.isNotEmpty() && step >= ANSWER_CHECK_FROM && (step - ANSWER_CHECK_FROM) % ANSWER_CHECK_EVERY == 0 &&
+                notes.size + facts.size >= ANSWER_CHECK_NOTES && ledger.pending() == null
+            ) history[history.lastIndex] += ANSWER_CHECK
             // The recovery ladder: another way to act, another route, a new plan, then the user.
             if (history.isNotEmpty()) {
                 ladder.climb(
@@ -597,6 +607,7 @@ class Agent(
                 continue
             }
             val reason = AgentTools.reasonOf(call)
+            AgentTools.itemOf(call)?.let { if (it > maxPlanItem) maxPlanItem = it }
             AgentTools.factsOf(call).forEach { fact ->
                 val key = fact.substringBefore(':').trim().lowercase()
                 val value = fact.substringAfter(':', "").trim()
@@ -853,9 +864,14 @@ class Agent(
                     if (clearing) {
                         // A field's own × clears all of it at once; deletes alone left "boarding pass" in Mail's
                         // search and the agent typed "4 November" after it (seen on the phone).
-                        AgentTools.focusPoint(call, screen.geometry)?.let { (fx, fy) -> clearControl(fx, fy, screen) }
+                        val focus = AgentTools.focusPoint(call, screen.geometry)
+                        focus?.let { (fx, fy) -> clearControl(fx, fy, screen) }
                             ?.let { (cx, cy) -> runCatching { phone.send(Op.Tap(cx, cy)) }; delay(FOCUS_MS) }
-                        repeat(CLEAR_KEYS) { runCatching { phone.send(Op.PressKey("delete")) } }
+                        // Twelve deletes left most of a 52-character search in place (Gmail, 5 Nov) and the new words
+                        // were typed after it, four times. Delete by what the field shows; a cut-off text is longer.
+                        val shown = focus?.let { (fx, fy) -> nearestText(fx, fy, screen) }.orEmpty()
+                        val deletes = (shown.length * if (shown.endsWith("...") || shown.endsWith("…")) 2 else 1) + CLEAR_SLACK
+                        repeat(deletes.coerceIn(CLEAR_KEYS, CLEAR_KEYS_MAX)) { runCatching { phone.send(Op.PressKey("delete")) } }
                     }
                     if (op is Op.Scroll) {
                         val direction = call.arguments.string("direction")
@@ -889,12 +905,16 @@ class Agent(
                         telemetry.event(Event.AgentCommit, telemetry.currentContext(), mapOf(Field.Outcome to "tapped"))
                     }
                     actionStarted = clock.markNow()
+                    var staleNote = ""
                     val outcome = try {
                         val result = phone.send(op)
                         lastWasPhoneAction = true
                         answeredSinceAction = false
                         if (op is Op.TypeText) {
                             lastTyped = op.text
+                            // Typed over old text: what the field shows is longer than what was typed. Delete it all
+                            // and type again (up to twice) before it is submitted.
+                            if (clearing) staleNote = retypeIfStale(op, screen)
                             if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
                         }
                         if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
@@ -967,7 +987,7 @@ class Agent(
                             else -> "; the field shows \"${shown.take(TYPED_SHOWN)}\""
                         }
                     }.orEmpty()
-                    record(described, reason, outcome + launchNote + typedNote, op.toString())
+                    record(described, reason, outcome + launchNote + typedNote + staleNote, op.toString())
                 }
             }
         }
@@ -1227,6 +1247,24 @@ class Agent(
     /** The facts as "name: value" lines, newest last. */
     private fun factLines(): List<String> = facts.map { (k, v) -> "$k: $v" }
 
+    /**
+     * After typing with clear: if the field shows more than what was typed, the old text is still there. Deletes
+     * what it shows and types again, up to [RETYPE_ROUNDS] times; the note says what was done, or what is left.
+     */
+    private suspend fun retypeIfStale(op: Op.TypeText, screen: Screen): String {
+        val probe = op.text.take(TYPED_PROBE)
+        repeat(RETYPE_ROUNDS) { round ->
+            val shown = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
+                .firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim() ?: return if (round == 0) "" else "; the old text was cleared and it was typed again"
+            if (shown.length <= op.text.length + STALE_SLACK) return if (round == 0) "" else "; the old text was cleared and it was typed again"
+            repeat((shown.length * 2 + CLEAR_SLACK).coerceAtMost(CLEAR_KEYS_MAX)) { runCatching { phone.send(Op.PressKey("delete")) } }
+            runCatching { phone.send(op) }
+            delay(FOCUS_MS)
+        }
+        val left = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty().firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim().orEmpty()
+        return if (left.length > op.text.length + STALE_SLACK) "; the field still holds old text (\"${left.take(TYPED_SHOWN)}\"): tap its ×, or open the search afresh" else "; the old text was cleared and it was typed again"
+    }
+
     /** Once-per-task flags of the done handling. */
     private class DoneFlags {
         var verifyAsked = false
@@ -1438,6 +1476,14 @@ class Agent(
         private const val MAX_ROUTE_STEPS = 8
         /** Deletes pressed to empty a field before typing (quantities, short entries). */
         private const val CLEAR_KEYS = 12
+        private const val CLEAR_KEYS_MAX = 120
+        private const val CLEAR_SLACK = 6
+        private const val RETYPE_ROUNDS = 2
+        private const val ANSWER_CHECK_FROM = 8
+        private const val ANSWER_CHECK_EVERY = 5
+        private const val ANSWER_CHECK_NOTES = 3
+        private const val ANSWER_CHECK = " [ANSWER CHECK: do your notes and facts already answer what was asked? If yes, call done now with " +
+            "them; more reading is only for what is still missing, not to double-check what you already found]"
         private val CLEAR_MARKS = Regex("[×✕✖xXⓧ⊗⊠]|clear", RegexOption.IGNORE_CASE)
         /** A shown field this much longer than what was typed still holds old text. */
         private const val STALE_SLACK = 2
@@ -1640,6 +1686,11 @@ class Agent(
             Never note passwords, passcodes or card numbers.
             Once your notes hold what the task asks for, finish (done) with them: scrolling back to re-check
             something you already noted wastes the user's time. To read a long page, go through it once.
+
+            Stop when you have the answer. For a task that asks for information, the first authoritative source
+            that answers it (the ticket, the confirmation, the order page) is enough: note it and call done. Do not
+            go looking for later changes, cancellations, other copies or extra details nobody asked for; if
+            something on that screen says it may have changed, say so in your reply instead.
 
             When something is in the way, keep going like a resourceful personal assistant would. Giving up is the
             last resort, after the other routes below; when the way forward is the user's choice, ask_user with

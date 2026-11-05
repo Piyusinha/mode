@@ -54,6 +54,11 @@ class StuckDetector(private val canStepUp: Boolean) {
      * [ACTION_WINDOW], this one included. Seen on the phone: back, escape, back… eleven times between two
      * screens; each stop looked a little different, so the same-screen count never saw it.
      */
+    /** The last action moved the screen on: it was progress, not a repeat (reading a long page by scrolling). */
+    fun forgetLastAction() {
+        if (actions.isNotEmpty()) actions.removeLast()
+    }
+
     fun repeated(signature: String): Int {
         actions.addLast(signature)
         if (actions.size > ACTION_WINDOW) actions.removeFirst()

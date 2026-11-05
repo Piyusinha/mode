@@ -350,9 +350,9 @@ public class TaskRunner(
             if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
                 // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
                 val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
-                // Talking over the answer ("and also tell Rahul"): a follow-up task in the same chat.
-                val over = runCatching { voices?.speakOrHear(said) }.getOrNull()
-                if (over is Heard.Words) onFollowUp?.invoke(over.text, conversation)
+                // Spoken with the microphone off: the screen stream is still up, and a microphone opened beside it
+                // records only silence (seen on the phone, 5 Nov: 153 buffers, peak level 0.00).
+                runCatching { voices?.speak(said) }
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
             notifier.postResult("Mode", PlainText.fromMarkdown(reply))
@@ -487,11 +487,13 @@ public class TaskRunner(
             val s = state.value
             if (!s.running) return
             if (s.voice != null || s.question != null || s.paused) continue
-            val done = s.plan.filter { it.done }.map { it.text }
-            val next = s.plan.firstOrNull { !it.done }?.text
-            // Progress is the status line moving on ("Searching flights…" → "Reading the results…"), not only a
-            // finished plan step: a long search stays on one plan step for a minute.
-            val progress = "${done.size}|${s.status}"
+            // The plan item the agent is on: from its [done] marks, or the item its last action worked on.
+            val current = maxOf(s.plan.indexOfFirst { !it.done }, (s.steps.lastOrNull { it.planItem != null }?.planItem ?: 1) - 1).coerceAtLeast(0)
+            val done = s.plan.take(current).map { it.text }
+            val next = s.plan.getOrNull(current)?.text
+            // Progress is the work moving on: a new plan item, or a couple more steps. Seen on the phone (5 Nov): the
+            // status line stayed "Working…" for a whole task, so after the first update Mode said nothing for five minutes.
+            val progress = "$current|${s.steps.size / NARRATE_EVERY_STEPS}"
             val elapsed = started.elapsedNow().inWholeMilliseconds
             if (!pacing.due(elapsed, progress)) continue
             pacing.said(elapsed, progress)
@@ -667,6 +669,8 @@ public class TaskRunner(
 private const val NARRATE_TICK_MS = 1_000L
 /** How many of the latest steps an update is written from. */
 private const val RECENT_STEPS = 3
+/** Every this many steps there is something new to say (about 15–25 s of work). */
+private const val NARRATE_EVERY_STEPS = 2
 private const val GOT_IT = "Got it. Going back."
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */

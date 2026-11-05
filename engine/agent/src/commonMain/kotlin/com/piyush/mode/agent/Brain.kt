@@ -246,6 +246,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
             - What is theirs to choose (which dish or product, size, quantity, a time slot) when several fit:
               put it in ask, to be asked once with options before anything is added. Use what you know about
               them first (ABOUT THE USER, their stated preferences); if they said "any" or "you choose", decide.
+            - Ask of the hands only what the request needs. For "find my flight", the confirmation that shows the
+              flight, date, times and reference is the answer: do not add checks for later changes, cancellations,
+              baggage rules or other copies unless the user asked or the screen suggests one. "Done when" is the
+              least that answers the request.
             - Never invent facts, names or amounts. What is remembered about lists (ratings, prices) is out of
               date: the screen decides.
 
