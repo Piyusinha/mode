@@ -72,4 +72,15 @@ class HomePresenterTest {
         f.settings.apiKey = ""
         assertTrue(home(f).state.awaitState { it.needsKey }.needsKey)
     }
+
+    @Test
+    fun homeOffersEasyTasksToTryThatRunLikeAnyTask() = runTest {
+        val f = Fixture(this)
+        val p = home(f)
+        val tryThese = p.state.value.tryThese
+        assertEquals(3, tryThese.size)
+        val conversation = p.ask(tryThese.first())
+        assertTrue(conversation != null)
+        assertEquals("Turn on Do Not Disturb", f.tasks.latest(5).single().text)
+    }
 }

@@ -31,7 +31,18 @@ public data class HomeUiState(
     val needsKey: Boolean = false,
     /** The "Did you know?" banner for the first days, or null. */
     val tips: TipsUiState? = null,
-)
+    /** Easy tasks to try, as pills under "Try". */
+    val tryThese: List<String> = TRY_THESE,
+) {
+    public companion object {
+        /** Small, read-only or easy to undo, and work on any iPhone. */
+        public val TRY_THESE: List<String> = listOf(
+            "Turn on Do Not Disturb",
+            "Tell me about everything on my calendar today",
+            "Catch me up on today's unread WhatsApp messages",
+        )
+    }
+}
 
 /** Something the user may want to ask again; tapping fills the message box with [text]. */
 public data class Suggestion(val text: String, val reason: Reason) {

@@ -48,6 +48,20 @@ struct HomeScreen: View {
                     .padding(.horizontal, ModeSpacing.screenEdge)
                     .padding(.bottom, ModeSpacing.m)
                 }
+                if !state.tryThese.isEmpty {
+                    section(L10n.Home.tryThese)
+                    ScrollView(.horizontal) {
+                        HStack(spacing: ModeSpacing.s) {
+                            ForEach(state.tryThese, id: \.self) { job in
+                                ModeTryPill(job) { onEvent(.suggestion(job)) }
+                            }
+                        }
+                        .padding(.horizontal, ModeSpacing.screenEdge)
+                    }
+                    .scrollIndicators(.hidden)
+                    .scrollClipDisabled()
+                    .padding(.bottom, ModeSpacing.m)
+                }
                 if state.isEmpty && running == nil {
                     ModeEmptyState(icon: .ask, title: L10n.Home.emptyTitle, message: L10n.Home.emptyMessage).frame(maxWidth: .infinity)
                 }
@@ -77,7 +91,8 @@ struct HomeScreen: View {
                     .padding(.horizontal, ModeSpacing.screenEdge)
                 }
             }
-            .padding(.bottom, ModeSpacing.xxl)
+            // The tab bar sits over the page's bottom (outside its safe area): keep the last item clear of it.
+            .padding(.bottom, ModeSize.tabBarClearance)
             .animation(ModeMotion.standard, value: state.tips)
             .animation(ModeMotion.standard, value: showingUndo)
         }

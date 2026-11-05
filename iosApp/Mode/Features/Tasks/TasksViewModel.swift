@@ -3,22 +3,12 @@ import ModeDesignSystem
 import ModeKit
 import Observation
 
-/// Tasks (its boards): Now (running, waiting for you, up next, or easy tasks to try), Scheduled (one-offs and
-/// repeats), Done (today and yesterday).
+/// Tasks (its boards): Scheduled (one-offs and repeats) and Done (today and yesterday). What runs now shows on
+/// Home and the Live Activity; tasks to try are on Home.
 @MainActor
 @Observable
 final class TasksViewModel {
-    enum Filter: Hashable { case now, scheduled, done }
-
-    struct Row: Identifiable, Equatable {
-        let id: String
-        let title: String
-        let subtitle: String
-        let leading: ModeRowLeading
-        /// When the running task started, for its ticking time.
-        var since: Date?
-        var paused = false
-    }
+    enum Filter: Hashable { case scheduled, done }
 
     /// A one-off or a repeat: its time, and whether it's on.
     struct ScheduleRow: Identifiable, Equatable {
@@ -38,30 +28,22 @@ final class TasksViewModel {
     }
 
     struct State: Equatable {
-        var running: Row?
-        var waiting: Row?
-        var upNext: [Row] = []
         var scheduled: [ScheduleRow] = []
         var repeats: [ScheduleRow] = []
         var doneToday: [DoneRow] = []
         var doneYesterday: [DoneRow] = []
-        var tryThese: [String] = []
-        var nowIsEmpty: Bool { running == nil && waiting == nil && upNext.isEmpty }
         var scheduledIsEmpty: Bool { scheduled.isEmpty && repeats.isEmpty }
         var doneIsEmpty: Bool { doneToday.isEmpty && doneYesterday.isEmpty }
     }
 
     enum Event {
-        case openLive
-        case cancel(String)
         case setRepeat(String, Bool)
         case deleteRepeat(String)
-        case tryTask(String)
         case open(DoneRow)
     }
 
     private(set) var state = State()
-    var filter: Filter = .now { didSet { presenter.setFilter(f: Self.kotlin(filter)) } }
+    var filter: Filter = .scheduled { didSet { presenter.setFilter(f: Self.kotlin(filter)) } }
     private let presenter: TasksPresenter
     private let navigate: (Route) -> Void
     private var updates: Updates?
@@ -74,11 +56,8 @@ final class TasksViewModel {
 
     func send(_ event: Event) {
         switch event {
-        case .openLive: navigate(.liveRun)
-        case let .cancel(id): presenter.cancel(taskId: id)
         case let .setRepeat(id, on): presenter.setRepeatEnabled(scheduleId: id, enabled: on)
         case let .deleteRepeat(id): presenter.deleteRepeat(scheduleId: id)
-        case let .tryTask(text): if let conversation = presenter.tryTask(text: text) { navigate(.conversation(id: conversation)) }
         case let .open(row): if let id = row.conversationId { navigate(.conversation(id: id)) }
         }
     }
@@ -90,28 +69,14 @@ final class TasksViewModel {
 
     private static func kotlin(_ f: Filter) -> TaskFilter {
         switch f {
-        case .now: .now
         case .scheduled: .scheduled
         case .done: .done
         }
     }
 
     static func map(_ s: TasksUiState) -> State {
-        let running = s.running.flatMap { r in r.question == nil ? r : nil }
-        let waiting = s.running.flatMap { r in r.question != nil ? r : nil }
         let done = s.done.map { d in (d, doneRow(d)) }
         return State(
-            running: running.map { r in
-                Row(id: r.taskId, title: r.text, subtitle: RunStatusViewModel.status(r), leading: .mo(.working),
-                    since: r.startedAtMs.map { Date(timeIntervalSince1970: TimeInterval(truncating: $0) / 1000) }, paused: r.paused)
-            },
-            waiting: waiting.map { r in
-                Row(id: r.taskId, title: r.text, subtitle: r.question?.text ?? "", leading: .mo(.yourTurn))
-            },
-            upNext: s.upNext.map { q in
-                Row(id: q.taskId, title: q.text, subtitle: [Format.day(q.day), Format.timeOfDay(epochMs: q.queuedAtMs)].joined(separator: " "),
-                    leading: .icon(.clock, ModeColor.textSecondary))
-            },
             scheduled: s.repeats.filter { $0.isoDays.isEmpty && $0.nextRunAtMs != nil }.map { r in
                 let when = r.nextRunAtMs.map { upcoming(epochMs: Int64(truncating: $0)) } ?? ""
                 return ScheduleRow(id: r.scheduleId, title: r.text, subtitle: withPaused(when, r.enabled), icon: .clock, enabled: r.enabled)
@@ -122,8 +87,7 @@ final class TasksViewModel {
                                    icon: .repeatTask, enabled: r.enabled)
             },
             doneToday: done.filter { if case .today = onEnum(of: $0.0.day) { true } else { false } }.map(\.1),
-            doneYesterday: done.filter { if case .yesterday = onEnum(of: $0.0.day) { true } else { false } }.map(\.1),
-            tryThese: s.tryThese
+            doneYesterday: done.filter { if case .yesterday = onEnum(of: $0.0.day) { true } else { false } }.map(\.1)
         )
     }
 

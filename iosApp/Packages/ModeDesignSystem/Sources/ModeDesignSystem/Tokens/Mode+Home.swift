@@ -52,9 +52,8 @@ public extension ModeRadius {
 public extension ModeSize {
     /// Tasks rows, a little roomier than other lists (Up next, Repeats, Done).
     static let tasksRow: CGFloat = 72
-    /// Mo on an empty Tasks page.
-    static let moTasksEmpty: CGFloat = 112
-    /// A suggested task: its height, and its dot.
-    static let tryRow: CGFloat = 56
-    static let tryDot: CGFloat = 9
+    /// Room under a tab's last item so the bar (tabs, the Speak button, its fade) never covers it.
+    static let tabBarClearance: CGFloat = 120
+    /// A task to try, as a pill on Home.
+    static let tryPill: CGFloat = 44
 }

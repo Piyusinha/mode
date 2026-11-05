@@ -18,26 +18,16 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.isoDayNumber
 
 /** Which part of Tasks is showing. */
-public enum class TaskFilter { Now, Scheduled, Done }
+public enum class TaskFilter { Scheduled, Done }
 
 public data class TasksUiState(
-    val filter: TaskFilter = TaskFilter.Now,
+    val filter: TaskFilter = TaskFilter.Scheduled,
     val running: RunningTask? = null,
     val upNext: List<QueuedTask> = emptyList(),
     val repeats: List<RepeatingTask> = emptyList(),
     /** Finished today and yesterday, newest first. */
     val done: List<FinishedTask> = emptyList(),
-    /** Easy first tasks, for an empty Now. */
-    val tryThese: List<String> = TRY_THESE,
 ) {
-    public companion object {
-        /** Small, read-only or easy to undo, and work on any iPhone. */
-        public val TRY_THESE: List<String> = listOf(
-            "Turn on Do Not Disturb",
-            "Tell me about everything on my calendar today",
-            "Catch me up on today's unread WhatsApp messages",
-        )
-    }
 
     val isEmpty: Boolean get() = running == null && upNext.isEmpty() && repeats.isEmpty() && done.isEmpty()
 }
@@ -113,9 +103,6 @@ public class TasksPresenter(
         filter.value = f
     }
 
-    /** One of the suggested tasks: it runs like any task; returns its chat, to open. */
-    public fun tryTask(text: String): String? = queue.submit(text, TaskSource.App, null, false)?.conversationId
-
     public fun cancel(taskId: String) {
         queue.cancel(taskId)
     }
@@ -136,7 +123,7 @@ public class TasksPresenter(
         scheduler.delete(scheduleId)
     }
 
-    private val filter = kotlinx.coroutines.flow.MutableStateFlow(TaskFilter.Now)
+    private val filter = kotlinx.coroutines.flow.MutableStateFlow(TaskFilter.Scheduled)
 
     private companion object {
         const val MAX_DONE = 60L

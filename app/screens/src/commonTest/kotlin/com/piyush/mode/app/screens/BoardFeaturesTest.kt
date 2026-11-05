@@ -87,7 +87,7 @@ class BoardFeaturesTest {
     fun tasksHaveAFilter() = runTest {
         val f = Fixture(this)
         val p = TasksPresenter(backgroundScope, f.runner, f.queue, f.scheduler, f.tasks, f.clock)
-        assertEquals(TaskFilter.Now, p.state.value.filter)
+        assertEquals(TaskFilter.Scheduled, p.state.value.filter, "Tasks opens on what is scheduled")
         p.setFilter(TaskFilter.Done)
         assertEquals(TaskFilter.Done, p.state.awaitState { it.filter == TaskFilter.Done }.filter)
     }

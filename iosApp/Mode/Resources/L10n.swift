@@ -83,6 +83,7 @@ enum L10n {
         static let profile = LocalizedStringResource("home.profile", defaultValue: "Profile and settings")
         static let suggested = LocalizedStringResource("home.suggested", defaultValue: "Suggested")
         static let recent = LocalizedStringResource("home.recent", defaultValue: "Recent")
+        static let tryThese = LocalizedStringResource("home.try", defaultValue: "Try")
         static let needsKeyTitle = LocalizedStringResource("home.needsKey.title", defaultValue: "Add your AI key")
         static let needsKeyMessage = LocalizedStringResource("home.needsKey.message", defaultValue: "Mode needs an OpenRouter key before it can do anything.")
         static let emptyTitle = LocalizedStringResource("home.empty.title", defaultValue: "Ask Mode anything")
@@ -167,9 +168,6 @@ enum L10n {
     }
 
     enum Tasks {
-        static let nothingYet = LocalizedStringResource("tasks.nothingYet", defaultValue: "Nothing here yet")
-        static let nothingYetMessage = LocalizedStringResource("tasks.nothingYetMessage", defaultValue: "Hold the mic and tell me what to do. Everything I do for you shows up here.")
-        static let tryOne = LocalizedStringResource("tasks.tryOne", defaultValue: "Try one of these")
         static let today = LocalizedStringResource("tasks.today", defaultValue: "Today")
         static let yesterday = LocalizedStringResource("tasks.yesterday", defaultValue: "Yesterday")
         static let nothingScheduled = LocalizedStringResource("tasks.nothingScheduled", defaultValue: "Nothing scheduled")

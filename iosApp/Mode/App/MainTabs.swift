@@ -36,12 +36,15 @@ struct MainTabs: View {
         TabView(selection: $tab) {
             Tab(value: AppTab.home) { stack(.home) { navigate in HomeRoute(app: app, run: run, navigate: navigate, openLive: { showingLive = true }) } }
             Tab(value: AppTab.tasks) { stack(.tasks) { navigate in TasksRoute(app: app, run: run, navigate: navigate) } }
-            Tab(value: AppTab.settings) { stack(.settings) { navigate in SettingsRoute(app: app, navigate: navigate) } }
         }
         .safeAreaInset(edge: .bottom, spacing: ModeSpacing.none) {
             if paths[tab, default: []].isEmpty {
                 // On Home the running task is the dark card in the page; elsewhere a white bar above the tabs.
-                MainBar(tab: $tab, running: tab == .home ? nil : run.state.running,
+                // Settings in the bar opens its own page over the tab you're on; back returns there, same tab.
+                MainBar(tab: Binding(get: { tab }, set: { picked in
+                            if picked == .settings { paths[tab, default: []].append(.settings) } else { tab = picked }
+                        }),
+                        running: tab == .home ? nil : run.state.running,
                         onSpeak: { showingAsk = true }, onPauseToggle: run.togglePause, onStop: run.stop, onOpen: { showingLive = true })
             }
         }
@@ -118,17 +121,17 @@ struct MainTabs: View {
         switch parts.first {
         case "tasks": tab = .tasks
         case "memory":
-            tab = .settings
-            paths[.settings] = [.memory]
+            tab = .home
+            paths[.home] = [.settings, .memory]
             switch parts.count > 1 ? parts.last : nil {
-            case "aboutyou": paths[.settings] = [.memory, .memoryAboutYou]
-            case "routines": paths[.settings] = [.memory, .memoryRoutines(app: nil)]
-            case "apps": paths[.settings] = [.memory, .memoryApps]
-            case let name?: paths[.settings] = name.hasPrefix("edit=") ? [.memory, .memoryEdit(id: String(name.dropFirst(5)))] : [.memory, .memoryApps, .memoryApp(name: name)]
+            case "aboutyou": paths[.home] = [.settings, .memory, .memoryAboutYou]
+            case "routines": paths[.home] = [.settings, .memory, .memoryRoutines(app: nil)]
+            case "apps": paths[.home] = [.settings, .memory, .memoryApps]
+            case let name?: paths[.home] = name.hasPrefix("edit=") ? [.settings, .memory, .memoryEdit(id: String(name.dropFirst(5)))] : [.settings, .memory, .memoryApps, .memoryApp(name: name)]
             default: break
             }
         case "live": showingLive = true
-        case "settings": tab = .settings
+        case "settings": paths[.home] = [.settings]
         case "picker": paths[.home] = [.settings, .modelPicker(stuck: parts.last == "stuck")]
         case "plan": paths[.home] = [.settings, .planModels(brain: parts.last == "brain")]
         case "access": paths[.home] = [.settings, .access]

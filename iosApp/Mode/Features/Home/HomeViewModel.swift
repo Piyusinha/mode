@@ -34,6 +34,8 @@ final class HomeViewModel {
         var recent: [RecentRow] = []
         var needsKey = false
         var tips: Tips?
+        /// Easy tasks to try, as pills.
+        var tryThese: [String] = []
         var isEmpty: Bool { suggestions.isEmpty && recent.isEmpty }
     }
 
@@ -163,7 +165,8 @@ final class HomeViewModel {
             needsKey: s.needsKey,
             tips: s.tips.map { t in
                 Tips(tips: t.tips.map(tip), index: t.tips.firstIndex(of: t.showing) ?? 0, closable: t.closable)
-            }
+            },
+            tryThese: s.tryThese
         )
     }
 

@@ -83,5 +83,7 @@ final class AppLinks {
 
 /// The tabs, plus Ask (the floating button beside them).
 enum AppTab: Hashable {
-    case home, tasks, settings, ask
+    case home, tasks, ask
+    /// Not a tab: its item in the bar opens Settings as a page over the tab that's showing.
+    case settings
 }

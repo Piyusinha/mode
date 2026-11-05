@@ -81,14 +81,4 @@ class TasksPresenterTest {
         assertEquals(null, done[1].why, "done tasks have no reason")
         assertEquals(100L, done[2].seconds)
     }
-
-    @Test
-    fun aSuggestedTaskRunsLikeAnyTask() = runTest {
-        val f = Fixture(this)
-        val p = tasks(f)
-        assertEquals(3, p.state.value.tryThese.size)
-        val conversation = p.tryTask("Turn on Do Not Disturb")
-        assertNotNull(conversation)
-        assertEquals("Turn on Do Not Disturb", f.tasks.latest(5).single().text)
-    }
 }

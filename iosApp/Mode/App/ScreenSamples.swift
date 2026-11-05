@@ -78,12 +78,8 @@ struct ScreenSample: Identifiable {
         case "home-tips-closed": shell(.home, running: nil) {
             HomeScreen(state: HomeViewModel.State(greeting: "Good evening", recent: Self.homeTips(.voice, closable: true).recent), running: nil, showingUndo: true, onEvent: { _ in })
         }
-        case "tasks": shell(.tasks, running: Self.running) {
-            TasksScreen(state: Self.tasks, progress: Self.running.progress, filter: .constant(.now), onEvent: { _ in })
-        }
-        case "tasks-empty": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksEmpty, progress: nil, filter: .constant(.now), onEvent: { _ in }) }
-        case "tasks-scheduled": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksScheduled, progress: nil, filter: .constant(.scheduled), onEvent: { _ in }) }
-        case "tasks-done": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksDone, progress: nil, filter: .constant(.done), onEvent: { _ in }) }
+        case "tasks-scheduled": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksScheduled, filter: .constant(.scheduled), onEvent: { _ in }) }
+        case "tasks-done": shell(.tasks, running: nil) { TasksScreen(state: Self.tasksDone, filter: .constant(.done), onEvent: { _ in }) }
         case "repeat":
             ModeColor.page.ignoresSafeArea().sheet(isPresented: .constant(true)) {
                 RepeatScreen(state: Self.repeatState, dayLabels: Format.shortDays, onEvent: { _ in }, onCancel: {})
@@ -255,18 +251,10 @@ struct ScreenSample: Identifiable {
         return HomeViewModel.State(
             greeting: "Good evening",
             recent: [.init(id: "1", title: "Turn off Wi-Fi", subtitle: "Today 22:41 · 23 s", leading: .mo(.done))],
-            tips: .init(tips: all.map(HomeViewModel.tip), index: all.firstIndex(of: tip) ?? 0, closable: closable)
+            tips: .init(tips: all.map(HomeViewModel.tip), index: all.firstIndex(of: tip) ?? 0, closable: closable),
+            tryThese: ["Turn on Do Not Disturb", "Tell me about everything on my calendar today", "Catch me up on today's unread WhatsApp messages"]
         )
     }
-
-    /// Board Tasks.
-    static let tasks = TasksViewModel.State(
-        running: .init(id: "r", title: "Ordering my usual dinner", subtitle: "Step 9 · checking the cart", leading: .mo(.working), since: Date().addingTimeInterval(-72)),
-        waiting: .init(id: "w", title: "Pay electricity bill", subtitle: "Your bank app needs Face ID", leading: .mo(.yourTurn))
-    )
-
-    /// Board Tasks · empty: easy tasks to try.
-    static let tasksEmpty = TasksViewModel.State(tryThese: ["Turn on Do Not Disturb", "Tell me about everything on my calendar today", "Catch me up on today's unread WhatsApp messages"])
 
     /// Board Tasks · scheduled.
     static let tasksScheduled = TasksViewModel.State(
