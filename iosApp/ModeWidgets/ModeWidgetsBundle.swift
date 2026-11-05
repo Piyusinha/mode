@@ -2,7 +2,7 @@ import ModeDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// Mode's widget extension: for now, the Live Activity of the running task.
+/// Mode's widget extension: the Live Activity of the running task, and "Mode is connected".
 @main
 struct ModeWidgetsBundle: WidgetBundle {
     init() {
@@ -11,5 +11,6 @@ struct ModeWidgetsBundle: WidgetBundle {
 
     var body: some Widget {
         ModeLiveActivity()
+        ModeSessionActivity()
     }
 }

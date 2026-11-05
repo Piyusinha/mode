@@ -89,6 +89,27 @@ struct StopTaskIntent: LiveActivityIntent {
     }
 }
 
+/// The "Mode is connected" Live Activity: the Device Hub session is open while no task runs, so iOS keeps
+/// the screen on. A separate activity type, so the task activity stays as it is.
+struct ModeSessionAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        /// When it was left open: the clock ticks by itself.
+        var since: Date
+    }
+}
+
+/// Disconnect, on "Mode is connected": closes the session and stops Mode's VPN. Unlike Stop on iOS's own
+/// indicator, it does not unpair; the next task connects again by itself.
+struct DisconnectIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Disconnect Mode"
+    static let isDiscoverable = false
+
+    func perform() async throws -> some IntentResult {
+        await ModeActivityActions.disconnect()
+        return .result()
+    }
+}
+
 /// Cancel, on "Unlock to start": the task waiting for the iPhone to unlock is dropped.
 struct CancelWaitingIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Cancel the waiting task"
@@ -135,6 +156,11 @@ enum ModeActivityActions {
     static var onStop: (() -> Void)?
     static var onAnswer: ((String, String) -> Void)?
     static var onCancelWaiting: ((String) -> Void)?
+    static var onDisconnect: (() -> Void)?
+
+    static func disconnect() {
+        onDisconnect?()
+    }
 
     static func cancelWaiting(_ taskId: String) {
         onCancelWaiting?(taskId)

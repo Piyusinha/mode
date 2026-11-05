@@ -102,6 +102,8 @@ public class HealthPresenter(
                 AppLog.log("health", "repair ${item.name}: ${if (worked) "done" else "did not help"}")
             }
             runChecks()
+            // Repairing reconnects; with no task to use it, close it again (it keeps iOS's indicator and the screen on).
+            if (!runner.state.value.running) session.disconnect()
             val now = mutableState.value.rows
             repaired += todo.filter { item -> now.first { it.item == item }.state == HealthState.Ok }
             mutableState.value = mutableState.value.copy(

@@ -386,3 +386,74 @@ extension ModeReplyBlock {
         }
     }
 }
+
+// MARK: - Mode is connected
+
+/// "Mode is connected" on the Lock Screen: the Device Hub session is open with no task running, so iOS keeps
+/// the screen on. Mo, how long it has been open, what that means, and Disconnect (it does not unpair).
+struct ModeSessionLockScreen: View {
+    let state: ModeSessionAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.s) {
+            HStack(spacing: ModeSpacing.s) {
+                ModeMo(.idle, size: ModeSize.activityMo)
+                ModeSessionClock(since: state.since).modeText(.subheadline, color: ModeColor.onDarkSecondary)
+                Spacer(minLength: ModeSpacing.s)
+                ModeActivityGlyph.connected.image.font(ModeIconFont.chevron).foregroundStyle(ModeColor.onDarkSecondary)
+            }
+            .frame(height: ModeSize.activityHeader)
+            .lineLimit(1)
+            ModeSessionBody(island: false)
+        }
+        .padding(.horizontal, ModeSpacing.activityHorizontal)
+        .padding(.vertical, ModeSpacing.activityVertical)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .environment(\.colorScheme, .dark)
+    }
+}
+
+/// "Connected · 4:12", ticking on its own.
+struct ModeSessionClock: View {
+    let since: Date
+
+    var body: some View {
+        HStack(spacing: ModeSpacing.xs) {
+            Text(ActivityL10n.connected).fixedSize()
+            Text(timerInterval: since...Date.distantFuture, countsDown: false)
+                .frame(width: ModeSize.islandTimer, alignment: .leading)
+        }
+        .monospacedDigit()
+        .lineLimit(1)
+    }
+}
+
+/// What an open session means, and Disconnect.
+struct ModeSessionBody: View {
+    let island: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: island ? ModeSpacing.islandGap : ModeSpacing.s) {
+            VStack(alignment: .leading, spacing: ModeSpacing.none) {
+                Text(ActivityL10n.canControl).modeText(.calloutEmphasis)
+                Text(ActivityL10n.screenStaysOn).modeText(.caption, color: ModeColor.onDarkSecondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(ModeTextScale.title)
+            ModeSessionDisconnectButton(island: island)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Disconnect: closes the session and Mode's VPN, keeps the pairing.
+struct ModeSessionDisconnectButton: View {
+    let island: Bool
+
+    var body: some View {
+        Button(intent: DisconnectIntent()) {
+            ModeActivityButtonLabel(ActivityL10n.disconnect, style: island ? .islandGrey : .light)
+        }
+        .buttonStyle(.plain)
+    }
+}

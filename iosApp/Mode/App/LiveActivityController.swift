@@ -6,7 +6,8 @@ import UIKit
 
 /// Keeps the Live Activity in step with the running task: starts it when a task
 /// starts, updates it when something changes, and ends it with the answer.
-/// Plumbing between Kotlin's LiveActivityPresenter and ActivityKit; it draws nothing.
+/// Also shows "Mode is connected", with Disconnect, while the Device Hub session is open and no task runs.
+/// Plumbing between Kotlin's LiveActivityPresenter / SessionActivityPresenter and ActivityKit; it draws nothing.
 @MainActor
 final class LiveActivityController {
     private typealias Content = ModeActivityAttributes.ContentState
@@ -16,6 +17,9 @@ final class LiveActivityController {
     private var activity: Activity<ModeActivityAttributes>?
     private var taskId: String?
     private var shown: Content?
+    private let sessionPresenter: SessionActivityPresenter
+    private var sessionUpdates: Updates?
+    private var sessionActivity: Activity<ModeSessionAttributes>?
     /// The last ActivityKit call, so the next waits for it.
     private var queue: Updates?
 
@@ -29,11 +33,17 @@ final class LiveActivityController {
         ModeActivityActions.onStop = { [presenter] in presenter.stop() }
         ModeActivityActions.onAnswer = { [presenter] id, answer in presenter.answer(questionId: id, text: answer) }
         ModeActivityActions.onCancelWaiting = { [presenter] id in presenter.cancelWaiting(taskId: id) }
-        // A task from an earlier launch can't still be running.
+        sessionPresenter = screens.sessionActivity()
+        ModeActivityActions.onDisconnect = { [sessionPresenter] in sessionPresenter.disconnect() }
+        // A task or a session from an earlier launch can't still be open.
         for old in Activity<ModeActivityAttributes>.activities {
             Updates { await old.end(nil, dismissalPolicy: .immediate) }
         }
+        for old in Activity<ModeSessionAttributes>.activities {
+            Updates { await old.end(nil, dismissalPolicy: .immediate) }
+        }
         updates = observe(presenter.state) { [weak self] state in self?.apply(state) }
+        sessionUpdates = observe(sessionPresenter.state) { [weak self] state in self?.applySession(state) }
         // Closed from the app switcher mid-task: take the activity away with it.
         NotificationCenter.default.addObserver(forName: UIApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             Self.endAllNow()
@@ -45,6 +55,7 @@ final class LiveActivityController {
         let done = DispatchSemaphore(value: 0)
         Updates.detached {
             for activity in Activity<ModeActivityAttributes>.activities { await activity.end(nil, dismissalPolicy: .immediate) }
+            for activity in Activity<ModeSessionAttributes>.activities { await activity.end(nil, dismissalPolicy: .immediate) }
             done.signal()
         }
         _ = done.wait(timeout: .now() + 1)
@@ -146,6 +157,33 @@ final class LiveActivityController {
             await activity.end(ActivityContent(state: content, staleDate: nil), dismissalPolicy: .after(until))
             presenter.showing(on: false)
             presenter.log(message: "finished (\(content.outcome?.rawValue ?? ""))")
+        }
+    }
+
+    /// "Mode is connected": shown while the session sits open with no task, gone the moment it closes
+    /// or a task starts (the task's own activity has Stop). No stale date: it stays as long as the session.
+    private func applySession(_ state: SessionActivityUiState) {
+        switch onEnum(of: state) {
+        case .hidden:
+            guard let current = sessionActivity else { return }
+            sessionActivity = nil
+            send { [sessionPresenter] in
+                await current.end(nil, dismissalPolicy: .immediate)
+                sessionPresenter.log(message: "session activity ended")
+            }
+        case let .connected(c):
+            if let current = sessionActivity, current.activityState == .active { return }
+            let since = Date(timeIntervalSince1970: TimeInterval(c.sinceMs) / 1000)
+            do {
+                sessionActivity = try Activity.request(
+                    attributes: ModeSessionAttributes(),
+                    content: ActivityContent(state: ModeSessionAttributes.ContentState(since: since), staleDate: nil)
+                )
+                sessionPresenter.log(message: "session activity started")
+            } catch {
+                sessionActivity = nil
+                sessionPresenter.log(message: "session activity could not start: \(error.localizedDescription)")
+            }
         }
     }
 

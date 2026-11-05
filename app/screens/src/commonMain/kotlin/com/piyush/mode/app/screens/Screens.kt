@@ -172,6 +172,10 @@ public class Screens(
     /** The Live Activity: one for the app's lifetime. */
     public fun liveActivity(): LiveActivityPresenter = LiveActivityPresenter(scope, runner, tasks, queue, settings)
 
+    /** The "Mode is connected" Live Activity, with Disconnect: one for the app's lifetime. */
+    public fun sessionActivity(): com.piyush.mode.app.screens.run.SessionActivityPresenter =
+        com.piyush.mode.app.screens.run.SessionActivityPresenter(scope, runner, session, clock)
+
     /** The first run: Welcome, Connect your AI, a first job (asking for the VPN and notifications as it starts). */
     public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter =
         com.piyush.mode.app.screens.firstrun.FirstRunPresenter(scope, settings, connectChatGpt(), queue) {

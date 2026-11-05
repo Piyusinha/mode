@@ -69,6 +69,8 @@ public enum ModeActivityGlyph: String, Sendable {
     case couldntFinish = "exclamationmark.triangle"
     case stopped = "stop.circle"
     case paused = "pause.fill"
+    /// Mode can see and control this iPhone (the Device Hub session is open).
+    case connected = "iphone.radiowaves.left.and.right"
 
     public var image: Image { Image(systemName: rawValue) }
 }

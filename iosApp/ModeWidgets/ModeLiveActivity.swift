@@ -49,3 +49,41 @@ struct ModeLiveActivity: Widget {
         }
     }
 }
+
+/// "Mode is connected", with Disconnect: the Device Hub session is open while no task runs.
+struct ModeSessionActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: ModeSessionAttributes.self) { context in
+            ModeSessionLockScreen(state: context.state)
+                .activityBackgroundTint(ModeColor.lockScreen)
+                .activitySystemActionForegroundColor(ModeColor.heroText)
+                .widgetURL(ModeLinks.open)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    ModeMo(.idle, size: ModeSize.islandExpandedMo)
+                        .padding(.leading, ModeSpacing.islandHorizontal)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    ModeActivityStatus(ActivityL10n.connectedShort, glyph: .connected, color: ModeColor.onDarkSecondary)
+                        .frame(height: ModeSize.islandExpandedMo)
+                        .padding(.trailing, ModeSpacing.islandHorizontal)
+                        .modeActivityTheme()
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    ModeSessionBody(island: true)
+                        .padding(.horizontal, ModeSpacing.islandHorizontal)
+                        .modeActivityTheme()
+                }
+            } compactLeading: {
+                ModeMo(.idle, size: ModeSize.islandCompactMo)
+            } compactTrailing: {
+                ModeActivityGlyph.connected.image.font(ModeIconFont.small).foregroundStyle(ModeColor.onDarkSecondary)
+            } minimal: {
+                ModeMo(.idle, size: ModeSize.islandMinimalMo)
+            }
+            .widgetURL(ModeLinks.open)
+            .keylineTint(ModeColor.brand)
+        }
+    }
+}

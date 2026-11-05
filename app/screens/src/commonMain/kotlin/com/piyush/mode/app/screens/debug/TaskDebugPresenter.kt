@@ -106,7 +106,9 @@ public class TaskDebugPresenter(
             val kinds = mutableState.value.findings.filter { it.problem }.map { it.kind }.toSet()
             val done = mutableListOf<String>()
             if (kinds.any { it in PHONE }) {
-                runCatching { session.reconnect() }.onSuccess { done += "Reconnected phone control" }
+                // Proves the connection works, then closes it: an open session keeps iOS's indicator and the screen on.
+                runCatching { try { session.reconnect() } finally { session.disconnect() } }
+                    .onSuccess { done += "Reconnected phone control" }
                     .onFailure { if (it is CancellationException) throw it }
             }
             if (kinds.any { it in AI }) {
