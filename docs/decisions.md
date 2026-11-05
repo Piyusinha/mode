@@ -456,3 +456,12 @@ the graph grows past what one file reads comfortably.
   drives another app (D17: the microphone and the screen stream cannot be on
   together); the Live Activity "Speak" button is the way in there (pending).
 
+
+## D39. The app icon: Mo peeking up
+
+- Mo, big, rising from the bottom edge on ink and looking up: "ready when you are". It replaces Orbit
+  (D27), a generic phone and orbit that said nothing about Mode, now that Mo is the character across the
+  app, Mode Setup and the boards. Picked from six Mo concepts on the Mo canvas ("App icon · Mo as the
+  icon"), chosen for the strongest contrast and a shape that reads at 29 pt.
+- `tools/make-icon.swift` draws it from Mo's own curves at 1024 px: light (coral on #1A1A1F), dark (a
+  deeper ground) and tinted (a light grey Mo on black, which iOS colours).
