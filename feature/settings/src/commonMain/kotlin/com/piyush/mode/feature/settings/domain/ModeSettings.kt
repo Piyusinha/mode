@@ -67,6 +67,10 @@ public data class ModeSettings(
      * Mode never sees or keeps the phrase or the passcode; this only changes what Mode says on a locked iPhone.
      */
     val voiceUnlock: Boolean = false,
+    /** When Home first showed the "Did you know?" tips (epoch ms): they show for five days from then. */
+    val tipsStartedAtMs: Long? = null,
+    /** The user closed the tips: never shown again (they stay in Settings). */
+    val tipsHidden: Boolean = false,
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

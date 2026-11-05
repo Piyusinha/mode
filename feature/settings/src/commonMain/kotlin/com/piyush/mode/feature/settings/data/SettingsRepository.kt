@@ -125,6 +125,8 @@ public class SettingsRepository(
         prefs.putString(SUGGEST_ROUTINES, next.suggestRoutines.toString())
         prefs.putString(BARGE_IN, next.bargeIn.toString())
         prefs.putString(VOICE_UNLOCK, next.voiceUnlock.toString())
+        prefs.putString(TIPS_STARTED, next.tipsStartedAtMs?.toString().orEmpty())
+        prefs.putString(TIPS_HIDDEN, next.tipsHidden.toString())
         prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
@@ -189,6 +191,8 @@ public class SettingsRepository(
             suggestRoutines = prefs.getString(SUGGEST_ROUTINES)?.toBooleanStrictOrNull() ?: defaults.suggestRoutines,
             bargeIn = prefs.getString(BARGE_IN)?.toBooleanStrictOrNull() ?: defaults.bargeIn,
             voiceUnlock = prefs.getString(VOICE_UNLOCK)?.toBooleanStrictOrNull() ?: defaults.voiceUnlock,
+            tipsStartedAtMs = prefs.getString(TIPS_STARTED)?.toLongOrNull(),
+            tipsHidden = prefs.getString(TIPS_HIDDEN)?.toBooleanStrictOrNull() ?: defaults.tipsHidden,
             voices = prefs.getString(VOICES)?.let {
                 runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
             } ?: defaults.voices,
@@ -229,6 +233,8 @@ public class SettingsRepository(
         const val SUGGEST_ROUTINES = "suggest_routines"
         const val BARGE_IN = "voice_barge_in"
         const val VOICE_UNLOCK = "voice_unlock_set_up"
+        const val TIPS_STARTED = "home_tips_started_at"
+        const val TIPS_HIDDEN = "home_tips_hidden"
         const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"

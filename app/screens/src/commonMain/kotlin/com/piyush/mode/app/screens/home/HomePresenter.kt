@@ -17,6 +17,7 @@ import com.piyush.mode.feature.tasks.domain.TaskInbox
 import com.piyush.mode.feature.tasks.domain.TaskSource
 import com.piyush.mode.feature.tasks.presentation.TaskRunner
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -28,6 +29,8 @@ public data class HomeUiState(
     val running: RunningTask? = null,
     /** Mode can't run anything until a key is added. */
     val needsKey: Boolean = false,
+    /** The "Did you know?" banner for the first days, or null. */
+    val tips: TipsUiState? = null,
 )
 
 /** Something the user may want to ask again; tapping fills the message box with [text]. */
@@ -63,10 +66,15 @@ public class HomePresenter(
     private val memory: MemoryRepository,
     private val clock: ScreenClock = ScreenClock(),
 ) : Presenter<HomeUiState>(parent, HomeUiState()) {
+    /** The tip the user moved to with the dots; null: today's. */
+    private val pickedTip = MutableStateFlow<SetupTip?>(null)
 
     init {
         scope.launch {
-            combine(settings.settings, runner.state, tasks.recent(RECENT_TASKS), conversations.recent(MAX_RECENT), memory.observe()) { s, run, recentTasks, convs, items ->
+            val tipsInput = combine(settings.settings, pickedTip) { s, picked -> s to picked }
+            combine(tipsInput, runner.state, tasks.recent(RECENT_TASKS), conversations.recent(MAX_RECENT), memory.observe()) { (s, picked), run, recentTasks, convs, items ->
+                // The five days start the first time Home shows after setup.
+                if (s.onboardingDone && s.tipsStartedAtMs == null) settings.update { it.copy(tipsStartedAtMs = clock.now()) }
                 val latestByConversation = recentTasks.filter { it.conversationId != null }.groupBy { it.conversationId }
                 HomeUiState(
                     partOfDay = clock.partOfDay(),
@@ -79,9 +87,25 @@ public class HomePresenter(
                     },
                     running = run.running(tasks),
                     needsKey = !s.hasModelAccess,
+                    tips = SetupTips.banner(s, clock.now(), picked),
                 )
             }.collect { mutableState.value = it }
         }
+    }
+
+    /** The dots on the banner: show [tip]. */
+    public fun showTip(tip: SetupTip) {
+        pickedTip.value = tip
+    }
+
+    /** The banner's close button: tips never show again (they stay in Settings). */
+    public fun hideTips() {
+        settings.update { it.copy(tipsHidden = true) }
+    }
+
+    /** Undo, right after closing. */
+    public fun undoHideTips() {
+        settings.update { it.copy(tipsHidden = false) }
     }
 
     /** Sends a task from the message box; returns its conversation, to open. */

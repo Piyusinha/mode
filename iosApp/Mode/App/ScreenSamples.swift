@@ -1,5 +1,6 @@
 #if DEBUG && targetEnvironment(simulator)
 import ModeDesignSystem
+import ModeKit
 import SwiftUI
 
 /// Simulator only: `MODE_OPEN=sample:<name>` shows a screen with the board's sample state, for screens whose
@@ -72,6 +73,11 @@ struct ScreenSample: Identifiable {
         case "task-debug": pushed { TaskDebugScreen(state: Self.taskDebug, onEvent: { _ in }) }
         case "task-debug-ask": pushed { TaskDebugAskScreen(state: Self.taskDebugAsk, onEvent: { _ in }) }
         case "home": shell(.home, running: nil) { HomeScreen(state: Self.home, running: Self.running, onEvent: { _ in }) }
+        case "home-tips": shell(.home, running: nil) { HomeScreen(state: Self.homeTips(.voice, closable: false), running: nil, onEvent: { _ in }) }
+        case "home-tips-day3": shell(.home, running: nil) { HomeScreen(state: Self.homeTips(.access, closable: true), running: nil, onEvent: { _ in }) }
+        case "home-tips-closed": shell(.home, running: nil) {
+            HomeScreen(state: HomeViewModel.State(greeting: "Good evening", recent: Self.homeTips(.voice, closable: true).recent), running: nil, showingUndo: true, onEvent: { _ in })
+        }
         case "tasks": shell(.tasks, running: Self.running) {
             TasksScreen(state: Self.tasks, progress: Self.running.progress, filter: .constant(.now), onEvent: { _ in })
         }
@@ -239,6 +245,16 @@ struct ScreenSample: Identifiable {
                  .init(id: "3", title: "Set an alarm for 6:30", subtitle: "Yesterday · 21 s", leading: .mo(.done)),
                  .init(id: "4", title: "Turn on Do Not Disturb", subtitle: "Friday · 18 s", leading: .mo(.done))]
     )
+
+    /// Board Home · Did you know: right after setup, with the first job in Recent.
+    static func homeTips(_ tip: SetupTip, closable: Bool) -> HomeViewModel.State {
+        let all: [SetupTip] = [.voice, .listening, .access, .startWithoutOpening, .name]
+        return HomeViewModel.State(
+            greeting: "Good evening",
+            recent: [.init(id: "1", title: "Turn off Wi-Fi", subtitle: "Today 22:41 · 23 s", leading: .mo(.done))],
+            tips: .init(tips: all.map(HomeViewModel.tip), index: all.firstIndex(of: tip) ?? 0, closable: closable)
+        )
+    }
 
     /// Board Tasks.
     static let tasks = TasksViewModel.State(

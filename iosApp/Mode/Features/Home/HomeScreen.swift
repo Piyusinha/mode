@@ -6,6 +6,7 @@ import SwiftUI
 struct HomeScreen: View {
     let state: HomeViewModel.State
     let running: RunStatusViewModel.Running?
+    var showingUndo = false
     let onEvent: (HomeViewModel.Event) -> Void
 
     var body: some View {
@@ -14,6 +15,22 @@ struct HomeScreen: View {
                 ModeHomeHeader(greeting: state.greeting, title: L10n.Home.subtitle)
                     .padding(.horizontal, ModeSpacing.xl)
                     .padding(.bottom, ModeSpacing.xl + ModeSpacing.xs)
+                if let tips = state.tips {
+                    ModeTipBanner(
+                        label: L10n.Tips.label, tips: tips.tips, index: tips.index, closable: tips.closable,
+                        closeLabel: L10n.Tips.close, dotLabel: { L10n.Tips.dot($0 + 1, of: tips.tips.count) },
+                        onAction: { onEvent(.tipAction($0)) }, onClose: { onEvent(.closeTips) }, onPick: { onEvent(.pickTip($0)) }
+                    )
+                    .padding(.horizontal, ModeSpacing.screenEdge)
+                    .padding(.bottom, ModeSpacing.m)
+                    .transition(.opacity)
+                } else if showingUndo {
+                    // Where the banner was, for a few seconds: the tab bar sits outside this page.
+                    ModeUndoToast(title: L10n.Tips.hidden, detail: L10n.Tips.hiddenDetail, undo: L10n.Tips.undo) { onEvent(.undoCloseTips) }
+                        .padding(.horizontal, ModeSpacing.screenEdge)
+                        .padding(.bottom, ModeSpacing.m)
+                        .transition(.opacity)
+                }
                 if let running {
                     ModeMiniPlayer(
                         title: running.title, status: running.status, paused: running.paused, progress: running.progress,
@@ -61,6 +78,8 @@ struct HomeScreen: View {
                 }
             }
             .padding(.bottom, ModeSpacing.xxl)
+            .animation(ModeMotion.standard, value: state.tips)
+            .animation(ModeMotion.standard, value: showingUndo)
         }
         .scrollEdgeEffectStyle(.soft, for: .all)
         .modeScreen()
@@ -91,6 +110,6 @@ struct HomeRoute: View {
     }
 
     var body: some View {
-        HomeScreen(state: model.state, running: run.state.running, onEvent: model.send)
+        HomeScreen(state: model.state, running: run.state.running, showingUndo: model.showingUndo, onEvent: model.send)
     }
 }
