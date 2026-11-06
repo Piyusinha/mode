@@ -43,6 +43,13 @@ public class ClaudeCredentialStore(
         get() = secrets.get(USAGE_AT)?.toLongOrNull()
         set(value) { secrets.set(USAGE_AT, value?.toString()) }
 
+    /** The Keychain changed outside this class (a backup was restored): read it again. */
+    public fun reload() {
+        accountRevision++
+        mutableConnected.value = load() != null
+        changed()
+    }
+
     public fun save(credentials: ClaudeOAuth.Credentials?, newSignIn: Boolean = false) {
         // Signed out, or a new sign-in (not a refresh of the one kept): what was kept about the account goes.
         if (newSignIn || credentials == null || load() == null) {
@@ -58,10 +65,13 @@ public class ClaudeCredentialStore(
         changed()
     }
 
-    private companion object {
+    internal companion object {
         const val KEY = "claude_oauth_credentials"
+        const val CREDENTIALS_KEY = KEY
         const val PROFILE = "claude_profile"
         const val USAGE = "claude_usage"
         const val USAGE_AT = "claude_usage_at"
+        /** The credentials and what is kept beside them: what a backup carries. */
+        val ACCOUNT_KEYS: List<String> get() = listOf(KEY, PROFILE, USAGE, USAGE_AT)
     }
 }

@@ -58,3 +58,17 @@ WHERE status = 'queued' AND created_at < ?;
 
 deleteAll:
 DELETE FROM task;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM task ORDER BY rowid;
+
+ids:
+SELECT id FROM task;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO task(id, conversation_id, text, source, status, created_at, started_at, ended_at, run_id, summary, steps, cost_usd, private)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM task;

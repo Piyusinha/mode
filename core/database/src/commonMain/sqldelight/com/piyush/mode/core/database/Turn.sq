@@ -18,3 +18,17 @@ SELECT * FROM turn WHERE conversation_id = ? ORDER BY created_at, rowid;
 
 deleteAll:
 DELETE FROM turn;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM turn ORDER BY rowid;
+
+ids:
+SELECT id FROM turn;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO turn(id, conversation_id, role, text, task_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM turn;

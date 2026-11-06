@@ -203,7 +203,7 @@ public class SettingsRepository(
         ).validated()
     }
 
-    private companion object {
+    internal companion object {
         // The first four names are kept from the first version, so existing installs keep their settings.
         const val API_KEY = "openrouter_api_key"
         const val PROVIDER = "model_provider"
@@ -238,6 +238,8 @@ public class SettingsRepository(
         const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"
+        const val API_KEY_NAME = API_KEY
+        fun voiceSecretName(kind: VoiceKind): String = voiceSecret(kind)
     }
 }
 

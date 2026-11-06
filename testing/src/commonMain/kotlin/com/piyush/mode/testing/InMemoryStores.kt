@@ -19,6 +19,7 @@ class InMemoryKeyValueStore : KeyValueStore {
     override fun putString(name: String, value: String) {
         values[name] = value
     }
+    override fun names(): Set<String> = values.keys.toSet()
     override fun clear() = values.clear()
 }
 

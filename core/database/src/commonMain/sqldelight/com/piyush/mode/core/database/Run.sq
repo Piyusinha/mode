@@ -36,3 +36,14 @@ SELECT count(*) FROM run;
 
 deleteAll:
 DELETE FROM run;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM run ORDER BY rowid;
+
+ids:
+SELECT id FROM run;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO run(id, task_id, task, outcome, summary, model, steps, ms, cost_usd, tag, started_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

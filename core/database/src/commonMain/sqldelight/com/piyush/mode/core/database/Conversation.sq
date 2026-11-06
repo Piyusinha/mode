@@ -28,3 +28,17 @@ SELECT * FROM conversation ORDER BY updated_at DESC LIMIT ?;
 
 deleteAll:
 DELETE FROM conversation;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM conversation ORDER BY rowid;
+
+ids:
+SELECT id FROM conversation;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO conversation(id, title, created_at, updated_at)
+VALUES (?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM conversation;

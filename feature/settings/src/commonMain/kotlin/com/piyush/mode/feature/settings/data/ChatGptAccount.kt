@@ -121,6 +121,14 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     /** The plan said its share for Mode is used up (ResponsesClient). */
     public fun limitReached() { secrets.set(LIMIT_AT, now().toString()) }
 
+    /** The Keychain changed outside this class (a backup was restored): read the account again. */
+    public fun reload() {
+        mutableConnected.value = secrets.get(REFRESH) != null
+        mutableModels.value = secrets.get(MODELS)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
+        mutableInfo.value = secrets.get(MODEL_INFO)?.let { runCatching { Json.decodeFromString<List<PlanModel>>(it) }.getOrNull() }.orEmpty()
+        onChange()
+    }
+
     public fun signOut() {
         cancelSignIn()
         generation++
@@ -130,7 +138,7 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     }
 
     private fun clearAccount() {
-        listOf(CLIENT_ID, ACCESS, REFRESH, EXPIRES, PROFILE, LIMIT_AT, MODELS, MODEL_INFO).forEach { secrets.set(it, null) }
+        ACCOUNT_KEYS.forEach { secrets.set(it, null) }
         mutableModels.value = emptyList()
         mutableInfo.value = emptyList()
     }
@@ -155,6 +163,12 @@ public class ChatGptAccount @OptIn(ExperimentalTime::class) constructor(
     public companion object {
         /** Present while signed in (SettingsRepository reads it to know ChatGPT is ready). */
         public const val CONNECTED_KEY: String = "chatgpt_refresh_token"
+        /**
+         * Every entry of one signed-in account (what signing out removes, and what a backup carries). Not
+         * [HOST_ID]: that is this iPhone's own id for OpenAI.
+         */
+        internal val ACCOUNT_KEYS: List<String> get() =
+            listOf(CLIENT_ID, ACCESS, REFRESH, EXPIRES, PROFILE, LIMIT_AT, MODELS, MODEL_INFO)
         private const val MODELS = "chatgpt_models"
         private const val MODEL_INFO = "chatgpt_model_info"
         private const val PROFILE = "chatgpt_profile"

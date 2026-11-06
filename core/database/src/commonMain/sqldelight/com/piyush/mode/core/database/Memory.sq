@@ -56,3 +56,17 @@ SELECT * FROM memory WHERE kind = ? ORDER BY updated_at DESC;
 
 changedByTask:
 SELECT * FROM memory WHERE source_task_id = ? ORDER BY updated_at;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM memory ORDER BY rowid;
+
+ids:
+SELECT id FROM memory;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO memory(id, kind, subject, title, text, evidence, keywords, app, source_task_id, previous_text, uses, successes, failures, created_at, updated_at, last_used_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM memory;
