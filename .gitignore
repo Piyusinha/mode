@@ -30,3 +30,6 @@ research_notes/
 
 # Promo video work folders (the finished films live in docs/media)
 brag-output*/
+
+# Your own Apple team and app ID (see iosApp/Signing.example.env)
+iosApp/Signing.env

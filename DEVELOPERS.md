@@ -42,8 +42,9 @@ open iosApp/Mode.xcodeproj            # build and run on your iPhone
 cd desktop && cargo build             # Mode Setup (Rust + Tauri)
 ```
 
-Set your own team in `iosApp/project.yml` (`DEVELOPMENT_TEAM`) and a bundle ID prefix of
-your own before building for a device.
+Before building for a device, copy `iosApp/Signing.example.env` to `iosApp/Signing.env`
+(git-ignored) and put in your Apple team ID and an app ID prefix of your own, then run
+`tools/gen-project.sh` again. Nothing tracked changes, so your pull requests stay clean.
 
 ## Tests
 

@@ -16,6 +16,11 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
 ## 1. Build
 
+First, your signing: copy `iosApp/Signing.example.env` to `iosApp/Signing.env` (git-ignored) and set
+`MODE_TEAM` (your Apple team ID) and `MODE_BUNDLE_PREFIX` (an app ID prefix of your own).
+`tools/gen-project.sh` reads it.
+
+
 ```sh
 tools/build-native.sh            # libmodecore.a for iPhone + simulator (Gradle also runs it)
 tools/gen-project.sh paid        # or: free

@@ -1,6 +1,6 @@
 name: Mode
 options:
-  bundleIdPrefix: com.piyush.mode
+  bundleIdPrefix: ${MODE_BUNDLE_PREFIX}
   deploymentTarget:
     iOS: "26.1"
   createIntermediateGroups: true
@@ -11,7 +11,8 @@ packages:
 settings:
   SWIFT_VERSION: "5.0"
   CODE_SIGN_STYLE: Automatic
-  DEVELOPMENT_TEAM: BH9TWW5HPR
+  # Your team and app ID come from iosApp/Signing.env (see Signing.example.env); tools/gen-project.sh reads it.
+  DEVELOPMENT_TEAM: ${MODE_TEAM}
   MARKETING_VERSION: "0.1"
   CURRENT_PROJECT_VERSION: "1"
 targets:
@@ -46,7 +47,7 @@ targets:
         NSSupportsLiveActivitiesFrequentUpdates: true
         # mode:// links: the Live Activity's Open chat and Another task.
         CFBundleURLTypes:
-          - CFBundleURLName: com.piyush.mode
+          - CFBundleURLName: ${MODE_BUNDLE_PREFIX}
             CFBundleURLSchemes:
               - mode
     dependencies:
@@ -76,7 +77,7 @@ targets:
         script: |
           "$SRCROOT/../tools/bundle-ddi.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/DDI"
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode
+      PRODUCT_BUNDLE_IDENTIFIER: ${MODE_BUNDLE_PREFIX}
       PRODUCT_NAME: Mode
       # Swift symbols for the string catalog's keys.
       STRING_CATALOG_GENERATE_SYMBOLS: YES
@@ -113,7 +114,7 @@ targets:
     dependencies:
       - package: ModeDesignSystem
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.widgets
+      PRODUCT_BUNDLE_IDENTIFIER: ${MODE_BUNDLE_PREFIX}.widgets
       PRODUCT_NAME: ModeWidgets
       GENERATE_INFOPLIST_FILE: YES
       INFOPLIST_KEY_CFBundleDisplayName: Mode

@@ -34,6 +34,6 @@ targets:
         com.apple.developer.networking.networkextension:
           - packet-tunnel-provider
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.piyush.mode.tunnel
+      PRODUCT_BUNDLE_IDENTIFIER: ${MODE_BUNDLE_PREFIX}.tunnel
       TARGETED_DEVICE_FAMILY: "1"
       GENERATE_INFOPLIST_FILE: YES
