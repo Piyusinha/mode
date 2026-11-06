@@ -29,6 +29,10 @@ public class Acknowledger(
     /** The fast model (phone control's) and its provider: the line has to come back in about a second. */
     private val model: () -> Pair<String, ModelProvider>?,
 ) {
+    /** The model the last line was asked of ("gpt-6-luna@low"), for the log. */
+    public var lastModel: String? = null
+        private set
+
     /**
      * The spoken line for [task] said by [name] at [hour] (0–23), or null when the AI is slow, fails or
      * isn't set up. [private] tasks use no memory.
@@ -37,10 +41,13 @@ public class Acknowledger(
         task: String, name: String?, hour: Int, private: Boolean = false, budgetMs: Long = BUDGET_MS,
         /** The language to speak ("Hindi"); null: English unless the whole request is in another language. */
         language: String? = null,
+        /** Today's calendar from now, so the line can tie the task to what's coming up ("a cab for your 7 pm dinner"). */
+        day: List<String> = emptyList(),
     ): String? {
         val said = task.trim()
         if (said.isEmpty()) return null
         val (id, provider) = model() ?: return null
+        lastModel = id
         return try {
             withTimeoutOrNull(budgetMs) {
                 val user = buildString {
@@ -50,6 +57,7 @@ public class Acknowledger(
                         val known = memory?.ofKind(MemoryKind.Fact).orEmpty().take(FACTS).map { it.text }
                         if (known.isNotEmpty()) append("WHAT YOU KNOW ABOUT THEM:\n").append(known.joinToString("\n") { "- $it" }).append('\n')
                     }
+                    if (!private && day.isNotEmpty()) append("THEIR CALENDAR FROM NOW:\n").append(day.take(EVENTS).joinToString("\n") { "- $it" }).append('\n')
                     append("WHAT THEY JUST ASKED: ").append(said)
                 }
                 val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
@@ -68,6 +76,7 @@ public class Acknowledger(
         /** How long a task may wait for its spoken line. */
         public const val BUDGET_MS: Long = 1_200
         private const val FACTS = 8
+        private const val EVENTS = 5
         private const val MAX_WORDS = 20
         private const val TOOL = "say"
         private const val LANGUAGE_RULE = "Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English."
@@ -96,6 +105,7 @@ public class Acknowledger(
             warm, capable human assistant would: acknowledge it and say what you are about to do, in your own words.
             - Sound personal: use their first name now and then (not every time), and use what you know about them
               when it fits ("your usual", "Asha on WhatsApp").
+            - If the task clearly fits something on their calendar, tie it in ("a cab for your 7 pm dinner"); never invent.
             - For a question, say you'll check or look it up; don't answer it yet.
             - Don't read their request back word for word, don't promise a result, don't ask anything.
             - Plain spoken words: no emoji, no markdown, no quotes. Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English.

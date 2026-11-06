@@ -61,6 +61,29 @@ public object ProviderModels {
         return withEffort(id, effort) to provider
     }
 
+    /**
+     * The provider's fast, light model at its lowest effort, for short spoken lines (the greeting, the reply
+     * to a task, progress updates): the newest Luna on a ChatGPT plan, the newest Haiku on a Claude account.
+     * On OpenRouter, or before the plan's list is known, the phone-control [model] at its lowest effort.
+     */
+    public fun fast(model: String?, provider: ModelProvider, known: List<com.piyush.mode.llm.PlanModel>): Pair<String, ModelProvider>? {
+        val family = when (provider) {
+            ModelProvider.ChatGpt -> FAST_CHATGPT
+            ModelProvider.ClaudeOAuth -> FAST_CLAUDE
+            ModelProvider.OpenRouter -> null
+        }
+        val pick = family?.let { f ->
+            known.map { it.id }.distinct()
+                .filter { accepts(provider, it) && !isReserve(it) && CHATGPT_HIDDEN.none { h -> h in it } && familyAndVersion(provider, it).first == f }
+                .maxByOrNull { familyAndVersion(provider, it).second ?: 0.0 }
+        } ?: if (provider == ModelProvider.ClaudeOAuth) ClaudeOAuthClient.MAIN_MODEL else null
+        return quick(pick ?: model, provider, known)
+    }
+
+    /** The light, fast family on each plan: ChatGPT's Luna (Sol is the strongest, Terra the middle), Claude's Haiku. */
+    private const val FAST_CHATGPT = "luna"
+    private const val FAST_CLAUDE = "haiku"
+
     /** The model without its effort: "gpt-6.1-terra@low" → "gpt-6.1-terra". */
     public fun base(id: String): String = id.substringBefore('@')
 

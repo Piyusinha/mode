@@ -1,5 +1,7 @@
 package com.piyush.mode.app.screens
 
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.flow.first
 import com.piyush.mode.feature.settings.data.ClaudeAccount
 
 import com.piyush.mode.app.screens.common.ScreenClock
@@ -67,6 +69,8 @@ public class Screens(
     private val logTail: () -> String = { "" },
     /** Whether the iPhone is locked (Unlock by voice's check). */
     private val deviceLock: com.piyush.mode.core.platform.DeviceLock = com.piyush.mode.core.platform.DeviceLock.None,
+    /** What Mode reads straight from the iPhone (the calendar), for the greeting's ideas. */
+    private val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
     private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
@@ -102,8 +106,43 @@ public class Screens(
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
-            acknowledger = acknowledger,
+            acknowledger = acknowledger, greeter = greeter, day = ::dayContext,
         )
+
+    /** Mode's first words when started by voice, written by the fast model with what's coming up in their day. */
+    private val greeter: com.piyush.mode.feature.memory.data.Greeter? by lazy {
+        providers?.let { llm ->
+            com.piyush.mode.feature.memory.data.Greeter(llm, memory) {
+                val s = settings.settings.value
+                com.piyush.mode.feature.settings.domain.ProviderModels.fast(
+                    s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
+                )
+            }
+        }
+    }
+
+    /** What's coming up today, read from the iPhone (calendar), the repeats due soon, and the last task. */
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    private suspend fun dayContext(): com.piyush.mode.feature.memory.data.DayContext {
+        val now = clock.now()
+        val zone = clock.zone()
+        val local = kotlin.time.Instant.fromEpochMilliseconds(now).toLocalDateTime(zone)
+        val label = "${local.dayOfWeek.name.lowercase().replaceFirstChar { it.uppercase() }} ${local.day} " +
+            "${local.month.name.lowercase().replaceFirstChar { it.uppercase() }}, ${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
+        val events = runCatching { device.calendar(1) }.getOrDefault(emptyList()).take(DAY_ITEMS)
+        val soon = now + REPEATS_AHEAD_MS
+        val repeats = runCatching { scheduler.all.first() }.getOrDefault(emptyList())
+            .filter { it.enabled && (it.nextRunAt ?: Long.MAX_VALUE) in now..soon }
+            .map { s ->
+                val at = kotlin.time.Instant.fromEpochMilliseconds(s.nextRunAt!!).toLocalDateTime(zone)
+                "${s.text} at ${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
+            }
+            .take(DAY_ITEMS)
+        val last = tasks.latest(1).firstOrNull()
+            ?.takeIf { t -> clock.relativeDay(t.endedAt ?: t.createdAt) == com.piyush.mode.app.screens.common.RelativeDay.Today }
+            ?.let { t -> "${t.text} · ${t.status.name.lowercase()}" }
+        return com.piyush.mode.feature.memory.data.DayContext(label, events, repeats, last)
+    }
 
     /** What Mode says when handed a spoken task, written by the fast model (phone control's). */
     private val acknowledger: com.piyush.mode.feature.memory.data.Acknowledger? by lazy {
@@ -111,7 +150,7 @@ public class Screens(
             com.piyush.mode.feature.memory.data.Acknowledger(llm, memory) {
                 val s = settings.settings.value
                 // One spoken line needs no thinking: the model's lowest effort, so it comes back in time.
-                com.piyush.mode.feature.settings.domain.ProviderModels.quick(
+                com.piyush.mode.feature.settings.domain.ProviderModels.fast(
                     s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
                 )
             }
@@ -222,3 +261,9 @@ public class Screens(
     /** The Repeat sheet, filled with [text] (the task to repeat) or empty. */
     public fun repeat(text: String = ""): RepeatPresenter = RepeatPresenter(scope, text, scheduler, clock)
 }
+
+/** How many calendar events or due repeats the greeting reads. */
+private const val DAY_ITEMS = 5
+
+/** Repeats due within this long count as "coming up" for the greeting. */
+private const val REPEATS_AHEAD_MS = 3 * 60 * 60 * 1000L

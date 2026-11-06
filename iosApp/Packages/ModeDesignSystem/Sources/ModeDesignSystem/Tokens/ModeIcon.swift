@@ -64,6 +64,7 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case bell = "bell"
     case siriWave = "waveform.circle"
     case microphone = "mic"
+    case micOff = "mic.slash"
     case checkmark = "checkmark"
     case emptyCircle = "circle"
     case arrowRight = "arrow.right"

@@ -28,6 +28,17 @@ public extension ModeSize {
     static let keySaved: CGFloat = 28
     /// A status dot (connected, failed) and the bigger one on a notice.
     static let voiceDot: CGFloat = 8
+    /// Talking as one conversation: Mo beside its lines, on a task's card, the card's timeline, and a result row's icon.
+    static let talkLineMo: CGFloat = 28
+    static let talkCardMo: CGFloat = 34
+    static let talkStepDot: CGFloat = 8
+    static let talkStepLine: CGFloat = 2
+    static let talkStepRail: CGFloat = 14
+    static let talkRowIcon: CGFloat = 30
+    static let talkChip: CGFloat = 26
+    static let talkCardButton: CGFloat = 40
+    static let talkStop: CGFloat = 220
+    static let talkDivider: CGFloat = 1
     static let noticeDot: CGFloat = 10
     /// A tag's height ("In use", "Most human").
     static let voiceTag: CGFloat = 20

@@ -173,6 +173,8 @@ public enum ModeSize {
 public enum ModeMotion {
     public static let quick = Animation.snappy(duration: 0.2)
     public static let standard = Animation.smooth(duration: 0.35)
+    /// How long to let a layout change settle before scrolling to it (seconds).
+    public static let settle: Double = 0.08
     /// One sweep of the working shimmer.
     public static let shimmerSeconds: Double = 1.4
 }

@@ -53,7 +53,9 @@ struct MainTabs: View {
         .fullScreenCover(isPresented: Binding(get: { showingListen || run.state.talking },
                                               set: { if !$0 { showingListen = false } })) {
             TalkRoute(app: app, forQuestion: !showingListen, conversationId: talkConversation, entry: talkEntry,
-                      onClose: { showingListen = false; talkConversation = nil }, onVoiceSettings: openVoiceSettings)
+                      onClose: { showingListen = false; talkConversation = nil }, onVoiceSettings: openVoiceSettings,
+                      onOpenChat: { id in open(.conversation(id: id)) },
+                      onWhatWentWrong: { taskId in tab = .home; paths[.home] = [.taskDebug(taskId: taskId)] })
         }
         .sheet(isPresented: $showingAsk, onDismiss: {
             if talkAfterAsk { talkAfterAsk = false; showingListen = true }
@@ -90,6 +92,14 @@ struct MainTabs: View {
 
     private func open(_ link: DeepLink) {
         app.screens.linkOpened(entry: link.traceName)
+        switch link {
+        case .conversation, .retry, .ask:
+            // Whatever is over the tabs (the live run, Ask, talking mode) closes, so the page it opens is seen.
+            showingLive = false
+            showingAsk = false
+            showingListen = false
+        default: break
+        }
         switch link {
         case let .conversation(id):
             showingLive = false

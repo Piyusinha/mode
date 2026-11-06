@@ -142,6 +142,7 @@ class ModeGraph(platform: PlatformServices) {
         telemetry = telemetry,
         narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),
         translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
+        titler = com.piyush.mode.feature.tasks.presentation.ChatTitler(llm, ::quickModel),
         device = platform.device,
     )
 
@@ -163,7 +164,7 @@ class ModeGraph(platform: PlatformServices) {
     /** The phone-control model at its lowest effort: quick lines, updates, translation. */
     private fun quickModel(): Pair<String, ModelProvider>? {
         val s = settings.settings.value
-        return com.piyush.mode.feature.settings.domain.ProviderModels.quick(s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value)
+        return com.piyush.mode.feature.settings.domain.ProviderModels.fast(s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value)
     }
 
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
@@ -183,6 +184,7 @@ class ModeGraph(platform: PlatformServices) {
         telemetry = telemetry,
         deviceLock = platform.deviceLock,
         background = platform.background,
+        device = platform.device,
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
     )
 

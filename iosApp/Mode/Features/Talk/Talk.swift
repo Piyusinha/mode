@@ -12,6 +12,10 @@ final class TalkModel {
     struct State: Equatable {
         var phase: TalkPhase = .greeting
         var greeting = ""
+        /// The conversation so far: what they asked, what Mode said, and each task's card.
+        var turns: [Turn] = []
+        /// A task was done in this conversation: "That's all" ends it.
+        var hasDone = false
         /// Live words: the settled part and the word still forming.
         var settled = ""
         var forming = ""
@@ -75,6 +79,9 @@ final class TalkModel {
         if typingAnswer { typingAnswer = false; presenter.answer(option: text) } else { presenter.submitTyped(text: text) }
     }
     func answer(_ option: String) { presenter.answer(option: option) }
+    /// One of Mode's offered answers ("Yes, look there"), as if said.
+    func pick(_ answer: String) { presenter.pick(answer: answer) }
+    func thatsAll() { presenter.thatsAll() }
     func later() { presenter.later() }
     func stop() { presenter.stop() }
     func dismiss() { presenter.dismiss() }
@@ -91,11 +98,64 @@ final class TalkModel {
         return options.first { $0.lowercased().hasPrefix(heard) }
     }
 
+    struct Turn: Identifiable, Equatable {
+        enum Kind: Equatable { case said, next, task }
+        let id: Int
+        let mine: Bool
+        let kind: Kind
+        let text: String
+        var card: Card?
+        /// Mode's offer: the yes and no answers to tap.
+        var yes: String?
+        var no: String?
+    }
+
+    struct Card: Equatable {
+        let taskId: String
+        let conversationId: String?
+        let status: ModeTalkTaskCard.Status
+        let title: String
+        let startedAt: Date
+        let seconds: Int
+        let steps: [ModeTalkTaskCard.Step]
+        let doneParts: Int
+        let parts: Int
+        let headline: String
+        let rows: [ModeTalkTaskCard.Row]
+    }
+
+    private static func turn(_ t: TalkTurn) -> Turn {
+        let kind: Turn.Kind = switch t.kind {
+        case .next: .next
+        case .task: .task
+        default: .said
+        }
+        return Turn(id: Int(t.id), mine: t.mine, kind: kind, text: t.text, card: t.card.map(card), yes: t.offer?.yes, no: t.offer?.no)
+    }
+
+    private static func card(_ c: TalkTaskCard) -> Card {
+        let status: ModeTalkTaskCard.Status = switch c.state {
+        case .done: .done
+        case .partial: .partial
+        case .failed: .failed
+        case .stopped: .stopped
+        default: .working
+        }
+        return Card(
+            taskId: c.taskId, conversationId: c.conversationId, status: status, title: c.title,
+            startedAt: Date(timeIntervalSince1970: TimeInterval(c.startedAtMs) / 1000), seconds: Int(c.seconds),
+            steps: c.steps.enumerated().map { ModeTalkTaskCard.Step(id: $0.offset, text: $0.element.text, time: $0.element.time) },
+            doneParts: Int(c.doneParts), parts: Int(c.parts), headline: c.headline,
+            rows: c.rows.enumerated().map { ModeTalkTaskCard.Row(id: $0.offset, title: $0.element.title, detail: $0.element.detail, done: $0.element.done) }
+        )
+    }
+
     private static func map(_ s: ListenUiState) -> State {
         // The newest word is still forming: it shows lighter until the next one comes.
         let words = s.partial.split(separator: " ").map(String.init)
         return State(
             phase: s.phase, greeting: s.greeting,
+            turns: s.turns.map(turn), hasDone: !s.doneSoFar.isEmpty,
             settled: words.dropLast().joined(separator: " "), forming: words.last ?? "",
             task: s.task, reply: s.reply, working: s.working, question: s.question, options: s.options,
             answer: s.answer, answerReply: s.answerReply, micDenied: s.micDenied, finished: s.finished,
@@ -132,6 +192,11 @@ struct TalkScreen: View {
     var cantHear = false
     /// Mode couldn't hear with the chosen listener: listen again.
     var onTryAgain: () -> Void = {}
+    /// The conversation: an offered answer tapped, That's all, a task's chat, and What went wrong.
+    var onPick: (String) -> Void = { _ in }
+    var onThatsAll: () -> Void = {}
+    var onOpenChat: (String) -> Void = { _ in }
+    var onWhatWentWrong: (String) -> Void = { _ in }
     @FocusState private var typing: Bool
 
     private var listening: Bool { (state.phase == .listening || state.phase == .answering) && !typingAnswer }
@@ -149,12 +214,23 @@ struct TalkScreen: View {
                     .padding(.horizontal, ModeSpacing.screenEdge)
                     .transition(.opacity)
             }
-            ScrollView {
-                VStack(spacing: ModeSpacing.l) { content }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, ModeSpacing.xl)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: ModeSpacing.l) { content }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, ModeSpacing.xl)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                // A conversation opens at its newest line and stays there as cards grow.
+                .defaultScrollAnchor(inConversation ? .bottom : .top)
+                .defaultScrollAnchor(.bottom, for: .sizeChanges)
+                // The newest line stays in view: a new line, a card's new step or result, the next phase (the
+                // dock above Stop grows while Mo works), and words as they're heard.
+                .onChange(of: state.turns) { _, _ in toEnd(proxy) }
+                .onChange(of: state.phase) { _, _ in toEnd(proxy) }
+                .onChange(of: state.forming) { _, _ in toEnd(proxy) }
+                .onAppear { toEnd(proxy) }
             }
-            .scrollBounceBehavior(.basedOnSize)
             dock
         }
         .padding(.bottom, ModeSpacing.l)
@@ -186,7 +262,7 @@ struct TalkScreen: View {
         case .needsMic: ModeTalkStatus(L10n.Talk.startMode, dot: nil)
         case .greeting: ModeTalkStatus(L10n.Talk.speaking, dot: ModeColor.brand)
         case .listening: ModeTalkStatus(L10n.Talk.listening, dot: ModeColor.danger)
-        case .starting: ModeTalkStatus(L10n.Talk.starting, dot: ModeColor.brand)
+        case .starting: ModeTalkStatus(inConversation ? L10n.Talk.workingMicOff : L10n.Talk.starting, dot: ModeColor.brand)
         case .asking, .answering: ModeTalkStatus(L10n.Talk.needsYou, dot: ModeColor.info, tone: .info)
         case .answered: ModeTalkStatus(L10n.Talk.gotIt, dot: nil, tone: .success)
         default: ModeTalkStatus(L10n.Talk.typeIt, dot: nil)
@@ -195,7 +271,113 @@ struct TalkScreen: View {
 
     // MARK: Content, by phase
 
+    /// They've asked for something: the screen is the conversation, with what's happening now at the bottom.
+    private var inConversation: Bool {
+        state.turns.contains { $0.mine } && [.greeting, .listening, .starting, .typing].contains(state.phase) && !hearingFailed
+    }
+
+    private static let now = "now"
+
+    /// Scrolls to the newest line once the layout has settled (the dock may have just grown).
+    private func toEnd(_ proxy: ScrollViewProxy) {
+        guard inConversation else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + ModeMotion.settle) {
+            withAnimation(ModeMotion.standard) { proxy.scrollTo(Self.now, anchor: .bottom) }
+        }
+    }
+
     @ViewBuilder private var content: some View {
+        if inConversation { conversation } else { page }
+    }
+
+    private var conversation: some View {
+        VStack(alignment: .leading, spacing: ModeSpacing.m) {
+            ForEach(state.turns) { turn in
+                switch turn.kind {
+                case .said:
+                    if turn.mine { ModeTalkBubble(turn.text) } else { ModeTalkMoLine(turn.text) }
+                case .next:
+                    let offer = turn.id == state.turns.last?.id && [.greeting, .listening].contains(state.phase)
+                    ModeTalkNext(turn.text, yes: offer ? turn.yes : nil, no: offer ? turn.no : nil,
+                                 onYes: { if let yes = turn.yes { onPick(yes) } }, onNo: { if let no = turn.no { onPick(no) } })
+                case .task:
+                    if let card = turn.card { taskCard(card) }
+                }
+            }
+            now.padding(.top, ModeSpacing.xs)
+            // Always there (what's happening now may draw nothing): where scrolling to the newest line lands.
+            Color.clear.frame(height: ModeSize.talkDivider).id(Self.now)
+        }
+        .padding(.top, ModeSpacing.s)
+    }
+
+    /// A task's card: while it works the header counts up every second.
+    @ViewBuilder private func taskCard(_ card: TalkModel.Card) -> some View {
+        if card.status == .working {
+            TimelineView(.periodic(from: card.startedAt, by: 1)) { context in
+                cardView(card, label: L10n.Talk.cardWorking(Self.clock(Int(context.date.timeIntervalSince(card.startedAt)))))
+            }
+        } else {
+            cardView(card, label: Self.label(card))
+        }
+    }
+
+    private func cardView(_ card: TalkModel.Card, label: String) -> some View {
+        ModeTalkTaskCard(
+            status: card.status, label: label, title: card.title, chip: Self.chip(card), steps: card.steps,
+            resultLabel: L10n.Talk.result, headline: card.headline, rows: card.rows,
+            openLabel: L10n.Talk.openChat, wrongLabel: L10n.Talk.whatWentWrong,
+            onOpen: { if let id = card.conversationId { onOpenChat(id) } }, onWrong: { onWhatWentWrong(card.taskId) }
+        )
+    }
+
+    /// "1:12", while it works.
+    private static func clock(_ seconds: Int) -> String {
+        let s = max(seconds, 0)
+        return "\(s / 60):" + String(format: "%02d", s % 60)
+    }
+
+    /// "DONE · 1 MIN 48 S", "PARTLY DONE · 2 MIN 10 S", once it ended.
+    private static func label(_ card: TalkModel.Card) -> String {
+        let took = card.seconds >= 60 ? L10n.Talk.tookMinutes(card.seconds / 60, card.seconds % 60) : L10n.Talk.tookSeconds(card.seconds)
+        return switch card.status {
+        case .done: L10n.Talk.cardDone(took)
+        case .partial: L10n.Talk.cardPartial(took)
+        case .failed: L10n.Talk.cardFailed(took)
+        case .stopped: String(localized: L10n.Talk.cardStopped)
+        case .working: L10n.Talk.cardWorking(clock(card.seconds))
+        }
+    }
+
+    /// "2 of 3" while it works (its plan), "Done", or "1 of 2" parts done.
+    private static func chip(_ card: TalkModel.Card) -> String? {
+        switch card.status {
+        case .working: card.parts > 1 ? L10n.Talk.partsOf(min(card.doneParts + 1, card.parts), card.parts) : nil
+        case .done: String(localized: L10n.Talk.chipDone)
+        case .partial: card.rows.isEmpty ? nil : L10n.Talk.partsOf(card.rows.filter(\.done).count, card.rows.count)
+        default: nil
+        }
+    }
+
+    /// The live part at the bottom of the conversation.
+    @ViewBuilder private var now: some View {
+        switch state.phase {
+        case .greeting, .listening:
+            VStack(spacing: ModeSpacing.m) {
+                if state.phase == .listening && !(state.settled.isEmpty && state.forming.isEmpty) {
+                    liveWords(placeholder: nil, style: .liveWords, cursor: ModeColor.brand)
+                }
+                ModeTalkWave(level: level, speaking: speaking || state.phase == .greeting)
+            }
+            .frame(maxWidth: .infinity)
+        case .starting:
+            EmptyView()
+        default:
+            typeBox(L10n.Talk.typeTask)
+        }
+    }
+
+    @ViewBuilder private var page: some View {
         switch state.phase {
         case .needsMic: needsMic
         case .greeting, .listening: listen
@@ -373,7 +555,11 @@ struct TalkScreen: View {
                 HStack(spacing: ModeSize.talkDockGap) {
                     ModeTalkSideButton(.keyboard, label: L10n.Talk.type, action: onType)
                     ModeTalkMicButton(listening: state.phase == .listening, label: L10n.Talk.done, action: onDone)
-                    ModeTalkSideButton(.close, label: L10n.Talk.cancel, action: onClose)
+                    if state.hasDone {
+                        ModeTalkSideButton(.checkmark, label: L10n.Talk.thatsAll, action: onThatsAll)
+                    } else {
+                        ModeTalkSideButton(.close, label: L10n.Talk.cancel, action: onClose)
+                    }
                 }
             case .asking, .answering:
                 if typingAnswer {
@@ -387,8 +573,12 @@ struct TalkScreen: View {
                     }
                 }
             case .starting:
-                ModeVoiceButton(L10n.Talk.stop, style: .danger, height: ModeSize.primaryButton, action: onStop)
-                    .frame(width: ModeSize.talkStopWidth)
+                VStack(spacing: ModeSpacing.l) {
+                    // Why Mo can't hear right now, just above Stop (board: Talking · one conversation, A).
+                    if inConversation { ModeTalkMicOff(L10n.Talk.micOffNote) }
+                    ModeVoiceButton(L10n.Talk.stop, style: .danger, height: ModeSize.primaryButton, action: onStop)
+                        .frame(width: ModeSize.talkStopWidth)
+                }
             case .answered:
                 EmptyView()
             default:
@@ -413,13 +603,18 @@ struct TalkRoute: View {
     @State private var model: TalkModel
     private let onClose: () -> Void
     private let onVoiceSettings: (Bool) -> Void
+    private let onOpenChat: (String) -> Void
+    private let onWhatWentWrong: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
     init(app: AppModel, forQuestion: Bool, conversationId: String? = nil, entry: String = "siri",
-         onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in }) {
+         onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in },
+         onOpenChat: @escaping (String) -> Void = { _ in }, onWhatWentWrong: @escaping (String) -> Void = { _ in }) {
         _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId, entry: entry))
         self.onClose = onClose
         self.onVoiceSettings = onVoiceSettings
+        self.onOpenChat = onOpenChat
+        self.onWhatWentWrong = onWhatWentWrong
     }
 
     var body: some View {
@@ -429,7 +624,11 @@ struct TalkRoute: View {
             onAnswer: model.answer, onLater: { model.later(); close() }, onStop: { model.stop(); close() }, onClose: close,
             onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; close(); onVoiceSettings(hearing) },
             cantHear: model.cantHear,
-            onTryAgain: model.tryAgain
+            onTryAgain: model.tryAgain,
+            onPick: model.pick,
+            onThatsAll: model.thatsAll,
+            onOpenChat: { id in close(); onOpenChat(id) },
+            onWhatWentWrong: { taskId in close(); onWhatWentWrong(taskId) }
         )
         .task { model.begin() }
         .onChange(of: model.state.finished) { _, finished in if finished { close() } }

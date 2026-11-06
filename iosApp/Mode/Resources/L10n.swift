@@ -817,6 +817,22 @@ enum L10n {
         static let typeTask = LocalizedStringResource("talk.typeTask", defaultValue: "Type what you want done")
         static let typeAnswer = LocalizedStringResource("talk.typeAnswer", defaultValue: "Type your answer")
         static let send = LocalizedStringResource("talk.send", defaultValue: "Send")
+        // Talking as one conversation (board Talking · one conversation).
+        static let workingMicOff = LocalizedStringResource("talk.workingMicOff", defaultValue: "Working · mic off")
+        static let micOffNote = LocalizedStringResource("talk.micOffNote", defaultValue: "Mic off while I work in your apps. I’ll listen again when I’m done.")
+        static let thatsAll = LocalizedStringResource("talk.thatsAll", defaultValue: "That’s all")
+        static let result = LocalizedStringResource("talk.result", defaultValue: "Result")
+        static let openChat = LocalizedStringResource("talk.openChat", defaultValue: "Open chat")
+        static let whatWentWrong = LocalizedStringResource("talk.whatWentWrong", defaultValue: "What went wrong")
+        static let chipDone = LocalizedStringResource("talk.chipDone", defaultValue: "Done")
+        static let cardStopped = LocalizedStringResource("talk.cardStopped", defaultValue: "STOPPED")
+        static func cardWorking(_ t: String) -> String { String(localized: "talk.cardWorking", defaultValue: "WORKING · \(t)") }
+        static func cardDone(_ t: String) -> String { String(localized: "talk.cardDone", defaultValue: "DONE · \(t)") }
+        static func cardPartial(_ t: String) -> String { String(localized: "talk.cardPartial", defaultValue: "PARTLY DONE · \(t)") }
+        static func cardFailed(_ t: String) -> String { String(localized: "talk.cardFailed", defaultValue: "COULDN’T FINISH · \(t)") }
+        static func tookSeconds(_ s: Int) -> String { String(localized: "talk.tookSeconds", defaultValue: "\(s) S") }
+        static func tookMinutes(_ m: Int, _ s: Int) -> String { String(localized: "talk.tookMinutes", defaultValue: "\(m) MIN \(s) S") }
+        static func partsOf(_ n: Int, _ of: Int) -> String { String(localized: "talk.partsOf", defaultValue: "\(n) of \(of)") }
     }
 
     enum Voice {

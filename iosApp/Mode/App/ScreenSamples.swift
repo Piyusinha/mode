@@ -57,6 +57,10 @@ struct ScreenSample: Identifiable {
         case "chat-long": pushed { ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant("Next time when you search flights, open Flightradar first and check the status for my IndiGo flight on the fourth, then tell me the gate and the delay if there is one."), canSend: true, onEvent: { _ in }) }
         case "teach-learned": pushed { ConversationScreen(state: Self.teachLearned, thumbnails: [:], draft: .constant(""), canSend: false, onEvent: { _ in }) }
         case "talk-mic": talk(.init(phase: .needsMic), level: 0, speaking: false)
+        case "talk-conv-working": talk(Self.conversation(.working), level: 0, speaking: false)
+        case "talk-conv-long": talk(Self.longConversation(), level: 0, speaking: false)
+        case "talk-conversation": talk(Self.conversation(.done), level: 0.4, speaking: false)
+        case "talk-conv-partial": talk(Self.conversation(.partial), level: 0.4, speaking: false)
         case "talk-canthear": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?"), level: 0, speaking: false, cantHear: true)
         case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
                                  level: 0.7, speaking: false)
@@ -677,6 +681,61 @@ extension ScreenSample {
             state.selected = "ava"; state.selectedName = "Ava"; state.playing = "ava"
         }
         return state
+    }
+}
+
+extension ScreenSample {
+    /// The board "Talking · one conversation": a request, its card working, done or partly done, and what's next.
+    static func conversation(_ status: ModeTalkTaskCard.Status) -> TalkModel.State {
+        let started = Date().addingTimeInterval(-72)
+        var steps = [
+            ModeTalkTaskCard.Step(id: 0, text: "Opening your chat with Sonali.", time: "10:03"),
+            ModeTalkTaskCard.Step(id: 1, text: "Sent Sonali “testing my agent”.", time: "10:04"),
+            ModeTalkTaskCard.Step(id: 2, text: "Checking today in Google Calendar.", time: "10:04"),
+        ]
+        if status == .done { steps.append(.init(id: 3, text: "Found the DoorDash sync at 11 pm.", time: "10:05")) }
+        if status == .partial { steps.append(.init(id: 3, text: "Nothing called DoorDash today in Google Calendar.", time: "10:05")) }
+        let rows: [ModeTalkTaskCard.Row] = status == .partial ? [
+            .init(id: 0, title: "Replied to Sonali", detail: "WhatsApp · “testing my agent”", done: true),
+            .init(id: 1, title: "DoorDash meeting not found", detail: "Nothing today in your Google Calendar", done: false),
+        ] : [
+            .init(id: 0, title: "Replied to Sonali", detail: "WhatsApp · “testing my agent”", done: true),
+            .init(id: 1, title: "DoorDash sync", detail: "Today 23:00–23:30 · Google Meet", done: true),
+        ]
+        let card = TalkModel.Card(
+            taskId: "sample", conversationId: "sample", status: status, title: "Sonali, then today’s DoorDash meeting",
+            startedAt: started, seconds: status == .partial ? 130 : 108, steps: steps, doneParts: 1, parts: 3,
+            headline: status == .partial ? "Sonali has your reply; I couldn’t find the DoorDash meeting" : "Sonali has your reply, and you have one DoorDash meeting today",
+            rows: rows
+        )
+        var turns: [TalkModel.Turn] = [
+            .init(id: 0, mine: false, kind: .said, text: "Good afternoon, Piyush. What would you like me to take care of?"),
+            .init(id: 1, mine: true, kind: .said, text: "Reply to Sonali that I’m testing my agent, then check my DoorDash meeting today"),
+            .init(id: 2, mine: false, kind: .task, text: "", card: card),
+        ]
+        if status == .done { turns.append(.init(id: 3, mine: false, kind: .next, text: "Anything else, Piyush? The DoorDash sync is at 11.")) }
+        if status == .partial {
+            turns.append(.init(id: 3, mine: false, kind: .next, text: "Want me to look in your work calendar too, or skip it?", yes: "Yes, look there", no: "Skip it"))
+        }
+        return TalkModel.State(phase: status == .working ? .starting : .listening, turns: turns, hasDone: status != .working)
+    }
+}
+extension ScreenSample {
+    /// A finished task, Mo's "Anything else?", then a second task working: the newest line must be in view.
+    static func longConversation() -> TalkModel.State {
+        var first = conversation(.done)
+        let next = conversation(.working).turns.compactMap(\.card).first.map { card in
+            TalkModel.Card(taskId: "second", conversationId: "sample", status: .working, title: "Turn on Do Not Disturb until 6", startedAt: Date().addingTimeInterval(-20),
+                           seconds: 0, steps: [.init(id: 0, text: "Opening Focus in Control Centre.", time: "10:07"), .init(id: 1, text: "Do Not Disturb is on; setting it to end at 6.", time: "10:07")],
+                           doneParts: 0, parts: 0, headline: "", rows: [])
+        }
+        first.turns += [
+            .init(id: 10, mine: true, kind: .said, text: "Turn on Do Not Disturb until 6"),
+            .init(id: 11, mine: false, kind: .said, text: "Sure, turning on Do Not Disturb until 6."),
+            .init(id: 12, mine: false, kind: .task, text: "", card: next),
+        ]
+        first.phase = .starting
+        return first
     }
 }
 #endif

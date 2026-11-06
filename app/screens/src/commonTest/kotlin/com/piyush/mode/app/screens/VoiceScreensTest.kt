@@ -12,6 +12,7 @@ import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -175,5 +176,152 @@ class VoiceScreensTest {
         assertEquals("", sent.reply)   // the task went before the line was written
         val spoken = talk.state.awaitState { it.reply.isNotEmpty() }
         assertEquals("On it, Piyush. Dark Mode, coming right up.", spoken.reply)
+    }
+
+    @Test
+    fun startedByVoiceModeGreetsInTheAIsWordsWithWhatsComingUp() = runTest {
+        val f = Fixture(backgroundScope)
+        var asked = ""
+        val greeting = "Evening, Piyush. Dinner with Priya's at 7. Want me to text her you're on your way?"
+        val model = com.piyush.mode.llm.LlmClient { _, messages, _ ->
+            asked = messages.last().text
+            com.piyush.mode.llm.ChatResult(
+                com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
+                    put("line", kotlinx.serialization.json.JsonPrimitive(greeting))
+                }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
+        }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val day = com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20", events = listOf("Thu 6 Nov 19:00–21:00 · Dinner with Priya"))
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", greeter = greeter, day = { day })
+            talk.begin()
+            assertEquals(greeting, talk.state.awaitState { it.greeting.isNotEmpty() }.greeting)
+            assertTrue("Dinner with Priya" in asked)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun withoutTheAIModeSaysItsOwnGreeting() = runTest {
+        val f = Fixture(backgroundScope)
+        f.settings.update { it.copy(userName = "Piyush") }
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", day = { com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20") })
+            talk.begin()
+            val s = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertTrue(s.greeting.startsWith("Hey Piyush"), s.greeting)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    private fun nextLines(vararg lines: String, offer: String? = null): com.piyush.mode.feature.memory.data.Greeter {
+        val queue = ArrayDeque(lines.toList())
+        var offered = false
+        val model = com.piyush.mode.llm.LlmClient { _, _, _ ->
+            com.piyush.mode.llm.ChatResult(
+                com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
+                    put("line", kotlinx.serialization.json.JsonPrimitive(queue.removeFirstOrNull() ?: "Anything else?"))
+                    if (offer != null && !offered) {
+                        offered = true
+                        put("offer_task", kotlinx.serialization.json.JsonPrimitive(offer))
+                        put("yes_label", kotlinx.serialization.json.JsonPrimitive("Yes, look there"))
+                        put("no_label", kotlinx.serialization.json.JsonPrimitive("Skip it"))
+                    }
+                }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
+        }
+        return com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+    }
+
+    @Test
+    fun startedByVoiceTheConversationCarriesOnAfterATaskInTheSameChat() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", greeter = nextLines("Anything else, Piyush?"), day = { com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20") })
+
+        talk.submitTyped("Turn on dark mode")
+        val next = talk.state.awaitState { it.greeting == "Anything else, Piyush?" }
+        assertEquals(listOf("Turn on dark mode"), next.doneSoFar)
+        assertFalse(next.finished, "the conversation goes on after the task")
+        // One conversation on one screen: the request, how it went, and what Mode asks next, in order.
+        val lines = next.turns
+        assertEquals("Turn on dark mode", lines.first { it.mine }.text)
+        assertEquals("Anything else, Piyush?", lines.last().text)
+        val card = lines.single { it.kind == com.piyush.mode.app.screens.settings.TalkTurn.Kind.Task }.card!!
+        assertTrue(card.state != com.piyush.mode.app.screens.settings.TalkTaskCard.State.Working, "the task's card ends with its result")
+        assertTrue(card.headline.isNotBlank())
+        assertTrue(lines.indexOfFirst { it.mine } < lines.indexOfLast { !it.mine })
+
+        talk.submitTyped("Now turn off Wi-Fi")
+        talk.state.awaitState { it.doneSoFar.size == 2 }
+        val chats = f.tasks.recent(10).first().map { it.conversationId }.distinct()
+        assertEquals(1, chats.size, "both tasks in one chat")
+
+        talk.submitTyped("That's all, thanks")
+        assertTrue(talk.state.awaitState { it.finished }.finished)
+    }
+
+    @Test
+    fun openedFromTheAppTheScreenStillClosesAfterTheTask() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "chat_mic", greeter = nextLines("Anything else?"))
+        talk.submitTyped("Turn on dark mode")
+        val done = talk.state.awaitState { it.finished }
+        assertTrue(done.doneSoFar.isEmpty())
+    }
+
+    @Test
+    fun aWrapUpIsTheWholeReplyNotAWordInsideATask() {
+        listOf("That's all", "thanks", "No thank you.", "bye Mo", "nahi bas", "that's it, thanks").forEach {
+            assertTrue(ListenPresenter.isWrapUp(it), it)
+        }
+        listOf("Text Priya thanks for dinner", "No, order the large one", "Stop the music on Spotify please now").forEach {
+            assertFalse(ListenPresenter.isWrapUp(it), it)
+        }
+    }
+
+    @Test
+    fun yesToModesOfferRunsTheTaskItOffered() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", greeter = nextLines("Want me to look in your work calendar too, or skip it?", offer = "Look for today's DoorDash meeting in my work calendar"))
+        talk.submitTyped("Check my DoorDash meeting today")
+        val next = talk.state.awaitState { s -> s.turns.any { it.offer != null } }
+        assertEquals("Yes, look there", next.turns.last().offer?.yes)
+
+        talk.pick("Yes, look there")
+        talk.state.awaitState { it.doneSoFar.size == 2 }
+        val asked = f.tasks.recent(10).first().map { it.text }
+        assertTrue("Look for today's DoorDash meeting in my work calendar" in asked, "yes runs the offered task: $asked")
+        val mine = talk.state.value.turns.filter { it.mine }.map { it.text }
+        assertEquals(listOf("Check my DoorDash meeting today", "Yes, look there"), mine, "the bubble shows what they said")
+    }
+
+    @Test
+    fun noToModesOfferRunsNothingAndTheConversationGoesOn() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", greeter = nextLines("Want me to look in your work calendar too?", "Okay. Anything else?", offer = "Look in my work calendar"))
+        talk.submitTyped("Check my DoorDash meeting today")
+        talk.state.awaitState { s -> s.turns.any { it.offer != null } }
+        talk.pick("Skip it")
+        val after = talk.state.awaitState { s -> s.turns.lastOrNull()?.text == "Okay. Anything else?" }
+        assertFalse(after.finished)
+        assertEquals(1, f.tasks.recent(10).first().size, "no task for a no")
+    }
+
+    @Test
+    fun yesAndNoAreTheWholeReply() {
+        listOf("Yes", "yeah sure", "Yes please", "go ahead Mo").forEach { assertTrue(ListenPresenter.isYes(it), it) }
+        listOf("Skip it", "no thanks", "leave it for now").forEach { assertTrue(ListenPresenter.isDecline(it), it) }
+        assertFalse(ListenPresenter.isYes("Yes, and also text Priya"))
     }
 }
