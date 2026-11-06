@@ -81,6 +81,30 @@ public class Scheduler(
         notifier.cancel(notificationId(id))
     }
 
+    /**
+     * Repeats just added from a backup: due next from now (a time saved in the backup may have passed, and
+     * must not run them at once), with this iPhone's reminder set. A one-off whose time has passed is
+     * switched off rather than run.
+     */
+    public fun rearm(ids: Collection<String>) {
+        val time = now()
+        for (id in ids) {
+            val s = schedules.get(id) ?: continue
+            if (!s.enabled) {
+                notifier.cancel(notificationId(id))
+                continue
+            }
+            val due = s.nextRunAt
+            val next = when {
+                due != null && due > time -> due
+                s.rule.once -> null
+                else -> s.rule.nextRun(time, zone())
+            }
+            schedules.setEnabled(id, next != null, next)
+            schedules.get(id)?.takeIf { it.enabled }?.let(::remind) ?: notifier.cancel(notificationId(id))
+        }
+    }
+
     /** Submits every schedule that is due, and works out when each is due next. */
     public fun checkDue() {
         val time = now()

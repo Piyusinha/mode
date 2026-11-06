@@ -37,11 +37,12 @@ val iosModeGraph: ModeGraph by lazy {
     val installationId = prefs.getString("telemetry.installation_id") ?: Uuid.random().toString().also {
         prefs.putString("telemetry.installation_id", it)
     }
+    val version = bundle.objectForInfoDictionaryKey("CFBundleShortVersionString")?.toString() ?: "unknown"
     val telemetry = runCatching {
         LocalTelemetry(files, TelemetryResource(
             installationId = installationId,
             appId = bundle.bundleIdentifier ?: "mode",
-            version = bundle.objectForInfoDictionaryKey("CFBundleShortVersionString")?.toString() ?: "unknown",
+            version = version,
             build = bundle.objectForInfoDictionaryKey("CFBundleVersion")?.toString() ?: "unknown",
             platform = "ios",
         ))
@@ -71,6 +72,7 @@ val iosModeGraph: ModeGraph by lazy {
             permissions = com.piyush.mode.core.platform.IosPermissions(),
             phoneChecks = com.piyush.mode.feature.connection.data.CoreDevicePhoneChecks(),
             device = IosDeviceData(),
+            appVersion = version,
         ),
     )
 }

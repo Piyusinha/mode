@@ -37,3 +37,17 @@ SELECT * FROM schedule WHERE enabled = 1 AND next_run_at <= ? ORDER BY next_run_
 
 deleteAll:
 DELETE FROM schedule;
+
+-- Backup and restore (feature:backup): every row in insertion order, and adding without replacing.
+everything:
+SELECT * FROM schedule ORDER BY rowid;
+
+ids:
+SELECT id FROM schedule;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO schedule(id, text, hour, minute, days, enabled, next_run_at, last_run_at, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+countAll:
+SELECT count(*) FROM schedule;

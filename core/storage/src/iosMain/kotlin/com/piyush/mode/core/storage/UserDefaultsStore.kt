@@ -13,6 +13,15 @@ public class UserDefaultsStore : KeyValueStore {
         defaults.setObject(value, forKey = name)
     }
 
+    /**
+     * Mode's own settings: the app's persistent domain (not the global and system defaults that standard
+     * defaults also answers), only text values, as Mode saves nothing else.
+     */
+    override fun names(): Set<String> {
+        val domain = NSBundle.mainBundle.bundleIdentifier?.let(defaults::persistentDomainForName) ?: return emptySet()
+        return domain.entries.mapNotNull { (key, value) -> (key as? String)?.takeIf { value is String } }.toSet()
+    }
+
     override fun clear() {
         NSBundle.mainBundle.bundleIdentifier?.let(defaults::removePersistentDomainForName)
         defaults.dictionaryRepresentation().keys.forEach { (it as? String)?.let(defaults::removeObjectForKey) }

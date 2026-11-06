@@ -140,4 +140,25 @@ class SchedulerTest {
         assertTrue(repo.all().isEmpty())
         assertTrue(reminders.pending.isEmpty())
     }
+
+    @Test
+    fun restoredRepeatsAreDueFromNowAndAPassedOneOffIsSwitchedOff() = runTest {
+        val s = scheduler(this)
+        val daily = s.add("Read my calendar", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))!!
+        val once = s.add("Call the bank", ScheduleRule(9, 0, emptySet()))!!
+        val later = s.add("Water the plants", ScheduleRule(20, 0, emptySet()))!!
+        reminders.pending.clear()
+        // Restored three days later: the backup's times have passed, except one still to come.
+        clock = at(4, 10, 0)
+        repo.setEnabled(later.id, true, at(4, 20))
+        s.rearm(listOf(daily.id, once.id, later.id))
+
+        assertEquals(at(5, 8), repo.get(daily.id)!!.nextRunAt)
+        assertEquals(at(5, 8), reminders.pending["schedule-${daily.id}"]!!.second)
+        assertFalse(repo.get(once.id)!!.enabled)
+        assertNull(reminders.pending["schedule-${once.id}"])
+        assertEquals(at(4, 20), reminders.pending["schedule-${later.id}"]!!.second)
+        s.checkDue()
+        assertTrue(inbox.submitted.isEmpty(), "nothing runs at once")
+    }
 }

@@ -16,6 +16,9 @@ public interface KeyValueStore {
     public fun getString(name: String): String?
     public fun putString(name: String, value: String)
 
+    /** The name of every setting Mode has saved (for a backup). */
+    public fun names(): Set<String>
+
     /** Removes every setting (Settings → Reset Mode). */
     public fun clear()
 }

@@ -49,6 +49,7 @@ include(":feature:tasks")
 include(":feature:schedules")
 include(":feature:diagnostics")
 include(":feature:compare")
+include(":feature:backup")
 // Test fakes shared by every module (test source sets only).
 include(":testing")
 include(":app:screens")

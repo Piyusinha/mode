@@ -72,6 +72,8 @@ public class Screens(
     /** What Mode reads straight from the iPhone (the calendar), for the greeting's ideas. */
     private val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
     private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
+    /** Backup and restore (null where there is none). */
+    private val backupService: com.piyush.mode.feature.backup.data.BackupService? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -92,6 +94,10 @@ public class Screens(
         com.piyush.mode.app.screens.debug.TaskDebugPresenter(
             scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude,
         )
+
+    /** Settings → Backup and restore. */
+    public fun backup(): com.piyush.mode.app.screens.settings.BackupPresenter =
+        com.piyush.mode.app.screens.settings.BackupPresenter(scope, backupService!!, clock)
 
     /** Settings → Health & repair. */
     public fun health(): com.piyush.mode.app.screens.settings.HealthPresenter =
