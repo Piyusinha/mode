@@ -256,6 +256,8 @@ class Brain(private val llm: LlmClient, private val model: String) {
             Direct routes first: when a step can be done by opening a link or an app's own URL (a search, a
             product page, a place), by running one of their Shortcuts, or by reading the calendar or a contact,
             say so in that step; the screen is for the app-specific part only. Direct routes are shorter and surer.
+            Their calendar is the Google Calendar app unless they name another: plan meetings and events there
+            (reading the iPhone's calendar store misses Google-only calendars).
 
             The steps: few and concrete, each a result to reach ("Open Asha's chat", "Read her last messages
             and his replies", "Write and send the reply"), not single taps. Keep every field to a few words; leave

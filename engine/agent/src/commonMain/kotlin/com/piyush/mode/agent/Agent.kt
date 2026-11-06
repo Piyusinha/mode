@@ -123,11 +123,20 @@ class StepRecord(
     /** The plan item (1-based) the model said this action works on, when it has a plan. */
     val planItem: Int? = null,
     val costReported: Boolean = true,
+    /** What the agent learned at this step ("Sonali sent five messages today"), for spoken updates. */
+    val note: String? = null,
 )
 
 sealed interface AgentOutcome {
     /** [spoken]: the reply as one or two sentences to say out loud (null: the model gave none). */
-    class Done(val summary: String, val success: Boolean, val spoken: String? = null) : AgentOutcome
+    /** [stay]: the task meant to leave the user on the screen it ended on (a video playing, an app opened). */
+    class Done(
+        val summary: String, val success: Boolean, val spoken: String? = null, val stay: Boolean = false,
+        /** The result as a short title ("Dark Mode is off"). */
+        val headline: String? = null,
+        /** One per thing asked for: done or not, with its detail. */
+        val parts: List<ResultPart> = emptyList(),
+    ) : AgentOutcome
     class Stopped(val why: String) : AgentOutcome
     class Failed(val why: String) : AgentOutcome
 }
@@ -592,7 +601,9 @@ class Agent(
                 val reason = codes.mask(reason0)
                 val outcome = codes.mask(outcome0)
                 onStep(StepRecord(step, model, action, reason, outcome, reply.usage.costUsd, stepStarted.elapsedNow().inWholeMilliseconds,
-                    planItem = call?.let(AgentTools::itemOf), costReported = reply.usage.costReported))
+                    planItem = call?.let(AgentTools::itemOf), costReported = reply.usage.costReported,
+                    note = call?.arguments?.get("note")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+                        ?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)))
                 trace.acted(step, action, op, outcome, actionStarted.elapsedNow().inWholeMilliseconds)
                 // A step the stronger model took is on purpose: the next steps build on it, not undo it.
                 // Seen on the phone: it opened Control Center for the Dark Mode switch; the next step called that
@@ -1352,7 +1363,12 @@ class Agent(
         }
         record("done", summary, (if (success) "finished" else "gave up") + evidence.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty())
         val spoken = call.arguments.string("spoken")?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)
-        return AgentOutcome.Done(summary, success, spoken)
+        val stay = success && call.arguments["stay_here"]?.jsonPrimitive?.booleanOrNull == true
+        val headline = call.arguments.string("headline")?.trim()?.takeIf { it.isNotEmpty() }?.let(codes::mask)
+        val parts = (call.arguments["parts"] as? JsonArray).orEmpty()
+            .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.let(codes::mask)?.let(ResultPart::parse) }
+            .take(MAX_RESULT_PARTS)
+        return AgentOutcome.Done(summary, success, spoken, stay, headline, parts)
     }
 
     /** Phone control stopped answering: reconnected and looked afresh (the new screen), or not (null), with the note. */
@@ -1560,6 +1576,7 @@ class Agent(
         private val SUBMIT = Regex("\\b(search|submit|go|done|send|next|continue|find|sign in|log in|pay|book|order)\\b", RegexOption.IGNORE_CASE)
 
         private const val MAX_GIVE_UP_CHARS = 300
+        private const val MAX_RESULT_PARTS = 6
 
         val SYSTEM_PROMPT = """
             You operate an iPhone for the user, one action at a time, to complete their task.
@@ -1692,6 +1709,11 @@ class Agent(
             go looking for later changes, cancellations, other copies or extra details nobody asked for; if
             something on that screen says it may have changed, say so in your reply instead.
 
+            The user's calendar: unless they name another calendar or app, it is the Google Calendar app (their
+            work and personal calendars live there). Open Google Calendar for meetings and events; read_calendar
+            only sees calendars synced to the iPhone, so it is a quick extra check, never proof that a meeting
+            doesn't exist.
+
             When something is in the way, keep going like a resourceful personal assistant would. Giving up is the
             last resort, after the other routes below; when the way forward is the user's choice, ask_user with
             2–3 concrete options instead of giving up:
@@ -1755,5 +1777,23 @@ object RiskGuard {
     fun isRisky(label: String): Boolean {
         val text = label.lowercase()
         return WORDS.any { word -> Regex("\\b${Regex.escape(word)}\\b").containsMatchIn(text) }
+    }
+}
+
+/** One thing a task asked for, in its result: done or not ([done]), what ([title]) and the detail. */
+data class ResultPart(val title: String, val detail: String, val done: Boolean) {
+    companion object {
+        private val MARK = Regex("""^\s*(✓|✔|✗|✘|×|\[x]|\[ ]|-|•)?\s*""", RegexOption.IGNORE_CASE)
+
+        /** "✓ Replied to Sonali — WhatsApp · hi" → done, title, detail; null when empty. */
+        fun parse(line: String): ResultPart? {
+            val text = line.trim().takeIf { it.isNotEmpty() } ?: return null
+            val mark = MARK.find(text)?.groupValues?.get(1).orEmpty()
+            val rest = text.substring(MARK.find(text)?.range?.last?.plus(1) ?: 0).trim()
+            if (rest.isEmpty()) return null
+            val done = mark !in setOf("✗", "✘", "×", "[ ]")
+            val split = rest.split(" — ", " – ", " - ", limit = 2)
+            return ResultPart(split[0].trim(), split.getOrNull(1)?.trim().orEmpty(), done)
+        }
     }
 }

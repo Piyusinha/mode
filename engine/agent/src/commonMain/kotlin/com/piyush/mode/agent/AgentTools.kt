@@ -220,7 +220,9 @@ object AgentTools {
             ),
         ),
         Tool(
-            "read_calendar", "Read the user's calendar events from now, without opening the Calendar app.", null,
+            "read_calendar", "Read the events in the iPhone's own calendar store from now, without opening an app. " +
+                "It misses calendars that live only in Google Calendar: for their meetings use the Google Calendar app " +
+                "(unless they named another), and never treat an empty result here as proof.", null,
             listOf(Param("days", "integer", "How many days ahead to read (1 for today, 7 for the week)."), reason),
         ),
         Tool(
@@ -247,6 +249,27 @@ object AgentTools {
                         "No lists, tables, links or Markdown.",
                 ),
                 Param("success", "boolean", "Whether the task was achieved."),
+                Param(
+                    "headline", "string",
+                    "The result as a short title, at most 12 words, no Markdown (\"Sonali has your reply, and you have one " +
+                        "DoorDash meeting today\", \"Dark Mode is off\").",
+                    required = false,
+                ),
+                Param(
+                    "parts", "array",
+                    "One line per thing the task asked for, as \"✓ What was done — the detail\" or \"✗ What wasn't done — " +
+                        "why\" (\"✓ Replied to Sonali — WhatsApp · testing my agent\", \"✓ DoorDash sync — today 23:00–23:30 · " +
+                        "Google Meet\", \"✗ Coffee not ordered — the café is closed until 8\"). Facts only, from what you saw.",
+                    required = false, items = "string",
+                ),
+                Param(
+                    "stay_here", "boolean",
+                    "true when the point of the task was to leave them on this screen: a video or song playing, an app, " +
+                        "page, map or chat they asked to open. Mode then leaves them here instead of coming back to itself. " +
+                        "false (the default) for things done on their behalf: a setting changed, a message sent, an order " +
+                        "placed, an answer found.",
+                    required = false,
+                ),
                 Param(
                     "evidence", "string",
                     "What on the current screen shows it is done (\"Dark Mode switch is off\", \"message shows Delivered\"), " +
