@@ -15,6 +15,7 @@ kotlin {
             api(projects.feature.runs)
             api(projects.feature.diagnostics)
             api(projects.feature.connection)
+            api(projects.feature.backup)
             implementation(projects.core.common)
             implementation(projects.core.telemetry)
         }

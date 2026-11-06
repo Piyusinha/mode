@@ -69,6 +69,7 @@ outside the layers and is used only by test source sets.
 | feature | `feature:tasks` | `TaskRunner` (one task at a time under a phone lock), `TaskQueue` / `TaskInbox` (the one way in for every source), `TaskMemory`, `TaskRepository` |
 | feature | `feature:schedules` | `ScheduleRule` (next run, local time), `ScheduleRepository`, `Scheduler` (due tasks to the inbox, notifications) |
 | feature | `feature:diagnostics` | `HandsCheck` |
+| feature | `feature:backup` | `BackupService`: one `.modebackup` file with every table and the settings (and, locked with a password, the sign-ins); restore merges, never deletes (D40) |
 | feature | `feature:compare` | `CompareRunner` |
 | app | `app:screens` | One presenter per screen (`StateFlow<UiState>` plus intents): Home, Conversation, Live run, Run screens, Tasks, Repeat, Memory, Settings, Onboarding; `Screens` makes them. Shared with a future Android UI |
 | app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |

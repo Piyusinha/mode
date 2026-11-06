@@ -73,6 +73,10 @@ class PlatformServices(
     val device: com.piyush.mode.ops.DeviceData = com.piyush.mode.ops.DeviceData.None,
     /** Whether the iPhone is locked: tasks wait for an unlock, and Unlock by voice is tested with it. */
     val deviceLock: com.piyush.mode.core.platform.DeviceLock = com.piyush.mode.core.platform.DeviceLock.None,
+    /** This build's version (CFBundleShortVersionString), written into backups. */
+    val appVersion: String = "unknown",
+    /** Where backups are written and picked ones read. */
+    val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles = com.piyush.mode.feature.backup.data.platformBackupFiles(),
 )
 
 /**
@@ -167,6 +171,22 @@ class ModeGraph(platform: PlatformServices) {
         return com.piyush.mode.feature.settings.domain.ProviderModels.fast(s.model, s.provider, chatGpt.modelInfo.value + claudeModels.known.value)
     }
 
+    /**
+     * Settings → Backup and restore. After a restore, what was written is read again: settings, the ChatGPT
+     * and Claude accounts, and the added repeats' next times and reminders.
+     */
+    private val backup = com.piyush.mode.feature.backup.data.BackupService(
+        database, platform.prefs, platform.secrets, platform.backupFiles,
+        deviceName = { settings.settings.value.userName?.let { "$it’s iPhone" } ?: "iPhone" },
+        appVersion = platform.appVersion,
+        onRestored = { report ->
+            settings.reload()
+            chatGpt.reload()
+            settings.claudeCredentials.reload()
+            scheduler.rearm(report.addedRepeatIds)
+        },
+    )
+
     val handsCheck: HandsCheck = HandsCheck(session, platform.background, platform.appInfo, activity)
     /** Each screen's presenter, for the native UI. */
     val screens: Screens = Screens(
@@ -185,6 +205,7 @@ class ModeGraph(platform: PlatformServices) {
         deviceLock = platform.deviceLock,
         background = platform.background,
         device = platform.device,
+        backupService = backup,
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
     )
 
