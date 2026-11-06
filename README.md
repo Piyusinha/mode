@@ -1,92 +1,180 @@
+<div align="center">
+
+<img src="docs/media/icon.png" width="112" alt="Mode app icon: Mo, an orange face peeking up">
+
 # Mode
 
-**Tell your iPhone what to do. Mode does it in your apps.**
+### Tell your iPhone what to do. Mode does it in your apps.
 
-Mode is an AI agent that runs on your iPhone. You say or type a task, such as
-“Turn off Dark Mode” or “Text Asha I’m on my way on WhatsApp”, and Mode looks at
-the screen, taps, types and opens apps until it is done, then tells you how it
-went. It uses the AI you already have (a ChatGPT or Claude plan, or an
-OpenRouter key), and it is open source.
+An AI agent that lives on your iPhone. Say a task, and Mode taps, types and opens
+your apps until it’s done, then tells you how it went.
 
-- **Runs on your iPhone.** No Mode server: Mode talks only to the AI and voice
-  providers you choose.
-- **Your own AI.** Continue with ChatGPT or Claude (your plan, no extra cost per
-  task), or bring an OpenRouter key and pick any model.
-- **Talk to it.** “Hey Siri, start Mode”; Mode answers out loud. Apple’s voice and
-  listening are free and private; ElevenLabs, Fish Audio, Deepgram and Soniox are
-  optional with your own key.
-- **It learns.** Correct it while it works (“search for it instead”) and it can
-  remember that for next time. Memory stays on the iPhone, and you can forget
-  anything.
-- **No scripts.** Nothing in Mode is written for a particular app. The AI decides
-  every step from your task and what is on the screen.
+<br>
 
-> Mode controls the phone through the remote-control services Apple added to
-> iOS 27 for developers (CoreDevice). It needs Developer Mode, and a computer
-> once to install it and pair it.
+<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://getmode.app"><img src="https://img.shields.io/badge/getmode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: getmode.app" height="44"></a>&nbsp;&nbsp;<a href="docs/media/mode-story.mp4"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
-## What you need
+<sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
 
-| | |
-|---|---|
-| iPhone | iOS 27 or later, Developer Mode on |
-| Computer | A Mac, Windows or Linux computer, once, for Mode Setup (and every 7 days on a free Apple account, unless you add SideStore) |
-| Apple account | Free or paid developer account. Free: Mode is signed for 7 days at a time. Paid ($99/year): signed for a year, and Mode uses its own VPN |
-| AI | A ChatGPT plan, a Claude plan, or an OpenRouter key |
+<br><br>
 
-## Install
+<img src="docs/media/hero.png" alt="Mode on three iPhones: the Lock Screen showing a task in progress, a spoken conversation with a task's result, and a chat with the day's calendar" width="100%">
 
-1. Download **Mode Setup** for your computer from the
-   [latest release](https://github.com/Piyusinha/mode/releases/latest).
-2. Connect your iPhone with a cable and follow Mode Setup: trust this computer,
-   turn on Developer Mode, sign in with your Apple account (the password goes
-   only to Apple), and Mode Setup signs and installs Mode and pairs it.
-3. Open Mode on the iPhone and finish setup: your name, your AI, a quick test.
+</div>
 
-On a free Apple account, Mode Setup can also install
-[SideStore](https://sidestore.io), which renews Mode every week on the iPhone so
-you don’t need the computer again.
+<br>
 
-## Build from source
+## See it in action
 
-See [docs/setup.md](docs/setup.md). In short:
+<a href="docs/media/mode-story.mp4"><img src="docs/media/poster.png" alt="Play the film: running late, three things done, you never touched your phone" width="100%"></a>
 
-```sh
-tools/gen-project.sh paid             # or: free (generates iosApp/Mode.xcodeproj)
-./gradlew jvmTest checkModuleRules    # shared Kotlin tests and module rules
-open iosApp/Mode.xcodeproj            # build and run on your iPhone
-cd desktop && cargo build             # Mode Setup (Rust + Tauri)
-```
+> Running late, hands on the wheel: *“Text Sam I’m ten minutes late. Any unread messages?
+> Order my usual coffee to the office.”* The iPhone does all three by itself.
+> [Watch the film](docs/media/mode-story.mp4) (71 s) · [the 23-second teaser](docs/media/mode-teaser.mp4)
 
-Set your own team in `iosApp/project.yml` (`DEVELOPMENT_TEAM`) before building.
+<br>
 
-## How it works
+## What Mode can do
 
-The agent, memory, task queue, model clients and voice are shared Kotlin
-(Kotlin Multiplatform). The iPhone app is SwiftUI. A small Rust library talks to
-the phone’s CoreDevice services for screenshots, taps, typing and opening apps.
-Mode Setup is a Rust and Tauri app built on
-[isideload](https://github.com/nab138/isideload) and
-[idevice](https://github.com/jkcoxson/idevice).
+<table>
+<tr>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-talk.png" width="260" alt="A spoken conversation: each task is a card with Mo's updates and the result">
+<h3>Just say it</h3>
+“Hey Siri, start Mode.” Ask out loud, hear it answer. When one thing’s done, Mo asks
+what’s next. One conversation, as many tasks as you like.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-lockscreen.png" width="260" alt="The Lock Screen Live Activity: Mode working, step by step">
+<h3>Watch it work</h3>
+Every step shows live on your Lock Screen and in the Dynamic Island, with a Stop
+button. You can put the phone down.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-chat.png" width="260" alt="A chat with the answer: message sent and the day's calendar">
+<h3>Any app, no setup</h3>
+WhatsApp, Calendar, Settings, YouTube, food delivery, your fitness tracker: if you can
+do it with your thumbs, Mode can try. Nothing is scripted.
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-memory.png" width="260" alt="About You: people, places and preferences Mode remembers">
+<h3>It learns you</h3>
+Who you text where, your usual order, how you write. Correct it once and it remembers.
+See everything it knows, and forget anything.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-your-ai.png" width="260" alt="AI providers: ChatGPT, Claude and OpenRouter">
+<h3>Your own AI</h3>
+Sign in with your ChatGPT or Claude plan, at no extra cost per task, or bring an
+OpenRouter key and pick any model.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="docs/media/phone-home.png" width="260" alt="Home: what can I do for you, with tips and recent tasks">
+<h3>Yours, privately</h3>
+No Mode server, no account. Your chats and memory stay on your iPhone, and your keys
+stay in its Keychain.
+</td>
+</tr>
+</table>
 
-| Document | What it covers |
-|---|---|
-| [docs/architecture.md](docs/architecture.md) | Layers, modules and data |
-| [docs/harness.md](docs/harness.md) | How the agent thinks, remembers and stays within budget |
-| [docs/flows.md](docs/flows.md) | Pairing, connecting, a look, a tap, the agent loop |
-| [docs/decisions.md](docs/decisions.md) | Every design decision and why |
-| [docs/status.md](docs/status.md) | What is done and what is next |
+<br>
 
-## Privacy
+## Things you can say
 
-Mode keeps your tasks, chats and memory on your iPhone. Screenshots of the
-current screen and your task go to the AI provider you chose, and your voice to
-the voice provider you chose (Apple’s stay on the iPhone). Keys and sign-ins are
-kept in the iPhone’s Keychain. Details: [PRIVACY.md](PRIVACY.md).
+> 💬 *“Reply to Sonali that I’m on my way, on WhatsApp.”*<br>
+> 📅 *“What’s on my calendar today?”*<br>
+> 🌙 *“Turn on Do Not Disturb until 6.”*<br>
+> ☕️ *“Order my usual coffee to the office.”*<br>
+> 📬 *“Read me my unread messages from today.”*<br>
+> ▶️ *“Play the latest Kurzgesagt video on YouTube.”*<br>
+> 🔁 *“Every morning at 8, tell me what’s on my calendar.”*
 
-## License
+When Mode needs you (which size, which address, a password only you know), it asks
+out loud or on the Lock Screen. Anything it can’t finish, it tells you why, and offers
+to try another way.
 
-Apache License 2.0. See [LICENSE](LICENSE).
+<br>
 
-Mode is not affiliated with Apple, OpenAI, Anthropic, OpenRouter or any voice
-provider. iPhone and iOS are trademarks of Apple Inc.
+## Get started
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+**1 · Download Mode Setup**
+
+[Download for Mac](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg). This downloads **Mode Setup**, a small Mac app that installs Mode on your iPhone for you.
+
+</td>
+<td width="33%" valign="top">
+
+**2 · Plug in your iPhone**
+
+Open Mode Setup and connect your iPhone with a cable. It walks you through each step, signs Mode with your Apple account and installs it. A few minutes, once.
+
+</td>
+<td width="33%" valign="top">
+
+**3 · Say hello to Mo**
+
+Open Mode on your iPhone, connect your AI, and give it its first task. Then try *“Hey Siri, start Mode.”*
+
+</td>
+</tr>
+</table>
+
+**You’ll need:** an iPhone on iOS 27 or later · a Mac, once, for setup · a free or paid
+Apple account · a ChatGPT or Claude plan, or an OpenRouter key.
+<sub>Windows and Linux versions of Mode Setup are on the [releases page](https://github.com/Piyusinha/mode/releases/latest).</sub>
+
+<br>
+
+## Questions
+
+<details>
+<summary><b>Is Mode free?</b></summary>
+<br>
+Yes. Mode is free and open source. It uses the AI you already pay for (a ChatGPT or
+Claude plan), or an OpenRouter key where you pay the provider per use.
+</details>
+
+<details>
+<summary><b>Does my phone need to stay plugged into the Mac?</b></summary>
+<br>
+No. The Mac is only for the first install. With a free Apple account, Apple asks for
+apps like Mode to be re-signed every 7 days. Mode Setup does that, or you can let
+SideStore renew it on the iPhone. With a paid developer account, it lasts a year.
+</details>
+
+<details>
+<summary><b>What does Mode send, and to whom?</b></summary>
+<br>
+Your task and a picture of the current screen go to the AI you chose, and your voice
+to the voice service you chose (Apple’s stays on the iPhone). Nothing goes to us: there
+is no Mode server. The details are in <a href="PRIVACY.md">PRIVACY.md</a>.
+</details>
+
+<details>
+<summary><b>Can it pay or send things without asking?</b></summary>
+<br>
+You decide how much Mode does on its own. It never types your passcode or card
+numbers: when a step needs one, it hands the phone back to you.
+</details>
+
+<details>
+<summary><b>Android?</b></summary>
+<br>
+Coming soon.
+</details>
+
+<br>
+
+<div align="center">
+
+**Building Mode or curious how it works?** Start with [DEVELOPERS.md](DEVELOPERS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<sub>Apache License 2.0 · [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Notices](NOTICE)</sub><br>
+<sub>Mode is not affiliated with Apple, OpenAI, Anthropic, OpenRouter or any voice provider. iPhone and iOS are trademarks of Apple Inc.</sub>
+
+</div>

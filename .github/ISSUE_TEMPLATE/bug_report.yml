@@ -1,0 +1,51 @@
+name: Bug report
+description: Mode did something wrong, or couldn't finish a task it should have.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please remove anything private (names, numbers, messages) from what you paste.
+        Security problems: please use the private form in SECURITY.md instead.
+  - type: textarea
+    id: task
+    attributes:
+      label: What you asked Mode to do
+      placeholder: "Reply to Sam on WhatsApp that I'm on my way"
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What Mode did, where it got stuck, and what it said. A screenshot of the task's "What went wrong" page helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: iphone
+    attributes:
+      label: iPhone and iOS version
+      placeholder: iPhone 17 Pro, iOS 27.2
+    validations:
+      required: true
+  - type: dropdown
+    id: ai
+    attributes:
+      label: Your AI
+      options: [ChatGPT, Claude, OpenRouter, Not sure]
+    validations:
+      required: true
+  - type: dropdown
+    id: account
+    attributes:
+      label: Apple account used to install Mode
+      options: [Free, Paid developer account, Not sure]
+  - type: input
+    id: version
+    attributes:
+      label: Mode version
+      description: Settings, at the bottom.

@@ -1,0 +1,19 @@
+name: Feature request
+description: An idea for something Mode should do.
+labels: [idea]
+body:
+  - type: textarea
+    id: trying
+    attributes:
+      label: What you were trying to do
+      description: The task or moment, in your own words. This matters more than the feature itself.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else

@@ -27,3 +27,6 @@ iosApp/Packages/*/.swiftpm/
 # Local research and reports (never published)
 reports/
 research_notes/
+
+# Promo video work folders (the finished films live in docs/media)
+brag-output*/

@@ -68,6 +68,8 @@ else
 fi
 MAC_DMG="build/release/Mode-Setup-$V-mac.dmg"
 cp "$DMG" "$MAC_DMG"
+# The same file under a fixed name: the README's Download button links to releases/latest/download/Mode-Setup-mac.dmg.
+cp "$DMG" build/release/Mode-Setup-mac.dmg
 
 echo "== Draft release $TAG"
 NOTES=$(mktemp)
@@ -85,7 +87,7 @@ EOF
 gh release create "$TAG" --draft --target main --title "Mode $V" --notes-file "$NOTES" \
     build/release/Mode.ipa build/release/Mode.ipa.sha256 \
     build/release/Mode-paid.ipa build/release/Mode-paid.ipa.sha256 \
-    "$MAC_DMG"
+    "$MAC_DMG" build/release/Mode-Setup-mac.dmg
 rm -f "$NOTES"
 
 # GitHub Actions (release.yml) builds Windows and Linux for this tag and adds them to the draft.

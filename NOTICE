@@ -1,6 +1,33 @@
 Mode
-Copyright 2026 Piyush Sinha
+Copyright 2026 Piyush Sinha and Mode contributors
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
-It includes third-party open-source software under their own licenses,
-including isideload and idevice (Mode Setup) and Kotlin Multiplatform libraries.
+
+Mode builds on the following open source work. Each is used under its own license;
+see the linked project for the full terms.
+
+Code adapted into Mode
+- OAuthLanguageModels by finnvoor (CC0 1.0): the Claude sign-in and Messages protocol
+  adapted in engine/llm (https://github.com/finnvoor/OAuthLanguageModels).
+
+Libraries
+- isideload (MIT OR Apache-2.0): signing and installing Mode from Mode Setup
+  (https://github.com/nab138/isideload).
+- idevice (MIT): talking to the iPhone over USB and CoreDevice
+  (https://github.com/jkcoxson/idevice).
+- Tauri (MIT OR Apache-2.0): the Mode Setup app (https://tauri.app).
+- Kotlin, kotlinx.coroutines, kotlinx.serialization, kotlinx-datetime (Apache-2.0),
+  JetBrains (https://github.com/Kotlin).
+- Ktor (Apache-2.0): networking (https://ktor.io).
+- SQLDelight (Apache-2.0): the on-phone database (https://github.com/cashapp/sqldelight).
+- SKIE (Apache-2.0): Swift interop for Kotlin (https://skie.touchlab.co).
+- The Rust crates listed in desktop/Cargo.lock and native/*/Cargo.lock, each under its
+  own license.
+
+Fonts
+- Bricolage Grotesque (SIL Open Font License 1.1), bundled in the design system
+  (https://github.com/ateliertriay/bricolage).
+
+Apps Mode works with (not bundled; installed separately by the user)
+- SideStore (https://sidestore.io): optional, renews Mode on a free Apple account.
+- LocalDevVPN: used by the free build to reach the iPhone's CoreDevice services.
