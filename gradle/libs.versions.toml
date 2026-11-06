@@ -10,6 +10,7 @@ sqldelight = "2.4.1"
 kotlinx-datetime = "0.7.1"
 opentelemetry-kotlin = "0.9.0"
 android-gradle = "9.2.1"
+cryptography = "0.6.0"
 
 [libraries]
 otel-core = { module = "io.opentelemetry.kotlin:core", version.ref = "opentelemetry-kotlin" }
@@ -32,6 +33,9 @@ sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sq
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
+# CryptoKit + CommonCrypto on iOS, the JDK on the JVM.
+cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptography" }
 
 [plugins]
 androidKmp = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }

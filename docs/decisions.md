@@ -465,3 +465,28 @@ the graph grows past what one file reads comfortably.
   icon"), chosen for the strongest contrast and a shape that reads at 29 pt.
 - `tools/make-icon.swift` draws it from Mo's own curves at 1024 px: light (coral on #1A1A1F), dark (a
   deeper ground) and tinted (a light grey Mo on black, which iOS colours).
+
+## D40. Backup and restore: one file, merged in, locked when it holds sign-ins (2026-11-06)
+
+- **What goes in.** Always: every chat and message, task, run (the history index), memory, repeat, and the
+  settings. Only when "Include my AI and voice sign-ins" is on: each connected provider's Keychain entries
+  (`SignIns`), and then the backup must be locked with a password. Never: run screenshots and step logs,
+  the pairing file, the VPN, logs, and the settings that belong to one iPhone (`BackupService.DEVICE_ONLY`:
+  the telemetry install id, onboarding done, Unlock by voice set up, when tips started, a one-time upgrade
+  marker, the cached Claude model list, the day a routine was last suggested, when this iPhone last backed
+  up) and ChatGPT's per-iPhone host id. This replaces the settings-only plan in
+  [telemetry-diagnostics-backup-plan.md](telemetry-diagnostics-backup-plan.md) §4: the user wants
+  everything.
+- **The file** (`.modebackup`): a `MODE-BACKUP` magic line, one line of JSON header readable without the
+  password (format, version, when, which iPhone, counts, sign-in names, the lock's salt, nonce and
+  iterations), then the payload: JSON, or AES-256-GCM of it with the header as associated data. The key is
+  PBKDF2-HMAC-SHA256 (310,000 rounds, 16-byte salt); a second key derived beside it, hashed into the header,
+  tells a wrong password from a damaged file. Argon2id (the earlier plan) has no platform implementation
+  on iOS; PBKDF2 is in CommonCrypto and the JDK.
+- **Crypto library.** `dev.whyoleg.cryptography` 0.6.0 with the optimal provider: CryptoKit (AES-GCM) and
+  CommonCrypto (PBKDF2, HMAC) on iOS, the JDK on the JVM. Nothing hand-rolled; CommonCrypto alone has no
+  public AES-GCM. A golden file sealed on the JVM opens in the iOS simulator tests.
+- **Restore merges.** A row whose id is already here is left exactly as it is; the rest is added in one
+  transaction; nothing is deleted. Settings from the backup are applied (they are the user's setup). A
+  sign-in comes back only for a provider with none here. A task that was queued or running in the backup
+  comes back ended, so it never runs; added repeats get their next time from now and their reminder.
