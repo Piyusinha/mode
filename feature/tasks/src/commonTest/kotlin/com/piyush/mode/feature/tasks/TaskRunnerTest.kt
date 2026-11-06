@@ -635,4 +635,25 @@ class TaskRunnerTest {
         testScheduler.advanceUntilIdle()
         assertEquals("Done.", f.tasks.get(task.id)?.summary)
     }
+
+    @Test
+    fun aTaskMeantToEndOnAnotherAppsScreenLeavesTheUserThere() = runTest {
+        val f = Fixture(this, ScriptedModel(
+            call("done", "evidence" to "video playing", "summary" to "Playing it.", "success" to true, "stay_here" to true),
+        ))
+        f.runner.start("Open YouTube and play lo-fi beats", quick)
+        testScheduler.advanceUntilIdle()
+        val done = assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome)
+        assertTrue(done.stay)
+        assertTrue(f.link.phone!!.actions.none { it == Op.LaunchApp("com.piyush.mode") }, "Mode doesn't pull them away from the video")
+    }
+
+    @Test
+    fun aTaskDoneOnTheirBehalfStillComesBackToMode() = runTest {
+        val f = Fixture(this, ScriptedModel(call("done", "evidence" to "switch off", "summary" to "Dark Mode is off.")))
+        f.runner.start("Turn off dark mode", quick)
+        testScheduler.advanceUntilIdle()
+        assertFalse(assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome).stay)
+        assertTrue(f.link.phone!!.actions.any { it == Op.LaunchApp("com.piyush.mode") }, "Mode comes back to show how it went")
+    }
 }

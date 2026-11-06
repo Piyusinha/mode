@@ -100,6 +100,8 @@ public class TaskRunner(
     private val narrator: Narrator? = null,
     /** Turns a request in another language into English before the task starts (null: as said). */
     private val translator: Translator? = null,
+    /** Renames the chat after each task from everything asked in it (null: the first request stays its name). */
+    private val titler: ChatTitler? = null,
     /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
     private val device: com.piyush.mode.ops.DeviceData? = null,
 ) {
@@ -355,9 +357,15 @@ public class TaskRunner(
                 runCatching { voices?.speak(said) }
             }
             // The notification reads like the chat reply, as plain text (it can't draw Markdown).
-            notifier.postResult("Mode", PlainText.fromMarkdown(reply))
-            // Come back so the user sees how it went.
-            runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+            notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
+            state.value.conversationId?.let(::retitle)
+            // Come back so the user sees how it went, unless the task was to leave them where it ended
+            // (a video playing, an app they asked to open): then Mode finishes in the background.
+            if ((finished.outcome as? AgentOutcome.Done)?.stay == true) {
+                AppLog.log("agent", "run ${recorder.id}: left on the screen it ended on (the task was to be there)")
+            } else {
+                runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+            }
             return finished
         } catch (e: CancellationException) {
             outcome = TaskStatus.Stopped
@@ -479,6 +487,19 @@ public class TaskRunner(
      * Says a short update now and then while the task runs: when the plan moves on, paced by
      * [Narrator.Pacing], never over a spoken question, never the same thing twice.
      */
+    /** The chat's name, written again from all it asked, in the background (the old name stays if this fails). */
+    private fun retitle(conversationId: String) {
+        val titler = titler ?: return
+        scope.launch {
+            val asked = runCatching { conversations.turnsNow(conversationId) }.getOrDefault(emptyList())
+                .filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User }.map { it.text }
+            val title = titler.title(asked) ?: return@launch
+            if (title == conversations.get(conversationId)?.title) return@launch
+            runCatching { conversations.rename(conversationId, title) }
+            AppLog.log("chat", "renamed $conversationId: \"$title\" (from ${asked.size} request(s))")
+        }
+    }
+
     private suspend fun narrate(narrator: Narrator, task: String, started: kotlin.time.TimeMark) {
         val pacing = Narrator.Pacing()
         val said = mutableListOf<String>()
@@ -498,17 +519,23 @@ public class TaskRunner(
             if (!pacing.due(elapsed, progress)) continue
             pacing.said(elapsed, progress)
             val recent = s.steps.takeLast(RECENT_STEPS).map { it.reason }.filter { it.isNotBlank() }
+            val found = s.steps.mapNotNull { it.note }.distinct().takeLast(FOUND_NOTES)
             telemetry.trace(Operation.VoiceUpdate) { span ->
                 val line = narrator.line(task, done, listOfNotNull(next, s.status.ifBlank { null }).joinToString(" · "), said,
-                    settings.settings.value.userName, recent, language = runReplyLanguage)
+                    settings.settings.value.userName, recent, found = found, language = runReplyLanguage)
                 val stillQuiet = state.value.running && state.value.voice == null && state.value.question == null
                 val result = when {
                     line == null -> "Skipped"
                     !stillQuiet -> "Overtaken"
-                    else -> { said += line; voices?.speak(line); "Spoke" }
+                    else -> {
+                        said += line
+                        mutableState.update { it.copy(updates = it.updates + com.piyush.mode.feature.tasks.domain.SpokenUpdate(line, startOfNow())) }
+                        voices?.speak(line)
+                        "Spoke"
+                    }
                 }
                 span.fields(mapOf(Field.Outcome to result))
-                AppLog.log("voice", "update at ${elapsed / 1000} s: $result" + (line?.let { " (${it.length} chars)" } ?: ""))
+                AppLog.log("voice", "update at ${elapsed / 1000} s: $result" + (line?.let { ": \"$it\"" } ?: ""))
             }
         }
     }
@@ -669,6 +696,9 @@ public class TaskRunner(
 private const val NARRATE_TICK_MS = 1_000L
 /** How many of the latest steps an update is written from. */
 private const val RECENT_STEPS = 3
+
+/** How many of the agent's findings a spoken update can draw on. */
+private const val FOUND_NOTES = 4
 /** Every this many steps there is something new to say (about 15–25 s of work). */
 private const val NARRATE_EVERY_STEPS = 2
 private const val GOT_IT = "Got it. Going back."

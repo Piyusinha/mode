@@ -57,7 +57,12 @@ public data class TaskState(
     val remembered: List<MemoryItem> = emptyList(),
     /** A spoken question in a task the user spoke: Mode came forward to ask it out loud and listen. */
     val voice: VoiceTurn? = null,
+    /** What Mode said out loud while this task worked ("Sonali's reply is sent…"), oldest first. */
+    val updates: List<SpokenUpdate> = emptyList(),
 )
+
+/** A line Mode said out loud while a task worked, and when (epoch ms). */
+public data class SpokenUpdate(val text: String, val atMs: Long)
 
 /** Where a spoken question is: Mode saying it, listening for the answer, or saying it heard it before going back. */
 public enum class VoiceTurnPhase { Asking, Listening, Answered }

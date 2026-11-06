@@ -8,17 +8,17 @@ struct ModeLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ModeActivityAttributes.self) { context in
             let asks = context.state.asks(stale: context.isStale)
-            ModeActivityLockScreen(conversationId: context.attributes.conversationId, state: context.state, stale: context.isStale)
+            ModeActivityLockScreen(conversationId: context.attributes.chat(context.state), state: context.state, stale: context.isStale)
                 // A question turns the card white, ringed in blue, so it stands out on the Lock Screen.
                 .overlay {
                     if asks { ContainerRelativeShape().strokeBorder(ModeColor.lockScreenAskRing, lineWidth: ModeSize.activityAskRing) }
                 }
                 .activityBackgroundTint(asks ? ModeColor.lockScreenAsk : ModeColor.lockScreen)
                 .activitySystemActionForegroundColor(asks ? ModeColor.lockScreenAskRing : ModeColor.heroText)
-                .widgetURL(ModeLinks.conversation(context.attributes.conversationId))
+                .widgetURL(ModeLinks.conversation(context.attributes.chat(context.state)))
         } dynamicIsland: { context in
             let state = context.state
-            let conversation = context.attributes.conversationId
+            let conversation = context.attributes.chat(context.state)
             return DynamicIsland {
                 // The sides beside the camera are narrow: Mo, and Stop or how things stand.
                 DynamicIslandExpandedRegion(.leading) {

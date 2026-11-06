@@ -26,7 +26,8 @@ final class LiveActivityController {
     /// How long the answer stays on the Lock Screen.
     private let answerStays: TimeInterval = 30 * 60
     /// If Mode stops updating for this long (it was closed mid-task), iOS shows the activity as stale.
-    private let staleAfter: TimeInterval = 3 * 60
+    /// No update for this long and iOS may show the activity as stale (Mode looks stuck): long tasks go quiet for minutes.
+    private let staleAfter: TimeInterval = 10 * 60
 
     init(screens: Screens) {
         presenter = screens.liveActivity()
@@ -85,10 +86,10 @@ final class LiveActivityController {
             let content = Content(phase: .locked, lockedTaskId: w.taskId, lockedTask: w.task, voiceUnlock: w.voiceUnlock)
             // From the background iOS won't start a new activity, but one already showing (the task before)
             // can change: it becomes "Unlock to start" for this one.
-            if let activity, activity.activityState == .active, taskId != w.taskId {
+            if let activity, Self.alive(activity), taskId != w.taskId {
                 taskId = w.taskId
             }
-            show(taskId: w.taskId, task: w.task, conversationId: nil, content: content)
+            show(taskId: w.taskId, task: w.task, conversationId: w.conversationId, content: content)
         case let .finished(f):
             finish(taskId: f.taskId, content: Content(
                 phase: .finished,
@@ -102,22 +103,19 @@ final class LiveActivityController {
     }
 
     private func show(taskId id: String, task: String, conversationId: String?, content: Content) {
-        if let activity, taskId == id, activity.activityState == .active {
-            guard content != shown else { return }
-            shown = content
-            let stale = Date().addingTimeInterval(staleAfter)
-            let line = "update \(content.phase.rawValue) step \(content.step)"
-            send { [presenter] in
-                await activity.update(ActivityContent(state: content, staleDate: stale))
-                presenter.log(message: line + " (\(activity.activityState))")
-            }
+        var content = content
+        content.chat = conversationId ?? (taskId == id ? shown?.chat : nil)
+        // Stale only means no update came for a while (iOS can mark it so mid-task even as updates arrive): an
+        // update brings it back. Seen on the phone (6 Nov): treating stale as dead ended the island 3 min into a
+        // task, and from the background iOS refused a new one, so it was simply gone.
+        if let activity, taskId == id, Self.alive(activity) {
+            guard content != shown || activity.activityState == .stale else { return }
+            update(activity, with: content)
             return
         }
-        if let previous = activity {
-            presenter.log(message: "replacing the activity (\(previous.activityState))")
-            send { await previous.end(nil, dismissalPolicy: .immediate) }
-        }
+        let previous = activity.flatMap { Self.alive($0) ? $0 : nil }
         do {
+            // The new one first; the old one ends only once it exists, so the island is never left empty.
             activity = try Activity.request(
                 attributes: ModeActivityAttributes(task: task, conversationId: conversationId),
                 content: ActivityContent(state: content, staleDate: Date().addingTimeInterval(staleAfter))
@@ -126,11 +124,39 @@ final class LiveActivityController {
             shown = content
             presenter.showing(on: true)
             presenter.log(message: "started \(content.phase.rawValue) step \(content.step)")
+            if let previous {
+                presenter.log(message: "replaced the activity (\(previous.activityState))")
+                send { await previous.end(nil, dismissalPolicy: .immediate) }
+            }
         } catch {
-            // Live Activities are off for Mode: the notification tells the answer instead.
-            activity = nil
-            presenter.showing(on: false)
-            presenter.log(message: "could not start: \(error.localizedDescription)")
+            if let previous {
+                // From the background iOS won't start a new one: the one showing carries on for this task
+                // (its chat moves with it, in the state).
+                activity = previous
+                taskId = id
+                update(previous, with: content)
+                presenter.log(message: "kept the activity for this task (could not start a new one: \(error.localizedDescription))")
+            } else {
+                // Live Activities are off for Mode: the notification tells the answer instead.
+                activity = nil
+                presenter.showing(on: false)
+                presenter.log(message: "could not start: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Showing: active, or stale (an update revives it). Ended or dismissed ones are gone.
+    private static func alive(_ activity: Activity<ModeActivityAttributes>) -> Bool {
+        activity.activityState == .active || activity.activityState == .stale
+    }
+
+    private func update(_ activity: Activity<ModeActivityAttributes>, with content: Content) {
+        shown = content
+        let stale = Date().addingTimeInterval(staleAfter)
+        let line = "update \(content.phase.rawValue) step \(content.step)"
+        send { [presenter] in
+            await activity.update(ActivityContent(state: content, staleDate: stale))
+            presenter.log(message: line + " (\(activity.activityState))")
         }
     }
 
@@ -149,6 +175,8 @@ final class LiveActivityController {
 
     private func finish(taskId id: String, content: Content) {
         guard let activity, taskId == id else { return }
+        var content = content
+        content.chat = content.chat ?? shown?.chat
         self.activity = nil
         taskId = nil
         shown = nil

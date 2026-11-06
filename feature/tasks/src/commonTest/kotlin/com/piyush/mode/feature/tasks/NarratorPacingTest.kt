@@ -19,7 +19,9 @@ class NarratorPacingTest {
             val progress = "${(steps / 9).coerceAtMost(2)}|${steps / 2}"
             if (pacing.due(elapsed, progress)) { pacing.said(elapsed, progress); spoken++ }
         }
-        assertTrue(spoken in 12..17, "about one line every 20–25 s over 5.5 minutes, got $spoken")
+        // 6 Nov: twenty lines in five minutes repeated themselves; a cap of 8 then went quiet 4 minutes in.
+        // Now: every 30 s for six lines, then once a minute, for as long as the task runs.
+        assertTrue(spoken in 8..10, "every 30 s, then once a minute, over 5.5 minutes, got $spoken")
     }
 
     @Test
@@ -28,8 +30,20 @@ class NarratorPacingTest {
         assertFalse(pacing.due(5_000, "0|1"), "not in the first eight seconds")
         assertTrue(pacing.due(9_000, "0|1")); pacing.said(9_000, "0|1")
         assertFalse(pacing.due(40_000, "0|1"), "the same progress is not said twice")
-        assertFalse(pacing.due(20_000, "0|2"), "not within 20 s of the last line")
-        assertTrue(pacing.due(30_000, "0|2"))
+        assertFalse(pacing.due(30_000, "0|2"), "not within 30 s of the last line")
+        assertTrue(pacing.due(40_000, "0|2"))
         assertEquals(20, Narrator.MAX_UPDATES)
+    }
+
+    @Test
+    fun aLongTaskIsNeverLeftSilentButSlowsToOnceAMinute() {
+        val pacing = Narrator.Pacing()
+        val at = mutableListOf<Int>()
+        for (second in 0..600) {
+            val progress = "0|${second / 20}"
+            if (pacing.due(second * 1000L, progress)) { pacing.said(second * 1000L, progress); at += second }
+        }
+        assertTrue(at.last() >= 540, "still talking near the end of a 10-minute task: $at")
+        assertTrue(at.zipWithNext().drop(6).all { (a, b) -> b - a >= 60 }, "after six lines, once a minute: $at")
     }
 }

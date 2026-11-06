@@ -42,6 +42,8 @@ public sealed interface ActivityUiState {
         val taskId: String,
         val task: String,
         val voiceUnlock: Boolean,
+        /** Its chat, which a tap on the activity opens. */
+        val conversationId: String? = null,
     ) : ActivityUiState
 
     /** The user stopped it (or it ended without an answer): the activity goes away at once. */
@@ -94,7 +96,7 @@ public class LiveActivityPresenter(
             val held = queue?.waitingForUnlock ?: kotlinx.coroutines.flow.MutableStateFlow(null)
             kotlinx.coroutines.flow.combine(runner.state, held) { s, waiting -> s to waiting }.collect { (s, waiting) ->
                 val state = waiting?.takeIf { !s.running }?.let {
-                    ActivityUiState.WaitingForUnlock(it.id, it.text, settings?.settings?.value?.voiceUnlock == true)
+                    ActivityUiState.WaitingForUnlock(it.id, it.text, settings?.settings?.value?.voiceUnlock == true, it.conversationId)
                 } ?: map(s)
                 // One line per change of phase or step, to see in the logs what the activity was given.
                 val line = when (state) {

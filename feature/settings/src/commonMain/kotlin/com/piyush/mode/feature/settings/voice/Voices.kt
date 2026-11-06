@@ -587,7 +587,8 @@ public class Voices(
             n >= 1_000 -> "${n / 1_000}K uses"
             else -> "$n uses"
         }
-        private val MAX_RECORD_MS = 20.seconds.inWholeMilliseconds
+        /** One turn's longest: a long, multi-part request fits; a pause still ends it as soon as they finish (TurnEnd). */
+        private val MAX_RECORD_MS = 60.seconds.inWholeMilliseconds
         private val SILENCE_MS = TurnEnd.PAUSE_MS
         private val PER_HEAR = 8.seconds
         private val TOTAL_HEAR = 20.seconds

@@ -124,16 +124,24 @@ public class IosNotifier : Notifier {
         public const val ACTION_TEXT: String = "answer.text"
         public const val ACTION_OPTION: String = "answer.option."
         public const val KEY_QUESTION: String = "question"
+        /** The chat a notification opens when tapped. */
+        public const val KEY_CONVERSATION: String = "conversation"
         public const val KEY_OPTIONS: String = "options"
         private const val MAX_OPTIONS = 4
     }
 
     override fun post(title: String, body: String) {
+        postFor(title, body, null)
+    }
+
+    override fun postFor(title: String, body: String, conversationId: String?) {
         if (UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive) return
         val content = UNMutableNotificationContent().apply {
             setTitle(title)
             setBody(body)
             setSound(UNNotificationSound.defaultSound)
+            // Tapping it opens this chat (QuestionAnswers reads it back).
+            conversationId?.let { setUserInfo(mapOf<Any?, Any?>(KEY_CONVERSATION to it)) }
         }
         val request = UNNotificationRequest.requestWithIdentifier(NSUUID().UUIDString, content, null)
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(request, null)

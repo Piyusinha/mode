@@ -112,7 +112,8 @@ class UnlockVoiceTest {
         val activity = LiveActivityPresenter(this, f.runner, f.tasks, queue, f.settings)
         val task = queue.submit("Order my usual oats", TaskSource.Siri)!!
         testScheduler.runCurrent()
-        assertEquals(ActivityUiState.WaitingForUnlock(task.id, "Order my usual oats", voiceUnlock = true), activity.state.value)
+        assertEquals(ActivityUiState.WaitingForUnlock(task.id, "Order my usual oats", voiceUnlock = true, conversationId = task.conversationId), activity.state.value)
+        assertTrue(task.conversationId != null, "a tap on the activity opens the waiting task's own chat")
         activity.cancelWaiting(task.id)
         testScheduler.runCurrent()
         assertEquals(null, queue.waitingForUnlock.value)

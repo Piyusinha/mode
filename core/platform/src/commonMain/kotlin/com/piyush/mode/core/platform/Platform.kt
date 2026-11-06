@@ -51,9 +51,17 @@ public interface Notifier {
     /** Questions can be answered from a notification (allowed by the user); otherwise Mode opens to ask. */
     public fun canAskInPlace(): Boolean = false
 
-    /** A finished task's answer: skipped while the Lock Screen already shows it (the Live Activity). */
-    public fun postResult(title: String, body: String) {
-        if (!ResultSurfaces.onLockScreen) post(title, body)
+    /**
+     * A notification that opens [conversationId]'s chat when tapped (a finished task's answer); without one,
+     * tapping just opens Mode.
+     */
+    public fun postFor(title: String, body: String, conversationId: String?) {
+        post(title, body)
+    }
+
+    /** A finished task's answer: skipped while the Lock Screen already shows it (the Live Activity). Tapping opens its chat. */
+    public fun postResult(title: String, body: String, conversationId: String? = null) {
+        if (!ResultSurfaces.onLockScreen) postFor(title, body, conversationId)
     }
 
     /** A notification at [atEpochMs], replacing any earlier one with the same [id]. Tapping it opens Mode. */

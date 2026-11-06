@@ -42,7 +42,13 @@ struct ModeActivityAttributes: ActivityAttributes {
         var lockedTaskId: String?
         var lockedTask: String?
         var voiceUnlock = false
+        /// The chat a tap opens. In the state (not the attributes) because one activity can move on to the
+        /// next task (a task waiting for an unlock), and its chat must move with it.
+        var chat: String?
     }
+
+    /// The chat a tap opens: the one the activity shows now, else the one it started with.
+    func chat(_ state: ContentState) -> String? { state.chat ?? conversationId }
 
     /// What was asked, and where the answer goes.
     var task: String

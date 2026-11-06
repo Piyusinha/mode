@@ -52,4 +52,13 @@ class NarratorTest {
         assertNull(Narrator(model("nothing"), quick).line("Turn on dark mode", emptyList(), "Open Settings", emptyList(), null))
         assertNull(Narrator(model("x"), { null }).line("Turn on dark mode", emptyList(), null, emptyList(), null))
     }
+
+    @Test
+    fun updatesCanShareWhatTheAgentFoundNotJustThatItIsStillWorking() = runTest {
+        val seen = mutableListOf<String>()
+        Narrator(model("Sonali messaged you five times today.", seen), quick)
+            .line("Catch me up on WhatsApp and Gmail", emptyList(), "Read unread chats", listOf("Checking your WhatsApp now."), "Piyush",
+                found = listOf("WhatsApp shows 113 unread chats.", "Sonali sent five messages today."))
+        assertTrue("WHAT YOU FOUND SO FAR (newest last):\n- WhatsApp shows 113 unread chats.\n- Sonali sent five messages today." in seen.single())
+    }
 }

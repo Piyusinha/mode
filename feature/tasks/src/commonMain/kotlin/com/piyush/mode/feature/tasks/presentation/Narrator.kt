@@ -29,6 +29,8 @@ public class Narrator(
         task: String, done: List<String>, now: String?, said: List<String>, name: String?,
         /** What the last few steps were for ("search for IndiGo flights"), so there is something real to say. */
         recent: List<String> = emptyList(),
+        /** What the agent has found so far, newest last ("Sonali sent five messages today"). */
+        found: List<String> = emptyList(),
         budgetMs: Long = BUDGET_MS,
         /** The language to speak ("Hindi"); null: English unless the whole request is in another language. */
         language: String? = null,
@@ -40,6 +42,7 @@ public class Narrator(
             if (done.isNotEmpty()) append("DONE SO FAR:\n").append(done.joinToString("\n") { "- $it" }).append('\n')
             now?.takeIf { it.isNotBlank() }?.let { append("DOING NOW: ").append(it).append('\n') }
             if (recent.isNotEmpty()) append("LAST STEPS:\n").append(recent.joinToString("\n") { "- $it" }).append('\n')
+            if (found.isNotEmpty()) append("WHAT YOU FOUND SO FAR (newest last):\n").append(found.joinToString("\n") { "- $it" }).append('\n')
             if (said.isNotEmpty()) append("YOU ALREADY SAID:\n").append(said.joinToString("\n") { "- $it" }).append('\n')
         }
         return try {
@@ -58,12 +61,15 @@ public class Narrator(
 
     /**
      * When an update is worth saying: real progress (a plan step done, a new step), not before [firstAfterMs],
-     * at least [gapMs] apart, at most [max] per task.
+     * at least [gapMs] apart for the first [quickUpdates], then at least [laterGapMs] apart for as long as the
+     * task runs (at most [max], a safety stop for a runaway task).
      */
     public class Pacing(
         private val firstAfterMs: Long = FIRST_AFTER_MS,
         private val gapMs: Long = GAP_MS,
         private val max: Int = MAX_UPDATES,
+        private val quickUpdates: Int = QUICK_UPDATES,
+        private val laterGapMs: Long = LATER_GAP_MS,
     ) {
         private var lastAt: Long? = null
         private var count = 0
@@ -73,7 +79,8 @@ public class Narrator(
         public fun due(elapsedMs: Long, progress: String): Boolean {
             if (count >= max || elapsedMs < firstAfterMs || progress.isBlank() || progress == lastProgress) return false
             val last = lastAt
-            return last == null || elapsedMs - last >= gapMs
+            val gap = if (count < quickUpdates) gapMs else maxOf(gapMs, laterGapMs)
+            return last == null || elapsedMs - last >= gap
         }
 
         /** An update was said (or tried) at [elapsedMs] about [progress]. */
@@ -88,8 +95,13 @@ public class Narrator(
         /** The agent never waits for an update, so it may take a while to write. */
         public const val BUDGET_MS: Long = 6_000
         public const val FIRST_AFTER_MS: Long = 8_000
-        public const val GAP_MS: Long = 20_000
-        /** A long task (up to 15 minutes) is kept company throughout: about one line every 20–40 s. */
+        public const val GAP_MS: Long = 30_000
+        /**
+         * A long task is kept company throughout (6 Nov: a cap of 8 went quiet 4 minutes in): every 30 s for the
+         * first [QUICK_UPDATES] lines, then once a minute; [MAX_UPDATES] only stops a runaway task (15 min+).
+         */
+        public const val QUICK_UPDATES: Int = 6
+        public const val LATER_GAP_MS: Long = 60_000
         public const val MAX_UPDATES: Int = 20
         private const val MAX_WORDS = 18
         private const val TOOL = "say"
@@ -112,6 +124,8 @@ public class Narrator(
             posted out loud like a capable human assistant would: one short, natural line (at most 12 words) about
             what you just got done or are doing now. Warm and personal; their first name only now and then.
             - Say something new: never repeat what you already said, never read the task back.
+            - Prefer something you found ("Sonali messaged you five times today") over saying you're still working.
+              Never say you can't see or can't find something unless the task truly failed.
             - Plain progress, not technical steps: no taps, screens, coordinates or app internals.
             - If there is nothing new worth saying, the line is exactly: nothing
             - No emoji, markdown or quotes. Speak English. Use another language only when their whole request is in it; a few Hindi or other words mixed into English still mean English.

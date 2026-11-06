@@ -12,6 +12,10 @@ final class QuestionAnswers: NSObject, UNUserNotificationCenterDelegate {
         let info = response.notification.request.content.userInfo
         if let id = info[IosNotifier.companion.KEY_QUESTION] as? String, let answer = Self.answer(response, options: info[IosNotifier.companion.KEY_OPTIONS] as? [String] ?? []) {
             Updates { @MainActor in IosModeGraphKt.iosModeGraph.tasks.answer(questionId: id, text: answer) }
+        } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+                  let chat = info[IosNotifier.companion.KEY_CONVERSATION] as? String {
+            // A tap on a finished task's notification opens its chat.
+            Updates { @MainActor in AppLinks.shared.pending = .conversation(id: chat) }
         }
         completionHandler()
     }
