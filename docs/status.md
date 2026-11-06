@@ -61,6 +61,10 @@ Later, one at a time, each tested on the phone before the next:
 11. "Always <option>" on a choice, kept as a usual.
 12. After the first task: offer to set up Mo's voice and dictation.
 13. Next app update: the Home Screen widget and the Watch app.
+14. Next app update: Mo's spoken lines (the greeting, the reply to a task, progress updates, "Anything else?")
+    from Apple's on-device model (Foundation Models, iOS 26+): under a second, free, private, and not queued
+    behind the agent on the same account. Apple first, then the plan's fast model (Luna or Haiku), then Mode's
+    own line; needs Apple Intelligence on; no new signing or entitlement. Until then: the fast cloud model.
 
 ## Roadmap
 
