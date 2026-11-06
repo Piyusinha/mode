@@ -223,7 +223,7 @@ final class OnboardingViewModel {
         guard let target = ProcessInfo.processInfo.environment["MODE_SETUP_STEP"] else { return }
         let order = ["welcome", "name", "key", "model", "permissions", "voice", "test", "result", "diagnose"]
         guard let index = order.firstIndex(of: target) else { return }
-        if index >= 1 { presenter.next(); cardPicked(given: "Piyush", family: "Sinha") }
+        if index >= 1 { presenter.next(); cardPicked(given: "Alex", family: "Morgan") }
         if index >= 2 { presenter.next() }
         if index >= 3 { key = "sk-or-v1-simulator-preview-0000"; presenter.next() }
         if index == 3, let raw = ProcessInfo.processInfo.environment["MODE_SETUP_ROLE"], let role = PickerRole(rawValue: raw) {

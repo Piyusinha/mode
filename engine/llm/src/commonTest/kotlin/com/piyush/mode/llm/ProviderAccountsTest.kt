@@ -19,8 +19,8 @@ class ProviderAccountsTest {
 
     @Test
     fun theChatGptAccountComesFromTheIdToken() {
-        val a = Jwt.chatGptAccount(jwt("""{"email":"p@example.com","name":"Piyush","https://api.openai.com/auth":{"chatgpt_plan_type":"plus"}}"""))!!
-        assertEquals(AccountInfo("p@example.com", "Piyush", "Plus"), a)
+        val a = Jwt.chatGptAccount(jwt("""{"email":"p@example.com","name":"Alex","https://api.openai.com/auth":{"chatgpt_plan_type":"plus"}}"""))!!
+        assertEquals(AccountInfo("p@example.com", "Alex", "Plus"), a)
         assertNull(Jwt.chatGptAccount("not a token"))
         assertEquals(AccountInfo("p@example.com", null, null), Jwt.chatGptAccount(jwt("""{"email":"p@example.com"}""")))
     }
@@ -31,13 +31,13 @@ class ProviderAccountsTest {
         val http = HttpClient(MockEngine { req ->
             assertEquals("oauth-2025-04-20", req.headers["anthropic-beta"])
             when (req.url.encodedPath) {
-                "/api/oauth/profile" -> respond("""{"account":{"email":"p@example.com","display_name":"Piyush","has_claude_max":true}}""", headers = json)
+                "/api/oauth/profile" -> respond("""{"account":{"email":"p@example.com","display_name":"Alex","has_claude_max":true}}""", headers = json)
                 "/api/oauth/usage" -> respond("""{"five_hour":{"utilization":34.0,"resets_at":"2026-11-02T15:40:00Z"},"seven_day":{"utilization":12,"resets_at":null}}""", headers = json)
                 else -> respond("", HttpStatusCode.NotFound)
             }
         })
         val api = ClaudeAccountApi(http)
-        assertEquals(AccountInfo("p@example.com", "Piyush", "Max"), api.profile("t"))
+        assertEquals(AccountInfo("p@example.com", "Alex", "Max"), api.profile("t"))
         val usage = api.usage("t")
         assertEquals(listOf(UsageWindow.Kind.Session, UsageWindow.Kind.Week), usage.map { it.kind })
         assertEquals(0.34, usage[0].usedFraction, 1e-9)

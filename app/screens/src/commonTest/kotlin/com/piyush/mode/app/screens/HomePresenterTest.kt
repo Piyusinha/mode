@@ -23,9 +23,9 @@ class HomePresenterTest {
     @Test
     fun greetsByNameAndPartOfDay() = runTest {
         val f = Fixture(this, now = nov(1, 19, 30))
-        f.settings.update { it.copy(userName = "Piyush") }
+        f.settings.update { it.copy(userName = "Alex") }
         val s = home(f).state.awaitState { it.name != null }
-        assertEquals("Piyush", s.name)
+        assertEquals("Alex", s.name)
         assertEquals(PartOfDay.Evening, s.partOfDay)
     }
 

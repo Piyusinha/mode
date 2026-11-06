@@ -25,14 +25,14 @@ class ChatTitlerTest {
     @Test
     fun theTitleCoversEverythingAskedInTheChat() = runTest {
         val seen = mutableListOf<String>()
-        val title = titler("Dark Mode, Sonali and DoorDash.", seen).title(listOf("Can you turn off dark mode", "Reply to Sonali", "Check my DoorDash meeting"))
-        assertEquals("Dark Mode, Sonali and DoorDash", title)
-        assertTrue("Reply to Sonali" in seen.single() && "DoorDash" in seen.single(), "every request is sent")
+        val title = titler("Dark Mode, Sam and DoorDash.", seen).title(listOf("Can you turn off dark mode", "Reply to Sam", "Check my DoorDash meeting"))
+        assertEquals("Dark Mode, Sam and DoorDash", title)
+        assertTrue("Reply to Sam" in seen.single() && "DoorDash" in seen.single(), "every request is sent")
     }
 
     @Test
     fun aRamblingAnswerIsNotUsed() = runTest {
-        assertNull(titler("This chat is about turning off dark mode and also replying to Sonali on WhatsApp").title(listOf("x")))
+        assertNull(titler("This chat is about turning off dark mode and also replying to Sam on WhatsApp").title(listOf("x")))
     }
 
     @Test

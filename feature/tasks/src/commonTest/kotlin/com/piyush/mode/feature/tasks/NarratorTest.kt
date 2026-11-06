@@ -39,11 +39,11 @@ class NarratorTest {
     fun theLineIsTheModelsOwnWithWhatIsDoneAndWhatWasAlreadySaid() = runTest {
         val seen = mutableListOf<String>()
         val line = Narrator(model("Found your usual, adding it now.", seen), quick)
-            .line("Order my usual from Swiggy", listOf("Open Swiggy"), "Add the usual to the cart", listOf("On it, Piyush."), "Piyush",
+            .line("Order my usual from Swiggy", listOf("Open Swiggy"), "Add the usual to the cart", listOf("On it, Alex."), "Alex",
                 recent = listOf("search for Paneer Tikka Bowl"))
         assertEquals("Found your usual, adding it now.", line)
         assertTrue("DONE SO FAR:\n- Open Swiggy" in seen.single())
-        assertTrue("YOU ALREADY SAID:\n- On it, Piyush." in seen.single())
+        assertTrue("YOU ALREADY SAID:\n- On it, Alex." in seen.single())
         assertTrue("LAST STEPS:\n- search for Paneer Tikka Bowl" in seen.single())
     }
 
@@ -56,9 +56,9 @@ class NarratorTest {
     @Test
     fun updatesCanShareWhatTheAgentFoundNotJustThatItIsStillWorking() = runTest {
         val seen = mutableListOf<String>()
-        Narrator(model("Sonali messaged you five times today.", seen), quick)
-            .line("Catch me up on WhatsApp and Gmail", emptyList(), "Read unread chats", listOf("Checking your WhatsApp now."), "Piyush",
-                found = listOf("WhatsApp shows 113 unread chats.", "Sonali sent five messages today."))
-        assertTrue("WHAT YOU FOUND SO FAR (newest last):\n- WhatsApp shows 113 unread chats.\n- Sonali sent five messages today." in seen.single())
+        Narrator(model("Sam messaged you five times today.", seen), quick)
+            .line("Catch me up on WhatsApp and Gmail", emptyList(), "Read unread chats", listOf("Checking your WhatsApp now."), "Alex",
+                found = listOf("WhatsApp shows 113 unread chats.", "Sam sent five messages today."))
+        assertTrue("WHAT YOU FOUND SO FAR (newest last):\n- WhatsApp shows 113 unread chats.\n- Sam sent five messages today." in seen.single())
     }
 }

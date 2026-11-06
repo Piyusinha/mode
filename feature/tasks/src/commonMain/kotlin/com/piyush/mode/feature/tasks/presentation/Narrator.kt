@@ -29,7 +29,7 @@ public class Narrator(
         task: String, done: List<String>, now: String?, said: List<String>, name: String?,
         /** What the last few steps were for ("search for IndiGo flights"), so there is something real to say. */
         recent: List<String> = emptyList(),
-        /** What the agent has found so far, newest last ("Sonali sent five messages today"). */
+        /** What the agent has found so far, newest last ("Sam sent five messages today"). */
         found: List<String> = emptyList(),
         budgetMs: Long = BUDGET_MS,
         /** The language to speak ("Hindi"); null: English unless the whole request is in another language. */
@@ -124,7 +124,7 @@ public class Narrator(
             posted out loud like a capable human assistant would: one short, natural line (at most 12 words) about
             what you just got done or are doing now. Warm and personal; their first name only now and then.
             - Say something new: never repeat what you already said, never read the task back.
-            - Prefer something you found ("Sonali messaged you five times today") over saying you're still working.
+            - Prefer something you found ("Sam messaged you five times today") over saying you're still working.
               Never say you can't see or can't find something unless the task truly failed.
             - Plain progress, not technical steps: no taps, screens, coordinates or app internals.
             - If there is nothing new worth saying, the line is exactly: nothing

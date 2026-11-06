@@ -44,13 +44,13 @@ class SettingsRepositoryTest {
     fun valuesAreBroughtIntoRangeAndSurviveARestart() {
         val prefs = InMemoryKeyValueStore()
         val repo = SettingsRepository(InMemorySecretStore(), prefs)
-        repo.update { it.copy(maxSteps = 999, maxCostPerTaskUsd = 0.0001, dailyCapUsd = 500.0, model = "  ", userName = "  Piyush ") }
+        repo.update { it.copy(maxSteps = 999, maxCostPerTaskUsd = 0.0001, dailyCapUsd = 500.0, model = "  ", userName = "  Alex ") }
         val s = SettingsRepository(InMemorySecretStore(), prefs).settings.value
         assertEquals(200, s.maxSteps)
         assertEquals(0.005, s.maxCostPerTaskUsd)
         assertEquals(100.0, s.dailyCapUsd)
         assertEquals(AgentConfig.DEFAULT_MODEL, s.model)
-        assertEquals("Piyush", s.userName)
+        assertEquals("Alex", s.userName)
     }
 
     @Test
@@ -92,7 +92,7 @@ class SettingsRepositoryTest {
         val prefs = InMemoryKeyValueStore()
         val repo = SettingsRepository(secrets, prefs)
         repo.apiKey = "sk-or-1"
-        repo.update { it.copy(onboardingDone = true, userName = "Piyush") }
+        repo.update { it.copy(onboardingDone = true, userName = "Alex") }
         assertTrue(repo.settings.value.onboardingDone)
 
         secrets.clear()

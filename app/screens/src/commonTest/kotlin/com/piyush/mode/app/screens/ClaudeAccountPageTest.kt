@@ -28,7 +28,7 @@ class ClaudeAccountPageTest {
         val http = HttpClient(MockEngine { req ->
             asked += req.url.encodedPath
             when (req.url.encodedPath) {
-                "/api/oauth/profile" -> respond("""{"account":{"email":"p@example.com","display_name":"Piyush","has_claude_max":true}}""", headers = json)
+                "/api/oauth/profile" -> respond("""{"account":{"email":"p@example.com","display_name":"Alex","has_claude_max":true}}""", headers = json)
                 "/api/oauth/usage" -> respond(if (used < 0) "{}" else """{"five_hour":{"utilization":$used,"resets_at":null}}""", headers = json)
                 else -> respond("", HttpStatusCode.NotFound)
             }
@@ -49,7 +49,7 @@ class ClaudeAccountPageTest {
         used = 50.0
         val next = page()
         val fresh = next.state.awaitState { it.limits.firstOrNull()?.usedFraction == 0.5 }
-        assertEquals("Piyush", fresh.name)
+        assertEquals("Alex", fresh.name)
         assertEquals(listOf("/api/oauth/usage"), asked)
 
         assertEquals(f.now, fresh.usageUpdatedAt, "the time the limits were answered")

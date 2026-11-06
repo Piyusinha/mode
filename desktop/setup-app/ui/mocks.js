@@ -2,7 +2,7 @@
 // Never loaded data: the real window talks to the engine.
 'use strict';
 (function () {
-  const phone = { udid: '00008150-0012345678901234', name: 'Piyush’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
+  const phone = { udid: '00008150-0012345678901234', name: 'Alex’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
   const free = { id: 'FGHIJ67890', name: 'Personal Team', kind: 'free' };
   const paid = { id: 'ABCDE12345', name: 'Acme Labs', kind: 'paid' };
   const mode = { bundleId: 'com.piyush.mode.ABCDE12345', name: 'Mode', version: '1.4', teamId: 'ABCDE12345', expires: '2026-11-10T08:20:00Z' };
@@ -20,8 +20,8 @@
     pickPhone: { screen: 'pickPhone', phones: [phone, { udid: 'x', name: 'Test iPhone', model: 'iPhone17,3', ios: '26.4', usb: true }], phone },
     trust: { screen: 'trust', phone, readiness: 'needsTrust' },
     devMode: { screen: 'devMode', phone, readiness: 'needsDeveloperMode' },
-    signIn: { screen: 'signIn', phone, readiness: 'ready', email: 'piyush@icloud.com' },
-    signInWrong: { screen: 'signIn', phone, readiness: 'ready', email: 'piyush@icloud.com', signInError: 'Wrong Apple Account or password.' },
+    signIn: { screen: 'signIn', phone, readiness: 'ready', email: 'alex@example.com' },
+    signInWrong: { screen: 'signIn', phone, readiness: 'ready', email: 'alex@example.com', signInError: 'Wrong Apple Account or password.' },
     code: { screen: 'code', phone, readiness: 'ready', codeReq: { numbers: [[1, '+91 •••••• •••41']], lastFailed: false }, code: '481' },
     helperDown: { screen: 'helperDown', phone, readiness: 'ready', helpers: [{ name: 'iLoader', url: 'https://ani.iloader.app', ms: 120 }, { name: 'SideStore', url: 'https://ani.sidestore.io', error: 'timed out' }] },
     team: { screen: 'team', phone, readiness: 'ready', teams: [paid, free], team: paid },
@@ -38,9 +38,9 @@
     ready: { screen: 'ready', phone, readiness: 'ready', record: rec({}) },
     readyPaid: { screen: 'ready', phone, readiness: 'ready', record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     unlockVoice: { screen: 'unlockVoice', phone, readiness: 'ready', record: rec({}) },
-    device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },
-    deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
-    deviceOK: { screen: 'device', phone, phones: [], readiness: 'ready', prefs: { email: 'piyush@icloud.com', phones: {} }, record: rec({}) },
-    settings: { screen: 'settings', phone, prefs: { email: 'piyush@icloud.com', phones: {} }, hasSaved: true, record: rec({}), helpers: [{ name: 'iLoader', url: 'https://ani.iloader.app', ms: 120 }, { name: 'SideStore', url: 'https://ani.sidestore.io', ms: 300 }] },
+    device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },
+    deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
+    deviceOK: { screen: 'device', phone, phones: [], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, record: rec({}) },
+    settings: { screen: 'settings', phone, prefs: { email: 'alex@example.com', phones: {} }, hasSaved: true, record: rec({}), helpers: [{ name: 'iLoader', url: 'https://ani.iloader.app', ms: 120 }, { name: 'SideStore', url: 'https://ani.sidestore.io', ms: 300 }] },
   };
 })();

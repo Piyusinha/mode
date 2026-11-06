@@ -44,13 +44,13 @@ class ContextBuilderTest {
 
     @Test
     fun theStablePartIsTheSameFromStepToStep() {
-        val context = TaskContext(userName = "Piyush", earlierTurns = listOf(TaskContext.EarlierTurn("message Asha", "Sent.")))
+        val context = TaskContext(userName = "Alex", earlierTurns = listOf(TaskContext.EarlierTurn("message Asha", "Sent.")))
         val one = ContextBuilder.stable(input(step = 2, history = listOf("1. open Settings — ok"), context = context, plan = "1. a"))
         val two = ContextBuilder.stable(
             input(step = 7, history = List(6) { "${it + 1}. tap \"x\" — ok" }, notes = listOf("a"), context = context, plan = "1. [done] a\n2. b"),
         )
         assertEquals(one, two)
-        assertTrue(one.indexOf("Their name: Piyush") < one.indexOf("EARLIER IN THIS CONVERSATION"))
+        assertTrue(one.indexOf("Their name: Alex") < one.indexOf("EARLIER IN THIS CONVERSATION"))
         assertTrue(one.indexOf("EARLIER IN THIS CONVERSATION") < one.indexOf("TASK:"))
     }
 
@@ -123,7 +123,7 @@ class ContextBuilderTest {
     @Test
     fun memorySectionsComeInOrderBeforeTheTask() {
         val context = TaskContext(
-            userName = "Piyush",
+            userName = "Alex",
             aboutYou = listOf("Asha: WhatsApp"),
             skills = listOf("SKILL: Turn off Dark Mode\n1. open Settings"),
             appNotes = listOf("Settings: search is at the top"),

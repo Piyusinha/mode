@@ -123,7 +123,7 @@ class StepRecord(
     /** The plan item (1-based) the model said this action works on, when it has a plan. */
     val planItem: Int? = null,
     val costReported: Boolean = true,
-    /** What the agent learned at this step ("Sonali sent five messages today"), for spoken updates. */
+    /** What the agent learned at this step ("Sam sent five messages today"), for spoken updates. */
     val note: String? = null,
 )
 
@@ -1785,7 +1785,7 @@ data class ResultPart(val title: String, val detail: String, val done: Boolean) 
     companion object {
         private val MARK = Regex("""^\s*(✓|✔|✗|✘|×|\[x]|\[ ]|-|•)?\s*""", RegexOption.IGNORE_CASE)
 
-        /** "✓ Replied to Sonali — WhatsApp · hi" → done, title, detail; null when empty. */
+        /** "✓ Replied to Sam — WhatsApp · hi" → done, title, detail; null when empty. */
         fun parse(line: String): ResultPart? {
             val text = line.trim().takeIf { it.isNotEmpty() } ?: return null
             val mark = MARK.find(text)?.groupValues?.get(1).orEmpty()

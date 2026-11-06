@@ -58,9 +58,9 @@ class OnboardingTest {
         val p = onboarding(f)
         p.next()
         assertEquals(1, p.state.value.step.number)
-        p.setNameFromCard("Piyush", "Sinha")
-        assertEquals("Piyush Sinha", p.state.value.cardName)
-        assertEquals("Piyush", p.state.value.callName)
+        p.setNameFromCard("Alex", "Sinha")
+        assertEquals("Alex Sinha", p.state.value.cardName)
+        assertEquals("Alex", p.state.value.callName)
         p.setCallName("Piyu")
         p.next()
         assertEquals("Piyu", f.settings.settings.value.userName)
@@ -73,7 +73,7 @@ class OnboardingTest {
         val secrets = com.piyush.mode.testing.InMemorySecretStore()
         val settings = com.piyush.mode.feature.settings.data.SettingsRepository(secrets, com.piyush.mode.testing.InMemoryKeyValueStore())
         val p = OnboardingPresenter(backgroundScope, settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth, lifecycle)
-        p.next(); p.setNameFromCard("Piyush", ""); p.next()
+        p.next(); p.setNameFromCard("Alex", ""); p.next()
         assertEquals(OnboardingStep.Key, p.state.value.step)
         assertFalse(p.state.value.canContinue)
 
@@ -92,7 +92,7 @@ class OnboardingTest {
         val settings = com.piyush.mode.feature.settings.data.SettingsRepository(secrets, com.piyush.mode.testing.InMemoryKeyValueStore())
         settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         val p = OnboardingPresenter(backgroundScope, settings, f.catalog, f.session, f.runner, f.permissions, f.checks, auth, lifecycle)
-        p.next(); p.setNameFromCard("Piyush", ""); p.next(); p.next()
+        p.next(); p.setNameFromCard("Alex", ""); p.next(); p.next()
         assertEquals(OnboardingStep.Model, p.state.value.step)
 
         // Mode's picks: phone control on Medium, the brain on High, both marked recommended.
@@ -124,7 +124,7 @@ class OnboardingTest {
         val f = Fixture(this)
         f.settings.apiKey = ""
         val p = onboarding(f)
-        p.next(); p.setNameFromCard("Piyush", ""); p.next()
+        p.next(); p.setNameFromCard("Alex", ""); p.next()
         assertFalse(p.state.value.canContinue)
         val url = p.startSignIn(OnboardingPresenter.SIGN_IN_CALLBACK)
         assertTrue(url.startsWith("https://openrouter.ai/auth?"))
@@ -196,7 +196,7 @@ class OnboardingTest {
             val voices = com.piyush.mode.feature.settings.voice.Voices(f.settings, client)
             val p = OnboardingPresenter(backgroundScope, f.settings, f.catalog, f.session, f.runner,
                 f.permissions, f.checks, auth, lifecycle, voices = voices)
-            p.next(); p.setNameFromCard("Piyush", ""); p.next(); p.next(); p.next(); p.next()
+            p.next(); p.setNameFromCard("Alex", ""); p.next(); p.next(); p.next(); p.next()
             assertEquals(OnboardingStep.Voice, p.state.value.step)
             p.state.awaitState { it.voiceOptions.size == 3 }
             p.chooseVoice("voice-2")

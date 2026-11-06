@@ -341,7 +341,7 @@ class TaskRunnerTest {
             call("done", "evidence" to "on screen", "summary" to "Told Rahul."),
         )
         val f = Fixture(this, model)
-        f.settings.update { it.copy(userName = "Piyush") }
+        f.settings.update { it.copy(userName = "Alex") }
         f.runner.runTask("Text Asha I'm leaving", quick)
         assertFalse("EARLIER IN THIS CONVERSATION" in model.lastUserText, "a new conversation has no history")
 
@@ -350,7 +350,7 @@ class TaskRunnerTest {
         assertTrue("They asked: Text Asha I'm leaving" in prompt, prompt)
         assertTrue("Result: Sent Asha: I'm leaving." in prompt, prompt)
         assertFalse("They asked: Also tell Rahul" in prompt, "the current task is not an earlier turn")
-        assertTrue("Their name: Piyush" in prompt)
+        assertTrue("Their name: Alex" in prompt)
     }
 
     /** Answers the agent from a script and the reflection with one saved fact; remembers what each was shown. */

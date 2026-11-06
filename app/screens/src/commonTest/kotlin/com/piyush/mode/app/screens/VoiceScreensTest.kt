@@ -58,10 +58,10 @@ class VoiceScreensTest {
 
     @Test
     fun modeGreetsByNameAndTimeOfDay() {
-        assertEquals("Hey Piyush, good evening. What do you want me to do?", ListenPresenter.greetingLine("Piyush Sinha", 19))
-        assertEquals("Hey Piyush, good morning. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 8))
+        assertEquals("Hey Alex, good evening. What do you want me to do?", ListenPresenter.greetingLine("Alex Sinha", 19))
+        assertEquals("Hey Alex, good morning. What do you want me to do?", ListenPresenter.greetingLine("Alex", 8))
         assertEquals("Hey, good afternoon. What do you want me to do?", ListenPresenter.greetingLine(null, 14))
-        assertEquals("Hey Piyush. What do you want me to do?", ListenPresenter.greetingLine("Piyush", 1), "late at night: no greeting for the hour")
+        assertEquals("Hey Alex. What do you want me to do?", ListenPresenter.greetingLine("Alex", 1), "late at night: no greeting for the hour")
     }
 
     @Test
@@ -164,7 +164,7 @@ class VoiceScreensTest {
             kotlinx.coroutines.delay(2_000)
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
-                    put("line", kotlinx.serialization.json.JsonPrimitive("On it, Piyush. Dark Mode, coming right up."))
+                    put("line", kotlinx.serialization.json.JsonPrimitive("On it, Alex. Dark Mode, coming right up."))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
         val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
@@ -175,14 +175,14 @@ class VoiceScreensTest {
         val sent = talk.state.awaitState { it.sent }
         assertEquals("", sent.reply)   // the task went before the line was written
         val spoken = talk.state.awaitState { it.reply.isNotEmpty() }
-        assertEquals("On it, Piyush. Dark Mode, coming right up.", spoken.reply)
+        assertEquals("On it, Alex. Dark Mode, coming right up.", spoken.reply)
     }
 
     @Test
     fun startedByVoiceModeGreetsInTheAIsWordsWithWhatsComingUp() = runTest {
         val f = Fixture(backgroundScope)
         var asked = ""
-        val greeting = "Evening, Piyush. Dinner with Priya's at 7. Want me to text her you're on your way?"
+        val greeting = "Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?"
         val model = com.piyush.mode.llm.LlmClient { _, messages, _ ->
             asked = messages.last().text
             com.piyush.mode.llm.ChatResult(
@@ -208,7 +208,7 @@ class VoiceScreensTest {
     @Test
     fun withoutTheAIModeSaysItsOwnGreeting() = runTest {
         val f = Fixture(backgroundScope)
-        f.settings.update { it.copy(userName = "Piyush") }
+        f.settings.update { it.copy(userName = "Alex") }
         val before = DeviceVoice.hearingState
         DeviceVoice.hearingState = { "ready" }
         try {
@@ -216,7 +216,7 @@ class VoiceScreensTest {
                 entry = "siri", day = { com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20") })
             talk.begin()
             val s = talk.state.awaitState { it.greeting.isNotEmpty() }
-            assertTrue(s.greeting.startsWith("Hey Piyush"), s.greeting)
+            assertTrue(s.greeting.startsWith("Hey Alex"), s.greeting)
         } finally {
             DeviceVoice.hearingState = before
         }
@@ -244,16 +244,16 @@ class VoiceScreensTest {
     fun startedByVoiceTheConversationCarriesOnAfterATaskInTheSameChat() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
-            entry = "siri", greeter = nextLines("Anything else, Piyush?"), day = { com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20") })
+            entry = "siri", greeter = nextLines("Anything else, Alex?"), day = { com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20") })
 
         talk.submitTyped("Turn on dark mode")
-        val next = talk.state.awaitState { it.greeting == "Anything else, Piyush?" }
+        val next = talk.state.awaitState { it.greeting == "Anything else, Alex?" }
         assertEquals(listOf("Turn on dark mode"), next.doneSoFar)
         assertFalse(next.finished, "the conversation goes on after the task")
         // One conversation on one screen: the request, how it went, and what Mode asks next, in order.
         val lines = next.turns
         assertEquals("Turn on dark mode", lines.first { it.mine }.text)
-        assertEquals("Anything else, Piyush?", lines.last().text)
+        assertEquals("Anything else, Alex?", lines.last().text)
         val card = lines.single { it.kind == com.piyush.mode.app.screens.settings.TalkTurn.Kind.Task }.card!!
         assertTrue(card.state != com.piyush.mode.app.screens.settings.TalkTaskCard.State.Working, "the task's card ends with its result")
         assertTrue(card.headline.isNotBlank())

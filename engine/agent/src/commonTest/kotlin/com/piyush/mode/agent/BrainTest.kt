@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class BrainTest {
     private val asha = call(
         "brief",
-        "intent" to "Continue the WhatsApp chat with Asha in Piyush's voice",
+        "intent" to "Continue the WhatsApp chat with Asha in Alex's voice",
         "app" to "WhatsApp",
         "start" to "continue",
         "done_when" to "A reply to her latest message is sent",
@@ -27,7 +27,7 @@ class BrainTest {
     @Test
     fun aBriefIsReadFromTheBrainsToolCall() = runTest {
         val model = ScriptedModel(asha)
-        val r = Brain(model, "strong").brief("talk with Asha", TaskContext(userName = "Piyush", today = "Sunday 1 November 2026, 19:05"))
+        val r = Brain(model, "strong").brief("talk with Asha", TaskContext(userName = "Alex", today = "Sunday 1 November 2026, 19:05"))
         val b = assertNotNull(r.brief)
         assertEquals("WhatsApp", b.app)
         assertEquals(false, b.fresh, "continue keeps the chat where it is")

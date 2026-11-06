@@ -15,7 +15,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * A chat's name, from everything asked in it: "Sonali, DoorDash meeting and coffee" rather than the first request
+ * A chat's name, from everything asked in it: "Sam, DoorDash meeting and coffee" rather than the first request
  * word for word ("Can you turn off dark mode"). Written by the quick model (lowest effort) after each task.
  */
 public class ChatTitler(
@@ -60,7 +60,7 @@ public class ChatTitler(
 
         private val SYSTEM = """
             Name a chat between the user and Mode, their iPhone assistant, from what they asked in it. 2 to 6 words,
-            like a phone's chat list: what it's about, covering the main things when there are several ("Sonali,
+            like a phone's chat list: what it's about, covering the main things when there are several ("Sam,
             DoorDash meeting and coffee", "Dark Mode and Wi-Fi", "Tomorrow's flight to Delhi"). No verbs like "Can you",
             no quotes, no full stop, no emoji. Same language as the requests. Call name_chat.
         """.trimIndent()

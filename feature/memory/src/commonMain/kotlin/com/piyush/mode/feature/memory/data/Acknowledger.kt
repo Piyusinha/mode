@@ -18,7 +18,7 @@ import kotlinx.serialization.json.putJsonObject
 /**
  * What Mode says out loud when handed a task, written by the AI like a personal assistant would say it:
  * short, warm, in the user's words, naming what it is about to do, and using what Mode knows about them
- * ("On it, Piyush. Your usual oat latte from Starbucks, coming up."). Never a fixed line.
+ * ("On it, Alex. Your usual oat latte from Starbucks, coming up."). Never a fixed line.
  *
  * It must not hold the task up: [line] gives up after [budgetMs] and returns null, and the caller then
  * says its own short line.

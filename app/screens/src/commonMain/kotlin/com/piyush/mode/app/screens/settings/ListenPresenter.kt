@@ -88,7 +88,7 @@ public data class TalkOffer(val task: String, val yes: String, val no: String)
 
 public data class ListenUiState(
     val phase: TalkPhase = TalkPhase.Greeting,
-    /** What Mode said first ("Hey Piyush, good evening. What do you want me to do?"). */
+    /** What Mode said first ("Hey Alex, good evening. What do you want me to do?"). */
     val greeting: String = "",
     /** The words heard so far (live), while listening or answering. */
     val partial: String = "",
@@ -613,7 +613,7 @@ public class ListenPresenter(
         private const val PREPARE_CHECKS = 60
         private val QUESTION_PHASES = setOf(TalkPhase.Asking, TalkPhase.Answering, TalkPhase.Answered)
 
-        /** "Hey Piyush, good evening. What do you want me to do?" (by the hour; late at night just "Hey Piyush."). */
+        /** "Hey Alex, good evening. What do you want me to do?" (by the hour; late at night just "Hey Alex."). */
         fun greetingLine(name: String?, hour: Int): String {
             val who = name?.trim()?.split(' ')?.firstOrNull()?.takeIf { it.isNotEmpty() }
             val part = when (hour) {

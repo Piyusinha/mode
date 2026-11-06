@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 class ResultPartTest {
     @Test
     fun aTickedPartIsDoneWithItsDetail() {
-        assertEquals(ResultPart("Replied to Sonali", "WhatsApp · testing my agent", true), ResultPart.parse("✓ Replied to Sonali — WhatsApp · testing my agent"))
+        assertEquals(ResultPart("Replied to Sam", "WhatsApp · testing my agent", true), ResultPart.parse("✓ Replied to Sam — WhatsApp · testing my agent"))
     }
 
     @Test

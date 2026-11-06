@@ -44,12 +44,12 @@ class GreeterTest {
 
     @Test
     fun theFirstWordsAreTheAIsWithWhatsComingUpInTheirDay() = runTest {
-        val model = Model("Evening, Piyush. Dinner with Priya's at 7. Want me to text her you're on your way?")
-        val line = Greeter(model, memory, fast).line("Piyush Sinha", hour = 18, day = evening)
+        val model = Model("Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?")
+        val line = Greeter(model, memory, fast).line("Alex Sinha", hour = 18, day = evening)
 
-        assertEquals("Evening, Piyush. Dinner with Priya's at 7. Want me to text her you're on your way?", line)
+        assertEquals("Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?", line)
         assertEquals("fast-model@low", model.model, "the quick model, at its lowest effort")
-        assertTrue("THEIR NAME: Piyush" in model.asked)
+        assertTrue("THEIR NAME: Alex" in model.asked)
         assertTrue("NOW: Thursday 6 November, 18:20 (evening)" in model.asked)
         assertTrue("Dinner with Priya" in model.asked)
         assertTrue("Read today's calendar at 20:00" in model.asked)
@@ -58,25 +58,25 @@ class GreeterTest {
 
     @Test
     fun withNothingComingUpItJustAsksWhatTheyNeed() = runTest {
-        val model = Model("Hey Piyush, what can I do for you?")
-        Greeter(model, memory, fast).line("Piyush", hour = 10, day = DayContext(now = "Friday 7 November, 10:00"))
+        val model = Model("Hey Alex, what can I do for you?")
+        Greeter(model, memory, fast).line("Alex", hour = 10, day = DayContext(now = "Friday 7 November, 10:00"))
         assertTrue("NOTHING IS COMING UP" in model.asked)
         assertFalse("CALENDAR" in model.asked)
     }
 
     @Test
     fun aSlowOrUnusableAnswerFallsBackToModesOwnGreeting() = runTest {
-        assertNull(Greeter(Model("Too late.", waitMs = Greeter.BUDGET_MS + 500), memory, fast).line("Piyush", 18, evening))
-        assertNull(Greeter(Model("x"), memory) { null }.line("Piyush", 18, evening), "no AI connected")
-        assertNull(Greeter(Model((1..40).joinToString(" ") { "word" }), memory, fast).line("Piyush", 18, evening), "too long to say")
+        assertNull(Greeter(Model("Too late.", waitMs = Greeter.BUDGET_MS + 500), memory, fast).line("Alex", 18, evening))
+        assertNull(Greeter(Model("x"), memory) { null }.line("Alex", 18, evening), "no AI connected")
+        assertNull(Greeter(Model((1..40).joinToString(" ") { "word" }), memory, fast).line("Alex", 18, evening), "too long to say")
     }
 
     @Test
     fun theReplyToATaskSeesTheirCalendar() = runTest {
         val model = Model("Booking a cab for your 7 pm dinner.")
-        Acknowledger(model, memory, fast).line("Book a cab", "Piyush", hour = 18, day = evening.events)
+        Acknowledger(model, memory, fast).line("Book a cab", "Alex", hour = 18, day = evening.events)
         assertTrue("THEIR CALENDAR FROM NOW" in model.asked && "Dinner with Priya" in model.asked)
-        Acknowledger(model, memory, fast).line("Book a cab", "Piyush", hour = 18, private = true, day = evening.events)
+        Acknowledger(model, memory, fast).line("Book a cab", "Alex", hour = 18, private = true, day = evening.events)
         assertFalse("Dinner with Priya" in model.asked, "a private task reads nothing personal")
     }
 }

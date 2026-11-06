@@ -31,7 +31,7 @@ struct ActivityPreview: View {
     private var state: ModeActivityAttributes.ContentState {
         switch Self.variant {
         case "working", "paused":
-            .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Sonali",
+            .init(phase: .working, step: 4, startedAt: Date().addingTimeInterval(-24), now: "Sending “Leaving in 10” to Sam",
                   paused: Self.variant == "paused",
                   plan: [.init("Open WhatsApp", state: .done), .init("Send message", state: .now), .init("Check it sent", state: .next)])
         case "options":
@@ -52,7 +52,7 @@ struct ActivityPreview: View {
             .init(phase: .finished, outcome: .stopped, reply: [.paragraph("You stopped “Book a Rapido to Bellandur”.")])
         default:
             // As the presenter sends it: one line; the rest is counted for the chat.
-            .init(phase: .finished, outcome: .done, seconds: 62, reply: [.paragraph("Sent “Leaving in 10” to Sonali on WhatsApp")])
+            .init(phase: .finished, outcome: .done, seconds: 62, reply: [.paragraph("Sent “Leaving in 10” to Sam on WhatsApp")])
         }
     }
 

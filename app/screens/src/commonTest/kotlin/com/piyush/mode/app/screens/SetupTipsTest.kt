@@ -43,11 +43,11 @@ class SetupTipsTest {
         val b = SetupTips.banner(voiceSet, start)!!
         assertEquals(SetupTip.Listening, b.showing, "the voice is set, so it starts at the next tip")
         assertFalse(SetupTip.Voice in b.tips)
-        val named = setUp.copy(userName = "Piyush")
+        val named = setUp.copy(userName = "Alex")
         assertEquals(SetupTip.entries.toList() - SetupTip.Name, SetupTips.banner(named, start)!!.tips, "a name is set: four tips")
         val allDone = setUp.copy(
             voices = mapOf("elevenlabs" to VoiceChoice("v1", "Rachel")), hearingOrder = listOf("deepgram", "apple", "soniox"),
-            fullAccess = true, voiceUnlock = true, userName = "Piyush",
+            fullAccess = true, voiceUnlock = true, userName = "Alex",
         )
         assertNull(SetupTips.banner(allDone, start), "nothing left to tell")
     }
@@ -62,7 +62,7 @@ class SetupTipsTest {
     @Test
     fun theDotsShowAnotherOpenTip() {
         assertEquals(SetupTip.Access, SetupTips.banner(setUp, start, picked = SetupTip.Access)!!.showing)
-        val named = setUp.copy(userName = "Piyush")
+        val named = setUp.copy(userName = "Alex")
         assertEquals(SetupTip.Voice, SetupTips.banner(named, start, picked = SetupTip.Name)!!.showing, "a done tip can't be picked")
     }
 

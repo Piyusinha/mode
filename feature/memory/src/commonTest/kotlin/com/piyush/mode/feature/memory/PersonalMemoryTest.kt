@@ -17,7 +17,7 @@ class PersonalMemoryTest {
     fun aUsualIsShownForAVagueRequestAndForOneThatNamesIt() {
         memory.save(MemoryDraft(MemoryKind.Usual, "order oats", "Usual: chocolate oats from Swiggy", "Swiggy · Dark chocolate oats 100 g · Home · paid from wallet · mornings", "step 9", listOf("oats", "breakfast", "swiggy"), app = "Swiggy"))
         memory.save(MemoryDraft(MemoryKind.Usual, "cab home", "Usual: cab home on Rapido", "Rapido · Cab Premium · GMR B → Home", "step 4", listOf("cab", "ride", "home"), app = "Rapido"))
-        memory.save(MemoryDraft(MemoryKind.Fact, "piyush", "Piyush", "Lives in Indiranagar, Bengaluru", "said"))
+        memory.save(MemoryDraft(MemoryKind.Fact, "alex", "Alex", "Lives in Indiranagar, Bengaluru", "said"))
         val retrieval = MemoryRetrieval(memory)
         val vague = retrieval.forTask("order my usual")
         assertEquals(listOf("Usual: chocolate oats from Swiggy: Swiggy · Dark chocolate oats 100 g · Home · paid from wallet · mornings", "Usual: cab home on Rapido: Rapido · Cab Premium · GMR B → Home", "Lives in Indiranagar, Bengaluru"), vague.aboutYou)

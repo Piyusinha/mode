@@ -251,14 +251,14 @@ object AgentTools {
                 Param("success", "boolean", "Whether the task was achieved."),
                 Param(
                     "headline", "string",
-                    "The result as a short title, at most 12 words, no Markdown (\"Sonali has your reply, and you have one " +
+                    "The result as a short title, at most 12 words, no Markdown (\"Sam has your reply, and you have one " +
                         "DoorDash meeting today\", \"Dark Mode is off\").",
                     required = false,
                 ),
                 Param(
                     "parts", "array",
                     "One line per thing the task asked for, as \"✓ What was done — the detail\" or \"✗ What wasn't done — " +
-                        "why\" (\"✓ Replied to Sonali — WhatsApp · testing my agent\", \"✓ DoorDash sync — today 23:00–23:30 · " +
+                        "why\" (\"✓ Replied to Sam — WhatsApp · testing my agent\", \"✓ DoorDash sync — today 23:00–23:30 · " +
                         "Google Meet\", \"✗ Coffee not ordered — the café is closed until 8\"). Facts only, from what you saw.",
                     required = false, items = "string",
                 ),

@@ -38,7 +38,7 @@ public data class NextLine(val line: String, val offer: Offer? = null) {
 /**
  * Mode's first words when it is started by voice ("Hey Siri, start Mode"), written by the AI like a personal
  * assistant would: a short greeting that asks what they need, or, when something in their day is coming up
- * and Mode could help, that one thing offered as a question ("Evening, Piyush. Dinner with Priya's at 7. Want
+ * and Mode could help, that one thing offered as a question ("Evening, Alex. Dinner with Priya's at 7. Want
  * me to text her you're on your way?"). Never a fixed line.
  *
  * It must not keep them waiting: [line] gives up after [budgetMs] and returns null, and the caller says its

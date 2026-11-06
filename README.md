@@ -11,7 +11,7 @@ your apps until it’s done, then tells you how it went.
 
 <br>
 
-<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://getmode.app"><img src="https://img.shields.io/badge/getmode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: getmode.app" height="44"></a>&nbsp;&nbsp;<a href="docs/media/mode-story.mp4"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
+<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://getmode.app"><img src="https://img.shields.io/badge/getmode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: getmode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
 <sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
 
@@ -25,11 +25,11 @@ your apps until it’s done, then tells you how it went.
 
 ## See it in action
 
-<a href="docs/media/mode-story.mp4"><img src="docs/media/poster.png" alt="Play the film: running late, three things done, you never touched your phone" width="100%"></a>
+<a href="https://github.com/Piyusinha/mode/raw/main/docs/media/mode-story.mp4"><img src="docs/media/mode-story-preview.gif" alt="The film, playing: running late in the car, Mode texts Sam, reads the unread chats and orders the usual coffee, all by voice" width="100%"></a>
 
 > Running late, hands on the wheel: *“Text Sam I’m ten minutes late. Any unread messages?
 > Order my usual coffee to the office.”* The iPhone does all three by itself.
-> [Watch the film](docs/media/mode-story.mp4) (71 s) · [the 23-second teaser](docs/media/mode-teaser.mp4)
+> ▶︎ [Watch the full film with sound](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-story.mp4) (71 s) · [the 23-second teaser](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-teaser.mp4)
 
 <br>
 
@@ -82,7 +82,7 @@ stay in its Keychain.
 
 ## Things you can say
 
-> 💬 *“Reply to Sonali that I’m on my way, on WhatsApp.”*<br>
+> 💬 *“Reply to Sam that I’m on my way, on WhatsApp.”*<br>
 > 📅 *“What’s on my calendar today?”*<br>
 > 🌙 *“Turn on Do Not Disturb until 6.”*<br>
 > ☕️ *“Order my usual coffee to the office.”*<br>

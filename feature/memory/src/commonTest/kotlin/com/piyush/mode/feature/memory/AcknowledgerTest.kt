@@ -38,11 +38,11 @@ class AcknowledgerTest {
 
     @Test
     fun theLineIsTheAIsOwnWordsWithWhatModeKnowsAboutThem() = runTest {
-        val model = Model("On it, Piyush. Your usual oat latte, coming up.")
-        val line = Acknowledger(model, memory, fast).line("Order my usual from Starbucks", "Piyush Sinha", hour = 9)
+        val model = Model("On it, Alex. Your usual oat latte, coming up.")
+        val line = Acknowledger(model, memory, fast).line("Order my usual from Starbucks", "Alex Sinha", hour = 9)
 
-        assertEquals("On it, Piyush. Your usual oat latte, coming up.", line)
-        assertTrue("THEIR NAME: Piyush" in model.asked)
+        assertEquals("On it, Alex. Your usual oat latte, coming up.", line)
+        assertTrue("THEIR NAME: Alex" in model.asked)
         assertTrue("TIME OF DAY: morning" in model.asked)
         assertTrue("oat latte" in model.asked)
     }
@@ -50,21 +50,21 @@ class AcknowledgerTest {
     @Test
     fun aPrivateTaskUsesNothingModeRemembers() = runTest {
         val model = Model("Sure, ordering it now.")
-        Acknowledger(model, memory, fast).line("Order my usual from Starbucks", "Piyush", hour = 9, private = true)
+        Acknowledger(model, memory, fast).line("Order my usual from Starbucks", "Alex", hour = 9, private = true)
         assertFalse("oat latte" in model.asked)
     }
 
     @Test
     fun aSlowAnswerNeverHoldsTheTaskUp() = runTest {
         val slow = Model("Too late.", waitMs = Acknowledger.BUDGET_MS + 500)
-        assertNull(Acknowledger(slow, memory, fast).line("Turn on dark mode", "Piyush", hour = 20))
+        assertNull(Acknowledger(slow, memory, fast).line("Turn on dark mode", "Alex", hour = 20))
     }
 
     @Test
     fun withoutAModelOrWithAnUnusableLineModeUsesItsOwn() = runTest {
-        assertNull(Acknowledger(Model("x"), memory) { null }.line("Turn on dark mode", "Piyush", hour = 20))
+        assertNull(Acknowledger(Model("x"), memory) { null }.line("Turn on dark mode", "Alex", hour = 20))
         val rambling = Model((1..40).joinToString(" ") { "word" })
-        assertNull(Acknowledger(rambling, memory, fast).line("Turn on dark mode", "Piyush", hour = 20))
-        assertEquals("On it, Piyush.", Acknowledger(Model("\"On it, Piyush.\" 🚀"), memory, fast).line("Turn on dark mode", "Piyush", hour = 20))
+        assertNull(Acknowledger(rambling, memory, fast).line("Turn on dark mode", "Alex", hour = 20))
+        assertEquals("On it, Alex.", Acknowledger(Model("\"On it, Alex.\" 🚀"), memory, fast).line("Turn on dark mode", "Alex", hour = 20))
     }
 }
