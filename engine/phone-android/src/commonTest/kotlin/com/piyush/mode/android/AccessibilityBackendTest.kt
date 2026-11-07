@@ -208,6 +208,15 @@ class AccessibilityBackendTest {
     }
 
     @Test
+    fun modesOwnOverlayIsNeverReadAsPartOfTheScreen() = runTest {
+        val overlay = WindowSnapshot(WindowKind.Overlay, "app.heymode.mode", PxRect(0, 1600, 1080, 2400), node(9, "Stop", 0, 1700, 300, 1800))
+        val hands = FakeHands(listOf(app(node(1, "Wi-Fi", 0, 200, 600, 300)), overlay))
+        val texts = (backend(hands).send(Op.ScreenText()) as kotlinx.serialization.json.JsonArray)
+            .map { it.jsonObject["text"]!!.jsonPrimitive.content }
+        assertEquals(listOf("Wi-Fi"), texts, "the overlay's Stop isn't something on the screen to tap")
+    }
+
+    @Test
     fun onAHiddenDisplayBackAndHomeStayThereAndPanelsAreRefused() = runTest {
         val hands = FakeHands()
         val pressed = mutableListOf<GlobalAction>()

@@ -25,6 +25,8 @@ object TreeText {
                 WindowKind.App -> "app"
                 WindowKind.Ime -> "ime"
                 WindowKind.System, WindowKind.Other -> "system"
+                // Mode's own overlay is not part of the screen the agent works on.
+                WindowKind.Overlay -> continue
             }
             val out = if (window.kind == WindowKind.Ime) keys else page
             window.root?.let { walk(it, density, name, out) }

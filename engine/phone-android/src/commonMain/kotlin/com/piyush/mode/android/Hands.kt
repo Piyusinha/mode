@@ -11,7 +11,8 @@ data class PxRect(val left: Int, val top: Int, val right: Int, val bottom: Int) 
 }
 
 /** Which kind of window a node sits in: the app in front, the keyboard, or the system's bars and dialogs. */
-enum class WindowKind { App, Ime, System, Other }
+/** [Overlay]: Mode's own overlay (the agent overlay over the user's app), which the agent never reads. */
+enum class WindowKind { App, Ime, System, Other, Overlay }
 
 /**
  * One node of the accessibility tree, copied: what it says, where it is and what it can do.

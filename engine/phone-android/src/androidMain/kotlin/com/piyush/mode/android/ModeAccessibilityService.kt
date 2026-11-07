@@ -92,10 +92,11 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
             val bounds = Rect().also(window::getBoundsInScreen)
             val root = window.root
             WindowSnapshot(
-                kind = when (window.type) {
-                    AccessibilityWindowInfo.TYPE_APPLICATION -> WindowKind.App
-                    AccessibilityWindowInfo.TYPE_INPUT_METHOD -> WindowKind.Ime
-                    AccessibilityWindowInfo.TYPE_SYSTEM -> WindowKind.System
+                kind = when {
+                    isOwnOverlay(window) -> WindowKind.Overlay
+                    window.type == AccessibilityWindowInfo.TYPE_APPLICATION -> WindowKind.App
+                    window.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD -> WindowKind.Ime
+                    window.type == AccessibilityWindowInfo.TYPE_SYSTEM -> WindowKind.System
                     else -> WindowKind.Other
                 },
                 packageName = root?.packageName?.toString(),
@@ -105,6 +106,10 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
             )
         }.filter { it.kind != WindowKind.Other || it.root != null }
     }
+
+    /** Mode's own overlay window (the agent overlay): the agent never reads or acts on it. */
+    private fun isOwnOverlay(window: AccessibilityWindowInfo): Boolean =
+        window.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && window.root?.packageName == packageName
 
     /** A copy of [node] and what is below it, at most [budget] nodes in all. */
     private fun snapshot(node: AccessibilityNodeInfo, depth: Int, budget: IntArray): NodeSnapshot {
@@ -135,7 +140,18 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
         )
     }
 
-    override suspend fun screenshot(displayId: Int): Shot = suspendCancellableCoroutine { cont ->
+    /** The user's screen is captured without Mode's own overlay on it (it hides for the shot). */
+    override suspend fun screenshot(displayId: Int): Shot {
+        val guarded = displayId == Display.DEFAULT_DISPLAY
+        if (guarded) OverlayGuard.beforeShot()
+        try {
+            return takeShot(displayId)
+        } finally {
+            if (guarded) OverlayGuard.afterShot()
+        }
+    }
+
+    private suspend fun takeShot(displayId: Int): Shot = suspendCancellableCoroutine { cont ->
         takeScreenshot(displayId, shotThread, object : TakeScreenshotCallback {
             override fun onSuccess(result: ScreenshotResult) {
                 val shot = runCatching {
@@ -167,7 +183,18 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
 
     // Hands -----------------------------------------------------------------------------------
 
-    override suspend fun gesture(stroke: Stroke): Boolean = suspendCancellableCoroutine { cont ->
+    /** A gesture on the user's screen goes through Mode's own overlay (it lets touches pass while it runs). */
+    override suspend fun gesture(stroke: Stroke): Boolean {
+        val guarded = stroke.displayId == Display.DEFAULT_DISPLAY
+        if (guarded) OverlayGuard.beforeGesture()
+        try {
+            return dispatch(stroke)
+        } finally {
+            if (guarded) OverlayGuard.afterGesture()
+        }
+    }
+
+    private suspend fun dispatch(stroke: Stroke): Boolean = suspendCancellableCoroutine { cont ->
         val path = Path().apply {
             val (x0, y0) = stroke.points.first()
             moveTo(x0.coerceAtLeast(0f), y0.coerceAtLeast(0f))
@@ -251,7 +278,7 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
     /** Closes System UI's dialogs (Back) and the shade, so what opens next is seen. */
     private fun closeSystemUi() {
         repeat(SYSTEM_UI_TRIES) {
-            val top = windows.orEmpty().firstOrNull { it.isFocused || it.isActive } ?: return@repeat
+            val top = windows.orEmpty().filterNot(::isOwnOverlay).firstOrNull { it.isFocused || it.isActive } ?: return@repeat
             if (top.type != AccessibilityWindowInfo.TYPE_SYSTEM || top.root?.packageName != SYSTEM_UI) return@repeat
             performGlobalAction(GLOBAL_ACTION_BACK)
             Thread.sleep(SYSTEM_UI_SETTLE_MS)
