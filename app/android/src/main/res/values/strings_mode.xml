@@ -454,7 +454,7 @@
     <string name="repeat_every_day">Every day</string>
     <string name="repeat_mo_note">Mo will do this for you on a schedule.</string>
     <string name="repeat_note">First run %1$s. If Mode isn\'t open then, you\'ll get a notification: tap it and Mode does the task.</string>
-    <string name="repeat_note_repeating">Runs at %1$s %2$s while Mode is open. If it isn\'t, you\'ll get a notification at %3$s: tap it and Mode does the task.</string>
+    <string name="repeat_note_repeating">Runs at %1$s %2$s while Mode is open. If it isn\'t, you\'ll get a notification at %1$s: tap it and Mode does the task.</string>
     <string name="repeat_on_days">on %1$s</string>
     <string name="repeat_on_every_day">every day</string>
     <string name="repeat_on_weekdays">on weekdays</string>
@@ -905,7 +905,7 @@
     <string name="voice_key_empty">Paste the key first.</string>
     <string name="voice_key_field">%1$s API key</string>
     <string name="voice_key_note">The key stays in this phone’s secure storage and only goes to %1$s.</string>
-    <string name="voice_key_plan">%1$s knows the key, but its plan doesn’t allow this. Check your plan on %2$s.</string>
+    <string name="voice_key_plan">%1$s knows the key, but its plan doesn’t allow this. Check your plan on %1$s.</string>
     <string name="voice_key_rejected">%1$s said the key is not valid. Copy it again from %2$s — keys are long and easy to cut short.</string>
     <string name="voice_key_section">Key</string>
     <string name="voice_key_unreachable">Couldn’t reach %1$s to check the key. Check the internet and try again.</string>

@@ -64,12 +64,16 @@ def to_android(value):
     parts = re.split(r"\\\(([^()]*(?:\([^()]*\)[^()]*)*)\)", value)
     text = ""
     n = 0
+    # The same value used twice ("at \(time) … at \(time)") keeps one number.
+    numbers = {}
     for i, part in enumerate(parts):
         if i % 2 == 0:
             text += swift_unescape(part).replace("%", "%%")
         else:
-            n += 1
-            text += f"%{n}$s"
+            if part not in numbers:
+                n += 1
+                numbers[part] = n
+            text += f"%{numbers[part]}$s"
     if n == 0:
         text = text.replace("%%", "%")
     for old, new in WORDS:

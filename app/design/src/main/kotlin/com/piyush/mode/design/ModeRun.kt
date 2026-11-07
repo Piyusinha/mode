@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.delay
@@ -317,3 +318,24 @@ public fun ModeFixStepForm(
 
 private const val FIX_MIN_LINES = 3
 private const val FIX_MAX_LINES = 6
+
+/** The days a repeat runs: one round button per day, Monday first, the chosen ones in ink. */
+@Composable
+public fun ModeDayPicker(labels: List<String>, selected: Set<Int>, onToggle: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        labels.forEachIndexed { i, label ->
+            val day = i + 1
+            val on = day in selected
+            Box(
+                Modifier.size(ModeSize.touch).clickable(role = Role.Checkbox, indication = null, interactionSource = null) { onToggle(day) }
+                    .semantics { this.selected = on },
+                Alignment.Center,
+            ) {
+                Box(Modifier.size(ModeSize.dayButton).background(if (on) c.accent else c.card, CircleShape), Alignment.Center) {
+                    ModeText(label, ModeTextStyle.SubheadlineEmphasis, color = if (on) c.onAccent else c.textPrimary)
+                }
+            }
+        }
+    }
+}

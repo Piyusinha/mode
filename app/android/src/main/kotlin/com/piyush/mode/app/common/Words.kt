@@ -69,6 +69,14 @@ class Words(private val context: Context) {
         }
     }
 
+    /** One-letter day names, Monday first. */
+    val shortDays: List<String>
+        get() = (1..7).map { DayOfWeek.of(it).getDisplayName(TextStyle.NARROW_STANDALONE, locale) }
+
+    /** "in 3 hours", "tomorrow": when something next happens, relative to now. */
+    fun moment(epochMs: Long): String =
+        android.text.format.DateUtils.getRelativeTimeSpanString(epochMs, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
+
     /** "Every day", "Weekdays", "Weekends", or the days by name ("Mon, Wed and Fri"). */
     fun days(isoDays: Set<Int>): String = when (isoDays) {
         (1..7).toSet() -> get(R.string.repeat_every_day)
