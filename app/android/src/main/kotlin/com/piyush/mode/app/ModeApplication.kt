@@ -120,7 +120,12 @@ class ModeApplication : Application() {
                 }
                 WorkNotice.refresh(this@ModeApplication)
                 handOver(s)
-                backgroundTask.value = s is ActivityUiState.Working && com.piyush.mode.app.graph.background?.working == true
+                // Only a real end closes the small window: between steps the state can briefly read otherwise.
+                backgroundTask.value = when (s) {
+                    is ActivityUiState.Working -> com.piyush.mode.app.graph.background?.working == true
+                    is ActivityUiState.Finished, is ActivityUiState.Ended, ActivityUiState.Hidden -> false
+                    else -> backgroundTask.value
+                }
                 // A task ended: the widget's suggestions may have changed.
                 if (s is ActivityUiState.Finished) com.piyush.mode.app.widget.ModeWidget.refresh(this@ModeApplication)
             }
