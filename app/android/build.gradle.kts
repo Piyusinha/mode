@@ -10,7 +10,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.piyush.mode"
+        applicationId = "app.heymode.mode"
         minSdk = 33
         targetSdk = 37
         versionCode = 1

@@ -9,7 +9,7 @@ import com.piyush.mode.design.ModeTheme
 
 /**
  * Debug builds only: the design system's catalogue.
- *     adb shell am start -n com.piyush.mode/com.piyush.mode.app.CatalogActivity --ez dark true
+ *     adb shell am start -n app.heymode.mode/com.piyush.mode.app.CatalogActivity --ez dark true
  */
 class CatalogActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

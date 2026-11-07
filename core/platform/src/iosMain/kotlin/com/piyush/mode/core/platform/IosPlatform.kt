@@ -12,7 +12,7 @@ import platform.UIKit.UIApplicationWillTerminateNotification
 import platform.UIKit.UIBackgroundTaskInvalid
 
 public class IosAppInfo : AppInfo {
-    override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode"
+    override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "app.heymode.mode"
 }
 
 public class IosAppLifecycle : AppLifecycle {

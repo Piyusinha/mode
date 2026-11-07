@@ -16,8 +16,8 @@ import kotlin.time.TimeSource
 /**
  * Debug builds only: drives the phone engine from adb, before there are screens to do it from.
  *
- *     adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op look
- *     adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 180 --ef y 400
+ *     adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op look
+ *     adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 180 --ef y 400
  *
  * Ops: look, text, tap, back, home, recents, notifications, quick, launch (--es name …), type (--es s …),
  * enter, scroll (--es dir down|up), checks, hold (--el ms …). Results go to logcat under the tag ModeProbe.

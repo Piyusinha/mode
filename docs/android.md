@@ -74,7 +74,7 @@ The first run has one more step than the iPhone's: Welcome, Connect your AI, **L
 - ChatGPT sign-in: `ChatGptSignIn` listens on 127.0.0.1:1455 (`LoopbackCallback`) before opening OpenAI's page in a browser tab; coming back to Mode without an answer is a cancel.
 - Strings both apps share are generated from the iPhone's `L10n*.swift` by `tools/gen-android-strings.py` (iPhone words swapped for Android's); Android-only ones are in `app/android/src/main/res/values/strings.xml`.
 
-To walk setup past Connect your AI on an emulator without an account: `adb shell am broadcast -n com.piyush.mode/.app.DevProbe --es op key` (debug builds only).
+To walk setup past Connect your AI on an emulator without an account: `adb shell am broadcast -n app.heymode.mode/.app.DevProbe --es op key` (debug builds only).
 
 Known gap: the Play build has no phone control, so its setup will need its own path (Phase 6).
 
@@ -88,7 +88,7 @@ Known gap: the Play build has no phone control, so its setup will need its own p
 - **The assistant** (`assistant/ModeAssistant.kt`): holding power (or the assistant gesture) opens talking mode. Android requires an assistant to bring a speech recognizer and may make it the default, so `ModeRecognitionService` forwards to the phone's own one, and Mode's listening names the phone's recognizer directly. The user picks Mode in Settings › Default apps › Digital assistant (`ROLE_ASSISTANT` can't be requested by an app).
 - **The widget** (`widget/ModeWidget.kt`, board "Home screen widget"): the mic opens talking mode; two suggestions run at once through `mode://run/<task>` and open their chat. Redrawn after each task.
 
-To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT com.piyush.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
+To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT app.heymode.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
 
 ## Developing
 
@@ -96,18 +96,18 @@ Debug builds have an adb probe, so the engine can be driven without the app's sc
 
 ```sh
 # Turn phone control on without the Settings pages (debug and emulators only):
-adb shell appops set com.piyush.mode ACCESS_RESTRICTED_SETTINGS allow
-adb shell settings put secure enabled_accessibility_services com.piyush.mode/com.piyush.mode.android.ModeAccessibilityService
+adb shell appops set app.heymode.mode ACCESS_RESTRICTED_SETTINGS allow
+adb shell settings put secure enabled_accessibility_services app.heymode.mode/com.piyush.mode.android.ModeAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 
 # Then (results in logcat under ModeProbe):
-adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op look
-adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 150 --ef y 233
-adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op checks
+adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op look
+adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 150 --ef y 233
+adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op checks
 ```
 
 `am broadcast` waits until the probe finishes; run it with `&` to look at the phone
-while it works (for example during `hold`). Logs: `adb shell run-as com.piyush.mode
+while it works (for example during `hold`). Logs: `adb shell run-as app.heymode.mode
 cat files/logs/events.log`.
 
 ## Background mode (planned, Phase 5)
