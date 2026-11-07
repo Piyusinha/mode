@@ -2,9 +2,9 @@
 export type Platform = 'mac' | 'windows' | 'linux';
 
 export const PLATFORMS: Record<Platform, { label: string; href: string }> = {
-  mac: { label: 'Mac', href: '/download/mac' },
-  windows: { label: 'Windows', href: '/download/windows' },
-  linux: { label: 'Linux', href: '/download/linux' },
+  mac: { label: 'Mac', href: '/download/mac?latest' },
+  windows: { label: 'Windows', href: '/download/windows?latest' },
+  linux: { label: 'Linux', href: '/download/linux?latest' },
 };
 
 export function detectPlatform(): Platform | null {

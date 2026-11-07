@@ -36,7 +36,7 @@ export default {
     if (url.pathname === '/api/stars') return stars(url.searchParams.has('fresh'));
     if (url.pathname === '/api/releases') return releases();
     const v = url.pathname.match(/^\/download\/v\/([\w.-]+)\/([\w.-]+)$/);
-    if (v) return send(request, `https://github.com/${REPO}/releases/download/${v[1]}/${v[2]}`, v[2], 'Mode');
+    if (v) return send(request, `https://github.com/${REPO}/releases/download/${v[1]}/${v[2]}`, v[2], 'Mode', v[1]);
     const m = url.pathname.match(/^\/download\/?([a-z-]*)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -44,25 +44,42 @@ export default {
     const entry = FILES[key];
     if (!entry) return Response.redirect(new URL('/#get', url).toString(), 302);
 
-    return send(request, `https://github.com/${REPO}/releases/latest/download/${entry.file}`, entry.file, entry.label);
+    // Ask which release is newest, then fetch that exact version's file: each release has its own address,
+    // so no cache (Cloudflare's or the browser's) can hand out an older installer.
+    const tag = await latestTag();
+    const from = tag ? `https://github.com/${REPO}/releases/download/${tag}/${entry.file}`
+                     : `https://github.com/${REPO}/releases/latest/download/${entry.file}`;
+    return send(request, from, entry.file, entry.label, tag);
   },
 };
 
-/** Fetches a release file and sends it from heymode.app as a download. Only successful files are cached (an hour);
-    CACHE_VERSION is part of the address, so bumping it refreshes every cached file at once. */
-async function send(request, from, file, label) {
+/** The newest published release's tag (e.g. "v0.1.1"), checked at most once a minute; null if GitHub can't say. */
+async function latestTag() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'heymode.app', Accept: 'application/vnd.github+json' },
+      cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 60, '300-599': 0 } },
+    });
+    return res.ok ? (await res.json()).tag_name : null;
+  } catch { return null; }
+}
+
+/** Fetches a release file and sends it from heymode.app as a download. A file at a version's own address never
+    changes, so Cloudflare keeps it a day; the browser keeps nothing, so it always gets what we serve now. */
+async function send(request, from, file, label, tag) {
   const upstream = await fetch(`${from}?v=${CACHE_VERSION}`, {
     method: request.method === 'HEAD' ? 'HEAD' : 'GET',
     redirect: 'follow',
-    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 3600, '300-599': 0 } },
+    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': tag ? 86400 : 300, '300-599': 0 } },
   });
   if (!upstream.ok) return almostHere(label);
   const headers = new Headers({
     'Content-Type': 'application/octet-stream',
     'Content-Disposition': `attachment; filename="${file}"`,
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
   });
+  if (tag) headers.set('X-Mode-Release', tag);
   const len = upstream.headers.get('content-length');
   if (len) headers.set('Content-Length', len);
   return new Response(request.method === 'HEAD' ? null : upstream.body, { status: 200, headers });
