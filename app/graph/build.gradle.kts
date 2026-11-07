@@ -29,5 +29,11 @@ kotlin {
             implementation(projects.core.database)
             implementation(projects.engine.phoneIos)
         }
+        androidMain.dependencies {
+            implementation(projects.core.network)
+            implementation(projects.core.database)
+            // The graph's scope runs on Dispatchers.Main.
+            implementation(libs.kotlinx.coroutines.android)
+        }
     }
 }

@@ -56,3 +56,5 @@ include(":app:screens")
 include(":app:graph")
 include(":app:dev-ui")
 include(":app:kit")
+// The Android app (Compose over the shared presenters).
+include(":app:android")

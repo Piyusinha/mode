@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mo's silhouette, as the small (status bar) icon: a single colour, as Android requires. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="120" android:viewportHeight="120">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M60 12 C90 12 106 30 106 60 C106 92 88 108 60 108 C32 108 14 92 14 60 C14 30 30 12 60 12 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="0"
+        android:pathData="M0 0" />
+</vector>
