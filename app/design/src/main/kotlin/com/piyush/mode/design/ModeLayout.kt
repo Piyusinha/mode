@@ -59,6 +59,8 @@ public object ModeRadius {
     public val repeatNote: Dp = 22.dp
     /** The field and switch on "What should Mode have done?". */
     public val chatFixField: Dp = 18.dp
+    /** A bar in the week's chart. */
+    public val bar: Dp = 4.dp
     /** Health's banner. */
     public val banner: Dp = 22.dp
     /** First-run cards (a provider, More options). */
@@ -240,6 +242,12 @@ public object ModeSize {
     public val healthAction: Dp = 32.dp
     public val moBanner: Dp = 40.dp
     public val bannerAction: Dp = 38.dp
+    /** A provider's page: its tile, Mo, the week's bars, usage bars, wide buttons. */
+    public val providerTileRadius: Dp = 18.dp
+    public val moProvider: Dp = 44.dp
+    public val weekBars: Dp = 48.dp
+    public val usageBar: Dp = 8.dp
+    public val wideButton: Dp = 48.dp
     /** A routine's step number on a memory card. */
     public val memoryStep: Dp = 20.dp
     /** The grab handle on top of a sheet. */
