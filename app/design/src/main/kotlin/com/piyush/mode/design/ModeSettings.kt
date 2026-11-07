@@ -319,3 +319,61 @@ public fun ModeProviderRow(
         }
     }
 }
+
+/** Chips that wrap onto more lines. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+public fun ModeChipFlow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s),
+        verticalArrangement = Arrangement.spacedBy(ModeSpacing.s),
+    ) { content() }
+}
+
+/** A word on a raised chip with an × to remove it. */
+@Composable
+public fun ModeRemovableChip(text: String, removeLabel: String, onRemove: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Row(
+        modifier.defaultMinSize(minHeight = ModeSize.filterChip).background(c.cardRaised, Capsule).padding(start = ModeSpacing.headerGap, end = ModeSpacing.xxs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModeText(text, ModeTextStyle.SubheadlineEmphasis)
+        Box(
+            Modifier.defaultMinSize(ModeSize.badge, ModeSize.filterChip).clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onRemove)
+                .semantics { contentDescription = removeLabel },
+            Alignment.Center,
+        ) { ModeIconImage(ModeIcon.Close, ModeIconSize.chevron, c.textPrimary) }
+    }
+}
+
+/** "+ Add a word": a chip that adds one. */
+@Composable
+public fun ModeAddChip(title: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Row(
+        modifier.defaultMinSize(minHeight = ModeSize.filterChip).border(ModeSize.separator, c.ring, Capsule)
+            .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onClick).padding(horizontal = ModeSpacing.headerGap),
+        horizontalArrangement = Arrangement.spacedBy(ModeSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModeIconImage(ModeIcon.Add, ModeIconSize.chevron, c.textPrimary)
+        ModeText(title, ModeTextStyle.SubheadlineEmphasis)
+    }
+}
+
+/** Something Mode always leaves to you: an orange round icon, its name and why. */
+@Composable
+public fun ModeBadgeRow(title: String, subtitle: String, icon: ModeIcon, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Row(modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.rowMin).padding(vertical = ModeSpacing.s), horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.clearAndSetSemantics {}.size(ModeSize.badge).background(c.tokens.tileOrange, CircleShape), Alignment.Center) {
+            ModeIconImage(icon, ModeIconSize.small, c.tokens.tileOrangeText)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+            ModeText(title, ModeTextStyle.Callout)
+            ModeText(subtitle, ModeTextStyle.Footnote, color = c.textSecondary)
+        }
+    }
+}

@@ -134,6 +134,7 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
         Route.Settings -> com.piyush.mode.app.settings.SettingsRoute(graph, nav::push, { nav.pop() }, overlays.openProviders, overlays.reset)
+        Route.Access -> com.piyush.mode.app.settings.AccessRoute(graph) { nav.pop() }
         Route.Health -> com.piyush.mode.app.settings.HealthRoute(graph, pages, nav::push) { nav.pop() }
         Route.Memory -> com.piyush.mode.app.memory.MemoryRoute(graph, com.piyush.mode.app.memory.MemoryPage.Hub, nav::push) { nav.pop() }
         Route.MemoryAboutYou -> com.piyush.mode.app.memory.MemoryRoute(graph, com.piyush.mode.app.memory.MemoryPage.AboutYou, nav::push) { nav.pop() }

@@ -73,6 +73,8 @@
     <string name="backup_row">Backup and restore</string>
     <string name="settings_permissions">Permissions</string>
     <string name="health_unlocked">Phone control unlocked</string>
+    <!-- The example word on How Mode acts when none is set (as on the iPhone). -->
+    <string name="access_example_word">just do it</string>
     <string name="settings_less">Less</string>
     <string name="settings_more">More</string>
 </resources>

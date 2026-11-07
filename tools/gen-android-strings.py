@@ -36,6 +36,8 @@ WORDS = [
     ("Files app", "Files"),
     ("iCloud Drive", "Google Drive"),
     ("AirDrop", "Quick Share"),
+    ("where iPhone hides", "where the app hides"),
+    ("iPhone hides", "Apps hide"),
     ("iOS", "Android"),
     ("On iPhone", "On this phone"),
     ("on iPhone", "on this phone"),
@@ -47,6 +49,10 @@ WORDS = [
 OVERRIDES = {
     "firstRun.permissionsNote": "Mo opens the app and does it while you watch. You can stop it any time from the notification.",
     "firstRun.widgetHow": "Touch and hold your home screen, tap Widgets, and pick Mode.",
+    "access.faceID": "Fingerprint or face unlock",
+    "access.pinDetail": "Apps hide these screens from Mode",
+    "setup.permissions.siri": "The assistant",
+    "start.mo.faceID": "Fingerprint",
 }
 
 
