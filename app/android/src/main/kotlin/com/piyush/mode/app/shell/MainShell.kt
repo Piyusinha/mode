@@ -135,6 +135,7 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
         Route.Settings -> com.piyush.mode.app.settings.SettingsRoute(graph, nav::push, { nav.pop() }, overlays.openProviders, overlays.reset)
         is Route.ProviderDetail -> com.piyush.mode.app.settings.ProviderDetailRoute(graph, route.id, pages, nav::push) { nav.pop() }
+        is Route.PlanModels -> com.piyush.mode.app.settings.PlanModelsRoute(graph, route.brain) { nav.pop() }
         Route.Backup -> com.piyush.mode.app.settings.BackupRoute(graph) { nav.pop() }
         Route.Access -> com.piyush.mode.app.settings.AccessRoute(graph) { nav.pop() }
         Route.Health -> com.piyush.mode.app.settings.HealthRoute(graph, pages, nav::push) { nav.pop() }

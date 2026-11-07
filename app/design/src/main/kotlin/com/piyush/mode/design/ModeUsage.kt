@@ -99,3 +99,30 @@ public fun ModeWideButton(title: String, onClick: () -> Unit, modifier: Modifier
         if (trailingIcon != null) ModeIconImage(trailingIcon, ModeIconSize.small, ink)
     }
 }
+
+/** One effort's speed and accuracy in the table under a chosen model. */
+public data class ModeEffortRow(val label: String, val speed: String, val accuracy: String, val selected: Boolean)
+
+/** How each thinking effort did: effort, speed, accuracy; the chosen one in bold. */
+@Composable
+public fun ModeEffortTable(headers: Triple<String, String, String>, rows: List<ModeEffortRow>, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    @Composable
+    fun line(a: String, b: String, d: String, style: ModeTextStyle, color: Color) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
+            ModeText(a, style, Modifier.weight(1f), color = color)
+            ModeText(b, style, Modifier.weight(1f), color = color)
+            ModeText(d, style, Modifier.weight(1f), color = color)
+        }
+    }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs)) {
+        line(headers.first, headers.second, headers.third, ModeTextStyle.Caption, c.textSecondary)
+        rows.forEach { r -> line(r.label, r.speed, r.accuracy, if (r.selected) ModeTextStyle.FootnoteEmphasis else ModeTextStyle.Footnote, c.textPrimary) }
+    }
+}
+
+/** A small white pill with a line ("On your ChatGPT Plus · 6 models"). */
+@Composable
+public fun ModeInfoChip(text: String, modifier: Modifier = Modifier) {
+    ModeText(text, ModeTextStyle.FootnoteEmphasis, modifier.background(Mode.colors.card, Capsule).padding(horizontal = ModeSpacing.m, vertical = ModeSpacing.xs + ModeSpacing.xxs))
+}
