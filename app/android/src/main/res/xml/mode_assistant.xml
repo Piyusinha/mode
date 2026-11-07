@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mode as the digital assistant: the session opens talking mode. -->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.piyush.mode.app.assistant.ModeAssistantSessionService"
+    android:recognitionService="com.piyush.mode.app.assistant.ModeRecognitionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="true" />

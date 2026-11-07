@@ -169,7 +169,9 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private fun recognize(maxMs: Long, silenceMs: Long, onDevice: Boolean, onPartial: (String) -> Unit, done: (String?, String?, String) -> Unit) {
         run {
             recognizer?.destroy()
-            val r = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(app) else SpeechRecognizer.createSpeechRecognizer(app)
+            // The phone's own recognizer by name: as the assistant, Mode's forwarding one is the default.
+            val r = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(app)
+            else SpeechRecognizer.createSpeechRecognizer(app, com.piyush.mode.app.assistant.PhoneRecognizer.component(app))
             recognizer = r
             var finished = false
             var heard = false
