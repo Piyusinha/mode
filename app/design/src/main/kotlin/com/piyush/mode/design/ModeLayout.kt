@@ -49,6 +49,13 @@ public object ModeRadius {
     public val chatCard: Dp = 24.dp
     public val chatNotice: Dp = 22.dp
     public val chatTile: Dp = 10.dp
+    /** The live run: the screen's frame, the panel; a screenshot cell; a repeat's note. */
+    public val liveScreen: Dp = 36.dp
+    public val livePanel: Dp = 40.dp
+    public val screenCell: Dp = 22.dp
+    public val repeatNote: Dp = 22.dp
+    /** The field and switch on "What should Mode have done?". */
+    public val chatFixField: Dp = 18.dp
     /** First-run cards (a provider, More options). */
     public val firstRunCard: Dp = 24.dp
     /** A tinted note on a setup guide. */
@@ -188,6 +195,19 @@ public object ModeSize {
     public val failedButton: Dp = 42.dp
     public val agendaTimeChat: Dp = 48.dp
     public val chatRing: Dp = 2.dp
+    /** The live run and its screens: Mo on cards and the panel, the badge, the panel's least height, cells. */
+    public val moCard: Dp = 36.dp
+    public val moPanel: Dp = 40.dp
+    public val liveBadgeHeight: Dp = 36.dp
+    public val livePanelHeight: Dp = 246.dp
+    public val screenCell: Dp = 196.dp
+    public val screenBadge: Dp = 20.dp
+    /** The field on "What should Mode have done?". */
+    public val chatFixField: Dp = 108.dp
+    /** The time wheel on Repeat: its height, a row, a column. */
+    public val timeWheel: Dp = 112.dp
+    public val timeWheelRow: Dp = 38.dp
+    public val timeWheelColumn: Dp = 64.dp
     /** The grab handle on top of a sheet. */
     public val sheetHandle: Dp = 36.dp
     public val sheetHandleHeight: Dp = 5.dp

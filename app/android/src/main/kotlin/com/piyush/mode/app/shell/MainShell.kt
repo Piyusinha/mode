@@ -128,6 +128,8 @@ private fun TabRoot(tab: AppTab, graph: ModeGraph, run: RunStatus, nav: Navigato
 private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator, pages: SystemPages, overlays: Overlays) {
     when (route) {
         is Route.Conversation -> com.piyush.mode.app.conversation.ConversationRoute(graph, route.id, nav::push, { nav.pop() }, overlays.openLive)
+        Route.LiveRun -> com.piyush.mode.app.live.LiveRoute(graph) { nav.pop() }
+        is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         else -> NotYet(nav)
     }
 }
