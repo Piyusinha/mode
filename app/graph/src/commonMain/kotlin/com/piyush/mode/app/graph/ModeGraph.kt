@@ -77,6 +77,8 @@ class PlatformServices(
     val appVersion: String = "unknown",
     /** Where backups are written and picked ones read. */
     val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles,
+    /** Which phone this is: the agent's words, status bar and tools. */
+    val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
 )
 
 /**
@@ -148,6 +150,7 @@ class ModeGraph(platform: PlatformServices) {
         translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
         titler = com.piyush.mode.feature.tasks.presentation.ChatTitler(llm, ::quickModel),
         device = platform.device,
+        profile = platform.profile,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */

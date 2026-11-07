@@ -104,6 +104,8 @@ public class TaskRunner(
     private val titler: ChatTitler? = null,
     /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
     private val device: com.piyush.mode.ops.DeviceData? = null,
+    /** Which phone this is, for the agent's prompts and tools. */
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
 ) {
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
@@ -314,7 +316,7 @@ public class TaskRunner(
             val base = TaskContext(
                 userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today(),
                 resumed = resumedFrom(saved),
-                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device),
+                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device, profile = profile),
             )
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
@@ -332,6 +334,7 @@ public class TaskRunner(
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
                 device = device,
+                profile = profile,
             )
             // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
             val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null

@@ -82,6 +82,7 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
             phoneChecks = UnavailablePhoneChecks(),
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
+            profile = com.piyush.mode.agent.PhoneProfile.Android,
         ),
     )
 }

@@ -20,7 +20,7 @@ import kotlinx.serialization.json.putJsonObject
  * "talk with Asha" asked what to say instead of reading the chat; "Beast Life in
  * my snacks" used yesterday's diary; Swiggy reopened on an old restaurant page.
  */
-class Brain(private val llm: LlmClient, private val model: String) {
+class Brain(private val llm: LlmClient, private val model: String, private val profile: PhoneProfile = PhoneProfile.IPhone) {
 
     /** What the task really asks for, and how the hands should go about it. */
     data class Brief(
@@ -55,7 +55,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
 
     suspend fun brief(task: String, context: TaskContext): Result {
         val messages = listOf(
-            ChatMessage("system", listOf(ChatMessage.Part.Text(SYSTEM, cacheAfter = true))),
+            ChatMessage("system", listOf(ChatMessage.Part.Text(system(profile), cacheAfter = true))),
             ChatMessage("user", listOf(ChatMessage.Part.Text(input(task, context)))),
         )
         return try {
@@ -85,7 +85,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
             append("THE ASSISTANT ASKS: ").append(question)
         }
         val messages = listOf(
-            ChatMessage("system", listOf(ChatMessage.Part.Text(DECIDE, cacheAfter = true))),
+            ChatMessage("system", listOf(ChatMessage.Part.Text(decide(profile), cacheAfter = true))),
             ChatMessage("user", listOf(ChatMessage.Part.Text(input))),
         )
         return try {
@@ -178,8 +178,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
             )
         }
 
-        val DECIDE = """
-            You are the planning mind of Mode, a personal assistant operating the user's iPhone. The assistant
+        val DECIDE: String get() = decide(PhoneProfile.IPhone)
+
+        fun decide(p: PhoneProfile): String = """
+            You are the planning mind of Mode, a personal assistant operating the user's ${p.deviceWord}. The assistant
             doing the tapping asks you to make a choice. Decide from what it saw (the text below; you do not see
             images), following your brief: ignore ads and sponsored entries (AD, Ad, Sponsored, Promoted) and
             entries that are not what was asked; break ties as the brief says (more ratings, then faster or
@@ -221,8 +223,10 @@ class Brain(private val llm: LlmClient, private val model: String) {
             )
         }
 
-        val SYSTEM = """
-            You are the planning mind of Mode, a personal assistant that operates the user's iPhone. Another
+        val SYSTEM: String get() = system(PhoneProfile.IPhone)
+
+        fun system(p: PhoneProfile): String = """
+            You are the planning mind of Mode, a personal assistant that operates the user's ${p.deviceWord}. Another
             model does the tapping. Before it starts, read the request the way a thoughtful personal assistant
             would and write it a brief by calling the brief tool. You do not see the screen.
 
@@ -257,7 +261,7 @@ class Brain(private val llm: LlmClient, private val model: String) {
             product page, a place), by running one of their Shortcuts, or by reading the calendar or a contact,
             say so in that step; the screen is for the app-specific part only. Direct routes are shorter and surer.
             Their calendar is the Google Calendar app unless they name another: plan meetings and events there
-            (reading the iPhone's calendar store misses Google-only calendars).
+            (reading the ${p.deviceWord}'s calendar store misses Google-only calendars).
 
             The steps: few and concrete, each a result to reach ("Open Asha's chat", "Read her last messages
             and his replies", "Write and send the reply"), not single taps. Keep every field to a few words; leave

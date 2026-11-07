@@ -101,7 +101,8 @@ object AgentTools {
     /** Tools that act on an element: they take its [id] in place of x and y. */
     private val BY_ID = setOf("tap", "long_press", "type_text")
 
-    val ALL: List<Tool> = listOf(
+    /** The tools for [profile]'s phone, before filtering by what this phone and build offer. */
+    fun tools(profile: PhoneProfile): List<Tool> = listOf(
         Tool("tap", "Tap a piece of text by its id, or a point (x and y) for an icon without text.", "input.tap", listOf(id, point("x"), point("y"), reason)),
         Tool("long_press", "Press and hold (context menus, rearranging): an id, or x and y.", "input.press", listOf(id, point("x"), point("y"), reason)),
         Tool(
@@ -142,13 +143,27 @@ object AgentTools {
                 reason,
             ),
         ),
-        Tool(
+        if (profile.backIsOp) Tool(
+            "back", "Go back one screen (the phone's own Back): it also closes dialogs and the keyboard. Prefer the " +
+                "screen's own Back / \"<\" button when there is one. To return to a different app, use open_app with its name.",
+            "nav.back", listOf(reason),
+        ) else Tool(
             "back", "Go back one screen inside the current app with the iOS edge swipe. Prefer the screen's own " +
                 "Back / \"<\" button when there is one. To return to a different app, use open_app with its name.", "input.drag", listOf(reason),
         ),
+        when (profile.quickPanel) {
+            QuickPanel.ControlCenter -> Tool(
+                "control_center", "Open Control Center (quick toggles: Wi-Fi, Bluetooth, brightness, Focus, " +
+                    "flashlight, and Dark Mode by long-pressing brightness).", "input.drag", listOf(reason),
+            )
+            QuickPanel.QuickSettings -> Tool(
+                "quick_settings", "Open Quick Settings (toggles: Wi-Fi, Bluetooth, Airplane mode, brightness, Do Not " +
+                    "Disturb, flashlight, Dark theme; long-press a tile for its settings page).", "quicksettings.open", listOf(reason),
+            )
+        },
         Tool(
-            "control_center", "Open Control Center (quick toggles: Wi-Fi, Bluetooth, brightness, Focus, " +
-                "flashlight, and Dark Mode by long-pressing brightness).", "input.drag", listOf(reason),
+            "notifications", "Open the notification shade: new messages, codes and alerts. Tap one to open it; " +
+                "back closes the shade.", "notifications.open", listOf(reason),
         ),
         Tool("home", "Go to the Home Screen.", "nav.home", listOf(reason)),
         Tool(
@@ -201,7 +216,7 @@ object AgentTools {
         ),
         Tool(
             "wait_for_user", "Hand over to the user for something only they can do on this screen: a UPI or bank PIN, " +
-                "a password or passcode, Face ID, or a screen that is black or blank (hidden from Mode). Mode waits " +
+                "a password or passcode, ${profile.biometric}, or a screen that is black or blank (hidden from Mode). Mode waits " +
                 "until the screen moves on, then you carry on.", null,
             listOf(Param("what", "string", "What they should do, in a few words: \"Enter your UPI PIN in PhonePe\"."), reason),
         ),
@@ -220,7 +235,7 @@ object AgentTools {
             ),
         ),
         Tool(
-            "read_calendar", "Read the events in the iPhone's own calendar store from now, without opening an app. " +
+            "read_calendar", "Read the events in the ${profile.deviceWord}'s own calendar store from now, without opening an app. " +
                 "It misses calendars that live only in Google Calendar: for their meetings use the Google Calendar app " +
                 "(unless they named another), and never treat an empty result here as proof.", null,
             listOf(Param("days", "integer", "How many days ahead to read (1 for today, 7 for the week)."), reason),
@@ -231,7 +246,7 @@ object AgentTools {
         ),
         Tool(
             "lookup", "Look a fact up on the web through your AI (a flight's status, a shop's hours, a price, an address, " +
-                "today's date for a holiday) in one step, without opening Safari. For facts, not for doing things in apps.", null,
+                "today's date for a holiday) in one step, without opening a browser. For facts, not for doing things in apps.", null,
             listOf(Param("question", "string", "The question, specific (\"IndiGo 6E223 status today\")."), reason),
         ),
         Tool(
@@ -301,6 +316,9 @@ object AgentTools {
         }
     }
 
+    /** The iPhone's tools, before filtering. */
+    val ALL: List<Tool> = tools(PhoneProfile.IPhone)
+
     /** The tools this phone can honour; recall only when there is a memory to look in. */
     /**
      * The tools this phone can honour; recall only with a memory to look in; decide only with a brain.
@@ -309,14 +327,15 @@ object AgentTools {
      */
     fun available(
         phoneOps: Set<String>, recall: Boolean = false, brain: Boolean = false, briefed: Boolean = false,
-        device: DeviceData? = null, lookup: Boolean = false,
+        device: DeviceData? = null, lookup: Boolean = false, profile: PhoneProfile = PhoneProfile.IPhone,
     ): List<Tool> {
         val urls = "url.open" in phoneOps || device?.canOpenUrl == true
-        return ALL.filter {
+        return tools(profile).filter {
             (it.needs == null || it.needs in phoneOps) && (recall || it.name != "recall") &&
                 (brain || it.name != "decide") && !(briefed && it.name == "plan") &&
                 when (it.name) {
-                    "open_url", "run_shortcut" -> urls
+                    "open_url" -> urls
+                    "run_shortcut" -> urls && profile.shortcuts
                     "read_calendar" -> device?.hasCalendar == true
                     "find_contact" -> device?.hasContacts == true
                     "lookup" -> lookup
@@ -326,8 +345,8 @@ object AgentTools {
     }
 
     /** The direct routes on offer, for the brief ("open_url, read_calendar"). */
-    fun directRoutes(phoneOps: Set<String>, device: DeviceData?, lookup: Boolean = false): List<String> =
-        available(phoneOps, device = device, lookup = lookup).map { it.name }.filter { it in DIRECT }
+    fun directRoutes(phoneOps: Set<String>, device: DeviceData?, lookup: Boolean = false, profile: PhoneProfile = PhoneProfile.IPhone): List<String> =
+        available(phoneOps, device = device, lookup = lookup, profile = profile).map { it.name }.filter { it in DIRECT }
 
     /** The Shortcuts app's URL to run [name], with [input] as text when given. */
     fun shortcutUrl(name: String, input: String?): String =
@@ -386,7 +405,7 @@ object AgentTools {
         return ToolCall(call.name, JsonObject(call.arguments + mapOf("x" to JsonPrimitive(e.x), "y" to JsonPrimitive(e.y))))
     }
 
-    fun toOp(call: ToolCall, g: Geometry): Op {
+    fun toOp(call: ToolCall, g: Geometry, profile: PhoneProfile = PhoneProfile.IPhone): Op {
         // An id that was not turned into a point (withElement) is not on this screen.
         if (call.name in BY_ID && call.arguments["id"] != null && call.arguments["x"] == null) {
             throw IllegalArgumentException(
@@ -444,8 +463,10 @@ object AgentTools {
             "home" -> Op.Home
             // Control Center: down from the top-right corner.
             "control_center" -> Op.Drag(g.screenWidth - 30, 2.0, g.screenWidth - 30, g.screenHeight * 0.55, duration = 0.35)
-            // The iOS back gesture: from the very left edge, across, at mid height.
-            "back" -> Op.Drag(1.0, g.screenHeight * 0.45, g.screenWidth * 0.75, g.screenHeight * 0.45, duration = 0.25)
+            // The phone's own Back where it has one; else the iOS back gesture: from the very left edge, across, at mid height.
+            "back" -> if (profile.backIsOp) Op.Back else Op.Drag(1.0, g.screenHeight * 0.45, g.screenWidth * 0.75, g.screenHeight * 0.45, duration = 0.25)
+            "quick_settings" -> Op.OpenQuickSettings
+            "notifications" -> Op.OpenNotifications
             "open_app" -> Op.LaunchApp(str("name"), fresh = call.arguments["fresh"]?.jsonPrimitive?.booleanOrNull == true)
             "open_url" -> Op.OpenUrl(str("url"))
             "run_shortcut" -> Op.OpenUrl(shortcutUrl(str("name"), call.arguments["input"]?.jsonPrimitive?.contentOrNull))
