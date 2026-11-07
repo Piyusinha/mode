@@ -6,6 +6,11 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
+## 0.1.4 · 7 Nov 2026
+
+- A saved Apple password that no longer works (changed since) is removed from this computer the
+  first time Apple turns it down, and the sign-in asks for the new one, instead of trying the
+  old one again each time.
 - Stops an iPhone on iOS 26 or earlier with "Mode needs iOS 27", instead of installing a Mode
   that can't see or tap the screen, and guides you through updating: Software Update, finding
   "Upgrade to iOS 27", and what to do if it isn't offered or there isn't enough space. Check

@@ -16,7 +16,7 @@ use mode_setup_core::{
     apps,
     device::{self, Phone, Readiness},
     install::{Installed, Signer, Stage, VpnStatus},
-    pairing, release,
+    pairing, release, SetupError,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -106,13 +106,18 @@ async fn helpers() -> Vec<HelperStatus> {
     out
 }
 
+/// Shown when the password kept in the keychain no longer works (the window matches on "saved password").
+const SAVED_PASSWORD_REJECTED: &str = "Your saved password didn’t work, so it was removed from this computer. Enter your Apple password.";
+
 /// Signs in; Apple's code is asked with the "code-needed" event. Answers the teams, paid first.
 #[tauri::command]
 async fn sign_in(app: AppHandle, state: State<'_, App>, email: String, password: Option<String>, remember: bool, helper: String) -> Res<Vec<Team>> {
     use std::sync::atomic::Ordering;
     let _login = state.signing_in.try_lock().map_err(|_| "Sign-in is already in progress.")?;
     let epoch = state.auth_epoch.fetch_add(1, Ordering::SeqCst) + 1;
-    let password = match password.filter(|p| !p.is_empty()) {
+    let typed = password.filter(|p| !p.is_empty());
+    let from_keychain = typed.is_none();
+    let password = match typed {
         Some(p) => p,
         None => account::remembered_password(&email).ok_or("Enter your password.")?,
     };
@@ -126,7 +131,16 @@ async fn sign_in(app: AppHandle, state: State<'_, App>, email: String, password:
         if !cancelled { let _ = handle.emit("code-needed", req); }
         async move { if cancelled { CodeAnswer::Cancel } else { rx.await.unwrap_or(CodeAnswer::Cancel) } }
     };
-    let mut session = account::sign_in(&email, &password, &helper, ask).await.map_err(err)?;
+    let mut session = match account::sign_in(&email, &password, &helper, ask).await {
+        Ok(s) => s,
+        // A remembered password Apple turns down (changed since) is forgotten, so it isn't tried again.
+        Err(SetupError::WrongPassword) if from_keychain => {
+            account::forget_password(&email);
+            save_prefs(&app, |p| p.remembered_password = false);
+            return Err(SAVED_PASSWORD_REJECTED.into());
+        }
+        Err(e) => return Err(err(e)),
+    };
     if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }
     let teams = account::teams(&mut session).await.map_err(err)?;
     if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }

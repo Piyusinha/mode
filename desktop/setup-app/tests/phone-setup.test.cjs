@@ -350,3 +350,14 @@ test('iOS 27 goes straight to Trust; the on-phone steps include trusting the App
   assert.match(f.app.innerHTML, /Trust your Apple account/);
   assert.match(f.app.innerHTML, /VPN &amp; Device Management/);
 });
+
+// ---- a remembered password Apple turns down ------------------------------------------------------------
+test('a saved password that no longer works is dropped, and the field asks for the new one', async () => {
+  const f = fixture({ sign_in: () => { throw 'Your saved password didn’t work, so it was removed from this computer. Enter your Apple password.'; } });
+  await f.run("S.prefs = { email: 'test@example.com', rememberedPassword: true, phones: {} }; S.email = 'test@example.com'; S.hasSaved = true; go('signIn')");
+  assert.match(f.app.innerHTML, /Saved on this computer/);
+  await f.run('signIn()');
+  assert.equal(f.run('S.hasSaved'), false);
+  assert.match(f.app.innerHTML, /saved password didn’t work/);
+  assert.doesNotMatch(f.app.innerHTML, /Saved on this computer/);
+});

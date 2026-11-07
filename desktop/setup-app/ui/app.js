@@ -253,7 +253,7 @@ const screens = {
     body: head('Sign in with your Apple account', 'Mode is signed with your account so it can run on your iPhone. A free account is fine.')
       + `<form id="signin" style="display:flex;flex-direction:column;gap:14px;max-width:420px">
           <label class="field"><span>Apple Account</span><input id="email" type="email" autocomplete="username" value="${esc(S.email)}" required></label>
-          <label class="field${S.signInError ? ' error' : ''}"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="${S.hasSaved ? 'Saved on this computer' : 'Leave blank to try a saved password'}">${S.signInError ? `<em>${esc(S.signInError)}</em>` : ''}</label>
+          <label class="field${S.signInError ? ' error' : ''}"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="${S.hasSaved ? 'Saved on this computer' : ''}">${S.signInError ? `<em>${esc(S.signInError)}</em>` : ''}</label>
           <button type="button" class="check ${S.remember ? 'on' : ''}" role="checkbox" aria-checked="${S.remember}" data-act="remember"><i>${S.remember ? svg('check', 12, 3.2) : ''}</i><span><b>Remember on this computer</b><small>Save the password in this computer’s Keychain. Apple may still ask for verification when signing in again.</small></span></button>
         </form>`
       + `<p class="note">${svg('lock', 16, 2)}<span>Your password goes only to Apple. Mode and its makers never see it.</span></p>`,
@@ -628,6 +628,8 @@ async function signIn() {
     const m = errText(e);
     if (/sign-in helper/i.test(m)) { go('helperDown'); return; }
     S.signInError = /wrong apple account or password/i.test(m) ? 'Wrong Apple Account or password.' : m;
+    // The saved password was turned down and forgotten: the field now needs the new one.
+    if (/saved password/i.test(m)) { S.hasSaved = false; if (S.prefs) S.prefs.rememberedPassword = false; }
     go('signIn');
   }
 }
