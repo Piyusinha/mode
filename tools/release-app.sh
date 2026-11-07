@@ -1,9 +1,10 @@
 #!/bin/sh
-# Makes a draft GitHub release of Mode, the phone app: tag app-v<version>, with Mode for iPhone
+# Makes a draft GitHub release of Mode, the phone app: tag and title
+# Mode-Mobile-Build-<version>, with Mode for iPhone
 # (and for Android, once it ships). Mode Setup is released on its own (tools/release-setup.sh) and
 # installs the newest published Mode.
 #
-#   tools/release-app.sh 0.2.0      # → draft release app-v0.2.0
+#   tools/release-app.sh 0.2.0      # → draft release Mode-Mobile-Build-0.2.0
 #
 # Before: set MARKETING_VERSION in iosApp/project.yml to the version, and write its section in
 # CHANGELOG.md (move the Unreleased items into "## 0.2.0 · <date>").
@@ -18,7 +19,7 @@ set -eu
 . "$(dirname "$0")/release-common.sh"
 
 V=${1:?"usage: tools/release-app.sh <version>, e.g. 0.2.0"}
-TAG="app-v$V"
+TAG="Mode-Mobile-Build-$V"
 check_main "$TAG"
 
 APP_V=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"$/\1/p' iosApp/project.yml | head -1)
@@ -38,9 +39,9 @@ echo "== Draft release $TAG"
 NOTES=$(mktemp)
 tools/release-notes.sh app "$V" > "$NOTES"
 # shellcheck disable=SC2086
-gh release create "$TAG" --draft --target main --title "Mode $V" --notes-file "$NOTES" $FILES
+gh release create "$TAG" --draft --target main --title "$TAG" --notes-file "$NOTES" $FILES
 rm -f "$NOTES"
-push_tag "$TAG" "Mode $V"
+push_tag "$TAG" "$TAG"
 echo "Draft $TAG made. Check it, then publish:"
 echo "  gh release edit $TAG --draft=false --latest"
 echo "Mode Setup installs it from then on; no new Mode Setup is needed."

@@ -1,9 +1,9 @@
 #!/bin/sh
-# Makes a draft GitHub release of Mode Setup, the desktop app that installs Mode: tag
-# setup-v<version>. The Mac .dmg is built, signed and notarized here; the tag starts GitHub
+# Makes a draft GitHub release of Mode Setup, the desktop app that installs Mode: tag and title
+# Mode-Desktop-App-<version>. The Mac .dmg is built, signed and notarized here; the tag starts GitHub
 # Actions (release.yml), which adds Windows (.exe, .msi) and Linux (.AppImage, .deb).
 #
-#   tools/release-setup.sh 0.1.3      # → draft release setup-v0.1.3
+#   tools/release-setup.sh 0.1.3      # → draft release Mode-Desktop-App-0.1.3
 #
 # Before: set the version in desktop/setup-app/tauri.conf.json and desktop/Cargo.toml, and write
 # its section in desktop/CHANGELOG.md. Mode itself is released on its own (tools/release-app.sh).
@@ -19,13 +19,13 @@
 # Without them the .dmg is unsigned and macOS asks people to right-click → Open.
 #
 # Publish it without making it GitHub's "Latest" (that stays the newest Mode release):
-#   gh release edit setup-v<version> --draft=false --latest=false
+#   gh release edit Mode-Desktop-App-<version> --draft=false --latest=false
 set -eu
 . "$(dirname "$0")/release-common.sh"
 CARGO=${CARGO:-"$HOME/.cargo/bin/cargo"}
 
 V=${1:?"usage: tools/release-setup.sh <version>, e.g. 0.1.3"}
-TAG="setup-v$V"
+TAG="Mode-Desktop-App-$V"
 check_main "$TAG"
 
 SETUP_V=$(sed -n 's/^ *"version": *"\(.*\)",*$/\1/p' desktop/setup-app/tauri.conf.json | head -1)
@@ -71,10 +71,10 @@ echo "== Draft release $TAG"
 NOTES=$(mktemp)
 tools/release-notes.sh setup "$V" > "$NOTES"
 printf '\nCarries Mode %s inside, and installs any newer Mode that has come out since.\n' "$MODE_V" >> "$NOTES"
-gh release create "$TAG" --draft --target main --title "Mode Setup $V" --notes-file "$NOTES" \
+gh release create "$TAG" --draft --target main --title "$TAG" --notes-file "$NOTES" \
     "$MAC_DMG" build/release/Mode-Setup-mac.dmg
 rm -f "$NOTES"
-push_tag "$TAG" "Mode Setup $V"
+push_tag "$TAG" "$TAG"
 echo "Draft $TAG made. Windows and Linux builds: gh run list --workflow release.yml"
 echo "When they are attached, check the files and publish:"
 echo "  gh release edit $TAG --draft=false --latest=false"

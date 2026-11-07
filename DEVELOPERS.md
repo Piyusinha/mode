@@ -400,12 +400,12 @@ Mode and Mode Setup are released separately, each with its own version and chang
 
 | | Mode (the phone app) | Mode Setup (the desktop app) |
 |---|---|---|
-| Tag | `app-v<version>` | `setup-v<version>` |
+| Tag and title | `Mode-Mobile-Build-<version>` | `Mode-Desktop-App-<version>` |
 | Version in | `iosApp/project.yml` (`MARKETING_VERSION`) | `desktop/setup-app/tauri.conf.json`, `desktop/Cargo.toml` |
 | Changelog | `CHANGELOG.md` | `desktop/CHANGELOG.md` |
 | Release | `tools/release-app.sh <version>` | `tools/release-setup.sh <version>` |
 | Holds | `Mode.ipa`, `Mode-paid.ipa` (and `Mode.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
-| Publish | `gh release edit app-v<v> --draft=false --latest` | `gh release edit setup-v<v> --draft=false --latest=false` |
+| Publish | `gh release edit Mode-Mobile-Build-<v> --draft=false --latest` | `gh release edit Mode-Desktop-App-<v> --draft=false --latest=false` |
 
 - Each script stops before building if the version doesn't match or its changelog has no
   section for it. The section becomes the release's "What's new" (`tools/release-notes.sh`).

@@ -53,8 +53,8 @@ export default {
   },
 };
 
-/** The newest published Mode Setup release's tag (e.g. "setup-v0.1.3"), checked at most once a minute; null if
-    GitHub can't say. Mode and Mode Setup are released separately ("app-v…" and "setup-v…"); the first releases
+/** The newest published Mode Setup release's tag (e.g. "Mode-Desktop-App-0.1.3"), checked at most once a minute; null if
+    GitHub can't say. Mode and Mode Setup are released separately ("Mode-Mobile-Build-…" and "Mode-Desktop-App-…"); the first releases
     ("v0.1.0" to "v0.1.2") held both. GitHub's own "Latest" is the newest Mode, so it isn't used here. */
 async function latestTag() {
   try {
@@ -66,7 +66,7 @@ async function latestTag() {
     let best = null;
     for (const r of await res.json()) {
       if (r.draft || r.prerelease || !r.assets.some((a) => a.name === FILES.mac.file)) continue;
-      const v = (r.tag_name.match(/^(?:setup-)?v(\d[\w.]*)$/) || [])[1];
+      const v = (r.tag_name.match(/^(?:Mode-Desktop-App-|v)(\d[\w.]*)$/) || [])[1];
       if (v && (!best || newer(v, best.v))) best = { v, tag: r.tag_name };
     }
     return best ? best.tag : null;

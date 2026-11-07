@@ -1,7 +1,7 @@
 # Changelog: Mode Setup
 
 What changed in each release of Mode Setup, the app for Mac, Windows and Linux that installs Mode
-on your phone. Mode Setup releases are tagged `setup-v<version>`, and `tools/release-setup.sh`
+on your phone. Mode Setup releases are tagged `Mode-Desktop-App-<version>`, and `tools/release-setup.sh`
 won't make one without its section here. Mode itself has its own: [CHANGELOG.md](../CHANGELOG.md).
 
 ## Unreleased

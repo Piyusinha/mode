@@ -1,7 +1,7 @@
 # Changelog: Mode
 
 What changed in each release of Mode, the phone app (iPhone now, Android next). Mode releases are
-tagged `app-v<version>`, and `tools/release-app.sh` won't make one without its section here.
+tagged `Mode-Mobile-Build-<version>`, and `tools/release-app.sh` won't make one without its section here.
 Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.md](desktop/CHANGELOG.md).
 
 ## Unreleased

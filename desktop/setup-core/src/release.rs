@@ -24,8 +24,9 @@ pub struct Release {
     pub sha256: Option<String>,
 }
 
-/// The two kinds of release, each with its own version and tag: Mode, the phone app ("app-v0.2.0",
-/// iPhone and Android), and Mode Setup, this desktop app ("setup-v0.1.3"). The first releases
+/// The two kinds of release, each with its own version and tag: Mode, the phone app
+/// ("Mode-Mobile-Build-0.2.0", iPhone and Android), and Mode Setup, this desktop app
+/// ("Mode-Desktop-App-0.1.3"). The first releases
 /// ("v0.1.0" to "v0.1.2") held both, so they count as either.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -34,9 +35,9 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The version in a release tag of this kind ("app-v0.2.0" → "0.2.0"), or None for the other kind.
+    /// The version in a release tag of this kind ("Mode-Mobile-Build-0.2.0" → "0.2.0"), or None for the other kind.
     pub fn version_of(self, tag: &str) -> Option<&str> {
-        let prefix = match self { Kind::App => "app-v", Kind::Setup => "setup-v" };
+        let prefix = match self { Kind::App => "Mode-Mobile-Build-", Kind::Setup => "Mode-Desktop-App-" };
         let v = tag.strip_prefix(prefix).or_else(|| tag.strip_prefix('v'))?;
         v.starts_with(|c: char| c.is_ascii_digit()).then_some(v)
     }
@@ -187,10 +188,10 @@ mod tests {
     #[test]
     fn each_kind_finds_its_own_newest_release() {
         let list = || vec![
-            rel("setup-v0.1.4", false, &["Mode-Setup-mac.dmg"]),
-            rel("app-v0.3.0", true, &["Mode.ipa"]),          // a draft: not out yet
-            rel("app-v0.2.0", false, &["Mode.ipa", "Mode-paid.ipa"]),
-            rel("setup-v0.1.3", false, &["Mode-Setup-mac.dmg"]),
+            rel("Mode-Desktop-App-0.1.4", false, &["Mode-Setup-mac.dmg"]),
+            rel("Mode-Mobile-Build-0.3.0", true, &["Mode.ipa"]),          // a draft: not out yet
+            rel("Mode-Mobile-Build-0.2.0", false, &["Mode.ipa", "Mode-paid.ipa"]),
+            rel("Mode-Desktop-App-0.1.3", false, &["Mode-Setup-mac.dmg"]),
             rel("v0.1.2", false, &["Mode.ipa", "Mode-paid.ipa", "Mode-Setup-mac.dmg"]),
         ];
         assert_eq!(newest(list(), Kind::App, Some("Mode.ipa")).unwrap().0, "0.2.0");
@@ -205,9 +206,9 @@ mod tests {
 
     #[test]
     fn tags_by_kind() {
-        assert_eq!(Kind::App.version_of("app-v0.2.0"), Some("0.2.0"));
-        assert_eq!(Kind::App.version_of("setup-v0.2.0"), None);
-        assert_eq!(Kind::Setup.version_of("setup-v0.1.3"), Some("0.1.3"));
+        assert_eq!(Kind::App.version_of("Mode-Mobile-Build-0.2.0"), Some("0.2.0"));
+        assert_eq!(Kind::App.version_of("Mode-Desktop-App-0.2.0"), None);
+        assert_eq!(Kind::Setup.version_of("Mode-Desktop-App-0.1.3"), Some("0.1.3"));
         assert_eq!(Kind::Setup.version_of("v0.1.2"), Some("0.1.2"));
         assert_eq!(Kind::App.version_of("vnext"), None);
     }

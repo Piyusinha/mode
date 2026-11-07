@@ -3,8 +3,9 @@
 # their .sha256, and writes build/release/Mode.version, for Mode Setup to carry inside it.
 # Used by tools/release-setup.sh and by CI (.github/workflows/release.yml). Prints the version.
 #
-# Mode releases are tagged "app-v<version>"; the first releases ("v0.1.0" to "v0.1.2") held Mode
-# and Mode Setup together and count too.
+# Mode releases are tagged "Mode-Mobile-Build-<version>"; the first releases ("v0.1.0" to "v0.1.2")
+# held Mode and Mode Setup together and count too. The highest version wins: GitHub's list order
+# isn't by version (a release made as a draft and published later can sit below older ones).
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -12,13 +13,14 @@ REPO=${GITHUB_REPOSITORY:-Piyusinha/mode}
 OUT="$ROOT/build/release"
 mkdir -p "$OUT"
 
-# Newest first, as GitHub lists them; the first published one with Mode.ipa.
 TAG=$(gh api "repos/$REPO/releases?per_page=50" --jq '
   [.[] | select(.draft == false and .prerelease == false)
-       | select(.tag_name | test("^(app-)?v[0-9]"))
-       | select([.assets[].name] | index("Mode.ipa"))][0].tag_name // empty')
+       | select(.tag_name | test("^(Mode-Mobile-Build-|v)[0-9]+(\\.[0-9]+)*$"))
+       | select([.assets[].name] | index("Mode.ipa"))
+       | {tag: .tag_name, v: (.tag_name | sub("^(Mode-Mobile-Build-|v)"; "") | split(".") | map(tonumber))}]
+  | sort_by(.v) | last | .tag // empty')
 [ -n "$TAG" ] || { echo "latest-app-release: no published Mode release with Mode.ipa" >&2; exit 1; }
-V=${TAG#app-}; V=${V#v}
+V=${TAG#Mode-Mobile-Build-}; V=${V#v}
 
 for f in Mode.ipa Mode.ipa.sha256 Mode-paid.ipa Mode-paid.ipa.sha256; do rm -f "$OUT/$f"; done
 gh release download "$TAG" --repo "$REPO" --dir "$OUT" \

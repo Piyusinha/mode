@@ -1,4 +1,4 @@
-# Mode Setup for Windows and Linux. tools/release-setup.sh makes the draft release setup-v<version>
+# Mode Setup for Windows and Linux. tools/release-setup.sh makes the draft release Mode-Desktop-App-<version>
 # on a Mac (the .dmg is signed and notarized there) and pushes the tag; this adds the Windows and
 # Linux installers to that draft, each carrying the newest published Mode. Run it by hand
 # (Actions → Run workflow) to build without a release.
@@ -6,7 +6,7 @@ name: Release · Mode Setup for Windows and Linux
 
 on:
   push:
-    tags: ["setup-v*"]
+    tags: ["Mode-Desktop-App-*"]
   workflow_dispatch:
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
       # The newest published Mode (.ipa files, checked against their .sha256, and Mode.version), to
       # carry inside Mode Setup: the same script the Mac build uses.
       - name: The newest Mode, to carry inside
-        if: startsWith(github.ref, 'refs/tags/setup-v')
+        if: startsWith(github.ref, 'refs/tags/Mode-Desktop-App-')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir out
-          V=${GITHUB_REF_NAME#setup-v}
+          V=${GITHUB_REF_NAME#Mode-Desktop-App-}
           [ "$V" != "$GITHUB_REF_NAME" ] || V=dev
           if [ "$RUNNER_OS" = Windows ]; then OSN=windows; else OSN=linux; fi
           take() {  # $1 = pattern, $2 = extension
@@ -78,7 +78,7 @@ jobs:
           name: mode-setup-${{ runner.os }}
           path: out/*
       - name: Attach to the draft release
-        if: startsWith(github.ref, 'refs/tags/setup-v')
+        if: startsWith(github.ref, 'refs/tags/Mode-Desktop-App-')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
