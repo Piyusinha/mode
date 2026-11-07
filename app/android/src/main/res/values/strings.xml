@@ -11,6 +11,9 @@
     <!-- The working notification. -->
     <string name="working_title">Mode is working</string>
     <string name="working_stop">Stop</string>
+    <string name="device_voice_name">%1$s · Voice %2$d</string>
+    <string name="device_voice_offline">Works offline</string>
+    <string name="device_voice_online">Needs internet</string>
     <string name="working_unlock">Waiting for you to unlock your phone</string>
 
     <!-- Durations as the boards show them ("62 s"). -->

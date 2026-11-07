@@ -21,6 +21,7 @@ class ModeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        voice.install()
         val words = NotifierWords(
             needsYou = getString(R.string.question_title),
             yourTurn = getString(R.string.question_your_turn),
@@ -59,6 +60,18 @@ class ModeApplication : Application() {
             stop = PendingIntent.getBroadcast(this, 0, Intent(this, StopReceiver::class.java), flags),
         )
         followTheRunningTask()
+    }
+
+    /** The phone's voice is installed before anything speaks or listens. */
+    private val voice by lazy {
+        com.piyush.mode.app.voice.AndroidDeviceVoice(
+            this,
+            com.piyush.mode.app.voice.VoiceWords(
+                name = { accent, n -> getString(R.string.device_voice_name, accent, n) },
+                offline = getString(R.string.device_voice_offline),
+                online = getString(R.string.device_voice_online),
+            ),
+        )
     }
 
     /** The working notice follows the task: what it's doing now, the plan as a bar, how long it's been going. */

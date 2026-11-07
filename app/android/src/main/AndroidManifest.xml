@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Speaking a task to Mode; asked the first time the user does. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- While a task runs: the working notification's service, and the CPU and screen kept on. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -10,6 +12,13 @@
 
     <!-- The apps Mode can open for the user: everything with a launcher icon. -->
     <queries>
+        <!-- The phone's text-to-speech and speech recognition. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
