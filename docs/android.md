@@ -110,12 +110,36 @@ adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op 
 while it works (for example during `hold`). Logs: `adb shell run-as app.heymode.mode
 cat files/logs/events.log`.
 
-## Background mode (planned, Phase 5)
+## Background mode ("In the background")
 
-Mode pairs with the phone's own Wireless debugging, starts a helper as the shell user
-and works on a hidden display while the user keeps the phone. Built on proven open
-source rather than our own: [libadb-android](https://github.com/MuntashirAkon/libadb-android)
-(Apache-2.0 option) for pairing and the connection, a trimmed fork of the
-[scrcpy](https://github.com/Genymobile/scrcpy) server (Apache-2.0) for the virtual
-display, input and starting apps on it, following [JemRec](https://github.com/jemcik/JemRec)
-(Apache-2.0), which does both on-device, and its notes on libadb's pitfalls.
+Optional, set up once from Settings › Permissions › Work in the background (boards B01–B06). Mode then does a
+task on a hidden display while the user keeps using the phone, and falls back to their screen whenever the hidden
+display isn't ready, so a task always runs.
+
+- **The link** (`engine:adb-link`): Mode pairs with its own phone's Wireless debugging and runs commands as the
+  shell user. Built on [libadb-android](https://github.com/MuntashirAkon/libadb-android) 3.1.1 (JitPack, only that
+  group) with Conscrypt 2.8.0 for TLS 1.3 (2.5.3's native library is 4 KB-aligned and won't load on 16 KB-page
+  phones) and BouncyCastle for Mode's own key (`AdbKeys`, in Mode's files). No mDNS: on Android 17 discovering
+  local services brings up a picker, which closes Settings' pairing window. The debugging port is found on
+  127.0.0.1 instead (`LoopbackPorts`, the ephemeral range, about a second), and the last one is tried first.
+- **Pairing** (`BackgroundSetup`): while the "Pair with device" window is open, Mode reads its code and port with
+  phone control (`PairingWindow`, digits and an address only, so any language) and pairs by itself; the board's
+  notification takes a typed code when it can't. Then Mode grants itself `WRITE_SECURE_SETTINGS` over the link, so
+  after a restart it switches Wireless debugging back on itself (`BackgroundMode.wirelessDebuggingOn`).
+- **The helper** (`engine:adb-helper`, see its `PATCHES.md`): started with `app_process` from Mode's APK over one
+  `exec:` stream (no PTY, no socket). Following the scrcpy server (Apache-2.0), it makes a trusted, always-unlocked
+  virtual display with its own focus, presses Back and Home there, and moves the hidden display's app to the user's
+  screen and back (`cmd activity display move-stack`). It ends with its input, taking the display with it.
+- **Tasks** (`AccessibilityPhoneLink` + `BackgroundMode`): the same accessibility backend with the hidden display's
+  id. Screenshots, the text tree, taps and typing all take a display id; Mode opens apps there itself. Back and Home
+  go through the helper, because the accessibility service's own actions always hit the user's screen; the
+  notification shade and quick settings are refused on the hidden display. Coming back to Mode after a task is
+  skipped there. The display ends with the task's session.
+- **The user's turn** (a PIN, a password, a private screen): the app comes to the user's screen and goes back once
+  Mode carries on. The live run shows "Live · in the background", a "Hidden screen" tag, and Take over / Give back
+  to Mode (boards R01, R03).
+
+Measured on the API 37 emulator: pairing about 1.2 s after the window opens; connecting, starting the helper and
+making the display 1.1–1.6 s (including switching Wireless debugging back on); a look on the hidden display
+130–170 ms, Back 117 ms. Debug probes: `--es op adb` (pair with `--es code … --ei port …`, or connect),
+`helper`, `on --ei display N`, `background --ez on true|false` / `--ez forget true`, `route`, `bring`, `giveback`.
