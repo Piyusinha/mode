@@ -106,16 +106,17 @@ async function send(request, from, file, label, tag) {
 
 /** Published releases with their notes and files, for the Releases page. Cached at Cloudflare for 10 minutes. */
 async function releases() {
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, {
+  // Checked at most once a minute, so a release you publish or delete shows up (or goes) within a minute.
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30&page=1`, {
     headers: { 'User-Agent': 'heymode.app', Accept: 'application/vnd.github+json' },
-    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 600, '300-599': 0 } },
+    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 60, '300-599': 0 } },
   });
   const list = res.ok ? await res.json() : [];
   const out = list.filter((r) => !r.draft).map((r) => ({
     tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at, prerelease: r.prerelease, notes: r.body || '',
     files: r.assets.map((a) => ({ name: a.name, size: a.size })),
   }));
-  return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } });
+  return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
 /** The repo's star count, for the GitHub button. Cached at Cloudflare for a minute; `?fresh` skips that
