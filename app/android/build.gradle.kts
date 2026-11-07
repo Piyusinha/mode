@@ -40,6 +40,7 @@ android {
 
 dependencies {
     implementation(projects.app.graph)
+    implementation(projects.app.design)
     implementation(projects.core.platform)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)

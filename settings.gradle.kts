@@ -60,3 +60,5 @@ include(":app:dev-ui")
 include(":app:kit")
 // The Android app (Compose over the shared presenters).
 include(":app:android")
+// The Android design system (Compose): tokens and components, like iosApp/Packages/ModeDesignSystem.
+include(":app:design")
