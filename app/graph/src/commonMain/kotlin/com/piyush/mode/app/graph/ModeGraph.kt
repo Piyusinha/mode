@@ -79,6 +79,8 @@ class PlatformServices(
     val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles,
     /** Which phone this is: the agent's words, status bar and tools. */
     val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
+    /** Whether an overlay over the user's app shows Mode (Android's agent overlay): then Mode's app stays back. */
+    val presence: com.piyush.mode.core.platform.ModePresence = com.piyush.mode.core.platform.ModePresence.None,
 )
 
 /**
@@ -156,6 +158,7 @@ class ModeGraph(platform: PlatformServices) {
         titler = com.piyush.mode.feature.tasks.presentation.ChatTitler(llm, ::quickModel),
         device = platform.device,
         profile = platform.profile,
+        presence = platform.presence,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */

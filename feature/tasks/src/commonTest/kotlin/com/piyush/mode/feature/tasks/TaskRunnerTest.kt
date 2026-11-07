@@ -83,7 +83,14 @@ private object Inline : BackgroundWork {
     override suspend fun <T> run(work: suspend () -> T): T = work()
 }
 
-private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "sk-or-test", fail: String? = null, withMemory: Boolean = false) {
+private class Fixture(
+    scope: CoroutineScope,
+    model: LlmClient,
+    key: String? = "sk-or-test",
+    fail: String? = null,
+    withMemory: Boolean = false,
+    overlay: Boolean = false,
+) {
     val link = Link(fail)
     val files = InMemoryFileStore()
     val notes = Notes()
@@ -113,6 +120,7 @@ private class Fixture(scope: CoroutineScope, model: LlmClient, key: String? = "s
         activity = activity,
         scope = scope,
         memory = if (withMemory) taskMemory else null,
+        presence = object : com.piyush.mode.core.platform.ModePresence { override val overlay = overlay },
     )
 }
 
@@ -646,6 +654,22 @@ class TaskRunnerTest {
         val done = assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome)
         assertTrue(done.stay)
         assertTrue(f.link.phone!!.actions.none { it == Op.LaunchApp("com.piyush.mode") }, "Mode doesn't pull them away from the video")
+    }
+
+    @Test
+    fun overAnOverlayModesAppNeverComesForwardToAskOrToShowTheResult() = runTest {
+        // Android's agent overlay asks and shows the result over the user's app: Mode's own app stays back.
+        val f = Fixture(this, ScriptedModel(
+            call("ask_user", "question" to "Which Wi-Fi?"),
+            call("done", "evidence" to "on screen", "summary" to "joined"),
+        ), overlay = true)
+        f.runner.start("Join Wi-Fi", quick)
+        testScheduler.runCurrent()
+        val question = f.runner.state.value.question!!
+        f.runner.answer(question.id, "Home")
+        testScheduler.advanceUntilIdle()
+        assertIs<AgentOutcome.Done>(f.runner.state.value.lastResult!!.outcome)
+        assertTrue(f.link.phone!!.actions.none { it == Op.LaunchApp("com.piyush.mode") }, "neither to ask (no notifications) nor after")
     }
 
     @Test
