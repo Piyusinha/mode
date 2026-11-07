@@ -267,10 +267,16 @@ public class ListenPresenter(
         mark(com.piyush.mode.core.telemetry.Event.ListenStarted)
         val since = clock.now()
         var tries = 0
+        var failures = 0
         while (true) {
             when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
                 is Heard.Words -> { heard(heard.text); return }
-                Heard.Nothing -> { outcome = "HearingFailed"; own.value = own.value.copy(phase = TalkPhase.Typing); return }
+                Heard.Nothing -> {
+                    // The listener failed (the notice says why). In a conversation it tries once more first, so a
+                    // hiccup doesn't end hands-free talking.
+                    if (keepsGoing && ++failures <= LISTEN_RETRIES) { delay(LISTEN_RETRY_MS); continue }
+                    outcome = "HearingFailed"; own.value = own.value.copy(phase = TalkPhase.Typing); return
+                }
                 Heard.Silence -> {
                     tries++
                     val quietLongEnough = if (followUp) clock.now() - since >= FOLLOW_UP_QUIET_MS else tries >= MAX_SILENT_LISTENS
@@ -296,7 +302,7 @@ public class ListenPresenter(
                 same(text, offer.no) || isDecline(text) -> { declined(text, offer); return }
             }
         }
-        if (keepsGoing && own.value.doneSoFar.isNotEmpty() && isWrapUp(text)) { end("ThatsAll"); return }
+        if (keepsGoing && isWrapUp(text)) { end("ThatsAll"); return }
         start(text, source)
     }
 
@@ -311,7 +317,11 @@ public class ListenPresenter(
     }
 
     /** Mode's line after a task (with its offer, if any), said out loud, then it listens again. */
-    private suspend fun nextLine(next: com.piyush.mode.feature.memory.data.NextLine?) {
+    private suspend fun nextLine(written: com.piyush.mode.feature.memory.data.NextLine?) {
+        // Without the AI's line (none connected, too slow, nothing to say) Mode still asks, so the conversation
+        // never goes quiet on the user.
+        val next = written ?: com.piyush.mode.feature.memory.data.NextLine(if (lastPartial) PART_DONE else ANYTHING_ELSE)
+        lastPartial = false
         val offer = next?.offer?.let { TalkOffer(it.task, it.yes, it.no) }
         pendingOffer = offer
         own.value = own.value.copy(phase = TalkPhase.Greeting, greeting = next?.line.orEmpty(), task = "", reply = "", partial = "", working = "", sent = false)
@@ -338,6 +348,8 @@ public class ListenPresenter(
     private var lastTask = ""
     private var lastDone = true
     private var lastSaid: String? = null
+    /** The last task finished only part of what was asked (said once, in the line after it). */
+    private var lastPartial = false
 
     /**
      * After a task in a conversation: unless it left them in another app (a video playing) or was stopped, Mode
@@ -358,8 +370,18 @@ public class ListenPresenter(
         })
         if (result is com.piyush.mode.agent.AgentOutcome.Stopped) { end("Stopped"); return }
         if (done != null && done.stay) { end("LeftInApp"); return }
+        failureLine(task, result, finishedState.status)?.let { line ->
+            lastTask = task
+            lastDone = false
+            lastSaid = null
+            own.value = own.value.copy(doneSoFar = own.value.doneSoFar + task)
+            com.piyush.mode.core.common.AppLog.log("talk", "task didn't finish: offering to try again")
+            nextLine(line)
+            return
+        }
         lastTask = task
         lastDone = done?.success == true
+        lastPartial = done != null && !done.success
         lastSaid = said
         own.value = own.value.copy(doneSoFar = own.value.doneSoFar + task)
         val s = settings.settings.value
@@ -369,6 +391,26 @@ public class ListenPresenter(
         val next = greeter?.next(s.userName, hour(), context, task, lastDone, said, budgetMs = GREET_WAIT_MS, language = speakLanguage())
         com.piyush.mode.core.common.AppLog.log("talk", if (next != null) "next by ${greeter?.lastModel} in ${clock.now() - started} ms: \"${next.line}\"${next.offer?.let { " offers: ${it.task}" }.orEmpty()}" else "next: none, listening")
         nextLine(next)
+    }
+
+    /**
+     * What Mode says when a task didn't finish: why, in the runner's plain words, and an offer to try again (yes runs
+     * the same task). A task that never started (no AI connected, today's limit) says only why. Null when it finished.
+     */
+    private fun failureLine(task: String, result: com.piyush.mode.agent.AgentOutcome?, status: String): com.piyush.mode.feature.memory.data.NextLine? {
+        val why = when (result) {
+            null -> status
+            is com.piyush.mode.agent.AgentOutcome.Failed -> result.why
+            else -> return null
+        }.removePrefix(FAILED_PREFIX).trim().trimEnd('.')
+        if (result == null && !status.startsWith(FAILED_PREFIX)) {
+            return com.piyush.mode.feature.memory.data.NextLine(status.trim())
+        }
+        val reason = if (why.isBlank()) "" else ": $why"
+        return com.piyush.mode.feature.memory.data.NextLine(
+            "$DIDNT_WORK$reason. $TRY_AGAIN_QUESTION",
+            com.piyush.mode.feature.memory.data.NextLine.Offer(task, TRY_AGAIN, SOMETHING_ELSE),
+        )
     }
 
     /** The card with what the running task said so far and how far its plan is. */
@@ -484,8 +526,11 @@ public class ListenPresenter(
         if (task.isEmpty()) return
         job?.cancel()
         voices.stop()
-        job = scope.launch { inSession { heard(task, TaskSource.App) } }
+        job = scope.launch { inSession { heard(task, if (typedSpeaks) TaskSource.Voice else TaskSource.App) } }
     }
+
+    /** The overlay talks the whole way: what's typed there is answered and asked about out loud too. */
+    private val typedSpeaks = entry == OVERLAY
 
     /** A tapped option answers Mode's spoken question. */
     public fun answer(option: String) { runner.answer(option) }
@@ -559,7 +604,17 @@ public class ListenPresenter(
 
     internal companion object {
         /** How talking mode opened when it should carry on after a task: Siri, Android's assistant, Ask's mic. */
-        val SESSION_ENTRIES = setOf("siri", "assistant", "ask_mic")
+        const val OVERLAY = "overlay"
+        val SESSION_ENTRIES = setOf("siri", "assistant", "ask_mic", OVERLAY)
+        const val ANYTHING_ELSE = "Anything else?"
+        const val PART_DONE = "I did part of it. Anything else?"
+        const val DIDNT_WORK = "That didn't work"
+        const val TRY_AGAIN_QUESTION = "Want me to try again?"
+        const val TRY_AGAIN = "Try again"
+        const val SOMETHING_ELSE = "Something else"
+        /** A listener that failed gets this many more tries in a conversation, this far apart. */
+        const val LISTEN_RETRIES = 1
+        const val LISTEN_RETRY_MS = 1_500L
 
         /**
          * How long the AI may take to write what Mode says on taking a task. Long on purpose: the task is

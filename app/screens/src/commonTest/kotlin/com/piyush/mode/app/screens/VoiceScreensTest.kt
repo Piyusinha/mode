@@ -279,6 +279,51 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun theOverlayTalksTheWholeWayEvenWithoutTheAi() = runTest {
+        val f = Fixture(backgroundScope, com.piyush.mode.testing.ScriptedModel(
+            com.piyush.mode.testing.call("done", "evidence" to "x", "summary" to "Dark mode is on."),
+        ))
+        // No greeter (no AI line): Mode still asks what's next, and keeps listening.
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("Turn on dark mode")
+        val next = talk.state.awaitState { it.greeting == ListenPresenter.ANYTHING_ELSE }
+        assertFalse(next.finished, "the overlay is a conversation")
+        val task = f.tasks.recent(10).first().first()
+        assertEquals(com.piyush.mode.feature.tasks.domain.TaskSource.Voice, task.source, "typed in the overlay, its questions are asked out loud")
+    }
+
+    @Test
+    fun aTaskThatFailsIsExplainedAndTryAgainRunsItAgain() = runTest {
+        val f = Fixture(backgroundScope, com.piyush.mode.llm.LlmClient { _, _, _ ->
+            throw com.piyush.mode.llm.LlmFailed("model: HTTP 401: nope", status = 401)
+        })
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("Order my usual coffee")
+        val offer = talk.state.awaitState { it.greeting.startsWith(ListenPresenter.DIDNT_WORK) }
+        assertTrue(offer.greeting.endsWith(ListenPresenter.TRY_AGAIN_QUESTION), offer.greeting)
+        assertFalse("HTTP" in offer.greeting || "401" in offer.greeting, "plain words, never codes")
+        assertEquals(ListenPresenter.TRY_AGAIN, offer.turns.last().offer?.yes)
+
+        talk.pick(ListenPresenter.TRY_AGAIN)
+        val tries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withTimeout(5_000) { f.tasks.recent(10).first { list -> list.size >= 2 } }
+        }
+        assertEquals(listOf("Order my usual coffee", "Order my usual coffee"), tries.map { it.text })
+    }
+
+    @Test
+    fun thatsAllEndsTheConversationEvenBeforeATask() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("That's all, thanks")
+        assertTrue(talk.state.awaitState { it.finished }.finished)
+        assertTrue(f.tasks.recent(10).first().isEmpty(), "nothing was started")
+    }
+
+    @Test
     fun openedFromTheAppTheScreenStillClosesAfterTheTask() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
