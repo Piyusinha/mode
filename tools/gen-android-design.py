@@ -49,6 +49,9 @@ ICONS = {
     "dragHandle": ("drag_handle", False), "personalVoice": ("record_voice_over", False),
 }
 
+# Logos only Android shows.
+ANDROID_LOGOS = {"android": "https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/android.svg"}
+
 # Icons only Android shows (phone setup), after the iPhone's cases.
 ANDROID_ICONS = {
     "tap": ("touch_app", False), "power": ("power_settings_new", False), "battery": ("battery_full", False),
@@ -202,6 +205,16 @@ def logos():
         name = entry[: -len(".imageset")].replace("-", "_")
         open(os.path.join(drawable, f"{name}.xml"), "w").write(vector(paths, viewbox, entry[: -len('.imageset')]))
         names.append(name)
+    # Android only: the phone's own voice and listening, from Simple Icons (CC0).
+    for name, url in ANDROID_LOGOS.items():
+        cached = os.path.join(CACHE, f"logo_{name}.svg")
+        if not os.path.exists(cached):
+            os.makedirs(CACHE, exist_ok=True)
+            with urllib.request.urlopen(url) as r:
+                open(cached, "wb").write(r.read())
+        paths, viewbox = parse_svg(open(cached).read())
+        open(os.path.join(drawable, f"logo_{name}.xml"), "w").write(vector(paths, viewbox, f"Simple Icons: {name}"))
+        names.append(f"logo_{name}")
     return names
 
 

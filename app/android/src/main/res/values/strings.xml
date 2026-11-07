@@ -68,4 +68,10 @@
     <string name="guide_battery_open">Open battery setting</string>
 
     <string name="guide_skip">Skip for now</string>
+
+    <!-- Settings. -->
+    <string name="backup_row">Backup and restore</string>
+    <string name="settings_permissions">Permissions</string>
+    <string name="settings_less">Less</string>
+    <string name="settings_more">More</string>
 </resources>

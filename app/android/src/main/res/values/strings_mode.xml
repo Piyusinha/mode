@@ -301,6 +301,7 @@
     <string name="language_spoken_detail">Mode answers you in it</string>
     <string name="language_subtitle">What you speak, and what Mode answers in.</string>
     <string name="language_title">Language</string>
+    <string name="language_works_in_english">Mode always works in English: words in another language are translated before it starts.</string>
     <string name="live_idle_message">When Mode works on a task, each step shows here.</string>
     <string name="live_idle_title">Nothing running</string>
     <string name="live_summary">%1$s · %2$s steps</string>
@@ -513,6 +514,7 @@
     <string name="settings_picker_note">Only models that can see the screen and use tools. Prices are OpenRouter\'s, for a typical task of about 10 steps.</string>
     <string name="settings_picker_plan_note">These run on your plan, so there is no cost per task.</string>
     <string name="settings_reset_confirm">Reset Mode and delete everything?</string>
+    <string name="settings_reset_detail">Your chats, tasks, routines, memory, connected accounts and keys, and settings are deleted from this phone, and setup starts again. Phone control stays. This can\'t be undone.</string>
     <string name="settings_reset_mode">Reset Mode</string>
     <string name="settings_resetting">Resetting…</string>
     <string name="settings_save_key">Save key</string>
@@ -679,6 +681,7 @@
     <string name="tab_tasks">Tasks</string>
     <string name="talk_allow_mic">Allow microphone</string>
     <string name="talk_cancel">Cancel</string>
+    <string name="talk_cant_hear">Can\'t hear you. Is your mic on? If this keeps happening, restart Mode.</string>
     <string name="talk_card_done">DONE · %1$s</string>
     <string name="talk_card_failed">COULDN’T FINISH · %1$s</string>
     <string name="talk_card_partial">PARTLY DONE · %1$s</string>

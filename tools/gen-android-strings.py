@@ -88,7 +88,7 @@ def to_android(value):
 
 
 def main():
-    pattern = re.compile(r'(?:LocalizedStringResource\(|String\(localized:\s*)"([^"]+)",\s*defaultValue:\s*"((?:[^"\\]|\\.)*)"')
+    pattern = re.compile(r'(?:LocalizedStringResource\(\s*|String\(\s*localized:\s*)"([^"]+)",\s*defaultValue:\s*"((?:[^"\\]|\\.)*)"')
     seen = {}
     for path in SOURCES:
         for key, value in pattern.findall(open(path).read()):

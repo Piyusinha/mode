@@ -37,18 +37,19 @@ import com.piyush.mode.design.ModeText
 import com.piyush.mode.design.ModeTextStyle
 
 /** What the main screens can open that sits over the tabs (the live run, Ask, talking mode). */
-class Overlays(val openLive: () -> Unit, val openAsk: () -> Unit)
+class Overlays(val openLive: () -> Unit, val openAsk: () -> Unit, val openProviders: () -> Unit = {}, val reset: () -> Unit = {})
 
 /**
  * The main screens: each tab's stack, and at the bottom the running task, the tabs and Speak. The bar
  * shows on each tab's first page; deeper pages have their own bottom (the conversation's message bar).
  */
 @Composable
-fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages) {
+fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signIn: com.piyush.mode.app.system.ChatGptSignIn, onReset: () -> Unit) {
     val nav = shell.navigator
     val run = rememberRunStatus(graph)
     var asking by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-    val overlays = Overlays(openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true })
+    var showingProviders by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val overlays = Overlays(openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true }, openProviders = { showingProviders = true }, reset = onReset)
 
     LaunchedEffect(nav.pending) {
         val route = nav.pending ?: return@LaunchedEffect
@@ -76,6 +77,7 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages) {
                 nav.open(AppTab.Home, Route.Conversation(conversation))
             }) { asking = false }
         }
+        if (showingProviders) com.piyush.mode.app.settings.ProvidersRoute(graph, pages, signIn, { showingProviders = false })
         // Mode's question, wherever the user is (a spoken one is answered in talking mode).
         run.state.question?.takeIf { !it.spoken }?.let { question ->
             com.piyush.mode.app.run.QuestionSheet(question, run::answer, run::stopFromQuestion)
@@ -131,6 +133,8 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         Route.LiveRun -> com.piyush.mode.app.live.LiveRoute(graph) { nav.pop() }
         is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
+        Route.Settings -> com.piyush.mode.app.settings.SettingsRoute(graph, nav::push, { nav.pop() }, overlays.openProviders, overlays.reset)
+        Route.PhoneSetup -> com.piyush.mode.app.firstrun.PhoneSetupRoute(graph, pages, dots = null, onContinue = { nav.pop() }, onBack = { nav.pop() })
         is Route.TaskDebug -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = false, nav::push) { nav.pop() }
         is Route.TaskDebugAsk -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = true, nav::push) { nav.pop() }
         else -> NotYet(nav)

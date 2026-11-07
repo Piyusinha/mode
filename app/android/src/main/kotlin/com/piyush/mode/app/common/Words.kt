@@ -105,6 +105,36 @@ class Words(private val context: Context) {
         else -> id
     }
 
+    /** "Couldn't speak · Key not accepted": why a voice or listener failed, short. */
+    fun voiceTrouble(trouble: String, hearing: Boolean): String {
+        val lead = get(if (hearing) R.string.voice_couldnt_hear else R.string.voice_couldnt_speak)
+        val reason = when (trouble) {
+            "NoKey" -> get(R.string.voice_trouble_no_key)
+            "KeyRejected" -> get(R.string.voice_trouble_key)
+            "PlanLimit" -> get(if (hearing) R.string.voice_trouble_plan_hear else R.string.voice_trouble_plan_speak)
+            else -> get(R.string.voice_trouble_not_ready)
+        }
+        return "$lead · $reason"
+    }
+
+    /** "Low", "High": how hard a model thinks. */
+    fun effort(e: String): String = when (e) {
+        "none" -> get(R.string.plan_effort_none)
+        "minimal" -> get(R.string.plan_minimal)
+        "low" -> get(R.string.plan_low)
+        "medium" -> get(R.string.plan_medium)
+        "high" -> get(R.string.plan_high)
+        "xhigh" -> get(R.string.plan_extra_high)
+        "max" -> get(R.string.plan_max)
+        else -> e
+    }
+
+    /** "$0.05", "$0.003": money as the boards show it. */
+    fun money(usd: Double): String = java.text.NumberFormat.getCurrencyInstance(Locale.US).apply {
+        maximumFractionDigits = if (usd < 0.01) 3 else 2
+        minimumFractionDigits = 2
+    }.format(usd)
+
     /** How a task ended: its word and icon. */
     fun badge(badge: TaskBadge): Pair<String, ModeIcon> = when (badge) {
         TaskBadge.Done -> get(R.string.badge_done) to ModeIcon.Done

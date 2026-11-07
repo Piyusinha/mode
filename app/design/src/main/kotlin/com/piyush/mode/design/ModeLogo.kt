@@ -25,6 +25,8 @@ public enum class ModeLogo(@DrawableRes public val res: Int) {
     FishAudio(R.drawable.logo_fishaudio),
     Soniox(R.drawable.logo_soniox),
     Deepgram(R.drawable.logo_deepgram),
+    /** The phone's own voice and listening on Android (Simple Icons, CC0). */
+    Android(R.drawable.logo_android),
     ;
 
     public companion object {

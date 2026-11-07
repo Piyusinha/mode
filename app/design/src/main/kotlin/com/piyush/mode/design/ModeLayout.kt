@@ -26,6 +26,9 @@ public object ModeSpacing {
     public val chatTight: Dp = 6.dp
     public val chatTitleInset: Dp = 4.dp
     public val composerInset: Dp = 5.dp
+    /** Notes and titles sit a little in from the cards' edge; a section's gap under its header. */
+    public val noteInset: Dp = 8.dp
+    public val headerGap: Dp = 14.dp
     /** A setup page's sides: titles sit a little further in than cards. */
     public val page: Dp = 24.dp
 }
@@ -215,6 +218,18 @@ public object ModeSize {
     public val debugCheck: Dp = 22.dp
     public val askSend: Dp = 42.dp
     public val askChip: Dp = 34.dp
+    /** Settings: a status dot, small logo tiles, value and logo rows, a tile row, filter chips, the switch. */
+    public val statusDot: Dp = 8.dp
+    public val smallTileRadius: Dp = 9.dp
+    public val valueRow: Dp = 52.dp
+    public val logoRow: Dp = 60.dp
+    public val logoRowTagged: Dp = 62.dp
+    public val logoRowProblem: Dp = 72.dp
+    public val tileRow: Dp = 72.dp
+    public val filterChip: Dp = 34.dp
+    public val switchWidth: Dp = 52.dp
+    public val switchHeight: Dp = 32.dp
+    public val switchThumb: Dp = 26.dp
     /** The grab handle on top of a sheet. */
     public val sheetHandle: Dp = 36.dp
     public val sheetHandleHeight: Dp = 5.dp

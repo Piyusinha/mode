@@ -54,6 +54,13 @@ class Navigator(private val presenters: PresenterStore) {
         }
     }
 
+    /** Back to Home's first page with every stack empty (after Reset Mode). */
+    fun reset() {
+        AppTab.entries.forEach { stacks.getValue(it).clear() }
+        tab = AppTab.Home
+        pending = null
+    }
+
     /** Opens [route] on [tab] over its first page (a deep link). */
     fun open(tab: AppTab, route: Route) {
         this.tab = tab

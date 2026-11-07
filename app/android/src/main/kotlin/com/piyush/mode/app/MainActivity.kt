@@ -39,7 +39,13 @@ class MainActivity : ComponentActivity() {
 
     /** A mode:// link: where it goes waits in the navigator until the tabs show. */
     private fun follow(intent: Intent) {
-        val link = intent.dataString?.let(DeepLink::parse) ?: return
+        val data = intent.dataString ?: return
+        // OpenRouter's sign-in page answers here; the providers sheet finishes it.
+        if (data.startsWith(com.piyush.mode.app.screens.onboarding.OnboardingPresenter.SIGN_IN_CALLBACK)) {
+            com.piyush.mode.app.settings.OpenRouterCallback.url.value = data
+            return
+        }
+        val link = DeepLink.parse(data) ?: return
         AppLog.log("link", link.traceName)
         shell.navigator.pending = when (link) {
             is DeepLink.Conversation -> Route.Conversation(link.id)
