@@ -87,6 +87,16 @@ class Words(private val context: Context) {
         PartOfDay.Night -> if (name != null) get(R.string.home_greeting_night_named, name) else get(R.string.home_greeting_night)
     }
 
+    /** A voice or listening service's name, by its stored id ("apple" is the phone's own). */
+    fun voiceProvider(id: String): String = when (id) {
+        "apple" -> get(R.string.voice_apple)
+        "fish" -> get(R.string.voice_fish)
+        "elevenlabs" -> get(R.string.voice_eleven)
+        "soniox" -> get(R.string.voice_soniox)
+        "deepgram" -> get(R.string.voice_deepgram)
+        else -> id
+    }
+
     /** How a task ended: its word and icon. */
     fun badge(badge: TaskBadge): Pair<String, ModeIcon> = when (badge) {
         TaskBadge.Done -> get(R.string.badge_done) to ModeIcon.Done

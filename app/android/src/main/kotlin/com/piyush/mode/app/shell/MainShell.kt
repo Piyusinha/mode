@@ -114,6 +114,7 @@ private fun TabRoot(tab: AppTab, graph: ModeGraph, run: RunStatus, nav: Navigato
 @Composable
 private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator, pages: SystemPages, overlays: Overlays) {
     when (route) {
+        is Route.Conversation -> com.piyush.mode.app.conversation.ConversationRoute(graph, route.id, nav::push, { nav.pop() }, overlays.openLive)
         else -> NotYet(nav)
     }
 }

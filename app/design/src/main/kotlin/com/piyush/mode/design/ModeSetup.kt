@@ -228,3 +228,16 @@ public fun ModeLinkCard(
 public fun ModeHairline(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(ModeSize.separator).background(Mode.colors.separator))
 }
+
+/** A page's top bar: the round back button on the left, actions on the right. */
+@Composable
+public fun ModePageBar(backLabel: String, onBack: () -> Unit, modifier: Modifier = Modifier, trailing: @Composable () -> Unit = {}) {
+    Row(
+        modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch).padding(horizontal = ModeSpacing.screenEdge),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModeIconButton(ModeIcon.Back, backLabel, onBack)
+        Box(Modifier.weight(1f))
+        trailing()
+    }
+}

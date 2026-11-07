@@ -60,6 +60,9 @@ public class ModeColors(public val tokens: ModeColorTokens, public val dark: Boo
     public val stopOnDark: Color = Color(0xFFFF6B61)
     public val stopDisc: Color = Color(0x33FF6B61)
     public val onDarkFill: Color = Color(0x1FFFFFFF)
+    /** Words on the blue info fill, and the grey tile on a lesson card. */
+    public val onInfo: Color = Color.White
+    public val lessonTile: Color = Color(0xFF7A7D86)
     public val onDarkTrack: Color = Color(0x38FFFFFF)
 
     /** Voice avatars: warm pairs that keep a white initial readable in both themes. */

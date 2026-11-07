@@ -18,6 +18,7 @@ kotlin {
 }
 
 dependencies {
+    testImplementation(kotlin("test-junit"))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.foundation)
     api(libs.androidx.compose.ui.tooling.preview)

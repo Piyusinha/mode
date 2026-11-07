@@ -36,6 +36,8 @@ sealed interface Route {
     data object UnlockVoice : Route
     /** Settings › Backup and restore. */
     data object Backup : Route
+    /** Repeat a task on a schedule (from a chat's More). */
+    data class Repeat(val text: String) : Route
 }
 
 /** The tabs. Ask is the floating button beside them; Settings opens as a page over the tab showing. */

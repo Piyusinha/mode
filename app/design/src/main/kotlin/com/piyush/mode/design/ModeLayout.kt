@@ -20,6 +20,12 @@ public object ModeSpacing {
     public val groupInset: Dp = 14.dp
     /** How far a note under a card sits in from the card's edge. */
     public val labelInset: Dp = 4.dp
+    /** A chat: between messages, inside a bubble or pill, tight gaps, the title's inset, the message bar's inset. */
+    public val chatGap: Dp = 14.dp
+    public val chatInline: Dp = 10.dp
+    public val chatTight: Dp = 6.dp
+    public val chatTitleInset: Dp = 4.dp
+    public val composerInset: Dp = 5.dp
     /** A setup page's sides: titles sit a little further in than cards. */
     public val page: Dp = 24.dp
 }
@@ -39,6 +45,10 @@ public object ModeRadius {
     public val bubbleTail: Dp = 6.dp
     /** The "Did you know?" cards on Home. */
     public val tipBanner: Dp = 26.dp
+    /** Chat cards (working, failed, a lesson), notices and the small tile on a lesson. */
+    public val chatCard: Dp = 24.dp
+    public val chatNotice: Dp = 22.dp
+    public val chatTile: Dp = 10.dp
     /** First-run cards (a provider, More options). */
     public val firstRunCard: Dp = 24.dp
     /** A tinted note on a setup guide. */
@@ -158,6 +168,26 @@ public object ModeSize {
     public val stopSquare: Dp = 11.dp
     public val stopSquareRadius: Dp = 3.dp
     public val recentRow: Dp = 62.dp
+    /** Chat: a bubble's widest, Mo on cards and notices, screenshot thumbnails, the small buttons, the working tag. */
+    public val bubbleMaxWidth: Dp = 286.dp
+    public val moChatCard: Dp = 40.dp
+    public val moFailed: Dp = 48.dp
+    public val moNotice: Dp = 28.dp
+    public val screensThumbWidth: Dp = 22.dp
+    public val screensThumbHeight: Dp = 36.dp
+    public val screensThumbBorder: Dp = 2.dp
+    public val screensLinkHeight: Dp = 48.dp
+    public val chatPillButton: Dp = 30.dp
+    public val lessonButton: Dp = 34.dp
+    public val chatTileSize: Dp = 34.dp
+    public val workingStop: Dp = 36.dp
+    public val stopGlyph: Dp = 12.dp
+    public val stopGlyphRadius: Dp = 3.dp
+    public val workingDot: Dp = 6.dp
+    public val workingTag: Dp = 24.dp
+    public val failedButton: Dp = 42.dp
+    public val agendaTimeChat: Dp = 48.dp
+    public val chatRing: Dp = 2.dp
     /** Tasks: a row, and the Scheduled / Done pill switch. */
     public val tasksRow: Dp = 72.dp
     public val segmentsHeight: Dp = 42.dp
@@ -199,6 +229,10 @@ public object ModeOpacity {
     public const val shimmer: Float = 0.55f
     public const val muted: Float = 0.28f
     public const val disabled: Float = 0.4f
+    /** The "Typed" / "Spoken" tag on your bubble. */
+    public const val bubbleTag: Float = 0.82f
+    /** The light sweep over a working line takes half its width. */
+    public const val shimmerWidth: Float = 0.5f
     /** Words and fills on ink (Undo). */
     public const val toastDetail: Float = 0.72f
     public const val toastButton: Float = 0.16f

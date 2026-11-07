@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -107,3 +109,33 @@ private fun SheetRow(title: String, color: androidx.compose.ui.graphics.Color, e
         Alignment.Center,
     ) { ModeText(title, if (emphasis) ModeTextStyle.Headline else ModeTextStyle.Body, color = color.copy(alpha = color.alpha * alpha)) }
 }
+
+/** A short text to edit over the page (a lesson in a chat): a title, the field, and Save. */
+@Composable
+public fun ModeTextSheet(title: String, initial: String, prompt: String, save: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    val c = Mode.colors
+    var text by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(initial) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().clickable(indication = null, interactionSource = null, onClick = onDismiss), Alignment.BottomCenter) {
+            Column(
+                Modifier.fillMaxWidth().background(c.page, RoundedCornerShape(topStart = ModeRadius.sheet, topEnd = ModeRadius.sheet))
+                    .clickable(indication = null, interactionSource = null) {}
+                    .navigationBarsPadding().imePadding().padding(ModeSpacing.screenEdge),
+                verticalArrangement = Arrangement.spacedBy(ModeSpacing.l),
+            ) {
+                ModeText(title, ModeTextStyle.Title2)
+                Box(Modifier.fillMaxWidth().background(c.field, RoundedCornerShape(ModeRadius.field)).padding(ModeSpacing.l)) {
+                    if (text.isEmpty()) ModeText(prompt, ModeTextStyle.Body, color = c.textSecondary)
+                    androidx.compose.foundation.text.BasicTextField(
+                        text, { text = it }, Modifier.fillMaxWidth(), textStyle = ModeTextStyle.Body.style(c.textPrimary),
+                        minLines = SHEET_MIN_LINES, maxLines = SHEET_MAX_LINES, cursorBrush = androidx.compose.ui.graphics.SolidColor(c.tint),
+                    )
+                }
+                ModeButton(save, { onSave(text); onDismiss() }, fullWidth = true, enabled = text.isNotBlank())
+            }
+        }
+    }
+}
+
+private const val SHEET_MIN_LINES = 3
+private const val SHEET_MAX_LINES = 8
