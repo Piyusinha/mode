@@ -182,7 +182,7 @@ test('Reconnect shows progress, prevents duplicate repairs, and reports success'
   assert.match(f.app.innerHTML, /data-act="reconnect" disabled/);
   await f.click('reconnect');
   assert.equal(f.calls.filter(c => c === 'phone_control').length, 1);
-  finish(['com.piyush.mode', 'com.piyush.mode.TEAM']);
+  finish(['app.heymode.mode', 'app.heymode.mode.TEAM']);
   await first;
   assert.equal(f.run('S.reconnecting'), false);
   assert.match(f.app.innerHTML, /Pairing repaired in all copies of Mode/);
@@ -212,9 +212,9 @@ test('Reconnect refuses a disconnected phone without contacting pairing services
 });
 
 test('the dashboard notices Mode was removed from the iPhone and offers to install it again', async () => {
-  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'app.heymode.mode', name: 'Mode', version: '0.1' }], sideloaded: [] } });
   device(f);
-  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  f.run("S.record.mode.bundleId = 'app.heymode.mode.TEAM'; render();");
   assert.doesNotMatch(f.app.innerHTML, /Not installed/);
   await f.run("enter('device')");
   for (let i = 0; i < 5; i++) await new Promise(setImmediate);
@@ -226,9 +226,9 @@ test('the dashboard notices Mode was removed from the iPhone and offers to insta
 });
 
 test('the dashboard stays as it was while this computer’s copy is still installed', async () => {
-  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode.TEAM', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'app.heymode.mode.TEAM', name: 'Mode', version: '0.1' }], sideloaded: [] } });
   device(f);
-  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  f.run("S.record.mode.bundleId = 'app.heymode.mode.TEAM'; render();");
   await f.run("enter('device')");
   for (let i = 0; i < 5; i++) await new Promise(setImmediate);
   assert.doesNotMatch(f.app.innerHTML, /Not installed/);

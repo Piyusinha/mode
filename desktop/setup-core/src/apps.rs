@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Result, device};
 
-/// Mode's bundle ID before signing; signed copies add the team: "com.piyush.mode.ABCDE12345".
-pub const MODE_BUNDLE: &str = "com.piyush.mode";
+/// Mode's bundle ID before signing; signed copies add the team: "app.heymode.mode.ABCDE12345".
+pub const MODE_BUNDLE: &str = "app.heymode.mode";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,7 +43,7 @@ pub async fn installed(udid: &str) -> Result<Vec<AppOnPhone>> {
     Ok(out)
 }
 
-/// Mode, however it was signed (Xcode keeps "com.piyush.mode"; this app adds the team).
+/// Mode, however it was signed (the release keeps "app.heymode.mode"; this app adds the team).
 pub fn mode(apps: &[AppOnPhone]) -> Option<&AppOnPhone> {
     apps.iter().find(|a| is_mode(&a.bundle_id))
 }
@@ -72,10 +72,10 @@ mod tests {
 
     #[test]
     fn finds_mode_however_it_was_signed() {
-        assert!(is_mode("com.piyush.mode"));
-        assert!(is_mode("com.piyush.mode.ABCDE12345"));
-        assert!(!is_mode("com.piyush.mode.ABCDE12345.widgets"));
-        assert!(!is_mode("com.piyush.modem"));
+        assert!(is_mode("app.heymode.mode"));
+        assert!(is_mode("app.heymode.mode.ABCDE12345"));
+        assert!(!is_mode("app.heymode.mode.ABCDE12345.widgets"));
+        assert!(!is_mode("app.heymode.modem"));
         assert!(!is_mode("com.SideStore.SideStore"));
     }
 }

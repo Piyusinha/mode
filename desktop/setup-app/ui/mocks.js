@@ -5,7 +5,7 @@
   const phone = { udid: '00008150-0012345678901234', name: 'Alex’s iPhone', model: 'iPhone18,1', ios: '27.2', usb: true };
   const free = { id: 'FGHIJ67890', name: 'Personal Team', kind: 'free' };
   const paid = { id: 'ABCDE12345', name: 'Acme Labs', kind: 'paid' };
-  const mode = { bundleId: 'com.piyush.mode.ABCDE12345', name: 'Mode', version: '1.4', teamId: 'ABCDE12345', expires: '2026-11-10T08:20:00Z' };
+  const mode = { bundleId: 'app.heymode.mode.ABCDE12345', name: 'Mode', version: '1.4', teamId: 'ABCDE12345', expires: '2026-11-10T08:20:00Z' };
   const rec = (o) => Object.assign({ phone: phone.name, teamId: free.id, teamName: free.name, paid: false, ownVpn: false, mode, sidestore: { version: '0.6' } }, o);
   const stages = (vpn) => [
     ...(vpn ? [{ id: 'vpn', title: 'Turned on Mode’s own VPN', sub: 'Network Extensions is on for Mode in your developer account', state: 'done' }] : []),
@@ -40,8 +40,8 @@
     installPaid: { screen: 'install', phone, readiness: 'ready', team: paid, ownVpn: true, stages: stages(true) },
     unplugged: { screen: 'unplugged', phone, readiness: 'ready', team: free, renew: 'sidestore', stages: stages(false) },
     limit: { screen: 'limit', phone, readiness: 'ready', team: free, renew: 'sidestore', phoneApps: { sideloaded: [{ name: 'SideStore' }, { name: 'StikDebug' }, { name: 'Feather' }] } },
-    vpn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.ABCDE12345', tunnelId: 'com.piyush.mode.ABCDE12345.tunnel', appOn: false, tunnelOn: false } },
-    vpnOn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'com.piyush.mode.ABCDE12345', tunnelId: 'com.piyush.mode.ABCDE12345.tunnel', appOn: true, tunnelOn: true } },
+    vpn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'app.heymode.mode.ABCDE12345', tunnelId: 'app.heymode.mode.ABCDE12345.tunnel', appOn: false, tunnelOn: false } },
+    vpnOn: { screen: 'vpn', phone, readiness: 'ready', team: paid, vpn: { appId: 'app.heymode.mode.ABCDE12345', tunnelId: 'app.heymode.mode.ABCDE12345.tunnel', appOn: true, tunnelOn: true } },
     onPhone: { screen: 'onPhone', phone, readiness: 'ready', installedSidestore: true, phoneApps: { localDevVpn: null } },
     onPhonePaid: { screen: 'onPhone', phone, ownVpn: true, readiness: 'ready' },
     onPhoneConfirmed: { screen: 'onPhone', phone, ownVpn: true, phoneTestConfirmed: true, phonePresenceKnown: true, cableDisconnected: true },
@@ -49,7 +49,7 @@
     readyPaid: { screen: 'ready', phone, readiness: 'ready', record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     unlockVoice: { screen: 'unlockVoice', phone, readiness: 'ready', record: rec({}) },
     device: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, record: rec({ sidestore: null, mode: Object.assign({}, mode, { expires: new Date(Date.now() + 2 * 86400000).toISOString() }) }) },
-    deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
+    deviceMissing: { screen: 'device', phone, phones: [phone], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, phoneAppsFor: phone.udid, phoneApps: { modes: [{ bundleId: 'app.heymode.mode', name: 'Mode', version: '0.1' }], sideloaded: [] }, record: rec({ teamId: paid.id, teamName: paid.name, paid: true, ownVpn: true, sidestore: null, mode: Object.assign({}, mode, { expires: '2027-11-03T11:04:34Z' }) }) },
     deviceOK: { screen: 'device', phone, phones: [], readiness: 'ready', prefs: { email: 'alex@example.com', phones: {} }, record: rec({}) },
     settings: { screen: 'settings', phone, prefs: { email: 'alex@example.com', phones: {} }, hasSaved: true, record: rec({}), helpers: [{ name: 'iLoader', url: 'https://ani.iloader.app', ms: 120 }, { name: 'SideStore', url: 'https://ani.sidestore.io', ms: 300 }] },
   };

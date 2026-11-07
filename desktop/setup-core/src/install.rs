@@ -28,9 +28,9 @@ pub const NETWORK_EXTENSIONS: &str = "NWEXT04537";
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VpnStatus {
-    /// "com.piyush.mode.ABCDE12345"
+    /// "app.heymode.mode.ABCDE12345"
     pub app_id: String,
-    /// "com.piyush.mode.ABCDE12345.tunnel"
+    /// "app.heymode.mode.ABCDE12345.tunnel"
     pub tunnel_id: String,
     pub app_on: bool,
     pub tunnel_on: bool,
@@ -59,7 +59,7 @@ pub type Progress = Arc<dyn Fn(Stage, f32) + Send + Sync>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Installed {
-    /// e.g. "com.piyush.mode.ABCDE12345": the team is part of it, like every app signed this way.
+    /// e.g. "app.heymode.mode.ABCDE12345": the team is part of it, like every app signed this way.
     pub bundle_id: String,
     pub name: String,
     pub version: String,
