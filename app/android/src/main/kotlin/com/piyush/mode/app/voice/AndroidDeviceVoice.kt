@@ -51,10 +51,12 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private var recognizer: SpeechRecognizer? = null
     private var recording: Job? = null
     @Volatile private var stopRecording = false
+    /** The on-device recognizer has the language's pack (false once it said it hasn't, until Mode restarts). */
+    private var onDeviceReady = true
 
     init {
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String) = Unit
+            override fun onStart(utteranceId: String) { VoiceLevel.speaking.value = true }
             override fun onDone(utteranceId: String) = finishSpeaking(utteranceId, true)
             @Deprecated("Android still calls it") override fun onError(utteranceId: String) = finishSpeaking(utteranceId, false)
             override fun onStop(utteranceId: String, interrupted: Boolean) = finishSpeaking(utteranceId, false)
@@ -104,6 +106,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     }
 
     private fun finishSpeaking(id: String, ok: Boolean) {
+        VoiceLevel.speaking.value = false
         val done = synchronized(speaking) { speaking.remove(id) } ?: return
         main.post { done(ok) }
     }
@@ -139,10 +142,11 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                 player?.release()
                 player = MediaPlayer().apply {
                     setDataSource(file.absolutePath)
-                    setOnCompletionListener { done(true); it.release(); player = null }
-                    setOnErrorListener { mp, _, _ -> done(false); mp.release(); player = null; true }
+                    setOnCompletionListener { VoiceLevel.speaking.value = false; done(true); it.release(); player = null }
+                    setOnErrorListener { mp, _, _ -> VoiceLevel.speaking.value = false; done(false); mp.release(); player = null; true }
                     prepare()
                     start()
+                    VoiceLevel.speaking.value = true
                 }
             }.onFailure { done(false) }
         }
@@ -155,15 +159,28 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private fun listen(maxMs: Long, silenceMs: Long, live: Boolean, onPartial: (String) -> Unit, done: (String?, String?, String) -> Unit) {
         if (!micAllowed()) return done(null, null, FAILED)
         if (!live) return record(maxMs, silenceMs) { path, reason -> done(path, null, reason) }
-        main.post {
+        main.post { recognize(maxMs, silenceMs, onDevice = onDeviceReady && SpeechRecognizer.isOnDeviceRecognitionAvailable(app), onPartial, done) }
+    }
+
+    /**
+     * On the phone when its speech pack for the language is there; otherwise the phone's regular recognizer, while
+     * Android downloads the pack for next time.
+     */
+    private fun recognize(maxMs: Long, silenceMs: Long, onDevice: Boolean, onPartial: (String) -> Unit, done: (String?, String?, String) -> Unit) {
+        run {
             recognizer?.destroy()
-            val r = if (SpeechRecognizer.isOnDeviceRecognitionAvailable(app)) SpeechRecognizer.createOnDeviceSpeechRecognizer(app)
-            else SpeechRecognizer.createSpeechRecognizer(app)
+            val r = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(app) else SpeechRecognizer.createSpeechRecognizer(app)
             recognizer = r
             var finished = false
+            var heard = false
+            VoiceLevel.listening()
+            val quiet = Runnable { if (!heard) VoiceLevel.cantHear.value = true }
+            main.postDelayed(quiet, CANT_HEAR_MS)
             fun end(text: String?, reason: String) {
                 if (finished) return
                 finished = true
+                main.removeCallbacks(quiet)
+                VoiceLevel.stopped()
                 done(null, text?.takeIf { it.isNotBlank() }, reason)
                 r.destroy()
                 if (recognizer === r) recognizer = null
@@ -173,11 +190,15 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) = Unit
                 override fun onBeginningOfSpeech() = Unit
-                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onRmsChanged(rmsdB: Float) {
+                    VoiceLevel.level.value = ((rmsdB - RMS_FLOOR_DB) / RMS_RANGE_DB).coerceIn(0f, 1f)
+                }
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
                 override fun onPartialResults(partial: Bundle) {
+                    heard = true
+                    VoiceLevel.cantHear.value = false
                     partial.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let(onPartial)
                 }
                 override fun onResults(results: Bundle) {
@@ -186,17 +207,29 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                 }
                 override fun onError(error: Int) {
                     main.removeCallbacks(timeout)
+                    if (onDevice && !heard && (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE || error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)) {
+                        AppLog.log("voice", "no speech pack on the phone yet; listening with the regular recognizer")
+                        onDeviceReady = false
+                        finished = true
+                        main.removeCallbacks(quiet)
+                        r.destroy()
+                        if (recognizer === r) recognizer = null
+                        runCatching { SpeechRecognizer.createOnDeviceSpeechRecognizer(app).triggerModelDownload(intentFor(silenceMs)) }
+                        recognize(maxMs, silenceMs, onDevice = false, onPartial, done)
+                        return
+                    }
                     end(null, if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) QUIET else FAILED)
                 }
             })
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
-                .apply { DeviceVoice.listenLanguage?.let { putExtra(RecognizerIntent.EXTRA_LANGUAGE, it) } }
-            r.startListening(intent)
+            r.startListening(intentFor(silenceMs))
         }
     }
+
+    private fun intentFor(silenceMs: Long): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silenceMs)
+        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, DeviceVoice.listenLanguage ?: Locale.getDefault().toLanguageTag())
 
     /** Records 16 kHz mono until a pause after speech, the limit, Done or cancel; a WAV file, or null if nobody spoke. */
     @SuppressLint("MissingPermission")
@@ -216,6 +249,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                 val buffer = ShortArray(size / 2)
                 val started = System.currentTimeMillis()
                 var lastVoice = started
+                VoiceLevel.listening()
                 record.startRecording()
                 while (isActive) {
                     val n = record.read(buffer, 0, buffer.size)
@@ -230,9 +264,14 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                     }
                     out.write(bytes)
                     val now = System.currentTimeMillis()
-                    if (sqrt(energy / n) > SPEECH_LEVEL) {
+                    val rms = sqrt(energy / n)
+                    VoiceLevel.level.value = (rms / LOUD).toFloat().coerceIn(0f, 1f)
+                    if (rms > SPEECH_LEVEL) {
                         spoke = true
                         lastVoice = now
+                        VoiceLevel.cantHear.value = false
+                    } else if (!spoke && now - started > CANT_HEAR_MS) {
+                        VoiceLevel.cantHear.value = true
                     }
                     when {
                         stopRecording -> { reason = DONE; break }
@@ -241,6 +280,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                     }
                 }
                 runCatching { record.stop() }
+                VoiceLevel.stopped()
                 writeHeader(out)
             }
             record.release()
@@ -265,6 +305,8 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
 
     private fun cancel() {
         tts.stop()
+        VoiceLevel.stopped()
+        VoiceLevel.speaking.value = false
         recording?.cancel()
         main.post {
             recognizer?.cancel()
@@ -278,6 +320,13 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         const val WAV_HEADER = 44
         /** Root-mean-square level above which the microphone hears speech, not room noise. */
         const val SPEECH_LEVEL = 900.0
+        /** A loud voice's level, for the bars. */
+        const val LOUD = 4000.0
+        /** The recognizer's loudness runs about -2…10 dB. */
+        const val RMS_FLOOR_DB = -2f
+        const val RMS_RANGE_DB = 12f
+        /** Listening this long with nothing heard: talking mode asks whether the microphone is on. */
+        const val CANT_HEAR_MS = 6_000L
         const val CLIP = "voice-clip"
         const val ASKED_PREFS = "mode.permissions"
         const val DEFAULT_SUFFIX = "-language"
@@ -292,3 +341,20 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
 
 /** How the phone's voices are named in the picker, from the app's strings. */
 class VoiceWords(val name: (accent: String, number: Int) -> String, val offline: String, val online: String)
+
+/** The microphone's loudness (0…1), whether Mode is speaking, and whether it hears nothing: talking mode's orb and bars. */
+object VoiceLevel {
+    val level = kotlinx.coroutines.flow.MutableStateFlow(0f)
+    val speaking = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val cantHear = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    internal fun listening() {
+        level.value = 0f
+        cantHear.value = false
+    }
+
+    internal fun stopped() {
+        level.value = 0f
+        cantHear.value = false
+    }
+}

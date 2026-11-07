@@ -379,10 +379,11 @@ public class TaskRunner(
         } catch (e: Exception) {
             outcome = TaskStatus.Failed
             // The chat shows "Failed" as a tag; the reply is just what went wrong.
-            reply = e.message ?: "Something went wrong."
+            // Plain words for the user; the raw error stays in the log and on What went wrong.
+            reply = com.piyush.mode.llm.FailureWords.of(e) ?: e.message ?: "Something went wrong."
             AppLog.error("agent", "run ${recorder.id} failed", e)
             status("Failed: $reply")
-            notifier.post("Mode", "Task failed: ${e.message}")
+            notifier.post("Mode", reply)
             return null
         } finally {
             span.fields(mapOf(Field.Outcome to outcome.name))

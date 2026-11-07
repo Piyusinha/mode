@@ -384,7 +384,9 @@ public class ListenPresenter(
             rows.any { it.done } || done?.success == true -> TalkTaskCard.State.Partial
             else -> TalkTaskCard.State.Failed
         }
-        val headline = done?.headline ?: done?.spoken ?: done?.summary?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.trimStart('#', ' ') ?: status
+        val headline = done?.headline ?: done?.spoken ?: done?.summary?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.trimStart('#', ' ')
+            // The card's label already says it couldn't finish.
+            ?: status.removePrefix(FAILED_PREFIX)
         return card.copy(state = state, seconds = ((clock.now() - card.startedAtMs) / 1000).coerceAtLeast(0), headline = headline, rows = rows)
     }
 
@@ -566,6 +568,8 @@ public class ListenPresenter(
         const val DAY_WAIT_MS = 600L
 
         private const val MAX_SILENT_LISTENS = 2
+        /** How the runner starts a failed task's status line. */
+        private const val FAILED_PREFIX = "Failed: "
 
         /** After a task, this long with nothing said ends the conversation. */
         const val FOLLOW_UP_QUIET_MS = 20_000L

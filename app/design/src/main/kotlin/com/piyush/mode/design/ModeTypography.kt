@@ -59,6 +59,19 @@ public enum class ModeTextStyle(
     /** 12 and 11: labels, tab titles, badges. */
     Caption(12f, 400, false, 16f),
     CaptionEmphasis(11f, 700, false, 13f),
+    /** 34 heavy display: Mode's spoken question in talking mode. */
+    Question(34f, 800, true, 39f),
+    /** 30 bold display: the words heard while listening. */
+    LiveWords(30f, 700, true, 35f),
+    /** 26 bold display: the answer heard. */
+    AnswerWords(26f, 700, true, 31f),
+    /** 24 heavy display: talking mode's notice. */
+    SheetTitle(24f, 800, true, 29f),
+    /** 18 semibold: what Mode says, the user's words in a bubble. */
+    Spoken(18f, 600, false, 24f),
+    /** 14: a hint, a status pill. */
+    Small(14f, 400, false, 19f),
+    SmallEmphasis(14f, 600, false, 19f),
     ;
 
     /** The Compose text style, in [color]. */

@@ -37,7 +37,13 @@ import com.piyush.mode.design.ModeText
 import com.piyush.mode.design.ModeTextStyle
 
 /** What the main screens can open that sits over the tabs (the live run, Ask, talking mode). */
-class Overlays(val openLive: () -> Unit, val openAsk: () -> Unit, val openProviders: () -> Unit = {}, val reset: () -> Unit = {})
+class Overlays(
+    val openLive: () -> Unit,
+    val openAsk: () -> Unit,
+    val openProviders: () -> Unit = {},
+    val reset: () -> Unit = {},
+    val openTalk: (com.piyush.mode.app.talk.TalkRequest) -> Unit = {},
+)
 
 /**
  * The main screens: each tab's stack, and at the bottom the running task, the tabs and Speak. The bar
@@ -49,7 +55,15 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     val run = rememberRunStatus(graph)
     var asking by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     var showingProviders by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-    val overlays = Overlays(openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true }, openProviders = { showingProviders = true }, reset = onReset)
+    val overlays = Overlays(
+        openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true }, openProviders = { showingProviders = true }, reset = onReset,
+        openTalk = { nav.talk = it },
+    )
+    // A spoken question comes forward in talking mode (unless talking mode is already open and asks it itself).
+    val spokenQuestion = run.state.question?.takeIf { it.spoken }?.id
+    LaunchedEffect(spokenQuestion) {
+        if (spokenQuestion != null && nav.talk == null) nav.talk = com.piyush.mode.app.talk.TalkRequest(forQuestion = true)
+    }
 
     LaunchedEffect(nav.pending) {
         val route = nav.pending ?: return@LaunchedEffect
@@ -75,6 +89,9 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
             com.piyush.mode.app.ask.AskRoute(graph, onSent = { conversation ->
                 asking = false
                 nav.open(AppTab.Home, Route.Conversation(conversation))
+            }, onSpeak = {
+                asking = false
+                nav.talk = com.piyush.mode.app.talk.TalkRequest(entry = com.piyush.mode.app.talk.TalkRequest.ENTRY_ASK)
             }) { asking = false }
         }
         if (showingProviders) com.piyush.mode.app.settings.ProvidersRoute(graph, pages, signIn, { showingProviders = false })
@@ -86,6 +103,22 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
             Box(Modifier.align(Alignment.BottomCenter), contentAlignment = Alignment.BottomCenter) {
                 ModeEdgeFade(top = false)
                 MainBar(nav, run, overlays)
+            }
+        }
+        nav.talk?.let { request ->
+            val close = {
+                nav.talk = null
+                shell.presenters.release(TALK)
+            }
+            PresenterOwner(shell.presenters, TALK) {
+                com.piyush.mode.app.talk.TalkRoute(
+                    graph, request,
+                    openSettings = pages::appInfo,
+                    onVoiceSettings = { hearing -> nav.push(if (hearing) Route.Listening else Route.Voice) },
+                    onOpenChat = { nav.open(AppTab.Home, Route.Conversation(it)) },
+                    onWhatWentWrong = { nav.push(Route.TaskDebug(it)) },
+                    onClose = close,
+                )
             }
         }
     }
@@ -129,7 +162,9 @@ private fun TabRoot(tab: AppTab, graph: ModeGraph, run: RunStatus, nav: Navigato
 @Composable
 private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator, pages: SystemPages, overlays: Overlays) {
     when (route) {
-        is Route.Conversation -> com.piyush.mode.app.conversation.ConversationRoute(graph, route.id, nav::push, { nav.pop() }, overlays.openLive)
+        is Route.Conversation -> com.piyush.mode.app.conversation.ConversationRoute(graph, route.id, nav::push, { nav.pop() }, overlays.openLive) {
+            overlays.openTalk(com.piyush.mode.app.talk.TalkRequest(route.id, com.piyush.mode.app.talk.TalkRequest.ENTRY_CHAT))
+        }
         Route.LiveRun -> com.piyush.mode.app.live.LiveRoute(graph) { nav.pop() }
         is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
@@ -168,3 +203,6 @@ private fun NotYet(nav: Navigator) {
         }
     }
 }
+
+/** Talking mode's presenters, released when it closes. */
+private const val TALK = "talk"

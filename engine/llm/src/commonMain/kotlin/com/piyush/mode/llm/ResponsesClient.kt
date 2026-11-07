@@ -163,7 +163,7 @@ class ResponsesClient(
             "subscription_sharing_usage_limit_exceeded" in body || status == 429 -> LlmFailed(SHARE_USED_UP)
             "subscription_sharing_user_not_eligible" in body || status == 403 -> LlmFailed(NOT_ELIGIBLE)
             "subscription_sharing_invalid_user" in body || status == 401 -> LlmFailed(SIGN_IN_AGAIN)
-            else -> LlmFailed("ChatGPT: ${if (status > 0) "HTTP $status: " else ""}${body.take(300)}", status400 = status == 400)
+            else -> LlmFailed("ChatGPT: ${if (status > 0) "HTTP $status: " else ""}${body.take(300)}", status400 = status == 400, status = status)
         }
     }
 }

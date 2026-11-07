@@ -51,7 +51,7 @@ private sealed interface Overlay {
 
 /** Connects a conversation to its presenter, its sheets, and Android's share and clipboard. */
 @Composable
-fun ConversationRoute(graph: ModeGraph, conversationId: String, navigate: (Route) -> Unit, close: () -> Unit, openLive: () -> Unit) {
+fun ConversationRoute(graph: ModeGraph, conversationId: String, navigate: (Route) -> Unit, close: () -> Unit, openLive: () -> Unit, talk: () -> Unit = {}) {
     val presenter: ConversationPresenter = rememberPresenter("conversation") { graph.screens.conversation(conversationId) }
     val ui by presenter.state.collectAsStateWithLifecycle()
     val words = rememberWords()
@@ -81,7 +81,7 @@ fun ConversationRoute(graph: ModeGraph, conversationId: String, navigate: (Route
         when (event) {
             ConversationEvent.Back -> close()
             ConversationEvent.Send -> if (presenter.send(draft)) draft = ""
-            ConversationEvent.Speak -> AppLog.log("conversation", "talking mode isn't on Android yet")
+            ConversationEvent.Speak -> talk()
             ConversationEvent.TogglePrivate -> presenter.setPrivate(!state.isPrivate)
             ConversationEvent.Add -> overlay = Overlay.Add
             ConversationEvent.More -> overlay = Overlay.More

@@ -53,5 +53,13 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
         if (link is DeepLink.Open) shell.navigator.select(AppTab.Home)
+        when (link) {
+            DeepLink.Listen -> shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest()
+            is DeepLink.Talk -> shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest(
+                link.conversationId,
+                if (link.conversationId == null) com.piyush.mode.app.talk.TalkRequest.ENTRY_ASK else com.piyush.mode.app.talk.TalkRequest.ENTRY_CHAT,
+            )
+            else -> Unit
+        }
     }
 }

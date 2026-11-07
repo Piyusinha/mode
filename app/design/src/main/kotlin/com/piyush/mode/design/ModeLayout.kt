@@ -46,6 +46,8 @@ public object ModeRadius {
     /** A chat bubble's corners, and the small one by its tail. */
     public val bubble: Dp = 22.dp
     public val bubbleTail: Dp = 6.dp
+    /** Talking mode's cards (what Mode says, a task). */
+    public val talkCard: Dp = 24.dp
     /** The "Did you know?" cards on Home. */
     public val tipBanner: Dp = 26.dp
     /** Chat cards (working, failed, a lesson), notices and the small tile on a lesson. */
@@ -159,6 +161,44 @@ public object ModeSize {
     public val talkWave: Dp = 36.dp
     public val talkMic: Dp = 76.dp
     public val talkSide: Dp = 52.dp
+
+    // Talking mode (the "Talking mode" boards).
+    public val voiceDot: Dp = 8.dp
+    public val noticeDot: Dp = 10.dp
+    public val talkLineMo: Dp = 28.dp
+    public val talkCardMo: Dp = 34.dp
+    public val talkStepDot: Dp = 8.dp
+    public val talkStepLine: Dp = 2.dp
+    public val talkStepRail: Dp = 14.dp
+    public val talkRowIcon: Dp = 30.dp
+    public val talkChip: Dp = 26.dp
+    public val talkCardButton: Dp = 40.dp
+    public val talkDivider: Dp = 1.dp
+    public val talkBar: Dp = 4.dp
+    public val talkBarRadius: Dp = 2.dp
+    public val talkWaveHeight: Dp = 34.dp
+    public val talkWaveQuestion: Dp = 26.dp
+    public val smallBar: Dp = 3.dp
+    public val cardWave: Dp = 16.dp
+    public val talkHalo: Dp = 236.dp
+    public val talkMoListening: Dp = 176.dp
+    public val talkMo: Dp = 132.dp
+    public val talkMoAsk: Dp = 124.dp
+    public val talkMoMic: Dp = 150.dp
+    public val talkMoNotice: Dp = 140.dp
+    public val talkMoCard: Dp = 30.dp
+    public val talkMicBadge: Dp = 48.dp
+    public val talkStatus: Dp = 32.dp
+    public val talkLiveLabel: Dp = 24.dp
+    public val talkLiveDot: Dp = 6.dp
+    public val talkStopSquare: Dp = 22.dp
+    public val talkStopRadius: Dp = 6.dp
+    public val talkSideButtonWidth: Dp = 92.dp
+    public val talkDockGap: Dp = 18.dp
+    public val talkStopWidth: Dp = 220.dp
+    public val talkSaysIcon: Dp = 32.dp
+    public val talkOption: Dp = 48.dp
+    public val talkBubbleMax: Dp = 280.dp
     public val readableWidth: Dp = 520.dp
     public val edgeFadeTop: Dp = 120.dp
     public val edgeFadeBottom: Dp = 150.dp

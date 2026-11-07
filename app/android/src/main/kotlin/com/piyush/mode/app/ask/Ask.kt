@@ -56,7 +56,7 @@ fun AskScreen(suggestions: List<String>, draft: String, onDraft: (String) -> Uni
 
 /** The Ask sheet: a new task starts in a new chat, which opens once it's sent. */
 @Composable
-fun AskRoute(graph: ModeGraph, onSent: (String) -> Unit, onDismiss: () -> Unit) {
+fun AskRoute(graph: ModeGraph, onSent: (String) -> Unit, onSpeak: () -> Unit, onDismiss: () -> Unit) {
     val presenter: HomePresenter = rememberPresenter("ask") { graph.screens.home() }
     val ui by presenter.state.collectAsStateWithLifecycle()
     var draft by rememberSaveable { mutableStateOf("") }
@@ -70,7 +70,7 @@ fun AskRoute(graph: ModeGraph, onSent: (String) -> Unit, onDismiss: () -> Unit) 
                     onSent(conversation)
                 }
             },
-            onSpeak = { AppLog.log("ask", "talking mode isn't on Android yet") },
+            onSpeak = onSpeak,
         )
     }
 }

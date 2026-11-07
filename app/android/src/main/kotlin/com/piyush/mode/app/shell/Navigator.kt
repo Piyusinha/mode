@@ -28,6 +28,9 @@ class Navigator(private val presenters: PresenterStore) {
     /** A link that arrived before the main tabs were showing (the first job's chat, a notification). */
     var pending: Route? by mutableStateOf(null)
 
+    /** Talking mode, over everything while it's open (a mic, the assistant, a spoken question). */
+    var talk: com.piyush.mode.app.talk.TalkRequest? by mutableStateOf(null)
+
     fun stack(tab: AppTab): List<Entry> = stacks.getValue(tab)
 
     fun push(route: Route) {
