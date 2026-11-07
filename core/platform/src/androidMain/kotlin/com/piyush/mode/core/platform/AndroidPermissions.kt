@@ -5,16 +5,18 @@ import android.content.Context
 import android.content.pm.PackageManager
 
 /**
- * Android: notifications and the microphone are runtime permissions; the
- * assistant button is a role the app layer reports through [assistantHeld].
+ * Android: notifications and the microphone are runtime permissions; "start by voice" (Permission.Assistant)
+ * is the "Ask Mode" entry the user's own assistant can open ("Hey Google, open Ask Mode"), which the app layer
+ * reports through [assistantHeld] and switches on with [turnOnAssistant]. Mode never replaces their assistant.
  * Android does not say whether a permission was ever asked for, so Mode keeps
  * that itself, to tell "not yet" from "refused".
  */
 public class AndroidPermissions(
     context: Context,
     private val assistantHeld: () -> Boolean = { false },
-    /** Whether this build has an assistant to choose (it declares a voice interaction service). */
+    /** Whether this build can be started by voice. */
     private val assistantAvailable: () -> Boolean = { false },
+    private val turnOnAssistant: () -> Unit = {},
 ) : Permissions {
     private val app = context.applicationContext
     private val asked = app.getSharedPreferences("mode.permissions", Context.MODE_PRIVATE)
@@ -33,7 +35,10 @@ public class AndroidPermissions(
         val name = when (permission) {
             Permission.Notifications -> Manifest.permission.POST_NOTIFICATIONS
             Permission.Microphone -> Manifest.permission.RECORD_AUDIO
-            Permission.Assistant -> return status(permission)
+            Permission.Assistant -> {
+                if (assistantAvailable()) turnOnAssistant()
+                return status(permission)
+            }
         }
         if (runtime(name) != PermissionStatus.Allowed) {
             ActivityBridge.requestPermission(name)

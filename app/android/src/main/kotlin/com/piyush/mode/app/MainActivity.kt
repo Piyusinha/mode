@@ -79,6 +79,12 @@ class MainActivity : ComponentActivity() {
     private fun follow(intent: Intent) {
         if (intent.getBooleanExtra(FOLLOWED, false)) return
         intent.putExtra(FOLLOWED, true)
+        // Opened as "Ask Mode" (by the user's assistant, or its icon): straight into talking mode.
+        if (intent.component?.className == com.piyush.mode.app.graph.ASK_MODE) {
+            AppLog.log("link", "ask mode")
+            shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest()
+            return
+        }
         val data = intent.dataString ?: return
         // OpenRouter's sign-in page answers here; the providers sheet finishes it.
         if (data.startsWith(com.piyush.mode.app.screens.onboarding.OnboardingPresenter.SIGN_IN_CALLBACK)) {

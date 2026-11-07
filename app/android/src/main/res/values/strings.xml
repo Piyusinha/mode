@@ -100,8 +100,9 @@
     <string name="phone_control_why">Mode sees the screen and taps for you while a task runs. Android calls this Accessibility.</string>
     <string name="phone_notifications">Notifications</string>
     <string name="phone_notifications_why">What Mode is doing, a Stop button, and questions for you.</string>
-    <string name="phone_assistant">Assistant button</string>
-    <string name="phone_assistant_why">Hold the power button and talk to Mode from any app. Optional.</string>
+    <string name="phone_assistant">Start by voice</string>
+    <string name="phone_assistant_why">Say “Hey Google, open Ask Mode” from anywhere. Your assistant stays as it is. Optional.</string>
+    <string name="ask_mode_label">Ask Mode</string>
     <string name="phone_battery">Battery</string>
     <string name="phone_battery_why">So Android doesn’t stop Mode halfway through a task. Optional.</string>
     <string name="phone_microphone">Microphone</string>

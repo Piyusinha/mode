@@ -92,7 +92,14 @@ Known gap: the Play build has no phone control, so its setup will need its own p
 - **Repeats** remind with an exact alarm (`SCHEDULE_EXACT_ALARM`; inexact when the user hasn't allowed it). `ScheduleReceiver` shows the reminder; `BootReceiver` re-arms every repeat after a restart, an update, or a clock or time zone change (`Scheduler.rearmAll`).
 - **Voice** (`AndroidDeviceVoice` behind the shared `DeviceVoice`): text-to-speech with the phone's voices (named "English (India) · Voice 2", the user's accent first); listening live with the speech recognizer, on the device when its speech pack is there, otherwise the phone's regular recognizer while Android downloads the pack; a 16 kHz WAV with echo cancelling for a cloud listener (Deepgram, Soniox). `VoiceLevel` feeds talking mode's orb and bars and its "can't hear you".
 - **Talking mode** (`talk/Talk.kt`, the Talking mode boards) over the shared `ListenPresenter`: from Ask's mic, a chat's mic, `mode://talk`, `mode://listen`, the assistant, and a spoken question in a running task.
-- **The assistant** (`assistant/ModeAssistant.kt`): holding power (or the assistant gesture) opens talking mode. Android requires an assistant to bring a speech recognizer and may make it the default, so `ModeRecognitionService` forwards to the phone's own one, and Mode's listening names the phone's recognizer directly. The user picks Mode in Settings › Default apps › Digital assistant (`ROLE_ASSISTANT` can't be requested by an app).
+- **Start by voice** ("Ask Mode"): Mode doesn't replace the phone's assistant. Setup's "Start by voice" switch
+  shows a second app entry, "Ask Mode" (an activity alias of the main screen), which opens straight into a voice
+  session, so "Hey Google, open Ask Mode" (or Gemini, Bixby) starts the same conversation as "Hey Siri, start
+  Mode": one task after another until "that's all". The widget's mic and Ask's mic do the same.
+  Mode also has an assistant service (`assistant/ModeAssistant.kt`) for anyone who picks it in Default apps ›
+  Digital assistant themselves; Mode's screens don't offer it. It opens Mode normally (an assistant activity was
+  hidden with the session on Android 16). An assistant must bring a speech recognizer, so `ModeRecognitionService`
+  forwards to the phone's own one.
 - **The widget** (`widget/ModeWidget.kt`, board "Home screen widget"): the mic opens talking mode; two suggestions run at once through `mode://run/<task>` and open their chat. Redrawn after each task.
 
 To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT app.heymode.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.

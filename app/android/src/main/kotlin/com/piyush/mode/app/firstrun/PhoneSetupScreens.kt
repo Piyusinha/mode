@@ -125,7 +125,7 @@ private class RowWords(@StringRes val title: Int, @StringRes val why: Int, val i
 private val ROWS = mapOf(
     PhoneSetupKind.PhoneControl to RowWords(R.string.phone_control, R.string.phone_control_why, ModeIcon.Tap, R.string.phone_turn_on, R.string.phone_on),
     PhoneSetupKind.Notifications to RowWords(R.string.phone_notifications, R.string.phone_notifications_why, ModeIcon.Bell, R.string.phone_allow, R.string.phone_allowed),
-    PhoneSetupKind.Assistant to RowWords(R.string.phone_assistant, R.string.phone_assistant_why, ModeIcon.Power, R.string.phone_set, R.string.phone_on),
+    PhoneSetupKind.Assistant to RowWords(R.string.phone_assistant, R.string.phone_assistant_why, ModeIcon.SiriWave, R.string.phone_turn_on, R.string.phone_on),
     PhoneSetupKind.Battery to RowWords(R.string.phone_battery, R.string.phone_battery_why, ModeIcon.Battery, R.string.phone_allow, R.string.phone_allowed),
     PhoneSetupKind.Microphone to RowWords(R.string.phone_microphone, R.string.phone_microphone_why, ModeIcon.Microphone, R.string.phone_allow, R.string.phone_allowed),
 )

@@ -84,6 +84,7 @@ fun FirstRunRoute(
 @Composable
 fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onContinue: () -> Unit, onBack: () -> Unit, openBackground: (() -> Unit)? = null) {
     val presenter: PhoneSetupPresenter = rememberPresenter("phoneSetup") { graph.screens.phoneSetup() }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by presenter.state.collectAsStateWithLifecycle()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { presenter.refresh() }
@@ -97,6 +98,11 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
             is PhoneSetupEvent.Allow -> when {
                 // Android stops asking after two refusals: its settings page is the only way left.
                 event.row.kind == PhoneSetupKind.Notifications && event.row.status == PermissionStatus.Denied -> pages.notifications()
+                // Start by voice: the "Ask Mode" entry appears at once; nothing in Android's settings to visit.
+                event.row.kind == PhoneSetupKind.Assistant -> {
+                    com.piyush.mode.app.graph.setAskMode(context.applicationContext as android.app.Application, true)
+                    presenter.refresh()
+                }
                 else -> presenter.allow(event.row.kind)
             }
             is PhoneSetupEvent.Open -> when (event.guide) {

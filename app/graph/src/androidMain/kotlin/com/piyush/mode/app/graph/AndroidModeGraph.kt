@@ -91,7 +91,9 @@ fun androidModeGraph(
             phoneLink = link ?: UnavailablePhoneLink(PLAY_BUILD),
             telemetry = telemetry,
             database = AndroidDatabaseFactory(app),
-            permissions = AndroidPermissions(app, assistantHeld = { holdsAssistantRole(app) }, assistantAvailable = { declaresAssistant(app) }),
+            permissions = AndroidPermissions(
+                app, assistantHeld = { askModeOn(app) }, assistantAvailable = { declaresAskMode(app) }, turnOnAssistant = { setAskMode(app, true) },
+            ),
             phoneChecks = link?.let { AccessibilityPhoneChecks(app, it) } ?: UnavailablePhoneChecks(PLAY_BUILD),
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
@@ -123,6 +125,30 @@ private class HiddenDisplayLock(
 /** Background mode, in builds that can drive the phone (the app's setup screens use it). */
 var background: BackgroundMode? = null
     private set
+
+/**
+ * "Ask Mode": a second app entry that opens Mode straight into talking mode, so the user's own assistant starts a
+ * voice session ("Hey Google, open Ask Mode") without Mode replacing it. Off until the user turns it on.
+ */
+private fun askMode(app: Application) = android.content.ComponentName(app, ASK_MODE)
+
+private fun declaresAskMode(app: Application): Boolean =
+    runCatching { app.packageManager.getActivityInfo(askMode(app), android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS); true }.getOrDefault(false)
+
+private fun askModeOn(app: Application): Boolean =
+    app.packageManager.getComponentEnabledSetting(askMode(app)) == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+
+/** Shows or hides the "Ask Mode" entry (the launcher and the user's assistant find it by its name). */
+fun setAskMode(app: Application, on: Boolean) {
+    app.packageManager.setComponentEnabledSetting(
+        askMode(app),
+        if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+        android.content.pm.PackageManager.DONT_KILL_APP,
+    )
+}
+
+/** The entry's activity alias in the app's manifest. */
+const val ASK_MODE: String = "com.piyush.mode.app.AskMode"
 
 /** Whether Mode is the phone's digital assistant (hold power to talk to it). */
 private fun holdsAssistantRole(app: Application): Boolean =

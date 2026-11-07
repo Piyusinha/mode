@@ -551,7 +551,12 @@ Android-only strings are written by hand in `strings.xml`. Navigation is a small
 (`Navigator`) with presenters released when their page goes, rather than a navigation library.
 Shared names that end up in the iPhone's Objective-C header avoid Objective-C keywords (`YES`, `NO`).
 
-## D47. The assistant role, and an assistant's speech recognizer (2026-11-07)
+## D47. Starting by voice without replacing the assistant; the assistant role stays optional (2026-11-07)
+
+Mode never asks to replace the phone's assistant. "Start by voice" turns on an "Ask Mode" app entry that opens a
+voice session, so the user's own assistant starts Mode by name ("Hey Google, open Ask Mode"). Android lets only
+system-approved assistants listen for a wake word, so there is no "Hey Mode". The rest of this entry describes
+the assistant service kept for anyone who chooses Mode as their assistant in Android's settings.
 
 Holding power (or the assistant gesture) opens Mode's talking mode through a `VoiceInteractionService`
 whose session only starts Mode's own screen: Mode doesn't draw an assistant overlay. Android requires an
