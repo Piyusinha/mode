@@ -90,6 +90,25 @@ Known gap: the Play build has no phone control, so its setup will need its own p
 
 To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT app.heymode.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
 
+## Releases
+
+- `tools/build-apk.sh [full|play] [release|debug]` builds into `dist/` (`Mode.apk` + `.sha256`). The version is
+  the iPhone's `MARKETING_VERSION` (`iosApp/project.yml`): one version everywhere; the version code is
+  major·10000 + minor·100 + patch.
+- Release signing comes from `MODE_ANDROID_KEYSTORE`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
+  (and `MODE_ANDROID_KEY_PASSWORD`); without them the APK is unsigned. Keep one key forever: Android only updates
+  an app signed with the key it was installed with. Register that key for Android developer verification before
+  the first public release.
+- The tag's release workflow (`.github/workflows/release.yml`, job `android`) builds and signs the APK from the
+  repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
+  and attaches it to the draft release. Without the secrets it builds unsigned and attaches nothing.
+- Not shrunk (no R8) yet: the helper is started by class name from the APK, and the link and storage use
+  reflection. The APK is about 55 MB; keep rules and per-ABI APKs would bring it down.
+- **The Play build** (`play` flavour, `app.heymode.mode.play`) has nothing that drives the phone: no accessibility
+  service, no special-use working service, no background mode (checked in its merged manifest). Its setup skips
+  "Let Mode use your phone". Still to do for Play: first jobs that don't need phone control, and the store's
+  declarations.
+
 ## Developing
 
 Debug builds have an adb probe, so the engine can be driven without the app's screens:

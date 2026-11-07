@@ -5,6 +5,18 @@ plugins {
 
 // The Android app: Compose screens over the shared presenters, and the system
 // pieces (services, receivers, widget) that Android needs in the app itself.
+
+// One version everywhere: the iPhone's MARKETING_VERSION (iosApp/project.yml) is Mode's version.
+val modeVersion: String = rootProject.file("iosApp/project.yml").readLines()
+    .firstNotNullOfOrNull { Regex("""^\s*MARKETING_VERSION:\s*"?([0-9.]+)"?""").find(it)?.groupValues?.get(1) } ?: "0.1.0"
+
+/** 1.2.3 → 10203: each release's code is higher than the last. */
+fun versionCodeOf(version: String): Int = version.split('.').map { it.toIntOrNull() ?: 0 }.let { (it + listOf(0, 0, 0)).take(3) }
+    .let { (major, minor, patch) -> major * 10_000 + minor * 100 + patch }
+
+// Release signing from the environment (CI secrets or a local keystore); without it the release APK is unsigned.
+val keystore: String? = System.getenv("MODE_ANDROID_KEYSTORE")?.takeIf { it.isNotBlank() && file(it).exists() }
+
 android {
     namespace = "com.piyush.mode.app"
     compileSdk = 37
@@ -13,8 +25,19 @@ android {
         applicationId = "app.heymode.mode"
         minSdk = 33
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeOf(modeVersion)
+        versionName = modeVersion
+    }
+
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("MODE_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MODE_ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("MODE_ANDROID_KEY_PASSWORD") ?: System.getenv("MODE_ANDROID_KEYSTORE_PASSWORD")
+            }
+        }
     }
 
     // full: everything, from GitHub. play: no accessibility engine, for the Play Store.
@@ -33,7 +56,9 @@ android {
 
     buildTypes {
         release {
+            // Not shrunk: the helper is started by class name from the APK, and the link and storage use reflection.
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 }

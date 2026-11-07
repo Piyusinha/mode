@@ -15,10 +15,11 @@ public class UnavailablePhoneLink(private val reason: String = "This build canno
 }
 
 public class UnavailablePhoneChecks(private val reason: String = "This build cannot control the phone yet.") : PhoneChecks {
-    override val steps: List<PhoneCheckId> = listOf(PhoneCheckId.Engine)
+    /** Nothing to set up or check: setup skips "Let Mode use your phone" in this build. */
+    override val steps: List<PhoneCheckId> = emptyList()
 
     override suspend fun run(update: (List<PhoneCheckResult>) -> Unit) {
-        update(listOf(PhoneCheckResult(PhoneCheckId.Engine, CheckState.Failed(reason, null))))
+        update(emptyList())
     }
 
     override fun ready(): Boolean = false
