@@ -1,8 +1,8 @@
-package com.piyush.mode.coredevice
+package com.piyush.mode.screen
 
 import com.piyush.mode.ops.OpFailed
 
-/** Turns what the agent calls an app into a bundle id. */
+/** Turns what the agent calls an app into the system's id (a bundle id, a package name). */
 object AppNames {
     /** `com.ubercab.UberClient`-like: dotted, no spaces. */
     fun looksLikeBundleId(name: String): Boolean = '.' in name && ' ' !in name.trim()

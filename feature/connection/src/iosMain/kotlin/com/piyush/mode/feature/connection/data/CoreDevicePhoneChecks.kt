@@ -1,5 +1,7 @@
 package com.piyush.mode.feature.connection.data
 
+import com.piyush.mode.coredevice.toTouch
+
 import com.piyush.mode.coredevice.LoopbackVpn
 import com.piyush.mode.coredevice.ModecoreSession
 import com.piyush.mode.coredevice.PairingFile

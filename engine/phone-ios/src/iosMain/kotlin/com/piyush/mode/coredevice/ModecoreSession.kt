@@ -2,6 +2,8 @@
 
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.InstalledApp
+
 import cnames.structs.McSession
 import com.piyush.mode.coredevice.native.mc_bytes_free
 import com.piyush.mode.coredevice.native.mc_button
