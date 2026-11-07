@@ -254,6 +254,31 @@ fn bundled_ipa(app: &AppHandle, name: &str) -> Option<PathBuf> {
     Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/release").join(name)).filter(|p| p.exists())
 }
 
+/// Is a newer Mode Setup out? Compares the latest release with this app's version. Read-only, no
+/// sign-in; the new installer is downloaded from the website by the person.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SetupUpdate {
+    current: String,
+    latest: String,
+    available: bool,
+    /// Where to download it for this computer.
+    url: String,
+}
+
+#[tauri::command]
+async fn check_setup_update(app: AppHandle) -> Res<SetupUpdate> {
+    let current = app.package_info().version.to_string();
+    let latest = release::latest_version().await.map_err(err)?;
+    let os = match std::env::consts::OS { "macos" => "mac", "windows" => "windows", _ => "linux" };
+    Ok(SetupUpdate { available: release::is_newer(&latest, &current), current, latest, url: format!("https://heymode.app/download/{os}") })
+}
+
+#[tauri::command]
+fn setup_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
 /// A read-only update check; it does not authenticate or access the Keychain.
 #[tauri::command]
 async fn check_update(own_vpn: bool) -> Res<release::Release> {
@@ -420,7 +445,7 @@ fn main() {
     tauri::Builder::default()
         .manage(App::default())
         .invoke_handler(tauri::generate_handler![
-            check_computer, phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
+            check_computer, check_setup_update, setup_version, phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
             mode_vpn_turn_on, mode_vpn_status, install_mode, install_sidestore, phone_control, prefs, set_helper, open_url, diagnostics,
             local_dev_vpn_qr, debug_start
         ])

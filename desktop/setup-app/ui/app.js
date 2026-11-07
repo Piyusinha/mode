@@ -77,7 +77,7 @@ const S = {
   phoneTestConfirmed: false, cableDisconnected: false, phonePresenceKnown: false,
   ownVpn: false, vpn: null, stages: [], progress: {}, installed: null, failure: null, phoneApps: null,
   prefs: { phones: {} }, record: null, busy: false, copied: false, customHelper: '',
-  computer: null, checking: false, copiedCheck: null,
+  computer: null, checking: false, copiedCheck: null, setupVersion: '', setupUpdate: null,
 };
 let timer = null;
 const stopPolling = () => { if (timer) { clearTimeout(timer); timer = null; } };
@@ -114,7 +114,7 @@ function side(nav, chip = true, settings = true) {
 }
 function page({ nav, body, left = '', right = '', tight = false, chip = true }) {
   const foot = left || right;
-  return `<div class="drag"></div>${side(nav, chip)}<main class="${foot ? '' : 'nofoot'} ${tight ? 'tight' : ''}">${body}</main>${foot ? `<footer>${left}<span class="spacer"></span>${right}</footer>` : ''}`;
+  return `<div class="drag"></div>${side(nav, chip)}<main class="${foot ? '' : 'nofoot'} ${tight ? 'tight' : ''}">${updateBanner()}${body}</main>${foot ? `<footer>${left}<span class="spacer"></span>${right}</footer>` : ''}`;
 }
 
 // ---- screens -------------------------------------------------------------------------------------------
@@ -141,6 +141,31 @@ async function runComputerCheck() {
   try { S.computer = await call('check_computer'); } catch (e) { console.warn(e); }
   S.checking = false;
   if (S.screen === 'welcome') render();
+}
+
+// ---- a newer Mode Setup: a banner on the first page and the phone page, and a row in Settings ---------
+function updateBanner() {
+  const u = S.setupUpdate;
+  if (!u?.available || !['welcome', 'device'].includes(S.screen)) return '';
+  return callout(`<b>Mode Setup ${esc(u.latest)} is available.</b> You have ${esc(u.current)}. Download it, open it, and replace this one.`, 'accent', 'down', link('Download', u.url));
+}
+
+function setupUpdateRow() {
+  const u = S.setupUpdate;
+  const text = u?.checking ? 'Checking…'
+    : u?.error ? esc(u.error)
+    : u?.available ? `Version ${esc(u.latest)} is available`
+    : u ? 'You have the latest version' : 'Not checked yet';
+  const action = u?.available ? link('Download', u.url) : btnIcon(u?.checking ? 'Checking…' : 'Check for updates', 'renew', 'checkSetupUpdate', 'small');
+  return kv('Updates', text, action);
+}
+
+async function checkSetupUpdate(quiet = false) {
+  if (S.setupUpdate?.checking) return;
+  S.setupUpdate = { checking: true }; if (!quiet) render();
+  try { S.setupUpdate = await call('check_setup_update'); }
+  catch (e) { S.setupUpdate = quiet ? null : { error: 'Couldn’t check. Are you online?' }; }
+  render();
 }
 
 const screens = {
@@ -408,7 +433,7 @@ const screens = {
       <section class="group"><h2 class="label">Sign-in helper</h2>${helperList(false)}<p>Tells Apple which computer you’re signing in from. It never sees your password. Run by open-source projects, not by Mode.</p></section>
       <section class="group"><h2 class="label">Apple account</h2>${box(kv('Signed in as', esc(S.prefs.email ?? 'Not signed in'), S.prefs.email ? btnIcon('Sign out', 'out', 'signOut', 'small plain') : '')
         + kv('Password', S.hasSaved ? 'Kept in this computer’s Keychain' : 'Asked each time', ''))}</section>
-      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', '0.1 · free and open source', link('Source', 'https://github.com/Piyusinha/mode')) + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
+      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', `${esc(S.setupVersion || '')} · free and open source`, link('Source', 'https://github.com/Piyusinha/mode')) + setupUpdateRow() + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
       <p>Reports never include passwords, codes, keys or phone-control files.</p></section></main>`,
 };
 
@@ -735,6 +760,7 @@ document.addEventListener('click', async e => {
     case 'welcomeConnect': S.operation = 'install'; S.failure = null; S.after = null; go('connect'); break;
     case 'welcome': go('welcome', { readiness: null, shownDevSwitch: false, record: null }); break;
     case 'checkComputer': await runComputerCheck(); break;
+    case 'checkSetupUpdate': await checkSetupUpdate(); break;
     case 'copyCheck': { const x = S.computer?.checks?.[+arg]; if (x?.command) { navigator.clipboard?.writeText(x.command).catch(() => {}); S.copiedCheck = +arg; render(); setTimeout(() => { S.copiedCheck = null; render(); }, 2000); } break; }
     case 'pick': S.phone = S.phones[+arg]; render(); break;
     case 'pickContinue': go('trust'); break;
@@ -818,6 +844,8 @@ async function start() {
   S.prefs = await call('prefs').catch(() => ({ phones: {} }));
   S.email = S.prefs.email ?? '';
   S.helper = S.prefs.helper ?? S.helper;
+  S.setupVersion = await call('setup_version').catch(() => '');
+  checkSetupUpdate(true); // in the background: a banner appears if a newer Mode Setup is out
   const debugStart = await call('debug_start').catch(() => null);
   if (debugStart) { go(debugStart); return; }
   const known = Object.keys(S.prefs.phones || {});

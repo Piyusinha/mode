@@ -295,3 +295,34 @@ test('Linux without usbmuxd shows the command to copy', async () => {
   assert.match(f.app.innerHTML, /sudo apt install usbmuxd/);
   assert.match(f.app.innerHTML, /data-act="copyCheck:0"/);
 });
+
+// ---- a newer Mode Setup ------------------------------------------------------------------------------
+test('a newer Mode Setup shows a download banner on the first page, and Settings can check again', async () => {
+  let latest = '0.1.3';
+  const f = fixture({
+    check_computer: MAC_READY,
+    check_setup_update: () => ({ current: '0.1.2', latest, available: latest !== '0.1.2', url: 'https://heymode.app/download/mac' }),
+  });
+  await f.run('checkSetupUpdate(true)');
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Mode Setup 0\.1\.3 is available/);
+  assert.match(f.app.innerHTML, /heymode\.app\/download\/mac/);
+  // Not on the steps in between.
+  await f.run("go('signIn')");
+  assert.doesNotMatch(f.app.innerHTML, /Mode Setup 0\.1\.3 is available/);
+  // Settings: up to date after checking again.
+  latest = '0.1.2';
+  await f.run("S.setupVersion = '0.1.2'; go('settings')");
+  await f.click('checkSetupUpdate');
+  assert.match(f.app.innerHTML, /You have the latest version/);
+});
+
+test('an update check that fails stays quiet at start, and says so in Settings', async () => {
+  const f = fixture({ check_setup_update: () => { throw new Error('offline'); } });
+  await f.run('checkSetupUpdate(true)');
+  assert.equal(f.run('S.setupUpdate'), null);
+  await f.run("go('settings')");
+  await f.click('checkSetupUpdate');
+  assert.match(f.app.innerHTML, /Couldn’t check/);
+});

@@ -45,6 +45,22 @@ fn client() -> Result<reqwest::Client> {
         .map_err(|e| SetupError::Download(e.to_string()))
 }
 
+/// The newest release's version ("0.1.2"). Mode and Mode Setup share it, so this also says whether
+/// a newer Mode Setup is out.
+pub async fn latest_version() -> Result<String> {
+    let url = format!("https://api.github.com/repos/{MODE_REPO}/releases/latest");
+    let rel: GhRelease = client()?
+        .get(&url)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| SetupError::Download(format!("Mode’s release list ({e})")))?
+        .json()
+        .await
+        .map_err(|e| SetupError::Download(format!("Mode’s release list ({e})")))?;
+    Ok(rel.tag_name.trim_start_matches('v').to_string())
+}
+
 /// The newest Mode release.
 pub async fn latest_mode() -> Result<Release> {
     latest_mode_variant(false).await
