@@ -1,0 +1,14 @@
+# Cloudflare Pages headers.
+# Built JS/CSS have a content hash in their names, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The film and the tour screens change rarely; a day is a good balance.
+/story.mp4
+  Cache-Control: public, max-age=86400
+/screens/*
+  Cache-Control: public, max-age=86400
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

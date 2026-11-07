@@ -19,20 +19,21 @@ public data class QuestionAction(val title: String, val answer: String, val type
  * "I've entered it" for something only the user can do. The answers are what the task runner expects.
  */
 public object QuestionActions {
-    public const val YES: String = "yes"
-    public const val NO: String = "no"
-    public const val ALWAYS: String = "always"
-    public const val DONE: String = "done"
+    // Not YES/NO: those are Objective-C keywords, and this is in the iPhone's framework too.
+    public const val ANSWER_YES: String = "yes"
+    public const val ANSWER_NO: String = "no"
+    public const val ANSWER_ALWAYS: String = "always"
+    public const val ANSWER_DONE: String = "done"
     /** Android shows at most three actions on a notification. */
-    public const val MAX: Int = 3
+    public const val MAX_ACTIONS: Int = 3
 
     public fun of(kind: QuestionKind, options: List<String>, words: QuestionWords): List<QuestionAction> = when (kind) {
-        QuestionKind.YesNo -> listOf(QuestionAction(words.yes, YES), QuestionAction(words.no, NO))
-        QuestionKind.YesNoAlways -> listOf(QuestionAction(words.yes, YES), QuestionAction(words.always, ALWAYS), QuestionAction(words.no, NO))
-        QuestionKind.YourTurn -> listOf(QuestionAction(words.entered, DONE))
+        QuestionKind.YesNo -> listOf(QuestionAction(words.yes, ANSWER_YES), QuestionAction(words.no, ANSWER_NO))
+        QuestionKind.YesNoAlways -> listOf(QuestionAction(words.yes, ANSWER_YES), QuestionAction(words.always, ANSWER_ALWAYS), QuestionAction(words.no, ANSWER_NO))
+        QuestionKind.YourTurn -> listOf(QuestionAction(words.entered, ANSWER_DONE))
         QuestionKind.Text -> listOf(QuestionAction(words.reply, "", typed = true))
         QuestionKind.Choice ->
-            if (options.size <= MAX) options.map { QuestionAction(it, it) }
-            else options.take(MAX - 1).map { QuestionAction(it, it) } + QuestionAction(words.somethingElse, "", typed = true)
+            if (options.size <= MAX_ACTIONS) options.map { QuestionAction(it, it) }
+            else options.take(MAX_ACTIONS - 1).map { QuestionAction(it, it) } + QuestionAction(words.somethingElse, "", typed = true)
     }
 }

@@ -53,5 +53,25 @@
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Mode backup</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.piyush.mode.backup</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>modebackup</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

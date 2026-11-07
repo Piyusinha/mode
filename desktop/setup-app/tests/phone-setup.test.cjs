@@ -182,7 +182,7 @@ test('Reconnect shows progress, prevents duplicate repairs, and reports success'
   assert.match(f.app.innerHTML, /data-act="reconnect" disabled/);
   await f.click('reconnect');
   assert.equal(f.calls.filter(c => c === 'phone_control').length, 1);
-  finish(['com.piyush.mode', 'com.piyush.mode.TEAM']);
+  finish(['app.heymode.mode', 'app.heymode.mode.TEAM']);
   await first;
   assert.equal(f.run('S.reconnecting'), false);
   assert.match(f.app.innerHTML, /Pairing repaired in all copies of Mode/);
@@ -212,9 +212,9 @@ test('Reconnect refuses a disconnected phone without contacting pairing services
 });
 
 test('the dashboard notices Mode was removed from the iPhone and offers to install it again', async () => {
-  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'app.heymode.mode', name: 'Mode', version: '0.1' }], sideloaded: [] } });
   device(f);
-  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  f.run("S.record.mode.bundleId = 'app.heymode.mode.TEAM'; render();");
   assert.doesNotMatch(f.app.innerHTML, /Not installed/);
   await f.run("enter('device')");
   for (let i = 0; i < 5; i++) await new Promise(setImmediate);
@@ -226,9 +226,9 @@ test('the dashboard notices Mode was removed from the iPhone and offers to insta
 });
 
 test('the dashboard stays as it was while this computer’s copy is still installed', async () => {
-  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'com.piyush.mode.TEAM', name: 'Mode', version: '0.1' }], sideloaded: [] } });
+  const f = fixture({ apps_on_phone: { modes: [{ bundleId: 'app.heymode.mode.TEAM', name: 'Mode', version: '0.1' }], sideloaded: [] } });
   device(f);
-  f.run("S.record.mode.bundleId = 'com.piyush.mode.TEAM'; render();");
+  f.run("S.record.mode.bundleId = 'app.heymode.mode.TEAM'; render();");
   await f.run("enter('device')");
   for (let i = 0; i < 5; i++) await new Promise(setImmediate);
   assert.doesNotMatch(f.app.innerHTML, /Not installed/);
@@ -249,4 +249,80 @@ test('Done on Ready offers the optional Unlock by voice step, which skips or fin
   await f.click('unlockVoice');
   await f.click('device');
   assert.equal(f.run('S.screen'), 'device');
+});
+
+// ---- this computer, checked before setup starts ---------------------------------------------------
+const WIN_MISSING = { os: 'windows', ready: false, checks: [
+  { id: 'driver', state: 'missing', title: 'iTunes (iPhone driver)', detail: 'Install Apple’s iTunes from apple.com.', fix: { label: 'Download iTunes', url: 'https://www.apple.com/itunes/download/win64' } },
+  { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] };
+const MAC_READY = { os: 'macos', ready: true, checks: [
+  { id: 'driver', state: 'ok', title: 'iPhone connection', detail: 'Built in to macOS.' },
+  { id: 'xcode', state: 'ok', title: 'Xcode', detail: 'Not needed. Mode Setup brings everything it uses.' },
+  { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] };
+
+test('Windows without iTunes: the download link shows and Get started stays off', async () => {
+  let result = WIN_MISSING;
+  const f = fixture({ check_computer: () => result });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Download iTunes/);
+  assert.match(f.app.innerHTML, /apple\.com\/itunes\/download\/win64/);
+  assert.match(f.app.innerHTML, /data-act="start" disabled/);
+  await f.click('start');
+  assert.equal(f.run('S.screen'), 'welcome');
+  // iTunes installed: Check again turns it green and lets setup start.
+  result = { ...WIN_MISSING, ready: true, checks: WIN_MISSING.checks.map(c => ({ ...c, state: 'ok', fix: null })) };
+  await f.click('checkComputer');
+  assert.doesNotMatch(f.app.innerHTML, /data-act="start" disabled/);
+  await f.click('start');
+  assert.notEqual(f.run('S.screen'), 'welcome'); // on to Connect (and on to Trust: the test phone is plugged in)
+});
+
+test('Mac: says Xcode is not needed, and setup can start', async () => {
+  const f = fixture({ check_computer: MAC_READY });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Xcode/);
+  assert.match(f.app.innerHTML, /Not needed/);
+  assert.doesNotMatch(f.app.innerHTML, /data-act="start" disabled/);
+});
+
+test('Linux without usbmuxd shows the command to copy', async () => {
+  const f = fixture({ check_computer: { os: 'linux', ready: false, checks: [
+    { id: 'driver', state: 'missing', title: 'usbmuxd (iPhone driver)', detail: 'Install usbmuxd.', command: 'sudo apt install usbmuxd' }] } });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /sudo apt install usbmuxd/);
+  assert.match(f.app.innerHTML, /data-act="copyCheck:0"/);
+});
+
+// ---- a newer Mode Setup ------------------------------------------------------------------------------
+test('a newer Mode Setup shows a download banner on the first page, and Settings can check again', async () => {
+  let latest = '0.1.3';
+  const f = fixture({
+    check_computer: MAC_READY,
+    check_setup_update: () => ({ current: '0.1.2', latest, available: latest !== '0.1.2', url: 'https://heymode.app/download/mac' }),
+  });
+  await f.run('checkSetupUpdate(true)');
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Mode Setup 0\.1\.3 is available/);
+  assert.match(f.app.innerHTML, /heymode\.app\/download\/mac/);
+  // Not on the steps in between.
+  await f.run("go('signIn')");
+  assert.doesNotMatch(f.app.innerHTML, /Mode Setup 0\.1\.3 is available/);
+  // Settings: up to date after checking again.
+  latest = '0.1.2';
+  await f.run("S.setupVersion = '0.1.2'; go('settings')");
+  await f.click('checkSetupUpdate');
+  assert.match(f.app.innerHTML, /You have the latest version/);
+});
+
+test('an update check that fails stays quiet at start, and says so in Settings', async () => {
+  const f = fixture({ check_setup_update: () => { throw new Error('offline'); } });
+  await f.run('checkSetupUpdate(true)');
+  assert.equal(f.run('S.setupUpdate'), null);
+  await f.run("go('settings')");
+  await f.click('checkSetupUpdate');
+  assert.match(f.app.innerHTML, /Couldn’t check/);
 });

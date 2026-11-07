@@ -57,6 +57,8 @@ final class SettingsViewModel {
         var voiceNote = L10n.Voice.sectionNote
         var query = ""
         var modelCount = 0
+        /// Your data → Backup and restore (only once it's wired to its logic).
+        var showsBackup = BackupFeature.ready
     }
 
     enum Event {
@@ -71,6 +73,7 @@ final class SettingsViewModel {
         case openDeveloper
         case openHealth
         case openUnlockVoice
+        case openBackup
         case openMemory
         case openPicker(stuck: Bool)
         case showProviders
@@ -148,6 +151,7 @@ final class SettingsViewModel {
         case .openDeveloper: navigate(.developer)
         case .openHealth: navigate(.health)
         case .openUnlockVoice: navigate(.unlockVoice)
+        case .openBackup: navigate(.backup)
         case .openMemory: navigate(.memory)
         case let .openPicker(stuck): navigate(state.showsCost ? .modelPicker(stuck: stuck) : .planModels(brain: stuck))
         case .openProvider: navigate(.providerDetail(id: activeProvider))

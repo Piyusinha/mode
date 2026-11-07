@@ -154,6 +154,7 @@ struct MainTabs: View {
         case "listen": showingListen = true
         case "provider": paths[.home] = [.settings, .providerDetail(id: parts.last ?? "chatgpt")]
         case "unlockvoice": paths[.home] = [.settings, .unlockVoice]
+        case "backup": paths[.home] = [.settings, .backup]
         case "conversation": paths[.home] = [.conversation(id: parts.last ?? "")]
         case "screens": paths[.home] = [.runScreens(taskId: parts.last ?? "")]
         case "activity":
@@ -245,6 +246,7 @@ private struct TabRoot<Content: View>: View {
                     case let .memoryApp(name): MemoryAppRoute(app: app, name: name, navigate: navigate)
                     case let .memoryEdit(id): MemoryEditRoute(app: app, id: id)
                     case .unlockVoice: UnlockVoiceRoute(app: app)
+                    case .backup: BackupRoute(app: app)
                     }
                 }
         }

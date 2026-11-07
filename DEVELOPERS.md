@@ -396,10 +396,25 @@ request.
 
 ## 14. Releasing
 
-`tools/release.sh <version>` builds the iPhone app files and Mode Setup for Mac on a Mac,
-notarises the Mac app when signing is set up, and makes a draft GitHub release. The
-`Release` workflow then adds the Windows and Linux installers. The README’s download
-button points at `releases/latest/download/Mode-Setup-mac.dmg`.
+Mode and Mode Setup are released separately, each with its own version and changelog.
+
+| | Mode (the phone app) | Mode Setup (the desktop app) |
+|---|---|---|
+| Tag and title | `Mode-Mobile-Build-<version>` | `Mode-Desktop-App-<version>` |
+| Version in | `iosApp/project.yml` (`MARKETING_VERSION`) | `desktop/setup-app/tauri.conf.json`, `desktop/Cargo.toml` |
+| Changelog | `CHANGELOG.md` | `desktop/CHANGELOG.md` |
+| Release | `tools/release-app.sh <version>` | `tools/release-setup.sh <version>` |
+| Holds | `Mode.ipa`, `Mode-paid.ipa` (and `Mode.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
+| Publish | `gh release edit Mode-Mobile-Build-<v> --draft=false --latest` | `gh release edit Mode-Desktop-App-<v> --draft=false --latest=false` |
+
+- Each script stops before building if the version doesn't match or its changelog has no
+  section for it. The section becomes the release's "What's new" (`tools/release-notes.sh`).
+- A Mode release is GitHub's "Latest". Mode Setup finds the newest Mode by its tag, installs it
+  on every install, reinstall and renewal, and offers it as an update. No new Mode Setup is
+  needed for a new Mode.
+- A Mode Setup release carries the newest published Mode inside it
+  (`tools/latest-app-release.sh`), so it installs offline too.
+- heymode.app's download links serve the newest Mode Setup release (`website/worker`).
 
 ## 15. More documents
 

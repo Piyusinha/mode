@@ -1,0 +1,27 @@
+{
+  "name": "mode-website",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && npx --yes wrangler@4 deploy",
+    "films": "cp ../docs/media/mode-story.mp4 public/story.mp4 && cp ../docs/media/mode-story-vertical.mp4 public/story-vertical.mp4",
+    "predev": "npm run films",
+    "prebuild": "npm run films"
+  },
+  "dependencies": {
+    "marked": "^12.0.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.6.3",
+    "vite": "5.4.11"
+  }
+}

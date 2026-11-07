@@ -27,7 +27,7 @@ struct ScreenSample: Identifiable {
             OnboardingScreen(state: Self.voiceSetup(eleven: id == "setup-voice-eleven"), callName: .constant(""),
                              providers: .init(), onProvider: { _ in }, onEvent: { _ in })
         case let setup where setup.hasPrefix("setup-"):
-            OnboardingScreen(state: Self.setup(setup), callName: .constant("Piyush"),
+            OnboardingScreen(state: Self.setup(setup), callName: .constant("Alex"),
                              providers: Self.setupProviders(setup), onProvider: { _ in }, onEvent: { _ in })
         case "connect-chatgpt", "connect-chatgpt-failed", "connect-chatgpt-settings":
             NavigationStack {
@@ -61,8 +61,8 @@ struct ScreenSample: Identifiable {
         case "talk-conv-long": talk(Self.longConversation(), level: 0, speaking: false)
         case "talk-conversation": talk(Self.conversation(.done), level: 0.4, speaking: false)
         case "talk-conv-partial": talk(Self.conversation(.partial), level: 0.4, speaking: false)
-        case "talk-canthear": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?"), level: 0, speaking: false, cantHear: true)
-        case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Piyush, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
+        case "talk-canthear": talk(.init(phase: .listening, greeting: "Hey Alex, good evening. What do you want me to do?"), level: 0, speaking: false, cantHear: true)
+        case "talk-listen": talk(.init(phase: .listening, greeting: "Hey Alex, good evening. What do you want me to do?", settled: "Order my usual from", forming: "Swiggy"),
                                  level: 0.7, speaking: false)
         case "talk-start": talk(.init(phase: .starting, task: "Order my usual from Swiggy", reply: "I’ll order your usual from Swiggy.", working: "Opening Swiggy"),
                                 level: 0, speaking: true)
@@ -95,7 +95,7 @@ struct ScreenSample: Identifiable {
         }
         case "settings": pushed { settings.defaultScrollAnchor(bottom ? .bottom : .top) }
         case "settings-voice", "settings-voice-failed": pushed {
-            SettingsScreen(state: Self.settingsVoice(failed: id.hasPrefix("settings-voice-failed")), providers: Self.providers, name: .constant("Piyush"),
+            SettingsScreen(state: Self.settingsVoice(failed: id.hasPrefix("settings-voice-failed")), providers: Self.providers, name: .constant("Alex"),
                            costStep: 0.01, costRange: 0.01...1, dailyCapStep: 0.1, dailyCapRange: 0...10, onEvent: { _ in })
         }
         case "providers": pushed {
@@ -124,6 +124,12 @@ struct ScreenSample: Identifiable {
             HealthScreen(state: Self.health(ok: id.hasPrefix("health-ok")), onEvent: { _ in }).defaultScrollAnchor(bottom ? .bottom : .top)
         }
         case "language": pushed { LanguageScreen(state: Self.language, onEvent: { _ in }) }
+        case let backup where backup.hasPrefix("backup"): pushed {
+            let stage = backup.replacingOccurrences(of: "-bottom", with: "")
+            BackupScreen(state: Self.backup(stage), password: .constant("correcthor"), passwordAgain: .constant("correcthor"),
+                         restorePassword: .constant(stage == "backup-wrong" ? "letmein" : ""), onEvent: { _ in })
+                .defaultScrollAnchor(bottom ? .bottom : .top)
+        }
         case "plan": pushed { PlanModelsScreen(state: Self.plan, onEvent: { _ in }).defaultScrollAnchor(bottom ? .bottom : .top) }
         case "claude": pushed { detail(Self.claude).defaultScrollAnchor(bottom ? .bottom : .top) }
         case "openrouter": pushed { detail(Self.openRouter).defaultScrollAnchor(bottom ? .bottom : .top) }
@@ -133,7 +139,7 @@ struct ScreenSample: Identifiable {
 
     /// Board Settings: ChatGPT in use, three providers, full access.
     private var settings: some View {
-        SettingsScreen(state: Self.settingsState, providers: Self.providers, name: .constant("Piyush"), costStep: 0.01, costRange: 0.01...1,
+        SettingsScreen(state: Self.settingsState, providers: Self.providers, name: .constant("Alex"), costStep: 0.01, costRange: 0.01...1,
                        dailyCapStep: 0.1, dailyCapRange: 0...10, onEvent: { _ in })
     }
 
@@ -153,7 +159,7 @@ struct ScreenSample: Identifiable {
     static let settingsState = SettingsViewModel.State(
         modelName: "GPT-6.1 Terra · Low", stuckName: "GPT-6.1 Sol · High", showsCost: false, learn: true, fullAccess: true,
         speaker: "apple", voiceName: "Ava", listener: "apple", listenerLabel: String(localized: L10n.Voice.onIPhone), talkBack: true,
-        voiceValue: "Ava"
+        voiceValue: "Ava", showsBackup: true
     )
 
     static let providers = ProvidersViewModel.State(
@@ -183,6 +189,46 @@ struct ScreenSample: Identifiable {
         state.makers = ["anthropic", "openai", "google", "qwen"]
         state.modelCount = 342
         state.showsCost = true
+        return state
+    }
+
+    /// Board Backup's stages: backup, backup-password, backup-restore, backup-wrong, backup-restored.
+    static func backup(_ stage: String) -> BackupState {
+        func item(_ id: String, _ title: String, _ value: String, _ icon: ModeBackupIcon, _ tone: ModeBackupTone) -> ModeBackupItem {
+            .init(id: id, title: title, value: value, mark: .tile(icon, tone))
+        }
+        func added(_ id: String, _ title: String, _ value: String) -> ModeBackupItem { .init(id: id, title: title, value: value, mark: .added) }
+        let contents = [
+            item("chats", L10n.Backup.chats, L10n.Backup.chatsCount(42, messages: 318), .chats, .coral),
+            item("memory", L10n.Backup.memory, "27", .memory, .lilac),
+            item("tasks", L10n.Backup.tasks, "156", .tasks, .blue),
+            item("repeats", L10n.Backup.repeats, "3", .repeats, .green),
+            item("settings", L10n.Backup.settings, L10n.Backup.all, .settings, .gray),
+        ]
+        var state = BackupState(contents: contents, signInsDetail: L10n.Backup.signInsDetail("ChatGPT, OpenRouter, ElevenLabs"),
+                                includeSignIns: stage == "backup-password", passwordsMatch: true,
+                                saveNote: L10n.Backup.saveNote(lastBackup: L10n.Backup.dayAndTime(L10n.Backup.yesterday, "21:40")))
+        switch stage {
+        case "backup-restore", "backup-wrong":
+            state.page = .preview
+            state.fileDetail = L10n.Backup.fileDetail("Thu 6 Nov, 16:20", device: "Alex’s iPhone", size: "2.4 MB")
+            state.inBackup = contents + [item("signIns", L10n.Backup.signIns, "ChatGPT, OpenRouter", .signIns, .orange)]
+            state.locked = true
+            state.wrongPassword = stage == "backup-wrong"
+            state.canRestore = stage != "backup-wrong"
+        case "backup-restored":
+            state.page = .restored
+            state.restoredLine = L10n.Backup.restoredLine(day: "Thursday")
+            state.added = [
+                added("chats", L10n.Backup.chats, L10n.Backup.added(38)),
+                added("memory", L10n.Backup.memory, L10n.Backup.added(24)),
+                added("tasks", L10n.Backup.tasks, L10n.Backup.added(151)),
+                added("repeats", L10n.Backup.repeats, L10n.Backup.added(3)),
+                added("signIns", L10n.Backup.signIns, "ChatGPT, OpenRouter"),
+            ]
+            state.skippedNote = L10n.Backup.skipped("4 chats and 3 memories", one: false)
+        default: break
+        }
         return state
     }
 
@@ -239,11 +285,11 @@ struct ScreenSample: Identifiable {
 
     /// Board Home.
     static let home = HomeViewModel.State(
-        greeting: "Good morning, Piyush",
+        greeting: "Good morning, Alex",
         suggestions: [.init(title: "Read today's calendar", subtitle: "You ask most mornings", icon: .calendar),
-                      .init(title: "Text Sonali", subtitle: "On WhatsApp", icon: .message),
+                      .init(title: "Text Sam", subtitle: "On WhatsApp", icon: .message),
                       .init(title: "Light mode", subtitle: "Settings", icon: .settings)],
-        recent: [.init(id: "1", title: "Text Sonali, then today's calendar", subtitle: "Today 8:13 · 62 s", leading: .mo(.done)),
+        recent: [.init(id: "1", title: "Text Sam, then today's calendar", subtitle: "Today 8:13 · 62 s", leading: .mo(.done)),
                  .init(id: "2", title: "Turn off dark mode", subtitle: "Yesterday · 37 s", leading: .mo(.done)),
                  .init(id: "3", title: "Set an alarm for 6:30", subtitle: "Yesterday · 21 s", leading: .mo(.done)),
                  .init(id: "4", title: "Turn on Do Not Disturb", subtitle: "Friday · 18 s", leading: .mo(.done))]
@@ -289,7 +335,7 @@ struct ScreenSample: Identifiable {
     @MainActor static func run() -> LiveViewModel.State {
         var state = LiveViewModel.State()
         state.running = .init(badge: L10n.Run.liveBadge(step: 7), startedAt: Date().addingTimeInterval(-41), paused: false,
-                              task: "Text Sonali, then calendar", now: "Reading the rest of today",
+                              task: "Text Sam, then calendar", now: "Reading the rest of today",
                               segments: [.init("Opened WhatsApp", state: .done), .init("Sent message", state: .done), .init("Calendar", state: .now)])
         state.screen = SampleCalendar.image
         return state
@@ -297,8 +343,8 @@ struct ScreenSample: Identifiable {
 
     /// Board Screens.
     static let screens = RunScreensViewModel.State(
-        title: String(localized: L10n.Screens.title), subtitle: "Text Sonali, then calendar · 11 steps",
-        shots: ["Opened WhatsApp", "Tapped Sonali", "Typed the message", "Tapped send", "Message sent", "Opened Calendar",
+        title: String(localized: L10n.Screens.title), subtitle: "Text Sam, then calendar · 11 steps",
+        shots: ["Opened WhatsApp", "Tapped Sam", "Typed the message", "Tapped send", "Message sent", "Opened Calendar",
                 "Tapped today", "Scrolled down", "Read the events", "Went back", "Done"].enumerated().map { index, label in
             .init(id: index + 1, number: String(index + 1), label: label, image: nil)
         })
@@ -403,15 +449,15 @@ struct ScreenSample: Identifiable {
 
     /// Board Chat: a spoken task done, its screens, the day's agenda, and a fact remembered.
     static let chat = ConversationViewModel.State(
-        title: "Text Sonali, then calendar", when: "Today 8:12",
-        messages: [said("1", "Text Sonali I'm leaving in 10, then tell me what's on my calendar today", spoken: true),
-                   .init(id: "2", fromUser: false, spoken: false, steered: false, text: "Done. I sent “Leaving in 10” to Sonali on WhatsApp.",
-                         blocks: [.paragraph("Done. I sent “Leaving in 10” to Sonali on WhatsApp."), .paragraph("Here's your day:"),
+        title: "Text Sam, then calendar", when: "Today 8:12",
+        messages: [said("1", "Text Sam I'm leaving in 10, then tell me what's on my calendar today", spoken: true),
+                   .init(id: "2", fromUser: false, spoken: false, steered: false, text: "Done. I sent “Leaving in 10” to Sam on WhatsApp.",
+                         blocks: [.paragraph("Done. I sent “Leaving in 10” to Sam on WhatsApp."), .paragraph("Here's your day:"),
                                   .agenda([.init(time: "14:00", end: nil, text: "Biozyme with lunch", allDay: false),
                                            .init(time: "21:00", end: nil, text: "Shelcal, fish oil, magnesium", allDay: false),
                                            .init(time: "23:00", end: nil, text: "Softovac before bed", allDay: false)])],
                          status: nil, screens: (Self.seeScreens, "t1"), mood: .done)],
-        remembered: [.init(id: "r1", text: L10n.Conversation.remembered("Sonali is on WhatsApp"))]
+        remembered: [.init(id: "r1", text: L10n.Conversation.remembered("Sam is on WhatsApp"))]
     )
     private static let seeScreens = L10n.Conversation.seeScreens(11)
 
@@ -689,31 +735,31 @@ extension ScreenSample {
     static func conversation(_ status: ModeTalkTaskCard.Status) -> TalkModel.State {
         let started = Date().addingTimeInterval(-72)
         var steps = [
-            ModeTalkTaskCard.Step(id: 0, text: "Opening your chat with Sonali.", time: "10:03"),
-            ModeTalkTaskCard.Step(id: 1, text: "Sent Sonali “testing my agent”.", time: "10:04"),
+            ModeTalkTaskCard.Step(id: 0, text: "Opening your chat with Sam.", time: "10:03"),
+            ModeTalkTaskCard.Step(id: 1, text: "Sent Sam “testing my agent”.", time: "10:04"),
             ModeTalkTaskCard.Step(id: 2, text: "Checking today in Google Calendar.", time: "10:04"),
         ]
         if status == .done { steps.append(.init(id: 3, text: "Found the DoorDash sync at 11 pm.", time: "10:05")) }
         if status == .partial { steps.append(.init(id: 3, text: "Nothing called DoorDash today in Google Calendar.", time: "10:05")) }
         let rows: [ModeTalkTaskCard.Row] = status == .partial ? [
-            .init(id: 0, title: "Replied to Sonali", detail: "WhatsApp · “testing my agent”", done: true),
+            .init(id: 0, title: "Replied to Sam", detail: "WhatsApp · “testing my agent”", done: true),
             .init(id: 1, title: "DoorDash meeting not found", detail: "Nothing today in your Google Calendar", done: false),
         ] : [
-            .init(id: 0, title: "Replied to Sonali", detail: "WhatsApp · “testing my agent”", done: true),
+            .init(id: 0, title: "Replied to Sam", detail: "WhatsApp · “testing my agent”", done: true),
             .init(id: 1, title: "DoorDash sync", detail: "Today 23:00–23:30 · Google Meet", done: true),
         ]
         let card = TalkModel.Card(
-            taskId: "sample", conversationId: "sample", status: status, title: "Sonali, then today’s DoorDash meeting",
+            taskId: "sample", conversationId: "sample", status: status, title: "Sam, then today’s DoorDash meeting",
             startedAt: started, seconds: status == .partial ? 130 : 108, steps: steps, doneParts: 1, parts: 3,
-            headline: status == .partial ? "Sonali has your reply; I couldn’t find the DoorDash meeting" : "Sonali has your reply, and you have one DoorDash meeting today",
+            headline: status == .partial ? "Sam has your reply; I couldn’t find the DoorDash meeting" : "Sam has your reply, and you have one DoorDash meeting today",
             rows: rows
         )
         var turns: [TalkModel.Turn] = [
-            .init(id: 0, mine: false, kind: .said, text: "Good afternoon, Piyush. What would you like me to take care of?"),
-            .init(id: 1, mine: true, kind: .said, text: "Reply to Sonali that I’m testing my agent, then check my DoorDash meeting today"),
+            .init(id: 0, mine: false, kind: .said, text: "Good afternoon, Alex. What would you like me to take care of?"),
+            .init(id: 1, mine: true, kind: .said, text: "Reply to Sam that I’m testing my agent, then check my DoorDash meeting today"),
             .init(id: 2, mine: false, kind: .task, text: "", card: card),
         ]
-        if status == .done { turns.append(.init(id: 3, mine: false, kind: .next, text: "Anything else, Piyush? The DoorDash sync is at 11.")) }
+        if status == .done { turns.append(.init(id: 3, mine: false, kind: .next, text: "Anything else, Alex? The DoorDash sync is at 11.")) }
         if status == .partial {
             turns.append(.init(id: 3, mine: false, kind: .next, text: "Want me to look in your work calendar too, or skip it?", yes: "Yes, look there", no: "Skip it"))
         }

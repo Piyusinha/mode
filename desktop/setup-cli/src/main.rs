@@ -12,6 +12,7 @@
 //!                                           (Network Extensions switched on through Apple's API,
 //!                                           or by you, with steps); --localdevvpn skips that.
 //!   mode-setup vpn                          whether Mode's own VPN is allowed for your team
+//!   mode-setup check                        is this computer ready (iPhone driver, internet; no Xcode needed)
 //!   mode-setup pair                         a new phone-control file for Mode (and SideStore)
 //!
 //! Sign-in asks for the Apple Account, password and code in this terminal; nothing is echoed.
@@ -31,6 +32,7 @@ async fn main() {
     mode_setup_core::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
+        Some("check") => check().await,
         Some("phones") => phones().await,
         Some("trust") => trust().await,
         Some("apps") => list_apps().await,
@@ -40,7 +42,7 @@ async fn main() {
         Some("pair") => pair(false).await,
         Some("vpn") => vpn().await,
         _ => {
-            eprintln!("usage: mode-setup phones|trust|apps|helpers|latest|install <ipa> [--paid <ipa>] [--sidestore] [--localdevvpn]|pair|vpn");
+            eprintln!("usage: mode-setup check|phones|trust|apps|helpers|latest|install <ipa> [--paid <ipa>] [--sidestore] [--localdevvpn]|pair|vpn");
             std::process::exit(2);
         }
     };
@@ -48,6 +50,18 @@ async fn main() {
         eprintln!("✗ {e}");
         std::process::exit(1);
     }
+}
+
+async fn check() -> Result<()> {
+    let c = mode_setup_core::system::check_computer().await;
+    for x in &c.checks {
+        let mark = if x.state == mode_setup_core::system::CheckState::Ok { "✓" } else { "✗" };
+        println!("{mark} {}: {}", x.title, x.detail);
+        if let Some(f) = &x.fix { println!("    {}: {}", f.label, f.url); }
+        if let Some(cmd) = &x.command { println!("    run: {cmd}"); }
+    }
+    println!("{}", if c.ready { "Ready to set up an iPhone." } else { "Not ready yet." });
+    Ok(())
 }
 
 async fn phone() -> Result<device::Phone> {

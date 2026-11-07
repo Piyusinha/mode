@@ -106,8 +106,8 @@ To try these on an emulator (debug builds): `--es op ask --es kind Choice --es o
   (and `MODE_ANDROID_KEY_PASSWORD`); without them the APK is unsigned. Keep one key forever: Android only updates
   an app signed with the key it was installed with. Register that key for Android developer verification before
   the first public release.
-- The tag's release workflow (`.github/workflows/release.yml`, job `android`) builds and signs the APK from the
-  repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
+- `.github/workflows/release-android.yml`, on the phone app's release tag `Mode-Mobile-Build-<version>` (made by
+  `tools/release-app.sh`), builds and signs the APK from the repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
   and attaches it to the draft release. Without the secrets it builds unsigned and attaches nothing.
 - Not shrunk (no R8) yet: the helper is started by class name from the APK, and the link and storage use
   reflection. The APK is about 55 MB; keep rules and per-ABI APKs would bring it down.

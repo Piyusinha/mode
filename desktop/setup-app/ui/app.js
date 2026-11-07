@@ -77,6 +77,7 @@ const S = {
   phoneTestConfirmed: false, cableDisconnected: false, phonePresenceKnown: false,
   ownVpn: false, vpn: null, stages: [], progress: {}, installed: null, failure: null, phoneApps: null,
   prefs: { phones: {} }, record: null, busy: false, copied: false, customHelper: '',
+  computer: null, checking: false, copiedCheck: null, setupVersion: '', setupUpdate: null,
 };
 let timer = null;
 const stopPolling = () => { if (timer) { clearTimeout(timer); timer = null; } };
@@ -113,21 +114,72 @@ function side(nav, chip = true, settings = true) {
 }
 function page({ nav, body, left = '', right = '', tight = false, chip = true }) {
   const foot = left || right;
-  return `<div class="drag"></div>${side(nav, chip)}<main class="${foot ? '' : 'nofoot'} ${tight ? 'tight' : ''}">${body}</main>${foot ? `<footer>${left}<span class="spacer"></span>${right}</footer>` : ''}`;
+  return `<div class="drag"></div>${side(nav, chip)}<main class="${foot ? '' : 'nofoot'} ${tight ? 'tight' : ''}">${updateBanner()}${body}</main>${foot ? `<footer>${left}<span class="spacer"></span>${right}</footer>` : ''}`;
 }
 
 // ---- screens -------------------------------------------------------------------------------------------
+// ---- this computer: the iPhone driver (iTunes on Windows, usbmuxd on Linux), the internet, no Xcode --------
+function computerCheck() {
+  const c = S.computer;
+  const title = `<h2 class="label">This computer</h2>`;
+  if (!c) return `<div style="display:flex;flex-direction:column;gap:10px">${title}${box(row('wait', 'Checking this computer…', 'A few seconds.'))}</div>`;
+  const kind = s => s === 'ok' ? 'done' : 'fail';
+  const rows = c.checks.map((x, i) => {
+    const sub = esc(x.detail) + (x.command && x.state !== 'ok' ? `<code class="cmd">${esc(x.command)}</code>` : '');
+    const right = x.state === 'ok' ? ''
+      : x.fix ? link(x.fix.label, x.fix.url)
+      : x.command ? btn(S.copiedCheck === i ? 'Copied' : 'Copy', `copyCheck:${i}`) : '';
+    return row(kind(x.state), x.title, sub, right);
+  }).join('');
+  const again = c.ready ? '' : `<div style="display:flex;justify-content:flex-end">${btn(S.checking ? 'Checking…' : 'Check again', 'checkComputer', '', S.checking ? 'disabled' : '')}</div>`;
+  return `<div style="display:flex;flex-direction:column;gap:10px">${title}${box(rows)}${again}</div>`;
+}
+
+async function runComputerCheck() {
+  if (S.checking) return;
+  S.checking = true;
+  try { S.computer = await call('check_computer'); } catch (e) { console.warn(e); }
+  S.checking = false;
+  if (S.screen === 'welcome') render();
+}
+
+// ---- a newer Mode Setup: a banner on the first page and the phone page, and a row in Settings ---------
+function updateBanner() {
+  const u = S.setupUpdate;
+  if (!u?.available || !['welcome', 'device'].includes(S.screen)) return '';
+  return callout(`<b>Mode Setup ${esc(u.latest)} is available.</b> You have ${esc(u.current)}. Download it, open it, and replace this one.`, 'accent', 'down', link('Download', u.url));
+}
+
+function setupUpdateRow() {
+  const u = S.setupUpdate;
+  const text = u?.checking ? 'Checking…'
+    : u?.error ? esc(u.error)
+    : u?.available ? `Version ${esc(u.latest)} is available`
+    : u ? 'You have the latest version' : 'Not checked yet';
+  const action = u?.available ? link('Download', u.url) : btnIcon(u?.checking ? 'Checking…' : 'Check for updates', 'renew', 'checkSetupUpdate', 'small');
+  return kv('Updates', text, action);
+}
+
+async function checkSetupUpdate(quiet = false) {
+  if (S.setupUpdate?.checking) return;
+  S.setupUpdate = { checking: true }; if (!quiet) render();
+  try { S.setupUpdate = await call('check_setup_update'); }
+  catch (e) { S.setupUpdate = quiet ? null : { error: 'Couldn’t check. Are you online?' }; }
+  render();
+}
+
 const screens = {
   welcome: () => page({
     nav: stepsNav(-1, 0),
     body: head('Set up Mode on your iPhone', 'Mode is an assistant that uses your iPhone for you. This app installs it and gets it ready. It takes about 10 minutes, once.', mo('idle', 60))
       + `<div style="display:flex;flex-direction:column;gap:10px"><h2 class="label">You’ll need</h2>${box(
-        row('', 'An iPhone and its cable', 'iOS 17.4 or later. Setup needs the cable once.', '', false, tile('phone', '', 32))
+        row('', 'An iPhone and its cable', 'iOS 27 or later. Setup needs the cable once.', '', false, tile('phone', '', 32))
         + row('', 'An Apple account', 'A free one works. Mode is signed with it so it can run on your iPhone.', '', false, tile('key', '', 32))
         + row('', 'A passcode on your iPhone', 'Your iPhone asks for it to trust this computer.', '', false, tile('shield', '', 32)))}</div>`
+      + computerCheck()
       + `<p class="note">${svg('lock', 16, 2)}<span>Mode is free and open source. Your Apple password goes only to Apple.</span></p>`,
     left: link('How setup works', 'https://github.com/Piyusinha/mode/blob/main/docs/mac-windows-setup-plan.md'),
-    right: btn('Get started', 'start', 'primary'),
+    right: btn('Get started', 'start', 'primary', S.computer?.ready ? '' : 'disabled'),
   }),
 
   connect: () => page({
@@ -136,7 +188,7 @@ const screens = {
       + `<div class="box" style="flex-direction:row;align-items:center;gap:28px;padding:22px 26px">${svg('phone', 64, 1.4)}<span style="flex:1;border-top:2.5px dashed var(--ring)"></span><span style="color:var(--sec)">${svg('plug', 40, 1.6)}</span><span style="flex:1;border-top:2.5px dashed var(--ring)"></span><span style="width:70px;height:46px;border-radius:6px;border:2.5px solid var(--text)"></span></div>`
       + box(row('wait', 'Looking for your iPhone…', 'This page moves on by itself when it’s connected.'))
       + (S.failure ? callout(esc(S.failure), 'orange', 'plug') : '')
-      + callout('<b>On Windows?</b> Install Apple’s iTunes from apple.com first — not the Microsoft Store version. It lets this app talk to your iPhone.', '', 'win', link('Get iTunes', 'https://www.apple.com/itunes/')),
+      + (S.computer?.os === 'windows' ? callout('<b>iPhone not showing up?</b> Unplug it and plug it back in, and keep it unlocked. If it still doesn’t appear, restart your computer: iTunes’ driver sometimes needs it.', '', 'win') : ''),
     left: btn('Back', 'welcome'),
   }),
 
@@ -381,7 +433,7 @@ const screens = {
       <section class="group"><h2 class="label">Sign-in helper</h2>${helperList(false)}<p>Tells Apple which computer you’re signing in from. It never sees your password. Run by open-source projects, not by Mode.</p></section>
       <section class="group"><h2 class="label">Apple account</h2>${box(kv('Signed in as', esc(S.prefs.email ?? 'Not signed in'), S.prefs.email ? btnIcon('Sign out', 'out', 'signOut', 'small plain') : '')
         + kv('Password', S.hasSaved ? 'Kept in this computer’s Keychain' : 'Asked each time', ''))}</section>
-      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', '0.1 · free and open source', link('Source', 'https://github.com/Piyusinha/mode')) + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
+      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', `${esc(S.setupVersion || '')} · free and open source`, link('Source', 'https://github.com/Piyusinha/mode')) + setupUpdateRow() + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
       <p>Reports never include passwords, codes, keys or phone-control files.</p></section></main>`,
 };
 
@@ -431,8 +483,13 @@ function phoneVoiceCommand() {
 async function enter(screen) {
   if (MOCK) return;
   if (screen === 'welcome') {
+    // Check this computer first; while it isn't ready, check again every few seconds, so installing
+    // iTunes or usbmuxd turns the line green by itself.
+    let ticks = 0;
+    if (!S.computer?.ready) runComputerCheck();
     // Show the iPhone in the sidebar as soon as it is plugged in; Get started then goes straight on.
     poll(async () => {
+      if (!S.computer?.ready && ++ticks % 3 === 0) runComputerCheck();
       const phones = (await call('phones')).filter(p => p.usb);
       const phone = phones.length === 1 ? phones[0] : null;
       if (phone?.udid !== S.phone?.udid) { S.phones = phones; S.phone = phone; render(); }
@@ -643,7 +700,8 @@ function stagesFor() {
 const stage = (id, patch) => { const s = S.stages.find(x => x.id === id); if (s) Object.assign(s, patch); if (S.screen === 'install') render(); };
 listen('progress', p => {
   if (p.what === 'sidestore') { stage('sidestore', { state: 'wait', fraction: p.fraction, sub: p.stage === 'download' ? 'Downloading' : p.stage === 'signing' ? 'Signing' : 'Installing' }); return; }
-  if (p.stage === 'signing') stage('signing', { state: 'wait', fraction: p.fraction });
+  if (p.stage === 'download') stage('signing', { state: 'wait', fraction: p.fraction, sub: 'Getting the latest Mode' });
+  if (p.stage === 'signing') stage('signing', { state: 'wait', fraction: p.fraction, sub: '' });
   if (p.stage === 'installing') { stage('signing', { state: 'done', fraction: null }); stage('installing', { state: 'wait', fraction: p.fraction }); }
 });
 
@@ -698,8 +756,12 @@ document.addEventListener('click', async e => {
   if (!el || el.disabled) return;
   const [act, arg] = el.dataset.act.split(':');
   switch (act) {
-    case 'start': case 'welcomeConnect': S.operation = 'install'; S.failure = null; S.after = null; go('connect'); break;
+    case 'start': if (!S.computer?.ready) break; // falls through
+    case 'welcomeConnect': S.operation = 'install'; S.failure = null; S.after = null; go('connect'); break;
     case 'welcome': go('welcome', { readiness: null, shownDevSwitch: false, record: null }); break;
+    case 'checkComputer': await runComputerCheck(); break;
+    case 'checkSetupUpdate': await checkSetupUpdate(); break;
+    case 'copyCheck': { const x = S.computer?.checks?.[+arg]; if (x?.command) { navigator.clipboard?.writeText(x.command).catch(() => {}); S.copiedCheck = +arg; render(); setTimeout(() => { S.copiedCheck = null; render(); }, 2000); } break; }
     case 'pick': S.phone = S.phones[+arg]; render(); break;
     case 'pickContinue': go('trust'); break;
     case 'remember': S.remember = !S.remember; render(); break;
@@ -782,6 +844,8 @@ async function start() {
   S.prefs = await call('prefs').catch(() => ({ phones: {} }));
   S.email = S.prefs.email ?? '';
   S.helper = S.prefs.helper ?? S.helper;
+  S.setupVersion = await call('setup_version').catch(() => '');
+  checkSetupUpdate(true); // in the background: a banner appears if a newer Mode Setup is out
   const debugStart = await call('debug_start').catch(() => null);
   if (debugStart) { go(debugStart); return; }
   const known = Object.keys(S.prefs.phones || {});

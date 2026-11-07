@@ -1,0 +1,16 @@
+// Cloudflare Workers: serves the built site (dist/) on heymode.app, plus the Mode Setup downloads
+// (/download/*, handled by worker/index.js). Deploy with `npm run deploy`.
+{
+  "name": "heymode",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/download", "/download/*", "/api/*"]
+  },
+  "routes": [
+    { "pattern": "heymode.app", "custom_domain": true }
+  ]
+}

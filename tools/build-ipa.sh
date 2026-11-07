@@ -17,6 +17,9 @@ OUT="$ROOT/build/release"
 DD="$ROOT/build/ipa-dd"
 SAVE=$(mktemp -d)
 mkdir -p "$OUT"
+# The release app ID, whatever iosApp/Signing.env says: Mode Setup finds Mode by it and adds the
+# person's team when it signs (desktop/setup-core/src/apps.rs, MODE_BUNDLE). No team: unsigned.
+export MODE_BUNDLE_PREFIX=app.heymode.mode MODE_TEAM=
 
 cd "$ROOT/iosApp"
 WAS=free

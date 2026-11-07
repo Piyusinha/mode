@@ -13,7 +13,7 @@ settings:
   CODE_SIGN_STYLE: Automatic
   # Your team and app ID come from iosApp/Signing.env (see Signing.example.env); tools/gen-project.sh reads it.
   DEVELOPMENT_TEAM: ${MODE_TEAM}
-  MARKETING_VERSION: "0.1"
+  MARKETING_VERSION: "0.1.3"
   CURRENT_PROJECT_VERSION: "1"
 targets:
   Mode:
@@ -50,6 +50,13 @@ targets:
           - CFBundleURLName: ${MODE_BUNDLE_PREFIX}
             CFBundleURLSchemes:
               - mode
+        # A Mode backup (.modebackup), made in Settings → Backup and restore: Files shows only these when restoring.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ${MODE_BUNDLE_PREFIX}.backup
+            UTTypeDescription: Mode backup
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [modebackup]
     dependencies:
       - package: ModeDesignSystem
       - target: ModeWidgets

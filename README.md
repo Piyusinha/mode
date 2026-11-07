@@ -11,7 +11,7 @@ your apps until it’s done, then tells you how it went.
 
 <br>
 
-<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://getmode.app"><img src="https://img.shields.io/badge/getmode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: getmode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
+<a href="https://heymode.app/download/mac"><img src="https://img.shields.io/badge/Download_Mode_installer_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode installer for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
 <sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
 
@@ -104,14 +104,14 @@ to try another way.
 
 **1 · Download Mode Setup**
 
-[Download for Mac](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg). This downloads **Mode Setup**, a small Mac app that installs Mode on your iPhone for you.
+[Download Mode installer for Mac](https://heymode.app/download/mac) (or [Windows](https://heymode.app/download/windows), [Linux](https://heymode.app/download/linux)). This downloads **Mode Setup**, a small app that installs Mode on your iPhone for you.
 
 </td>
 <td width="33%" valign="top">
 
 **2 · Plug in your iPhone**
 
-Open Mode Setup and connect your iPhone with a cable. It walks you through each step, signs Mode with your Apple account and installs it. A few minutes, once.
+Open Mode Setup. It checks your computer first, then asks you to connect your iPhone with a cable. It walks you through each step, signs Mode with your Apple account and installs it. A few minutes, once.
 
 </td>
 <td width="33%" valign="top">
@@ -124,9 +124,91 @@ Open Mode on your iPhone, connect your AI, and give it its first task. Then try 
 </tr>
 </table>
 
-**You’ll need:** an iPhone on iOS 27 or later · a Mac, once, for setup · a free or paid
-Apple account · a ChatGPT or Claude plan, or an OpenRouter key.
-<sub>Windows and Linux versions of Mode Setup are on the [releases page](https://github.com/Piyusinha/mode/releases/latest).</sub>
+**You’ll need:** an iPhone on iOS 27 or later · a computer, once, for setup · a free or paid
+Apple account · a ChatGPT or Claude plan, or an OpenRouter key. No Xcode needed.
+
+**On Windows or Linux?** Get [Mode installer for Windows](https://heymode.app/download/windows)
+(it needs Apple’s [iTunes from apple.com](https://www.apple.com/itunes/download/win64) for the iPhone driver) or
+[for Linux](https://heymode.app/download/linux)
+([.deb](https://heymode.app/download/linux-deb); it needs `usbmuxd`).
+Mode Setup checks your computer before it starts and tells you if anything is missing.
+
+<br>
+
+## Why isn’t Mode on the App Store?
+
+**Because Apple doesn’t allow it.** App Store apps aren’t allowed to see or tap other apps, and
+using your apps for you is exactly what Mode does.
+
+- **So you install it yourself.** Mode uses Apple’s developer tools on your own iPhone, the same
+  ones Xcode uses to test apps. Mode Setup signs it with your own Apple account and installs it
+  over a cable, once. That’s why setup needs a computer.
+- **Nothing is hidden.** Every line of Mode is in this repository, so anyone can read exactly what
+  it does. It has no server and no account of its own ([privacy](https://heymode.app/privacy)).
+- **Free Apple account? Renew weekly.** Apple asks for apps installed this way to be re-signed
+  every 7 days. Mode Setup or SideStore does it for you. A paid developer account lasts a year.
+
+We’re working on an App Store version with the parts Apple does allow, like asking by voice or
+Siri, your calendar, reminders and contacts, and Shortcuts. Using your other apps on screen will
+stay in this version.
+
+<br>
+
+## Setting up your iPhone
+
+Mode Setup shows each of these on screen when it’s needed. Here they are in one place.
+
+### Turn on Developer Mode
+
+Mode uses Apple’s developer tools to see and tap your screen, the same ones app developers
+use to test their apps. They only work with Developer Mode on.
+
+1. Plug your iPhone into your computer with Mode Setup open, and tap **Trust** on the iPhone.
+   The Developer Mode switch is hidden until a computer shows it, and Mode Setup does that.
+2. On your iPhone, open **Settings → Privacy & Security**.
+3. Scroll to the bottom, tap **Developer Mode** and turn it on.
+4. Tap **Restart**. Keep the cable plugged in.
+5. After the restart, unlock your iPhone. When it asks *“Turn on Developer Mode?”*, tap
+   **Turn On** and enter your passcode.
+
+Mode Setup notices the restart and carries on by itself.
+
+> **No Developer Mode in Privacy & Security?** Unplug your iPhone, plug it back in with Mode
+> Setup open, and tap Trust again. Then close Settings and open it again.
+
+Developer Mode stays on until you turn it off, and it changes nothing else on your iPhone.
+
+### Trust your Apple account
+
+If your iPhone says **“Untrusted Developer”** when you first open Mode:
+
+1. Open **Settings → General → VPN & Device Management**.
+2. Tap your Apple account under *Developer App*.
+3. Tap **Trust**, then **Trust** again.
+
+This tells your iPhone that you signed Mode yourself. You only do it once per Apple account.
+
+<br>
+
+## Good to know
+
+Mode is early, and it works around what iPhones normally allow. A few things to expect:
+
+- **Connect on Wi-Fi.** Mode reaches its tools on your iPhone through a small VPN that
+  stays on the phone. iOS won’t open that route on mobile data alone, so if you’re away
+  from Wi-Fi, turn Mobile Data off for a moment while Mode connects.
+- **It uses your VPN slot.** An iPhone runs one VPN at a time, so another VPN (a work
+  VPN, Tailscale) pauses while Mode is connected. Your normal internet isn’t affected.
+- **Your phone is busy while it works.** Mode taps on your screen, where you can watch,
+  so you can’t use the phone for that task’s few seconds. You can stop it or take over
+  at any time.
+- **Free Apple accounts renew weekly.** Apple asks for apps installed this way to be
+  re-signed every 7 days. Mode Setup or SideStore does it for you. A paid developer
+  account lasts a year.
+- **Some steps are always yours.** Mode never types your passcode, passwords or card
+  numbers, and it hands the phone back when one is needed.
+- **It isn’t perfect yet.** An app it has never seen can take Mode a few tries, and
+  some tasks fail. It tells you why, and it gets better at the apps you use often.
 
 <br>
 
@@ -140,9 +222,9 @@ Claude plan), or an OpenRouter key where you pay the provider per use.
 </details>
 
 <details>
-<summary><b>Does my phone need to stay plugged into the Mac?</b></summary>
+<summary><b>Does my phone need to stay plugged into the computer?</b></summary>
 <br>
-No. The Mac is only for the first install. With a free Apple account, Apple asks for
+No. The computer is only for the first install. With a free Apple account, Apple asks for
 apps like Mode to be re-signed every 7 days. Mode Setup does that, or you can let
 SideStore renew it on the iPhone. With a paid developer account, it lasts a year.
 </details>

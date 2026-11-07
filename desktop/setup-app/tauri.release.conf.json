@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "resources": {
+      "../../build/release/Mode.ipa": "Mode.ipa",
+      "../../build/release/Mode-paid.ipa": "Mode-paid.ipa",
+      "../../build/release/Mode.version": "Mode.version"
+    }
+  }
+}

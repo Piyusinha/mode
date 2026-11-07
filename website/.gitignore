@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.wrangler/
+
+# The films live in ../docs/media; `npm run films` (run before dev and build) copies them in.
+public/story.mp4
+public/story-vertical.mp4

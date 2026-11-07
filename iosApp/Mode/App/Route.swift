@@ -33,6 +33,8 @@ enum Route: Hashable {
     case memoryEdit(id: String)
     /// Settings → Unlock by voice: the guide, and the check that it works.
     case unlockVoice
+    /// Settings → Backup and restore (and Restore, Restored).
+    case backup
 }
 
 /// A mode:// link from the Live Activity (or anywhere): open a conversation, Ask, or just Mode.
