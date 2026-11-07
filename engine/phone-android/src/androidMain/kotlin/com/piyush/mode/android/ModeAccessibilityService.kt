@@ -233,6 +233,9 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
         // Coming back to Mode after a task: on a hidden display the user never left it, and opening Mode
         // there would pull its window off their screen.
         if (packageName == this.packageName && displayId != Display.DEFAULT_DISPLAY) return true
+        // An app opened under the notification shade or a system dialog (Quick Settings' "Modes") stays hidden
+        // behind it: close those first.
+        if (displayId == Display.DEFAULT_DISPLAY) closeSystemUi()
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or if (fresh) Intent.FLAG_ACTIVITY_CLEAR_TASK else Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         val options = ActivityOptions.makeBasic().apply { if (displayId != Display.DEFAULT_DISPLAY) launchDisplayId = displayId }
@@ -243,6 +246,17 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
             AppLog.log("phone", "could not open $packageName: ${e.message}")
             false
         }
+    }
+
+    /** Closes System UI's dialogs (Back) and the shade, so what opens next is seen. */
+    private fun closeSystemUi() {
+        repeat(SYSTEM_UI_TRIES) {
+            val top = windows.orEmpty().firstOrNull { it.isFocused || it.isActive } ?: return@repeat
+            if (top.type != AccessibilityWindowInfo.TYPE_SYSTEM || top.root?.packageName != SYSTEM_UI) return@repeat
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            Thread.sleep(SYSTEM_UI_SETTLE_MS)
+        }
+        performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
     }
 
     override fun installedApps(): List<InstalledApp> {
@@ -268,6 +282,11 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
     private fun Rect.toPx() = PxRect(left, top, right, bottom)
 
     private companion object {
+        const val SYSTEM_UI = "com.android.systemui"
+        /** Nested System UI dialogs (a tile's dialog over the shade) close one Back at a time. */
+        const val SYSTEM_UI_TRIES = 3
+        const val SYSTEM_UI_SETTLE_MS = 200L
+
         /** A tree is cut off at this many nodes and this depth (long lists, web views). */
         const val MAX_NODES = 2000
         const val MAX_DEPTH = 40
