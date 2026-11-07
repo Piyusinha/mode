@@ -42,6 +42,9 @@ public class AccessibilityPhoneLink(
         return PhoneConnection(backend(service), route = ROUTE, attempts = "$ROUTE: connected")
     }
 
+    /** Reads screens phone control can't (games, maps, canvases); made once, when first needed. */
+    private val textReader by lazy { com.piyush.mode.android.MlKitTextReader() }
+
     /** The task is over: the helper ends and its hidden display goes with it (the link stays for next time). */
     override suspend fun release() {
         background?.stop()
@@ -50,6 +53,7 @@ public class AccessibilityPhoneLink(
     private fun backend(service: ModeAccessibilityService, displayId: Int = 0, hidden: BackgroundMode? = null) = AccessibilityBackend(
         hands = service,
         images = AndroidImageTools(service::bitmapFor),
+        reader = textReader,
         telemetry = telemetry,
         displayId = displayId,
         displayKeys = hidden?.let { mode -> { action -> mode.press(displayId, action) } },

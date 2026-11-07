@@ -89,6 +89,13 @@ class DevProbe : BroadcastReceiver() {
                         val id = com.piyush.mode.adb.HelperAnswer.displayId(display) ?: error(display)
                         "display=$id " + session.send(com.piyush.mode.adb.HelperCommand.start(id, intent.getStringExtra("component") ?: "com.android.settings/.Settings"))
                     }
+                    // Text recognition on the current screen (what the fallback reads when the tree has nothing).
+                    "ocr" -> {
+                        val service = com.piyush.mode.android.ServiceRegistry.service.value ?: error("phone control is off")
+                        val shot = service.screenshot(0) as? com.piyush.mode.android.Shot.Image ?: error("no screenshot")
+                        val lines = com.piyush.mode.android.MlKitTextReader().read(shot.png)
+                        "${lines.size} lines: " + lines.take(12).joinToString(" | ") { "${it.text}@${"%.2f".format(it.left)},${"%.2f".format(it.top)}" }
+                    }
                     "tls" -> runCatching {
                         Class.forName("org.conscrypt.OpenSSLProvider").getDeclaredConstructor().newInstance().toString()
                     }.fold({ "bundled conscrypt ok: $it" }, { e -> "bundled conscrypt failed: ${e::class.java.name}: ${e.message} / ${e.cause?.let { c -> c::class.java.name + ": " + c.message }}" })

@@ -42,6 +42,13 @@ the agent uses in place of the iPhone's fixed 60 points.
 Measured on the API 37 emulator (2026-11-07): a look (a 462×1000 JPEG plus 20 texts)
 in 131–229 ms; a tap in about 50 ms; open an app in about 40 ms.
 
+### Screens phone control can't read
+
+When an app's window has no readable text (games, maps, canvases, some web views), the backend reads the
+screenshot with Google's on-device text recognition (`MlKitTextReader`: ML Kit through Google Play services,
+Latin script, plus Devanagari when the phone's language is written in it); boxes come back with source "ocr".
+About 0.4 s on the emulator.
+
 ### Keeping Mode running
 
 While a task runs, `AndroidBackgroundWork` starts `WorkService`, a special-use

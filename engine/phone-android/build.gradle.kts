@@ -13,5 +13,9 @@ kotlin {
             implementation(projects.core.telemetry)
             implementation(projects.core.common)
         }
+        androidMain.dependencies {
+            implementation(libs.mlkit.text)
+            implementation(libs.mlkit.text.devanagari)
+        }
     }
 }
