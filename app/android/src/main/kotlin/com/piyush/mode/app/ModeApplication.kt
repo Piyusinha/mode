@@ -62,6 +62,28 @@ class ModeApplication : Application() {
         followTheRunningTask()
     }
 
+    /** The user's turn came during a background task: its app is on their screen until they're done. */
+    private var userHasTheApp = false
+
+    /**
+     * Background mode and "your turn" (a PIN, a password, a private screen): the app comes from the hidden display
+     * to the user's screen, and goes back once Mode carries on.
+     */
+    private fun handOver(s: ActivityUiState) {
+        val mode = com.piyush.mode.app.graph.background ?: return
+        val theirTurn = s is ActivityUiState.Waiting && s.yourTurn
+        when {
+            theirTurn && !userHasTheApp && mode.working -> {
+                userHasTheApp = true
+                kotlinx.coroutines.MainScope().launch { mode.bringToUser() }
+            }
+            !theirTurn && userHasTheApp -> {
+                userHasTheApp = false
+                kotlinx.coroutines.MainScope().launch { mode.giveBack() }
+            }
+        }
+    }
+
     /** Background mode's setup, made when first opened. */
     val backgroundSetup: com.piyush.mode.app.background.BackgroundSetup? by lazy {
         com.piyush.mode.app.graph.background?.let { com.piyush.mode.app.background.BackgroundSetup(this, it) }
@@ -94,6 +116,7 @@ class ModeApplication : Application() {
                     else -> null
                 }
                 WorkNotice.refresh(this@ModeApplication)
+                handOver(s)
                 // A task ended: the widget's suggestions may have changed.
                 if (s is ActivityUiState.Finished) com.piyush.mode.app.widget.ModeWidget.refresh(this@ModeApplication)
             }

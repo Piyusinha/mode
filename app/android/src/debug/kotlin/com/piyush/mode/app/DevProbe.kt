@@ -102,6 +102,8 @@ class DevProbe : BroadcastReceiver() {
                         }
                         "background=${mode.enabled}"
                     }
+                    "bring" -> "brought=${com.piyush.mode.app.graph.background?.bringToUser()}"
+                    "giveback" -> "back=${com.piyush.mode.app.graph.background?.giveBack()}"
                     "route" -> graph.session.phone().let { "state=${graph.session.state.value}" }
                     "helperstop" -> {
                         helper?.close()

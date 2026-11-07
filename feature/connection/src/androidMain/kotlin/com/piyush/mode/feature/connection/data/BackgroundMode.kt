@@ -64,8 +64,36 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
         return HelperAnswer.ok(session.send(HelperCommand.key(displayId, code)))
     }
 
+    /** The app Mode was using, moved to the user's screen (their turn), so it can go back after. */
+    private var withUser: Int? = null
+
+    /** Moves the app on the hidden display to the user's screen: a step only they can do, or they take over. */
+    public suspend fun bringToUser(): Boolean {
+        val id = display ?: return false
+        val session = helper ?: return false
+        val task = HelperAnswer.broughtTask(session.send(HelperCommand.bring(id))) ?: return false
+        withUser = task
+        AppLog.log("background", "brought the app to the user's screen")
+        return true
+    }
+
+    /** Sends that app back to the hidden display, and Mode carries on there. */
+    public suspend fun giveBack(): Boolean {
+        val task = withUser ?: return false
+        val id = display ?: return false
+        val session = helper ?: return false
+        withUser = null
+        val ok = HelperAnswer.ok(session.send(HelperCommand.send(task, id)))
+        AppLog.log("background", if (ok) "the app went back to the hidden screen" else "the app stayed on the user's screen")
+        return ok
+    }
+
+    /** A task is on the hidden display right now. */
+    public val working: Boolean get() = display != null && helper?.open == true
+
     /** Ends the helper (its display goes with it). The link stays for next time. */
     public suspend fun stop(): Unit = lock.withLock {
+        withUser = null
         helper?.close()
         helper = null
         display = null

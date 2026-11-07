@@ -29,5 +29,8 @@ class HelperProtocolTest {
         assertTrue(HelperAnswer.ok("started"))
         assertFalse(HelperAnswer.ok("error SecurityException: denied"))
         assertEquals("start 7 com.android.settings/.Settings", HelperCommand.start(7, "com.android.settings/.Settings"))
+        assertEquals(87, HelperAnswer.broughtTask("brought 87"))
+        assertNull(HelperAnswer.broughtTask("error nothing on display 7"))
+        assertEquals("send 87 7", HelperCommand.send(87, 7))
     }
 }

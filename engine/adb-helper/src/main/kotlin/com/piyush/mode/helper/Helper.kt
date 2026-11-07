@@ -24,6 +24,8 @@ import kotlin.system.exitProcess
  * - `display <width> <height> <dpi>` → `display <id>`: makes the hidden display (one at a time)
  * - `start <displayId> <package/activity>` → `started`: opens an app on it
  * - `key <displayId> <keycode>` → `pressed`: Back (4) or Home (3) on that display, never the user's screen
+ * - `bring <displayId>` → `brought <taskId>`: moves the app on top of that display to the user's screen
+ * - `send <taskId> <displayId>` → `sent`: moves it back to the hidden display
  * - `release` → `released`: removes the display and what runs on it
  * - `quit` → `bye`
  * Anything that fails answers `error <why>`. It prints `ready <sdk>` once it can take commands, and ends when
@@ -60,6 +62,8 @@ public object Helper {
         }
         "start" -> start(parts[1].toInt(), parts[2])
         "key" -> key(parts[1].toInt(), parts[2].toInt())
+        "bring" -> bring(parts[1].toInt())
+        "send" -> move(parts[1].toInt(), parts[2].toInt()).let { if (it == null) "sent" else "error $it" }
         "release" -> {
             release()
             "released"
@@ -102,6 +106,28 @@ public object Helper {
         return if (process.exitValue() == 0 && "Error" !in out) "started" else "error ${out.lines().firstOrNull { "Error" in it } ?: out.trim()}"
     }
 
+    /** Moves the top task of [displayId] to the user's screen (a private step only they can do, or take over). */
+    private fun bring(displayId: Int): String {
+        val list = run("cmd", "activity", "stack", "list") ?: return "error no task list"
+        // "RootTask id=87 bounds=[…] displayId=11 …": the first one on that display is its top task.
+        val task = list.lineSequence().mapNotNull { ROOT_TASK.find(it) }
+            .firstOrNull { it.groupValues[2].toInt() == displayId }?.groupValues?.get(1)?.toInt()
+            ?: return "error nothing on display $displayId"
+        return move(task, USER_DISPLAY)?.let { "error $it" } ?: "brought $task"
+    }
+
+    /** Null when moved, else why not. */
+    private fun move(task: Int, displayId: Int): String? {
+        val out = run("cmd", "activity", "display", "move-stack", task.toString(), displayId.toString()) ?: return "timed out"
+        return if ("Exception" in out || "Error" in out) out.lines().first() else null
+    }
+
+    private fun run(vararg command: String): String? {
+        val process = ProcessBuilder(*command).redirectErrorStream(true).start()
+        val out = process.inputStream.bufferedReader().readText()
+        return if (process.waitFor(START_SECONDS, TimeUnit.SECONDS)) out else null
+    }
+
     /** A key press on one display, as `input -d` does from a computer. */
     private fun key(displayId: Int, code: Int): String {
         val process = ProcessBuilder("input", "-d", displayId.toString(), "keyevent", code.toString()).redirectErrorStream(true).start()
@@ -118,6 +144,8 @@ public object Helper {
     }
 
     private const val NAME = "Mode"
+    private const val USER_DISPLAY = 0
+    private val ROOT_TASK = Regex("""RootTask id=(\d+) .*displayId=(\d+)""")
     private const val BYE = "bye"
     private const val FULLSCREEN = "1"
     private const val NEW_TASK = "0x10000000"
