@@ -10,5 +10,8 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
+        androidMain.dependencies {
+            implementation(libs.ktor.client.okhttp)
+        }
     }
 }

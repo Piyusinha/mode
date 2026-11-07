@@ -13,6 +13,9 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver)
         }
+        androidMain.dependencies {
+            implementation(libs.sqldelight.android.driver)
+        }
         commonTest.dependencies {
             implementation(projects.testing)
         }
