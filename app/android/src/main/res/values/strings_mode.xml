@@ -17,7 +17,7 @@
     <string name="access_ask_first_short">Ask first</string>
     <string name="access_codes">One-time codes</string>
     <string name="access_face_id">your fingerprint</string>
-    <string name="access_face_iddetail">Only you can look at the phone</string>
+    <string name="access_face_id_detail">Only you can look at the phone</string>
     <string name="access_full">Full access</string>
     <string name="access_full_detail">Mode does the whole task without asking. It stops only where phone hides the screen or you must type: a UPI PIN, a password, your fingerprint.</string>
     <string name="access_how_mode_acts">How Mode acts</string>
@@ -37,7 +37,7 @@
     <string name="account_account">Account</string>
     <string name="account_add_credits">Add credits on OpenRouter</string>
     <string name="account_available">Available</string>
-    <string name="account_chat_gptnote">Plus shares one 5-hour limit across every app that uses your plan. OpenAI doesn\'t tell apps what is left: Mode shows what it used, and says so when the limit is reached.</string>
+    <string name="account_chat_gpt_note">Plus shares one 5-hour limit across every app that uses your plan. OpenAI doesn\'t tell apps what is left: Mode shows what it used, and says so when the limit is reached.</string>
     <string name="account_claude_note">From Claude, for your whole plan (Claude apps and Mode together).</string>
     <string name="account_claude_note_updated">From Claude, for your whole plan (Claude apps and Mode together). Updated %1$s.</string>
     <string name="account_credits">Credits</string>
@@ -58,7 +58,7 @@
     <string name="account_reached_at">Reached at %1$s</string>
     <string name="account_remove_key">Remove key</string>
     <string name="account_resets">Resets %1$s</string>
-    <string name="account_see_chat_gptusage">See usage in ChatGPT</string>
+    <string name="account_see_chat_gpt_usage">See usage in ChatGPT</string>
     <string name="account_see_claude_usage">See usage in Claude</string>
     <string name="account_session">Current session · 5 hours</string>
     <string name="account_sign_out_chat_gpt">Sign out of ChatGPT</string>
@@ -192,7 +192,7 @@
     <string name="developer_title">Developer</string>
     <string name="first_run_add_widget">Add widget</string>
     <string name="first_run_cancel">Cancel</string>
-    <string name="first_run_chat_gptdetail">Your Plus plan, no cost per task</string>
+    <string name="first_run_chat_gpt_detail">Your Plus plan, no cost per task</string>
     <string name="first_run_checking">Checking your plan…</string>
     <string name="first_run_connect">Connect</string>
     <string name="first_run_connect_body">Mo thinks with the AI plan you already have.</string>
@@ -211,7 +211,7 @@
     <string name="first_run_not_eligible_detail">Mode needs a Plus or Pro plan. You can connect OpenRouter instead, pay as you go.</string>
     <string name="first_run_nothing_changed">Nothing changed on your phone.</string>
     <string name="first_run_own_job">Or type your own</string>
-    <string name="first_run_permissions_note">Mode needs to see and tap your screen. Next, Android asks you to turn on phone control and allow notifications.</string>
+    <string name="first_run_permissions_note">Mo opens the app and does it while you watch. You can stop it any time from the notification.</string>
     <string name="first_run_pick_different">Pick a different first job</string>
     <string name="first_run_recommended">Recommended</string>
     <string name="first_run_see_code">See the code on GitHub</string>
@@ -631,13 +631,13 @@
     <string name="setup_welcome_paired">Paired with Mode Setup on your Mac</string>
     <string name="setup_welcome_see_code">See the code on GitHub</string>
     <string name="setup_welcome_step_ai">Your AI</string>
-    <string name="setup_welcome_step_aidetail">ChatGPT, Claude or OpenRouter, and a model</string>
+    <string name="setup_welcome_step_ai_detail">ChatGPT, Claude or OpenRouter, and a model</string>
     <string name="setup_welcome_step_name">Your name</string>
     <string name="setup_welcome_step_name_detail">From your contact card, one tap</string>
     <string name="setup_welcome_step_test">Permissions and a quick test</string>
     <string name="setup_welcome_step_test_detail">Mode opens Settings, taps Wi-Fi and comes back</string>
     <string name="setup_welcome_tagline">Tell your phone what to do.\nMode does it in your apps.</string>
-    <string name="setup_welcome_this_iphone">This phone</string>
+    <string name="setup_welcome_this_i_phone">This phone</string>
     <string name="source_app">From Mode</string>
     <string name="source_schedule">Repeats</string>
     <string name="source_shortcut">From Shortcuts</string>
@@ -656,7 +656,7 @@
     <string name="start_mo_action_title">Action Button</string>
     <string name="start_mo_automatic">Automatic</string>
     <string name="start_mo_face_id">your fingerprint</string>
-    <string name="start_mo_face_iddetail">Look at your phone when you ask</string>
+    <string name="start_mo_face_id_detail">Look at your phone when you ask</string>
     <string name="start_mo_how">How</string>
     <string name="start_mo_locked_note">Mo takes your task, then starts it the moment your phone unlocks. You never say it twice.</string>
     <string name="start_mo_off">Off</string>
@@ -935,7 +935,7 @@
     <string name="voice_now_listens">Mode now listens with %1$s. Pick Android any time to switch back.</string>
     <string name="voice_now_speaks">Mode now speaks with %1$s. Pick Android any time to switch back.</string>
     <string name="voice_off">Off</string>
-    <string name="voice_on_iphone">On this phone</string>
+    <string name="voice_on_i_phone">On this phone</string>
     <string name="voice_open">Open %1$s</string>
     <string name="voice_open_keys">Open %1$s API keys</string>
     <string name="voice_open_settings">Open Settings</string>

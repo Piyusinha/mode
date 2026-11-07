@@ -35,6 +35,11 @@ class DevProbe : BroadcastReceiver() {
                         com.piyush.mode.core.platform.AndroidBackgroundWork(context).run { kotlinx.coroutines.delay(intent.getLongExtra("ms", 8000)) }
                         "held"
                     }
+                    // Walks setup past Connect your AI on a test phone: a key from the probe, or a stand-in.
+                    "key" -> {
+                        graph.settings.apiKey = intent.getStringExtra("value") ?: "sk-or-probe"
+                        "key set"
+                    }
                     "checks" -> buildString {
                         graph.phoneChecks.run { rows -> clear(); rows.forEach { append("${it.id}=${it.state} ") } }
                     }

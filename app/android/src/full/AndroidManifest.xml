@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The full build (GitHub): Mode's accessibility service, which drives the phone during a task. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- One tap to let Mode run while a task goes (the Play build sends people to App info instead). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application>
         <service
             android:name="com.piyush.mode.android.ModeAccessibilityService"

@@ -40,16 +40,22 @@ android {
 
 dependencies {
     implementation(projects.app.graph)
+    implementation(projects.app.screens)
+    implementation(projects.core.network)
+    implementation(projects.feature.connection)
     implementation(projects.app.design)
     implementation(projects.core.platform)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(kotlin("test-junit"))
 }
 
 // No literals in screens: tools/check-ui-literals-android.sh, part of `check`.

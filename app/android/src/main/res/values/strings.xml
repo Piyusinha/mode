@@ -1,6 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Android-only strings, written by hand. The ones both apps share are generated into strings_mode.xml. -->
 <resources>
     <!-- The working notification, until the live progress (Phase 4) takes over its text. -->
     <string name="working_title">Mode is working</string>
     <string name="working_stop">Stop</string>
+
+    <!-- Names, the same in every language. -->
+    <string name="name_chatgpt" translatable="false">ChatGPT</string>
+
+    <!-- Let Mode use your phone (the phone-setup boards). -->
+    <string name="phone_title">Let Mode use your phone</string>
+    <string name="phone_body">Android asks for each one. Here’s why.</string>
+    <string name="phone_control">Phone control</string>
+    <string name="phone_control_why">Mode sees the screen and taps for you while a task runs. Android calls this Accessibility.</string>
+    <string name="phone_notifications">Notifications</string>
+    <string name="phone_notifications_why">What Mode is doing, a Stop button, and questions for you.</string>
+    <string name="phone_assistant">Assistant button</string>
+    <string name="phone_assistant_why">Hold the power button and talk to Mode from any app. Optional.</string>
+    <string name="phone_battery">Battery</string>
+    <string name="phone_battery_why">So Android doesn’t stop Mode halfway through a task. Optional.</string>
+    <string name="phone_microphone">Microphone</string>
+    <string name="phone_microphone_why">Asked the first time you speak a task.</string>
+    <string name="phone_turn_on">Turn on</string>
+    <string name="phone_allow">Allow</string>
+    <string name="phone_set">Set</string>
+    <string name="phone_on">On</string>
+    <string name="phone_allowed">Allowed</string>
+    <string name="phone_later">Later</string>
+    <string name="phone_continue_hint">Turn on Phone control to continue.</string>
+    <string name="phone_continue">Continue</string>
+    <string name="phone_back">Back</string>
+
+    <string name="guide_restricted_title">Unlock Phone control</string>
+    <string name="guide_restricted_body">Android locks this setting for apps that are not from the Play Store. You unlock it once.</string>
+    <string name="guide_restricted_1">Open Mode’s App info</string>
+    <string name="guide_restricted_2">Tap the three dots at the top right</string>
+    <string name="guide_restricted_3">Tap Allow restricted settings, then confirm with your PIN or fingerprint</string>
+    <string name="guide_restricted_note">No three dots? Try turning Phone control on once. Android shows them after that.</string>
+    <string name="guide_restricted_open">Open App info</string>
+    <string name="guide_restricted_done">I’ve done this</string>
+
+    <string name="guide_access_title">Turn on Phone control</string>
+    <string name="guide_access_body">This is how Mode sees the screen and taps for you.</string>
+    <string name="guide_access_1">Open Accessibility</string>
+    <string name="guide_access_2">Under Downloaded apps, tap Mode</string>
+    <string name="guide_access_3">Turn on Use Mode, then tap Allow</string>
+    <string name="guide_access_note">Mode only looks and taps while a task is running. The screen goes to the AI you chose and nowhere else.</string>
+    <string name="guide_access_open">Open Accessibility</string>
+    <string name="guide_access_waiting">Waiting for you to turn it on</string>
+
+    <string name="guide_assistant_title">Hold power, talk to Mode</string>
+    <string name="guide_assistant_body">Make Mode your assistant and start a task from any app, hands-free.</string>
+    <string name="guide_assistant_1">Open Default apps</string>
+    <string name="guide_assistant_2">Tap Digital assistant app</string>
+    <string name="guide_assistant_3">Choose Mode</string>
+    <string name="guide_assistant_note">This replaces your current assistant on the power button. You can switch back any time in Settings.</string>
+    <string name="guide_assistant_open">Open Default apps</string>
+
+    <string name="guide_battery_title">Keep Mode awake</string>
+    <string name="guide_battery_body">Some phones stop apps to save battery, which would cut a task off halfway.</string>
+    <string name="guide_battery_1">Open Mode’s battery setting</string>
+    <string name="guide_battery_2">Choose Allow, or Unrestricted</string>
+    <string name="guide_battery_note">Mode only runs while a task is going, so this does not drain your battery.</string>
+    <string name="guide_battery_open">Open battery setting</string>
+
+    <string name="guide_skip">Skip for now</string>
 </resources>

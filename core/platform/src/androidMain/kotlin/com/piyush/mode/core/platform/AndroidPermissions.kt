@@ -13,6 +13,8 @@ import android.content.pm.PackageManager
 public class AndroidPermissions(
     context: Context,
     private val assistantHeld: () -> Boolean = { false },
+    /** Whether this build has an assistant to choose (it declares a voice interaction service). */
+    private val assistantAvailable: () -> Boolean = { false },
 ) : Permissions {
     private val app = context.applicationContext
     private val asked = app.getSharedPreferences("mode.permissions", Context.MODE_PRIVATE)
@@ -20,7 +22,11 @@ public class AndroidPermissions(
     override suspend fun status(permission: Permission): PermissionStatus = when (permission) {
         Permission.Notifications -> runtime(Manifest.permission.POST_NOTIFICATIONS)
         Permission.Microphone -> runtime(Manifest.permission.RECORD_AUDIO)
-        Permission.Assistant -> if (assistantHeld()) PermissionStatus.Allowed else PermissionStatus.NotAsked
+        Permission.Assistant -> when {
+            !assistantAvailable() -> PermissionStatus.Unavailable
+            assistantHeld() -> PermissionStatus.Allowed
+            else -> PermissionStatus.NotAsked
+        }
     }
 
     override suspend fun request(permission: Permission): PermissionStatus {

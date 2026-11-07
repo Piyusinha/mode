@@ -27,7 +27,7 @@ Android canvas, 135 boards. Decisions D41–D43.
 | 0 | Foundations: Android target in the convention plugin, stores, platform adapters, OkHttp, the database driver, `app:android`, `androidModeGraph`, CI job | ✅ Done; the app starts on the API 37 emulator with the full graph |
 | 1 | Shared code for two phones: `engine:screen`, four new ops, `PhoneProfile`, keyboard and private screens from a tree, the renames | ✅ Done |
 | 2 | The accessibility engine (`engine:phone-android`): tree text, screenshots, gestures, the service, checks, the working service | ✅ Done on the API 37 emulator (look 131–229 ms); a real phone and the OCR fallback still to do |
-| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | 🟡 Tokens (generated from the iPhone's), the literal check, buttons, rows and cards done; the other components, strings, navigation and screens next |
+| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | 🟡 Tokens, the literal check, buttons, rows, cards, first-run and setup components; strings generated from the iPhone's; navigation (per-tab stacks, presenters held per page, mode:// links); the first run with "Let Mode use your phone" and its guides, checked on the emulator end to end. Next: the main tabs and their screens, then Settings and providers |
 | 4 | Hands-free: notifications with answers, the assistant role, widget, exact-alarm schedules, Android voice | ⏳ |
 | 5 | Background mode: libadb-android for the link, a scrcpy server fork as the helper, the hidden display | ⏳ |
 | 6 | Distribution: signed APK on GitHub, the `play` flavour, CI | ⏳ |

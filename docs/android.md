@@ -63,6 +63,21 @@ nothing on Android; Mode goes to the background on every step of a task.
 3. **Sees the screen** (one screenshot) and **taps** (on Mode's own title area).
 4. **Battery.** Unrestricted, so Android doesn't stop a task halfway. A warning only.
 
+## Setup on Android
+
+The first run has one more step than the iPhone's: Welcome, Connect your AI, **Let Mode use your phone**, then the first job. Phone control is a switch the user turns on in Settings, so it is set up rather than asked for (`FirstRunStep.Phone`, shown when the phone's checks include `Engine`).
+
+- `PhoneSetupPresenter` (shared) lists Phone control (required), Notifications, the assistant button, Battery and the Microphone (asked later), each with its state from `PhoneChecks.status()` (a quick read of Android's settings, no screenshot or tap) and `Permissions`. A setting this build can't offer (the assistant, until Mode has its assistant service) is left out.
+- Phone control, the assistant and battery each open a guide page (the S02–S05 boards). The guide's button opens Android's page; when Mode comes back to the front everything is read again, and a guide whose setting is now on closes itself.
+- An app not from a store has its accessibility switch locked by Android 13+: Phone control then opens the "Unlock Phone control" guide first (App info › ⋮ › Allow restricted settings).
+- Android pages and their fallbacks live in `SystemPages`: Mode's own accessibility switch is not openable directly on stock Android, so the Accessibility list opens; battery asks Android's one-tap question in the full build.
+- ChatGPT sign-in: `ChatGptSignIn` listens on 127.0.0.1:1455 (`LoopbackCallback`) before opening OpenAI's page in a browser tab; coming back to Mode without an answer is a cancel.
+- Strings both apps share are generated from the iPhone's `L10n*.swift` by `tools/gen-android-strings.py` (iPhone words swapped for Android's); Android-only ones are in `app/android/src/main/res/values/strings.xml`.
+
+To walk setup past Connect your AI on an emulator without an account: `adb shell am broadcast -n com.piyush.mode/.app.DevProbe --es op key` (debug builds only).
+
+Known gap: the Play build has no phone control, so its setup will need its own path (Phase 6).
+
 ## Developing
 
 Debug builds have an adb probe, so the engine can be driven without the app's screens:

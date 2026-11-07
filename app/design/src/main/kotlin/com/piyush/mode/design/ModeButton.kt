@@ -48,6 +48,8 @@ public enum class ModeButtonRole {
     AnswerQuiet,
     /** Stop on a soft red, under a blue answer. */
     StopSoft,
+    /** A second choice under the main one on a guide ("Skip for now"): blue words, no fill. */
+    Link,
 }
 
 /** Mode's buttons, as on the canvas: solid capsules, ink for the one main action. */
@@ -68,20 +70,20 @@ public fun ModeButton(
         ModeButtonRole.Primary -> if (fullWidth) ModeSize.primaryButton else ModeSize.secondaryButton
         ModeButtonRole.Secondary -> ModeSize.secondaryButton
         ModeButtonRole.Pill, ModeButtonRole.PillProminent -> ModeSize.pillButton
-        ModeButtonRole.Plain, ModeButtonRole.Destructive -> ModeSize.touch
+        ModeButtonRole.Plain, ModeButtonRole.Destructive, ModeButtonRole.Link -> ModeSize.touch
         else -> ModeSize.loopButton
     }
     val foreground: Color = when (role) {
         ModeButtonRole.Primary, ModeButtonRole.PillProminent, ModeButtonRole.Main -> c.onAccent
         ModeButtonRole.Destructive, ModeButtonRole.Stop, ModeButtonRole.StopSoft -> c.danger
         ModeButtonRole.Answer -> Color.White
-        ModeButtonRole.AnswerQuiet -> c.infoText
+        ModeButtonRole.AnswerQuiet, ModeButtonRole.Link -> c.infoText
         else -> c.textPrimary
     }
     val background: Color = when (role) {
         ModeButtonRole.Primary, ModeButtonRole.PillProminent, ModeButtonRole.Main -> c.accent
         ModeButtonRole.Secondary, ModeButtonRole.Pill, ModeButtonRole.Other, ModeButtonRole.Stop -> c.cardRaised
-        ModeButtonRole.Plain, ModeButtonRole.Destructive -> Color.Transparent
+        ModeButtonRole.Plain, ModeButtonRole.Destructive, ModeButtonRole.Link -> Color.Transparent
         ModeButtonRole.OtherOnPage, ModeButtonRole.AnswerQuiet -> c.card
         ModeButtonRole.Answer -> c.info
         ModeButtonRole.StopSoft -> c.tokens.tileRed

@@ -1,0 +1,88 @@
+package com.piyush.mode.app.system
+
+import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.browser.customtabs.CustomTabsIntent
+import com.piyush.mode.core.common.AppLog
+
+/**
+ * Android's own pages Mode sends the user to during setup, each with fallbacks: phone makers move
+ * or rename them, so the first page that opens wins and the last is always Mode's App info.
+ */
+class SystemPages(private val activity: Activity) {
+    private val pkg = activity.packageName
+    private val appInfo get() = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))
+
+    /** App info, where ⋮ › Allow restricted settings lives. */
+    fun appInfo() = open("app info", appInfo)
+
+    /** Mode's own switch in Accessibility when Android can open it directly, else the Accessibility list. */
+    fun accessibility() {
+        val service = ComponentName(pkg, ACCESSIBILITY_SERVICE)
+        open(
+            "accessibility",
+            Intent(ACTION_ACCESSIBILITY_DETAILS).putExtra(Intent.EXTRA_COMPONENT_NAME, service.flattenToString()),
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+        )
+    }
+
+    /** Default apps › Digital assistant. */
+    fun defaultApps() = open(
+        "default apps",
+        Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+    )
+
+    /**
+     * The battery setting: Android's one-tap "let Mode run in the background" question where this build
+     * may ask it, else App info (› Battery › Unrestricted).
+     */
+    fun battery() {
+        val ask = activity.checkSelfPermission(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED
+        open(
+            "battery",
+            *listOfNotNull(
+                if (ask) Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", pkg, null)) else null,
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            ).toTypedArray(),
+        )
+    }
+
+    /** Mode's notification settings, once Android stops asking. */
+    fun notifications() = open("notifications", Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, pkg))
+
+    /** A web page in a browser tab inside Mode. */
+    fun web(url: String) {
+        try {
+            CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(activity, Uri.parse(url))
+        } catch (e: ActivityNotFoundException) {
+            open("browser", Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }
+    }
+
+    private fun open(name: String, vararg intents: Intent) {
+        for (intent in intents.toList() + appInfo) {
+            try {
+                activity.startActivity(intent)
+                AppLog.log("setup", "opened $name: ${intent.action}")
+                return
+            } catch (e: ActivityNotFoundException) {
+                continue
+            } catch (e: SecurityException) {
+                continue
+            }
+        }
+    }
+
+    private companion object {
+        /** Settings › Accessibility › one service (public on Android 13+, missing on some phones). */
+        const val ACTION_ACCESSIBILITY_DETAILS = "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
+        const val ACCESSIBILITY_SERVICE = "com.piyush.mode.android.ModeAccessibilityService"
+    }
+}

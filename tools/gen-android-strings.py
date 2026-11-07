@@ -45,13 +45,13 @@ WORDS = [
 
 # Strings that say something different on Android (key → text).
 OVERRIDES = {
-    "firstRun.permissionsNote": "Mode needs to see and tap your screen. Next, Android asks you to turn on phone control and allow notifications.",
+    "firstRun.permissionsNote": "Mo opens the app and does it while you watch. You can stop it any time from the notification.",
     "firstRun.widgetHow": "Touch and hold your home screen, tap Widgets, and pick Mode.",
 }
 
 
 def android_name(key):
-    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", key).replace(".", "_").replace("-", "_").lower()
+    snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", "_", key).replace(".", "_").replace("-", "_").lower()
     return re.sub(r"_+", "_", snake)
 
 

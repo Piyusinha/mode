@@ -67,6 +67,19 @@ class PhoneSetupTest {
     }
 
     @Test
+    fun aSettingThisBuildCantOfferIsLeftOut() = runTest {
+        val f = Fixture(this)
+        f.checks.quick = results(engine = true)
+        val permissions = object : com.piyush.mode.core.platform.Permissions by f.permissions {
+            override suspend fun status(permission: Permission) =
+                if (permission == Permission.Assistant) PermissionStatus.Unavailable else f.permissions.status(permission)
+        }
+        val p = PhoneSetupPresenter(backgroundScope, f.checks, permissions, FakeLifecycle())
+        val s = p.state.awaitState { it.rows.isNotEmpty() }
+        assertTrue(s.rows.none { it.kind == PhoneSetupKind.Assistant })
+    }
+
+    @Test
     fun notificationsAreAskedInPlace() = runTest {
         val f = Fixture(this)
         f.checks.quick = results(engine = true)
@@ -93,6 +106,7 @@ class PhoneSetupTest {
         assertEquals(FirstRunStep.FirstTask, p.state.awaitState { it.step == FirstRunStep.FirstTask }.step)
         p.back()
         assertEquals(FirstRunStep.Phone, p.state.awaitState { it.step == FirstRunStep.Phone }.step)
-        assertEquals(3, p.totalSteps)
+        assertEquals(4, p.totalSteps)
+        assertEquals(4, p.stepNumber(FirstRunStep.FirstTask))
     }
 }

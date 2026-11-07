@@ -16,6 +16,12 @@ public object ModeSpacing {
     public val xxxl: Dp = 40.dp
     /** The gap between a screen's edge and its content. */
     public val screenEdge: Dp = 16.dp
+    /** Inside a first-run card, between its head and its buttons. */
+    public val groupInset: Dp = 14.dp
+    /** How far a note under a card sits in from the card's edge. */
+    public val labelInset: Dp = 4.dp
+    /** A setup page's sides: titles sit a little further in than cards. */
+    public val page: Dp = 24.dp
 }
 
 /** Corner radii. */
@@ -31,6 +37,10 @@ public object ModeRadius {
     /** A chat bubble's corners, and the small one by its tail. */
     public val bubble: Dp = 22.dp
     public val bubbleTail: Dp = 6.dp
+    /** First-run cards (a provider, More options). */
+    public val firstRunCard: Dp = 24.dp
+    /** A tinted note on a setup guide. */
+    public val note: Dp = 18.dp
 }
 
 /** Icon sizes, so an icon never borrows a text style's size. */
@@ -126,6 +136,21 @@ public object ModeSize {
     public val readableWidth: Dp = 520.dp
     public val edgeFadeTop: Dp = 120.dp
     public val edgeFadeBottom: Dp = 150.dp
+    /** First run: the step dots (done and current are wider), job capsules, Mo, provider tiles. */
+    public val progressDot: Dp = 8.dp
+    public val progressDotCurrent: Dp = 22.dp
+    public val progressRing: Dp = 1.5.dp
+    public val jobButton: Dp = 54.dp
+    public val moWelcome: Dp = 150.dp
+    public val moFirstJob: Dp = 120.dp
+    public val providerTile: Dp = 44.dp
+    public val moreOptions: Dp = 56.dp
+    /** Phone setup: Mo beside the title, a row's tile, a guide step's number and row, the waiting dot. */
+    public val moSetup: Dp = 56.dp
+    public val permissionTile: Dp = 36.dp
+    public val guideNumber: Dp = 28.dp
+    public val guideStep: Dp = 60.dp
+    public val waitingDot: Dp = 10.dp
     /** A phone screen's width to height, for screenshot cells. */
     public const val screenAspect: Float = 9f / 19.5f
 }

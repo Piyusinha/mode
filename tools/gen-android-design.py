@@ -49,6 +49,12 @@ ICONS = {
     "dragHandle": ("drag_handle", False), "personalVoice": ("record_voice_over", False),
 }
 
+# Icons only Android shows (phone setup), after the iPhone's cases.
+ANDROID_ICONS = {
+    "tap": ("touch_app", False), "power": ("power_settings_new", False), "battery": ("battery_full", False),
+    "background": ("layers", False),
+}
+
 
 def snake(name):
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
@@ -206,6 +212,8 @@ def icons():
     swift = open(os.path.join(IOS, "Tokens/ModeIcon.swift")).read()
     cases = re.findall(r"case (\w+) = \"", swift)
     missing = [c for c in cases if c not in ICONS]
+    ICONS.update(ANDROID_ICONS)
+    cases += list(ANDROID_ICONS)
     if missing:
         sys.exit(f"ModeIcon cases with no Android icon: {missing}")
     for case in cases:

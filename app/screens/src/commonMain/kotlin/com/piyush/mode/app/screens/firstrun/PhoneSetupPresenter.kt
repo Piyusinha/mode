@@ -87,7 +87,7 @@ public class PhoneSetupPresenter(
                 PhoneSetupRow(PhoneSetupKind.Assistant, permissions.status(Permission.Assistant), optional = true),
                 PhoneSetupRow(PhoneSetupKind.Battery, if (battery is CheckState.Passed) PermissionStatus.Allowed else PermissionStatus.NotAsked, optional = true),
                 PhoneSetupRow(PhoneSetupKind.Microphone, permissions.status(Permission.Microphone), optional = true, later = true),
-            )
+            ).filter { it.status != PermissionStatus.Unavailable }
             val ready = control is CheckState.Passed
             mutableState.value = mutableState.value.let { s ->
                 val done = s.guide != null && guideDone(s.guide, rows, locked)

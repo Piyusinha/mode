@@ -138,8 +138,16 @@ public class FirstRunPresenter(
         }
     }
 
-    /** How many steps the dots count (Welcome is not one): 2 on the iPhone, 3 with phone control. */
-    public val totalSteps: Int get() = if (phoneStep) 3 else 2
+    /** How many steps the dots count, Welcome included: 3 on the iPhone, 4 with phone control. */
+    public val totalSteps: Int get() = if (phoneStep) 4 else 3
+
+    /** Which dot [step] is, counting from 1 (Welcome). */
+    public fun stepNumber(step: FirstRunStep): Int = when (step) {
+        FirstRunStep.Welcome -> 1
+        FirstRunStep.Connect -> 2
+        FirstRunStep.Phone -> 3
+        FirstRunStep.FirstTask -> if (phoneStep) 4 else 3
+    }
 
     /**
      * A first job was picked (or typed): ask for what it needs, put it in the queue, and finish setup so

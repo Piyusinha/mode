@@ -82,7 +82,7 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
             phoneLink = link ?: UnavailablePhoneLink(PLAY_BUILD),
             telemetry = telemetry,
             database = AndroidDatabaseFactory(app),
-            permissions = AndroidPermissions(app, assistantHeld = { holdsAssistantRole(app) }),
+            permissions = AndroidPermissions(app, assistantHeld = { holdsAssistantRole(app) }, assistantAvailable = { declaresAssistant(app) }),
             phoneChecks = link?.let { AccessibilityPhoneChecks(app, it) } ?: UnavailablePhoneChecks(PLAY_BUILD),
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
@@ -103,4 +103,10 @@ private fun declaresPhoneControl(app: Application): Boolean = runCatching {
 /** Whether Mode is the phone's digital assistant (hold power to talk to it). */
 private fun holdsAssistantRole(app: Application): Boolean =
     app.getSystemService(android.app.role.RoleManager::class.java)?.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT) == true
+
+/** Whether this build has an assistant service Android can offer as the digital assistant. */
+private fun declaresAssistant(app: Application): Boolean =
+    app.packageManager.queryIntentServices(
+        android.content.Intent("android.service.voice.VoiceInteractionService").setPackage(app.packageName), 0,
+    ).isNotEmpty()
 
