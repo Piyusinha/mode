@@ -48,6 +48,9 @@ public object ModeRadius {
     public val bubbleTail: Dp = 6.dp
     /** Talking mode's cards (what Mode says, a task). */
     public val talkCard: Dp = 24.dp
+    /** The agent overlay's sheet and slim bar (boards O01–O10). */
+    public val overlay: Dp = 34.dp
+    public val overlayMini: Dp = 18.dp
     /** The "Did you know?" cards on Home. */
     public val tipBanner: Dp = 26.dp
     /** Chat cards (working, failed, a lesson), notices and the small tile on a lesson. */
@@ -199,6 +202,27 @@ public object ModeSize {
     public val talkSaysIcon: Dp = 32.dp
     public val talkOption: Dp = 48.dp
     public val talkBubbleMax: Dp = 280.dp
+
+    // The agent overlay (boards O01–O10).
+    public val overlayHalo: Dp = 52.dp
+    public val overlayMo: Dp = 42.dp
+    public val overlayBarMo: Dp = 40.dp
+    public val overlayBar: Dp = 68.dp
+    public val overlayButton: Dp = 60.dp
+    public val overlayButtonMo: Dp = 40.dp
+    public val overlayStatusDot: Dp = 7.dp
+    public val overlayStepIcon: Dp = 22.dp
+    public val overlayStepDot: Dp = 8.dp
+    public val overlayMiniWidth: Dp = 112.dp
+    public val overlayMiniHeight: Dp = 196.dp
+    public val overlayStrip: Dp = 56.dp
+    public val overlayStripMic: Dp = 32.dp
+    public val overlayChip: Dp = 40.dp
+    public val overlayAnswer: Dp = 46.dp
+    public val overlayGlowBlur: Dp = 14.dp
+    public val overlayGlowEdge: Dp = 3.dp
+    public val overlayRing: Dp = 1.5.dp
+    public val overlayBubbleMax: Dp = 220.dp
     public val readableWidth: Dp = 520.dp
     public val edgeFadeTop: Dp = 120.dp
     public val edgeFadeBottom: Dp = 150.dp
