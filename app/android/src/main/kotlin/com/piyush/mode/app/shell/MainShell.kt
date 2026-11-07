@@ -140,6 +140,7 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         Route.Listening -> com.piyush.mode.app.settings.VoiceRoute(graph, hearing = true, pages, nav::push) { nav.pop() }
         Route.Language -> com.piyush.mode.app.settings.LanguageRoute(graph) { nav.pop() }
         is Route.VoicePicker -> com.piyush.mode.app.settings.VoicePickerRoute(graph, route.provider) { nav.pop() }
+        Route.Developer -> com.piyush.mode.app.settings.DeveloperRoute(graph) { nav.pop() }
         Route.Backup -> com.piyush.mode.app.settings.BackupRoute(graph) { nav.pop() }
         Route.Access -> com.piyush.mode.app.settings.AccessRoute(graph) { nav.pop() }
         Route.Health -> com.piyush.mode.app.settings.HealthRoute(graph, pages, nav::push) { nav.pop() }

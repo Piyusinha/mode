@@ -41,6 +41,7 @@ android {
 dependencies {
     implementation(projects.app.graph)
     implementation(projects.app.screens)
+    implementation(projects.app.devUi)
     implementation(projects.core.network)
     implementation(projects.feature.connection)
     implementation(projects.app.design)
