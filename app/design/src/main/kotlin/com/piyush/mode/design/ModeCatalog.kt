@@ -41,6 +41,29 @@ public fun ModeCatalog() {
         verticalArrangement = Arrangement.spacedBy(ModeSpacing.l),
     ) {
         ModeText(if (c.dark) "Mode · dark" else "Mode · light", ModeTextStyle.LargeTitle) // literal-ok
+        ModeSectionHeader("Buttons") // literal-ok
+        ModeButton("Continue", {}, fullWidth = true) // literal-ok
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s), verticalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
+            listOf(ModeButtonRole.Secondary, ModeButtonRole.Pill, ModeButtonRole.PillProminent, ModeButtonRole.Plain, ModeButtonRole.Destructive).forEach {
+                ModeButton(it.name, {}, role = it) // literal-ok
+            }
+            ModeButton("Disabled", {}, enabled = false) // literal-ok
+            ModeIconButton(ModeIcon.Back, "Back", {}) // literal-ok
+            ModeIconButton(ModeIcon.Ask, "Speak", {}, prominent = true, size = ModeSize.speakButton) // literal-ok
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
+            Box(Modifier.weight(1f)) { ModeButton("Yes", {}, role = ModeButtonRole.Answer) } // literal-ok
+            Box(Modifier.weight(1f)) { ModeButton("Stop", {}, role = ModeButtonRole.StopSoft) } // literal-ok
+        }
+        ModeSectionHeader("Rows") // literal-ok
+        ModeCard(lifted = true, rows = listOf(
+            { ModeRow("Phone control", subtitle = "Turned on", leading = ModeRowLeading.IconTile(ModeIcon.Shield, c.tintSoft, c.tint)) {} }, // literal-ok
+            { ModeRow("Text Sonali, then calendar", subtitle = "Today 8:13 · 62 s", leading = ModeRowLeading.Mo(MoMood.Done), onClick = {}) }, // literal-ok
+            { ModeRow("Claude", subtitle = "Signed in", leading = ModeRowLeading.LogoTile(ModeLogo.Claude, c.accent, c.onAccent), onClick = {}) }, // literal-ok
+            { ModeRow("Checking", leading = ModeRowLeading.Progress) }, // literal-ok
+            { ModeRow("Asha", leading = ModeRowLeading.Initial("A")) { ModeButton("Change", {}, role = ModeButtonRole.Pill) } }, // literal-ok
+            { ModeRow("Failed", leading = ModeRowLeading.Failure) }, // literal-ok
+        ))
         ModeText("Mo", ModeTextStyle.Section) // literal-ok
         FlowRow(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
             MoMood.entries.forEach { ModeMo(it, ModeSize.moHero) }

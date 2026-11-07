@@ -45,6 +45,8 @@ public object ModeIconSize {
     public val hero: Dp = 24.dp
     /** A big status mark. */
     public val status: Dp = 28.dp
+    /** The icon in Mo's corner badge. */
+    public val moBadge: Dp = 11.dp
 }
 
 /** Fixed sizes: touch targets, icons, avatars, rows (ModeSize on the iPhone). */
@@ -81,12 +83,17 @@ public object ModeSize {
     public val iconCircle: Dp = 40.dp
     public val primaryButton: Dp = 56.dp
     public val secondaryButton: Dp = 50.dp
+    /** Capsules on sheets and guides (the loop sheet, first run). */
+    public val loopButton: Dp = 52.dp
     /** A small pill button inside a row (Connect, Change, Undo). */
     public val pillButton: Dp = 44.dp
     public val sendButton: Dp = 40.dp
     public val moLarge: Dp = 80.dp
     public val moHero: Dp = 56.dp
     public val moRow: Dp = 32.dp
+    /** The badge on Mo's corner in a row, and its ring. */
+    public val moRowBadge: Dp = 19.dp
+    public val moRowBadgeRing: Dp = 2.dp
     public val progressBar: Dp = 6.dp
     public val segmentHeight: Dp = 4.dp
     public val liveDot: Dp = 8.dp
