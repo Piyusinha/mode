@@ -11,7 +11,7 @@ your apps until it’s done, then tells you how it went.
 
 <br>
 
-<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://getmode.app"><img src="https://img.shields.io/badge/getmode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: getmode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
+<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
 <sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
 
@@ -130,6 +130,28 @@ Apple account · a ChatGPT or Claude plan, or an OpenRouter key.
 
 <br>
 
+## Good to know
+
+Mode is early, and it works around what iPhones normally allow. A few things to expect:
+
+- **Connect on Wi-Fi.** Mode reaches its tools on your iPhone through a small VPN that
+  stays on the phone. iOS won’t open that route on mobile data alone, so if you’re away
+  from Wi-Fi, turn Mobile Data off for a moment while Mode connects.
+- **It uses your VPN slot.** An iPhone runs one VPN at a time, so another VPN (a work
+  VPN, Tailscale) pauses while Mode is connected. Your normal internet isn’t affected.
+- **Your phone is busy while it works.** Mode taps on your screen, where you can watch,
+  so you can’t use the phone for that task’s few seconds. You can stop it or take over
+  at any time.
+- **Free Apple accounts renew weekly.** Apple asks for apps installed this way to be
+  re-signed every 7 days. Mode Setup or SideStore does it for you. A paid developer
+  account lasts a year.
+- **Some steps are always yours.** Mode never types your passcode, passwords or card
+  numbers, and it hands the phone back when one is needed.
+- **It isn’t perfect yet.** An app it has never seen can take Mode a few tries, and
+  some tasks fail. It tells you why, and it gets better at the apps you use often.
+
+<br>
+
 ## Questions
 
 <details>
@@ -137,6 +159,19 @@ Apple account · a ChatGPT or Claude plan, or an OpenRouter key.
 <br>
 Yes. Mode is free and open source. It uses the AI you already pay for (a ChatGPT or
 Claude plan), or an OpenRouter key where you pay the provider per use.
+</details>
+
+<details>
+<summary><b>Why isn’t Mode on the App Store?</b></summary>
+<br>
+To work in your other apps, Mode uses Apple’s developer tools on your own iPhone: the
+same ones Xcode uses to test apps. App Store apps aren’t allowed to see or tap other
+apps, so Mode is installed with your own Apple account instead, which is why setup
+needs a Mac once.
+<br><br>
+We’re working on an App Store version with the parts Apple does allow, like asking by
+voice or Siri, your calendar, reminders and contacts, and Shortcuts. Using other apps
+on screen will stay in this version.
 </details>
 
 <details>
