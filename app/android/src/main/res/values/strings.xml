@@ -72,6 +72,7 @@
     <!-- Settings. -->
     <string name="backup_row">Backup and restore</string>
     <string name="settings_permissions">Permissions</string>
+    <string name="health_unlocked">Phone control unlocked</string>
     <string name="settings_less">Less</string>
     <string name="settings_more">More</string>
 </resources>

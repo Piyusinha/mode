@@ -36,6 +36,8 @@ import kotlinx.serialization.json.putJsonObject
 /** One part of Mode, in its group (phone, ai, voice, iphone). */
 public enum class HealthItem(public val group: String) {
     Paired("phone"), Vpn("phone"), Reach("phone"), Screen("phone"),
+    /** Android: the accessibility switch's lock, the switch itself, and the battery setting. */
+    Unlocked("phone"), Engine("phone"), Battery("phone"),
     Ai("ai"), Actions("ai"),
     Microphone("voice"), Listening("voice"), Speaking("voice"),
     Notifications("iphone"),
@@ -124,7 +126,7 @@ public class HealthPresenter(
 
     /** One repair; true when it did something. */
     private suspend fun repairOne(item: HealthItem): Boolean = when (item) {
-        HealthItem.Paired, HealthItem.Vpn, HealthItem.Reach, HealthItem.Screen -> { session.reconnect(); true }
+        HealthItem.Paired, HealthItem.Vpn, HealthItem.Reach, HealthItem.Screen, HealthItem.Engine -> { session.reconnect(); true }
         HealthItem.Actions, HealthItem.Ai -> when (settings.settings.value.provider) {
             ModelProvider.ChatGpt -> chatGpt.accessToken() != null
             ModelProvider.ClaudeOAuth -> claude?.accessToken(forceRefresh = true) != null
@@ -133,6 +135,8 @@ public class HealthPresenter(
         HealthItem.Microphone -> { DeviceVoice.prepare(); true }
         HealthItem.Notifications -> permissions.request(Permission.Notifications) == PermissionStatus.Allowed
         HealthItem.Listening, HealthItem.Speaking -> { voices?.clearProblem(); false }
+        // Settings the user turns on; Mode can't flip them itself.
+        HealthItem.Unlocked, HealthItem.Battery -> false
     }
 
     private fun set(row: HealthRow) {
@@ -153,7 +157,10 @@ public class HealthPresenter(
 
     /** Phone control, from the step-by-step checks; skipped while a task drives the phone. */
     private suspend fun checkPhone() {
-        val phone = listOf(HealthItem.Paired, HealthItem.Vpn, HealthItem.Reach, HealthItem.Screen)
+        // Android lists its own steps (Engine among them); the iPhone's are pairing, VPN and reach.
+        val android = PhoneCheckId.Engine in phoneChecks.steps
+        val phone = if (android) listOf(HealthItem.Unlocked, HealthItem.Engine, HealthItem.Screen, HealthItem.Battery)
+        else listOf(HealthItem.Paired, HealthItem.Vpn, HealthItem.Reach, HealthItem.Screen)
         if (runner.state.value.running) {
             phone.forEach { set(HealthRow(it, HealthState.Busy, "Mode is working on a task: check after it ends")) }
             return
@@ -165,6 +172,8 @@ public class HealthPresenter(
         fun fixFor(id: PhoneCheckId): Pair<HealthFix, String?> = when (id) {
             PhoneCheckId.PairingFile, PhoneCheckId.Paired -> HealthFix.None to null
             PhoneCheckId.DeveloperMode -> HealthFix.Open to "iphone-settings"
+            // Android: switches the user turns on in Settings, through the phone setup page.
+            PhoneCheckId.RestrictedSettings, PhoneCheckId.Engine, PhoneCheckId.Battery -> HealthFix.Open to "phone-setup"
             else -> HealthFix.Repair to null
         }
         fun row(item: HealthItem, ids: List<PhoneCheckId>, ok: String): HealthRow {
@@ -179,6 +188,13 @@ public class HealthPresenter(
                 states.all { it.second is CheckState.Passed } -> HealthRow(item, HealthState.Ok, ok)
                 else -> HealthRow(item, HealthState.Waiting, "Checked once the part above works")
             }
+        }
+        if (android) {
+            set(row(HealthItem.Unlocked, listOf(PhoneCheckId.RestrictedSettings), "Unlocked"))
+            set(row(HealthItem.Engine, listOf(PhoneCheckId.Engine), "On"))
+            set(row(HealthItem.Screen, listOf(PhoneCheckId.Screen, PhoneCheckId.Hands), "Checked just now"))
+            set(row(HealthItem.Battery, listOf(PhoneCheckId.Battery), "Unrestricted"))
+            return
         }
         val reachMs = (results.firstOrNull { it.id == PhoneCheckId.Reach }?.state as? CheckState.Passed)?.ms
         set(row(HealthItem.Paired, listOf(PhoneCheckId.PairingFile, PhoneCheckId.Paired), "Pairing file is here"))
