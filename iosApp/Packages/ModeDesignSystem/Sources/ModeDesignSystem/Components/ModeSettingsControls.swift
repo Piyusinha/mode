@@ -33,29 +33,34 @@ public extension View {
 }
 
 /// A note under a card, 8 points in from the card's edge, with an optional icon before it (a lock).
+/// [centered]: a note under a wide button ("Save it to Files…").
 public struct ModeFootnote: View {
     private let text: Text
     private let style: ModeTextStyle
     private let icon: ModeIcon?
+    private let centered: Bool
 
-    public init(_ text: LocalizedStringResource, style: ModeTextStyle = .footnote, icon: ModeIcon? = nil) {
+    public init(_ text: LocalizedStringResource, style: ModeTextStyle = .footnote, icon: ModeIcon? = nil, centered: Bool = false) {
         self.text = Text(text)
         self.style = style
         self.icon = icon
+        self.centered = centered
     }
 
-    public init(verbatim text: String, style: ModeTextStyle = .footnote, icon: ModeIcon? = nil) {
+    public init(verbatim text: String, style: ModeTextStyle = .footnote, icon: ModeIcon? = nil, centered: Bool = false) {
         self.text = Text(text)
         self.style = style
         self.icon = icon
+        self.centered = centered
     }
 
     public var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: ModeSpacing.s) {
             if let icon { icon.image.font(ModeIconFont.small).foregroundStyle(ModeColor.textSecondary).accessibilityHidden(true) }
             text.modeText(style, color: ModeColor.textSecondary).lineSpacing(ModeSpacing.xxs)
+                .multilineTextAlignment(centered ? .center : .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: centered ? .center : .leading)
         .padding(.horizontal, ModeSpacing.noteInset)
     }
 }

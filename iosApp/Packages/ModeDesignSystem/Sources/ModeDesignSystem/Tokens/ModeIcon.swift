@@ -83,6 +83,8 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case keyboard = "keyboard"
     case dragHandle = "line.3.horizontal"
     case personalVoice = "person.wave.2"
+    /// Settings → Backup and restore.
+    case backup = "archivebox"
 
     public var image: Image { Image(systemName: rawValue) }
 }

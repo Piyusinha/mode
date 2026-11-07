@@ -50,6 +50,13 @@ targets:
           - CFBundleURLName: ${MODE_BUNDLE_PREFIX}
             CFBundleURLSchemes:
               - mode
+        # A Mode backup (.modebackup), made in Settings → Backup and restore: Files shows only these when restoring.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ${MODE_BUNDLE_PREFIX}.backup
+            UTTypeDescription: Mode backup
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [modebackup]
     dependencies:
       - package: ModeDesignSystem
       - target: ModeWidgets

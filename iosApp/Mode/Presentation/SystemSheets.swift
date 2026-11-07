@@ -65,3 +65,24 @@ struct SharedText: Identifiable {
     let text: String
     var id: String { text }
 }
+
+/// iOS's share sheet for a file (a backup): Save to Files, AirDrop, and the rest. [onFinish] says whether it was
+/// saved or sent (false when they closed the sheet).
+struct FileShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    let onFinish: (Bool) -> Void
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        sheet.completionWithItemsHandler = { _, completed, _, _ in onFinish(completed) }
+        return sheet
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+/// Lets an optional file drive `.sheet(item:)`.
+struct SharedFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}

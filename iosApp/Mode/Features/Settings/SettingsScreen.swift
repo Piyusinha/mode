@@ -83,6 +83,13 @@ struct SettingsScreen: View {
                 }
                 .padding(.top, ModeSpacing.xl)
 
+                if state.showsBackup {
+                    ModeSectionHeader(L10n.Backup.section)
+                    ModeCard {
+                        ModeRow(String(localized: L10n.Backup.title), leading: .icon(.backup), action: { onEvent(.openBackup) }) { ModeChevron() }
+                    }
+                }
+
                 ModeButton(resetting ? L10n.Settings.resetting : L10n.Settings.resetMode, role: .destructive, fullWidth: true) {
                     onEvent(.askReset)
                 }
