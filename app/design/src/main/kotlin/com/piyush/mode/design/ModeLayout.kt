@@ -230,6 +230,8 @@ public object ModeSize {
     public val switchWidth: Dp = 52.dp
     public val switchHeight: Dp = 32.dp
     public val switchThumb: Dp = 26.dp
+    /** A routine's step number on a memory card. */
+    public val memoryStep: Dp = 20.dp
     /** The grab handle on top of a sheet. */
     public val sheetHandle: Dp = 36.dp
     public val sheetHandleHeight: Dp = 5.dp
