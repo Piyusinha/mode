@@ -33,6 +33,7 @@
     connect: { screen: 'connect' },
     pickPhone: { screen: 'pickPhone', phones: [phone, { udid: 'x', name: 'Test iPhone', model: 'iPhone17,3', ios: '26.4', usb: true }], phone },
     trust: { screen: 'trust', phone, readiness: 'needsTrust' },
+    oldIos: { screen: 'oldIos', phone: Object.assign({}, phone, { ios: '26.4' }) },
     devMode: { screen: 'devMode', phone, readiness: 'needsDeveloperMode' },
     signIn: { screen: 'signIn', phone, readiness: 'ready', email: 'alex@example.com' },
     signInWrong: { screen: 'signIn', phone, readiness: 'ready', email: 'alex@example.com', signInError: 'Wrong Apple Account or password.' },

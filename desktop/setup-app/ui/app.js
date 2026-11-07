@@ -168,6 +168,18 @@ async function checkSetupUpdate(quiet = false) {
   render();
 }
 
+// ---- iOS 27 or later: Apple's remote control (how Mode sees and taps the screen) starts in iOS 27 ------
+const MIN_IOS = 27;
+const iosMajor = p => parseInt(String(p?.ios ?? ''), 10);
+const iosTooOld = p => iosMajor(p) < MIN_IOS; // unknown versions pass: the engine checks again
+function goTrust() { go(iosTooOld(S.phone) ? 'oldIos' : 'trust'); }
+async function recheckIos() {
+  const phones = (await call('phones').catch(() => [])).filter(p => p.usb);
+  const same = phones.find(p => p.udid === S.phone?.udid) ?? (phones.length === 1 ? phones[0] : null);
+  if (same) S.phone = same;
+  if (same && !iosTooOld(same)) go('trust'); else render();
+}
+
 const screens = {
   welcome: () => page({
     nav: stepsNav(-1, 0),
@@ -197,6 +209,18 @@ const screens = {
     body: head('Which iPhone?', 'More than one is connected. Mode is set up on one at a time.')
       + box(S.phones.map((p, i) => radio(p.name, `${esc(model(p.model))} · iOS ${esc(p.ios)} · ${p.usb ? 'by cable' : 'Wi-Fi'}`, S.phone?.udid === p.udid, `pick:${i}`, '', tile('phone', i ? 'grey' : '', 34))).join('')),
     left: btn('Back', 'welcome'), right: btn('Continue', 'pickContinue', 'primary', S.phone ? '' : 'disabled'),
+  }),
+
+  oldIos: () => page({
+    nav: stepsNav(0),
+    body: head('Mode needs iOS 27', `This iPhone has iOS ${esc(S.phone?.ios)}. Mode sees and taps your screen with Apple’s remote control, which starts in iOS 27.`)
+      + `<ol class="numbered">${[
+        ['Open Settings → General → Software Update', 'Keep your iPhone charging and on Wi-Fi.'],
+        ['Install iOS 27 or later', 'Your iPhone restarts when it’s done.'],
+        ['Plug it in here again and press Check again', '']].map(([t, sub], i) =>
+        `<li><span class="n">${i + 1}</span><span><b>${t}</b>${sub ? `<span>${sub}</span>` : ''}</span></li>`).join('')}</ol>`
+      + box(row('fail', esc(S.phone?.name ?? 'Your iPhone'), `${esc(model(S.phone?.model))} · iOS ${esc(S.phone?.ios)}`)),
+    left: btn('Back', 'welcome'), right: btn('Check again', 'checkIos', 'primary'),
   }),
 
   trust: () => page({
@@ -338,6 +362,7 @@ const screens = {
       nav: stepsNav(3), tight: true,
       body: head('Finish on your iPhone', 'Please complete setup in Mode on your iPhone, then confirm that its phone-control test passed.')
         + `<div class="side-by-side"><div class="grow">` + box(row('done', S.installedSidestore ? 'Mode and SideStore installed' : 'Mode installed', S.ownVpn ? 'With Mode’s own VPN — no extra app needed' : '')
+          + row('todo', 'Trust your Apple account', 'If your iPhone says “Untrusted Developer” when you open Mode: Settings → General → VPN &amp; Device Management → your Apple account → Trust. Once per Apple account.')
           + (needsVpnApp ? row(vpnApp ? 'done' : 'wait', 'Get LocalDevVPN from the App Store', vpnApp ? 'Installed. Open it and tap Connect.' : 'Free. Mode uses it to reach its tools on your iPhone without a computer. Scan the code with your iPhone.') : '')
           + row(S.phoneTestConfirmed ? 'done' : 'todo', 'Complete setup and run the test in Mode', S.phoneTestConfirmed ? 'You confirmed the test passed on your iPhone.' : 'Open the Mode copy just installed. Finish setup and run its phone-control test.')
           + row(S.cableDisconnected ? 'done' : 'todo', 'Unplug the cable', S.cableDisconnected ? 'Cable disconnected. Check Mode can still open Settings and tap.' : 'After the test passes, unplug and check Mode still works.', '', !S.phoneTestConfirmed)) + '</div>'
@@ -499,7 +524,7 @@ async function enter(screen) {
     poll(async () => {
       const phones = (await call('phones')).filter(p => p.usb);
       S.phones = phones;
-      if (phones.length === 1) { S.phone = phones[0]; go('trust'); return false; }
+      if (phones.length === 1) { S.phone = phones[0]; goTrust(); return false; }
       if (phones.length > 1) { S.phone = null; go('pickPhone'); return false; }
     }, 1500);
   }
@@ -763,7 +788,8 @@ document.addEventListener('click', async e => {
     case 'checkSetupUpdate': await checkSetupUpdate(); break;
     case 'copyCheck': { const x = S.computer?.checks?.[+arg]; if (x?.command) { navigator.clipboard?.writeText(x.command).catch(() => {}); S.copiedCheck = +arg; render(); setTimeout(() => { S.copiedCheck = null; render(); }, 2000); } break; }
     case 'pick': S.phone = S.phones[+arg]; render(); break;
-    case 'pickContinue': go('trust'); break;
+    case 'pickContinue': goTrust(); break;
+    case 'checkIos': await recheckIos(); break;
     case 'remember': S.remember = !S.remember; render(); break;
     case 'signIn': signIn(); break;
     case 'signInScreen': go('signIn'); break;

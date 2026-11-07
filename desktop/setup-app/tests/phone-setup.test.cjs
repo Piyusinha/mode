@@ -326,3 +326,27 @@ test('an update check that fails stays quiet at start, and says so in Settings',
   await f.click('checkSetupUpdate');
   assert.match(f.app.innerHTML, /Couldn’t check/);
 });
+
+// ---- iOS 27 or later --------------------------------------------------------------------------------
+test('an iPhone on iOS 26 stops at "Mode needs iOS 27" and goes on after updating', async () => {
+  let ios = '26.4';
+  const f = fixture({ phones: () => [{ udid: 'old', name: 'Old iPhone', model: 'iPhone17,3', ios, usb: true }] });
+  await f.run("S.phone = { udid: 'old', name: 'Old iPhone', ios: '26.4', usb: true }; goTrust()");
+  assert.equal(f.run('S.screen'), 'oldIos');
+  assert.match(f.app.innerHTML, /Mode needs iOS 27/);
+  assert.match(f.app.innerHTML, /iOS 26\.4/);
+  await f.click('checkIos');
+  assert.equal(f.run('S.screen'), 'oldIos');
+  ios = '27.1';
+  await f.click('checkIos');
+  assert.equal(f.run('S.screen'), 'trust');
+});
+
+test('iOS 27 goes straight to Trust; the on-phone steps include trusting the Apple account', async () => {
+  const f = fixture();
+  await f.run("S.phone = { udid: 'p', name: 'P', ios: '27.2', usb: true }; goTrust()");
+  assert.equal(f.run('S.screen'), 'trust');
+  await f.run("go('onPhone')");
+  assert.match(f.app.innerHTML, /Trust your Apple account/);
+  assert.match(f.app.innerHTML, /VPN &amp; Device Management/);
+});
