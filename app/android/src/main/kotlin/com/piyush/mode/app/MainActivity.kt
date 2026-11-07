@@ -20,8 +20,8 @@ class MainActivity : ComponentActivity() {
         val graph = ModeApplication.graph(this)
         setContent {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                // Placeholder until the design system and screens land. literal-ok
-                BasicText("Mode ${if (graph.screens.needsOnboarding) "· first run" else "· ready"}")
+                // Placeholder until the screens land.
+                BasicText("Mode ${if (graph.screens.needsOnboarding) "· first run" else "· ready"}") // literal-ok
             }
         }
     }

@@ -51,3 +51,16 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// No literals in screens: tools/check-ui-literals-android.sh, part of `check`.
+val checkUiLiterals = tasks.register<Exec>("checkUiLiterals") {
+    group = "verification"
+    description = "Fails when a screen hard-codes colours, sizes, fonts, icons or text."
+    val script = rootProject.file("tools/check-ui-literals-android.sh")
+    inputs.file(script)
+    inputs.dir("src")
+    outputs.upToDateWhen { true }
+    commandLine(script.absolutePath)
+}
+tasks.named("check") { dependsOn(checkUiLiterals) }
+

@@ -32,7 +32,7 @@ jobs:
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
       - name: Android app and host tests
-        run: ./gradlew :app:android:assembleFullDebug testAndroidHostTest
+        run: ./gradlew :app:android:assembleFullDebug :app:android:assemblePlayDebug testAndroidHostTest :app:android:checkUiLiterals
 
   mode-setup:
     runs-on: ubuntu-22.04
