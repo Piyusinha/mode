@@ -41,6 +41,9 @@ SETUP_V=$(sed -n 's/^ *"version": *"\(.*\)",*$/\1/p' desktop/setup-app/tauri.con
 APP_V=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"$/\1/p' iosApp/project.yml | head -1)
 case "$V" in "$APP_V" | "$APP_V".0) ;; *) die "iosApp/project.yml MARKETING_VERSION is $APP_V; set it to $V";; esac
 
+# What's new: the release notes come from CHANGELOG.md, so its section must exist first.
+tools/release-notes.sh "$V" >/dev/null || die "write the $V section of CHANGELOG.md first"
+
 echo "== Mode (.ipa, free and paid)"
 tools/build-ipa.sh both
 
@@ -76,23 +79,7 @@ cp "$DMG" build/release/Mode-Setup-mac.dmg
 
 echo "== Draft release $TAG"
 NOTES=$(mktemp)
-cat > "$NOTES" <<EOF
-## Install
-1. Download **Mode Setup** for your computer:
-   - Mac: \`Mode-Setup-mac.dmg\` (Apple silicon and Intel, signed and notarized)
-   - Windows: \`Mode-Setup-windows.exe\` (or the .msi)
-   - Linux: \`Mode-Setup-linux.AppImage\` (or the .deb)
-2. Open it. It checks your computer first: on Windows it needs Apple's iTunes from apple.com, on
-   Linux usbmuxd, and it tells you if either is missing. Xcode is not needed.
-3. Connect your iPhone with a cable and follow the steps. Mode is inside Mode Setup, so nothing
-   else is downloaded.
-
-Mode needs an iPhone on iOS 27 or later. See the README.
-
-## Files
-- \`Mode.ipa\`, \`Mode-paid.ipa\`: Mode, unsigned. Mode Setup signs it with your Apple account.
-- \`*.sha256\`: their checksums.
-EOF
+tools/release-notes.sh "$V" > "$NOTES"
 gh release create "$TAG" --draft --target main --title "Mode $V" --notes-file "$NOTES" \
     build/release/Mode.ipa build/release/Mode.ipa.sha256 \
     build/release/Mode-paid.ipa build/release/Mode-paid.ipa.sha256 \
