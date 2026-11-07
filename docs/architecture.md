@@ -73,6 +73,7 @@ database.
 | engine | `engine:llm` | `LlmClient`, `OpenRouterClient`, and `OpenRouterModels` (the live model catalogue) |
 | engine | `engine:agent` | The agent loop, its tools, `ContextBuilder` (what the model sees), `StuckDetector`, `AgentTrace` and `PhoneProfile` (what differs per phone) |
 | engine | `engine:phone-ios` | The iPhone backend over CoreDevice, the VPN and the pairing file |
+| engine | `engine:phone-android` | The Android backend over Mode's accessibility service (see [android.md](android.md)) |
 | feature | `feature:connection` | `PhoneSession` (one shared session, `ConnectionState`), the `PhoneLink` port, `IdleDisconnectPolicy` |
 | feature | `feature:settings` | `SettingsRepository` (typed `ModeSettings`, including the per-task cost limit) and `ModelCatalog` (usable models with cost per task, cached a day) |
 | feature | `feature:runs` | `RunRecorder`, `RunRepository` (listed from the database; events and screenshots stay files) |

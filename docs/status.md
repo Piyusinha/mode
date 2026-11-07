@@ -19,17 +19,17 @@ As of 2026-11-01.
 
 ## Android (started 2026-11-06, branch `mode-android`)
 
-The plan has eight phases (see the session plan and `docs/android.md` once it exists). Design: the
+The plan has eight phases; how Android works is in [android.md](android.md). Design: the
 Android canvas, 135 boards. Decisions D41–D43.
 
 | Phase | What | State |
 |---|---|---|
 | 0 | Foundations: Android target in the convention plugin, stores, platform adapters, OkHttp, the database driver, `app:android`, `androidModeGraph`, CI job | ✅ Done; the app starts on the API 37 emulator with the full graph |
 | 1 | Shared code for two phones: `engine:screen`, four new ops, `PhoneProfile`, keyboard and private screens from a tree, the renames | ✅ Done |
-| 2 | The accessibility engine (`engine:phone-android`): tree text, screenshots, gestures, the service, checks, the working service | ⏳ Next |
-| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | ⏳ |
+| 2 | The accessibility engine (`engine:phone-android`): tree text, screenshots, gestures, the service, checks, the working service | ✅ Done on the API 37 emulator (look 131–229 ms); a real phone and the OCR fallback still to do |
+| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | ⏳ Next |
 | 4 | Hands-free: notifications with answers, the assistant role, widget, exact-alarm schedules, Android voice | ⏳ |
-| 5 | Background mode: Mode's own ADB link, the helper, the hidden display | ⏳ |
+| 5 | Background mode: libadb-android for the link, a scrcpy server fork as the helper, the hidden display | ⏳ |
 | 6 | Distribution: signed APK on GitHub, the `play` flavour, CI | ⏳ |
 | 7 | Quality: the task suite on phones, brand quirks, docs | ⏳ |
 

@@ -521,3 +521,21 @@ that says `private` is the user's turn at once, with no model call.
 `ready()/permitted()`, and `steps` says which checks a phone runs. The health rows for Android's
 own checks come with its engine.
 
+## D44. Keeping Mode running on Android: a special-use foreground service (2026-11-07)
+
+While a task runs, a foreground service of type `specialUse` shows the ongoing "Mode is working"
+notification with Stop, and Mode holds a partial and a screen-on wake lock until the last run ends.
+Silent audio (the iPhone's way, D19) is not used: Android 17 restricts background audio, and it would
+mislead the user. Android allows the start from the background because the accessibility service is
+bound. `AppLifecycle.onTerminate` does nothing on Android: there is no reliable call, and running
+terminate actions on every trip to the background closed the session mid-task.
+
+## D45. The Android engine reads the tree, in dp (2026-11-07)
+
+On Android, `screen.text` is the accessibility tree (`source: "tree"`, each box's window), not OCR; OCR is
+only a fallback for an app window with no readable text. Points are dp, and `screen.bounds` gives the
+status bar inset. The service is not marked `isAccessibilityTool`: Mode is not a disability tool, so
+screens an app marks sensitive stay hidden from it, and a secure screen answers `private`, which the
+agent turns into the user's turn. Background mode (Phase 5) reuses libadb-android and a scrcpy server
+fork rather than new code (see android.md).
+
