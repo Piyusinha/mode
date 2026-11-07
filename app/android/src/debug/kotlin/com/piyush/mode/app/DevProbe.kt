@@ -59,6 +59,7 @@ class DevProbe : BroadcastReceiver() {
                         val d = intent.getIntExtra("display", 0)
                         val backend = com.piyush.mode.android.AccessibilityBackend(service, com.piyush.mode.android.AndroidImageTools(service::bitmapFor), displayId = d)
                         if (intent.hasExtra("x")) backend.send(Op.Tap(intent.getFloatExtra("x", 0f).toDouble(), intent.getFloatExtra("y", 0f).toDouble()))
+                        intent.getStringExtra("launch")?.let { backend.send(Op.LaunchApp(it)); kotlinx.coroutines.delay(2000) }
                         val shot = backend.send(Op.ScreenCapture(maxSize = 1000)).jsonObject
                         val text = backend.send(Op.ScreenText()) as JsonArray
                         "display=$d bounds=${shot["bounds"]} private=${shot["private"]} jpeg=${shot["jpeg_b64"]?.toString()?.length} texts=${text.size}: " +
@@ -90,6 +91,14 @@ class DevProbe : BroadcastReceiver() {
                     "tls" -> runCatching {
                         Class.forName("org.conscrypt.OpenSSLProvider").getDeclaredConstructor().newInstance().toString()
                     }.fold({ "bundled conscrypt ok: $it" }, { e -> "bundled conscrypt failed: ${e::class.java.name}: ${e.message} / ${e.cause?.let { c -> c::class.java.name + ": " + c.message }}" })
+                    // Turns background mode on or off (after pairing with op=adb), then the next look shows the route.
+                    "background" -> {
+                        val mode = com.piyush.mode.app.graph.background ?: error("no background mode in this build")
+                        mode.enabled = intent.getBooleanExtra("on", true)
+                        if (!mode.enabled) mode.stop()
+                        "background=${mode.enabled}"
+                    }
+                    "route" -> graph.session.phone().let { "state=${graph.session.state.value}" }
                     "helperstop" -> {
                         helper?.close()
                         helper = null

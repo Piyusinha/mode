@@ -208,6 +208,23 @@ class AccessibilityBackendTest {
     }
 
     @Test
+    fun onAHiddenDisplayBackAndHomeStayThereAndPanelsAreRefused() = runTest {
+        val hands = FakeHands()
+        val pressed = mutableListOf<GlobalAction>()
+        val b = AccessibilityBackend(
+            hands, images = { _, maxSide -> ShrunkImage(byteArrayOf(9), maxSide / 2, maxSide) }, displayId = 7,
+            displayKeys = { pressed += it; true },
+        )
+        b.send(Op.Back)
+        b.send(Op.Home)
+        assertEquals(listOf(GlobalAction.Back, GlobalAction.Home), pressed)
+        assertFailsWith<OpFailed> { b.send(Op.OpenQuickSettings) }
+        assertFailsWith<OpFailed> { b.send(Op.OpenNotifications) }
+        assertFailsWith<OpFailed> { b.send(Op.Recents) }
+        assertTrue(hands.calls.none { it.startsWith("global") }, "the user's screen is never touched")
+    }
+
+    @Test
     fun appsLaunchByNameOrPackageAndTheCurrentOneIsKnown() = runTest {
         val hands = FakeHands(listOf(app(node(1, "x", 0, 0, 10, 10), pkg = "com.whatsapp")), apps = listOf(InstalledApp("WhatsApp", "com.whatsapp"), InstalledApp("Uber", "com.ubercab")))
         val b = backend(hands)

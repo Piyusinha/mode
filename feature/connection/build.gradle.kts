@@ -14,7 +14,9 @@ kotlin {
             implementation(projects.engine.phoneIos)
         }
         androidMain.dependencies {
-            implementation(projects.engine.phoneAndroid)
+            api(projects.engine.phoneAndroid)
+            api(projects.engine.adbLink)
+            implementation(projects.core.storage)
         }
         commonTest.dependencies {
             implementation(projects.testing)

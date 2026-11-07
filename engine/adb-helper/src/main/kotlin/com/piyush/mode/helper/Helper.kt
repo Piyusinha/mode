@@ -23,6 +23,7 @@ import kotlin.system.exitProcess
  * One command per line on standard input, one answer per line on standard output:
  * - `display <width> <height> <dpi>` → `display <id>`: makes the hidden display (one at a time)
  * - `start <displayId> <package/activity>` → `started`: opens an app on it
+ * - `key <displayId> <keycode>` → `pressed`: Back (4) or Home (3) on that display, never the user's screen
  * - `release` → `released`: removes the display and what runs on it
  * - `quit` → `bye`
  * Anything that fails answers `error <why>`. It prints `ready <sdk>` once it can take commands, and ends when
@@ -58,6 +59,7 @@ public object Helper {
             "display ${makeDisplay(context, w, h, dpi)}"
         }
         "start" -> start(parts[1].toInt(), parts[2])
+        "key" -> key(parts[1].toInt(), parts[2].toInt())
         "release" -> {
             release()
             "released"
@@ -98,6 +100,14 @@ public object Helper {
         val out = process.inputStream.bufferedReader().readText()
         if (!process.waitFor(START_SECONDS, TimeUnit.SECONDS)) return "error start timed out"
         return if (process.exitValue() == 0 && "Error" !in out) "started" else "error ${out.lines().firstOrNull { "Error" in it } ?: out.trim()}"
+    }
+
+    /** A key press on one display, as `input -d` does from a computer. */
+    private fun key(displayId: Int, code: Int): String {
+        val process = ProcessBuilder("input", "-d", displayId.toString(), "keyevent", code.toString()).redirectErrorStream(true).start()
+        val out = process.inputStream.bufferedReader().readText()
+        if (!process.waitFor(START_SECONDS, TimeUnit.SECONDS)) return "error key timed out"
+        return if (process.exitValue() == 0) "pressed" else "error ${out.trim()}"
     }
 
     private fun release() {

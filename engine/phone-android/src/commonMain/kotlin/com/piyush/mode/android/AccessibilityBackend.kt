@@ -46,6 +46,11 @@ class AccessibilityBackend(
     private val telemetry: Telemetry = Telemetry.None,
     /** The display Mode works on: 0 is the phone's own screen; a hidden display in background mode. */
     private val displayId: Int = 0,
+    /**
+     * Back and Home on the hidden display (the helper presses them there). The accessibility service's own
+     * Back and Home always act on the user's screen, so without this they fail on a hidden display.
+     */
+    private val displayKeys: (suspend (GlobalAction) -> Boolean)? = null,
 ) : PhoneBackend {
 
     override val name = "android-a11y"
@@ -99,7 +104,16 @@ class AccessibilityBackend(
         return JsonNull
     }
 
-    private fun global(action: GlobalAction): JsonElement {
+    private suspend fun global(action: GlobalAction): JsonElement {
+        if (displayId != 0) {
+            // Never touch the screen the user is on: Back and Home go to the hidden display; its panels don't exist.
+            if (action != GlobalAction.Back && action != GlobalAction.Home) {
+                throw OpFailed("Mode is working on a hidden screen, which has no $action: open the Settings app instead")
+            }
+            val keys = displayKeys ?: throw OpFailed("the hidden screen can't do $action")
+            if (!keys(action)) throw OpFailed("the hidden screen did not do $action")
+            return JsonNull
+        }
         if (!hands.global(action)) throw OpFailed("the phone did not do $action")
         return JsonNull
     }

@@ -22,6 +22,7 @@ import com.piyush.mode.core.telemetry.TelemetryResource
 import com.piyush.mode.feature.backup.data.AndroidBackupFiles
 import com.piyush.mode.feature.connection.data.AccessibilityPhoneChecks
 import com.piyush.mode.feature.connection.data.AccessibilityPhoneLink
+import com.piyush.mode.feature.connection.data.BackgroundMode
 import com.piyush.mode.feature.connection.data.UnavailablePhoneChecks
 import com.piyush.mode.feature.connection.data.UnavailablePhoneLink
 import kotlinx.coroutines.CoroutineScope
@@ -73,7 +74,7 @@ fun androidModeGraph(
     }
     lifecycle.onForeground { telemetry.event(Event.Foreground) }
     // The full build declares Mode's accessibility service; the Play build has none and cannot drive the phone.
-    val link = if (declaresPhoneControl(app)) AccessibilityPhoneLink(telemetry) else null
+    val link = if (declaresPhoneControl(app)) AccessibilityPhoneLink(telemetry, BackgroundMode(app, prefs).also { background = it }) else null
     return ModeGraph(
         PlatformServices(
             secrets = KeystoreSecretStore(app),
@@ -105,6 +106,10 @@ private fun declaresPhoneControl(app: Application): Boolean = runCatching {
     app.packageManager.getServiceInfo(component, 0)
     true
 }.getOrDefault(false)
+
+/** Background mode, in builds that can drive the phone (the app's setup screens use it). */
+var background: BackgroundMode? = null
+    private set
 
 /** Whether Mode is the phone's digital assistant (hold power to talk to it). */
 private fun holdsAssistantRole(app: Application): Boolean =

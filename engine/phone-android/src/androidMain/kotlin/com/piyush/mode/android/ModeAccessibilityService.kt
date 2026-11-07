@@ -230,6 +230,9 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
     // Apps ------------------------------------------------------------------------------------
 
     override fun launch(packageName: String, fresh: Boolean, displayId: Int): Boolean {
+        // Coming back to Mode after a task: on a hidden display the user never left it, and opening Mode
+        // there would pull its window off their screen.
+        if (packageName == this.packageName && displayId != Display.DEFAULT_DISPLAY) return true
         val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or if (fresh) Intent.FLAG_ACTIVITY_CLEAR_TASK else Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         val options = ActivityOptions.makeBasic().apply { if (displayId != Display.DEFAULT_DISPLAY) launchDisplayId = displayId }

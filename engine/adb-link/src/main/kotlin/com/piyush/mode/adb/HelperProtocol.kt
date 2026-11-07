@@ -13,6 +13,9 @@ public object HelperCommand {
     public fun display(width: Int, height: Int, dpi: Int): String = "display $width $height $dpi"
     public fun start(displayId: Int, component: String): String = "start $displayId $component"
     public const val RELEASE: String = "release"
+    public const val KEY_BACK: Int = 4
+    public const val KEY_HOME: Int = 3
+    public fun key(displayId: Int, keyCode: Int): String = "key $displayId $keyCode"
 }
 
 public object HelperAnswer {
