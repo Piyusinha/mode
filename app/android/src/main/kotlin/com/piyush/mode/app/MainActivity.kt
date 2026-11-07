@@ -40,7 +40,11 @@ class MainActivity : ComponentActivity() {
         }
         // While a task runs on the hidden screen, leaving Mode shrinks it to a small window.
         lifecycleScope.launch {
-            (application as ModeApplication).backgroundTask.collect { running -> runCatching { setPictureInPictureParams(pipParams(running)) } }
+            (application as ModeApplication).backgroundTask.collect { running ->
+                runCatching { setPictureInPictureParams(pipParams(running)) }
+                // The task ended: the small window goes (its answer comes as a notification, and in the chat).
+                if (!running && isInPictureInPictureMode) moveTaskToBack(true)
+            }
         }
     }
 

@@ -101,6 +101,14 @@ class DevProbe : BroadcastReceiver() {
                         (context.applicationContext as ModeApplication).backgroundTask.value = intent.getBooleanExtra("on", true)
                         "pip=${intent.getBooleanExtra("on", true)}"
                     }
+                    // How the loopback search does on this phone: --ei threads 256 --ei ms 25
+                    "scan" -> {
+                        val t0 = System.currentTimeMillis()
+                        val found = com.piyush.mode.adb.LoopbackPorts.open(
+                            com.piyush.mode.adb.LoopbackPorts.EPHEMERAL, intent.getIntExtra("threads", 256), intent.getIntExtra("ms", 25),
+                        )
+                        "found $found in ${System.currentTimeMillis() - t0} ms"
+                    }
                     "tls" -> runCatching {
                         Class.forName("org.conscrypt.OpenSSLProvider").getDeclaredConstructor().newInstance().toString()
                     }.fold({ "bundled conscrypt ok: $it" }, { e -> "bundled conscrypt failed: ${e::class.java.name}: ${e.message} / ${e.cause?.let { c -> c::class.java.name + ": " + c.message }}" })

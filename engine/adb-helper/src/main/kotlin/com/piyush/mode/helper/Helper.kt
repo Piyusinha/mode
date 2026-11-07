@@ -82,9 +82,24 @@ public object Helper {
         val manager = DisplayManager::class.java.getDeclaredConstructor(Context::class.java).apply { isAccessible = true }.newInstance(context)
         val virtual = manager.createVirtualDisplay(NAME, width, height, dpi, images.surface, flags())
             ?: error("no display")
+        noKeyboard(virtual.display.displayId)
         reader = images
         display = virtual
         return virtual.display.displayId
+    }
+
+    /**
+     * No keyboard for the hidden display: without this Android shows its keyboard on the user's screen whenever
+     * Mode taps a field there. Mode fills fields through phone control, so no keyboard is needed (scrcpy's
+     * --display-ime-policy=hide).
+     */
+    @SuppressLint("PrivateApi")
+    private fun noKeyboard(displayId: Int) {
+        runCatching {
+            val binder = Class.forName("android.os.ServiceManager").getMethod("getService", String::class.java).invoke(null, "window")
+            val wm = Class.forName("android.view.IWindowManager\$Stub").getMethod("asInterface", android.os.IBinder::class.java).invoke(null, binder)
+            wm.javaClass.getMethod("setDisplayImePolicy", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).invoke(wm, displayId, IME_HIDE)
+        }.onFailure { System.err.println("ime policy: ${it.message}") }
     }
 
     /** As scrcpy's new display: hidden from the user's screen, its own focus, usable while the phone is locked. */
@@ -144,6 +159,8 @@ public object Helper {
     }
 
     private const val NAME = "Mode"
+    /** WindowManager.DISPLAY_IME_POLICY_HIDE. */
+    private const val IME_HIDE = 2
     private const val USER_DISPLAY = 0
     private val ROOT_TASK = Regex("""RootTask id=(\d+) .*displayId=(\d+)""")
     private const val BYE = "bye"

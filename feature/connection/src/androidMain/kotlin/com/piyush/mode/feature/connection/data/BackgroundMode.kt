@@ -46,10 +46,18 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
         val ready = helper?.takeIf { it.open }
         display?.let { if (ready != null) return it }
         if (!link.connected) {
-            wirelessDebuggingOn()
-            check(link.connect(lastPort)) { "Wireless debugging is off or not reachable" }
-            lastPort = link.port
+            // Just switched on, Wireless debugging needs a moment before it listens.
+            val tries = if (wirelessDebuggingOn()) STARTING_TRIES else 1
+            var connected = false
+            for (i in 1..tries) {
+                if (i > 1 || tries > 1) kotlinx.coroutines.delay(STARTING_WAIT_MS)
+                connected = link.connect(lastPort)
+                if (connected) break
+            }
+            check(connected) { "Wireless debugging is off or not reachable (${link.lastError ?: "no port answered"})" }
         }
+        // The port, for next time (also when setup connected): finding it again means searching for it.
+        link.port?.let { if (it != lastPort) lastPort = it }
         helper?.close()
         val session = HelperSession.start(link, app.applicationInfo.sourceDir)
         helper = session
@@ -120,18 +128,19 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
      * Wireless debugging turns itself off on a restart. Setup granted Mode the right to write secure settings, so
      * it switches it back on (Android then only needs the Wi-Fi it was allowed on).
      */
-    private fun wirelessDebuggingOn() {
-        runCatching {
-            if (Settings.Global.getInt(app.contentResolver, ADB_WIFI, 0) == 0) {
-                Settings.Global.putInt(app.contentResolver, ADB_WIFI, 1)
-                AppLog.log("background", "turned Wireless debugging back on")
-            }
-        }
-    }
+    /** True when it was off and Mode switched it on. */
+    private fun wirelessDebuggingOn(): Boolean = runCatching {
+        if (Settings.Global.getInt(app.contentResolver, ADB_WIFI, 0) != 0) return@runCatching false
+        Settings.Global.putInt(app.contentResolver, ADB_WIFI, 1)
+        AppLog.log("background", "turned Wireless debugging back on")
+        true
+    }.getOrDefault(false)
 
     public companion object {
         private const val ENABLED = "background.enabled"
         private const val PORT = "background.port"
         private const val ADB_WIFI = "adb_wifi_enabled"
+        private const val STARTING_TRIES = 3
+        private const val STARTING_WAIT_MS = 1_500L
     }
 }

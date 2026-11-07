@@ -45,8 +45,16 @@ public class AdbLink(context: Context) {
         withContext(Dispatchers.IO) {
             val m = manager()
             if (m.isConnected) return@withContext true
-            val candidates = listOfNotNull(lastPort) + LoopbackPorts.open(LoopbackPorts.EPHEMERAL).filter { it != lastPort }
-            candidates.any { port -> runCatching { m.connect(LOCALHOST, port) }.getOrDefault(false).also { if (it) this@AdbLink.port = port } }
+            fun tryPort(port: Int) = runCatching { m.connect(LOCALHOST, port) }
+                .onFailure { lastError = "port $port: ${it::class.java.simpleName}: ${it.message}" }
+                .getOrDefault(false).also { if (it) this@AdbLink.port = port }
+            // The port that worked last first; the search only when it doesn't (Wireless debugging was toggled).
+            if (lastPort != null && tryPort(lastPort)) return@withContext true
+            // Up to Android 16 the phone says its port over mDNS (about a second). Android 17 shows a picker for
+            // that, which would close Settings' pairing window, so there the loopback search finds it instead.
+            val announced = if (Build.VERSION.SDK_INT <= LAST_SDK_WITHOUT_PICKER) discoverConnectPort() else null
+            if (announced != null && announced != lastPort && tryPort(announced)) return@withContext true
+            LoopbackPorts.open(LoopbackPorts.EPHEMERAL).filter { it != lastPort && it != announced }.any(::tryPort)
         }
     }
 
@@ -82,6 +90,21 @@ public class AdbLink(context: Context) {
         withContext(Dispatchers.IO) { runCatching { manager?.disconnect() } }
     }
 
+    /** This phone's Wireless debugging port, as it announces it over mDNS; null when nothing answers in time. */
+    private suspend fun discoverConnectPort(): Int? = kotlinx.coroutines.withTimeoutOrNull(DISCOVER_MS) {
+        kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+            var mdns: io.github.muntashirakon.adb.android.AdbMdns? = null
+            mdns = io.github.muntashirakon.adb.android.AdbMdns(app, io.github.muntashirakon.adb.android.AdbMdns.SERVICE_TYPE_TLS_CONNECT) { host, port ->
+                if (host != null && port > 0 && cont.isActive) {
+                    mdns?.stop()
+                    cont.resume(port) { }
+                }
+            }
+            cont.invokeOnCancellation { mdns.stop() }
+            mdns.start()
+        }
+    }
+
     private fun manager(): Manager = manager ?: Manager(keys.load()).also { manager = it }
 
     private class Manager(key: Pair<PrivateKey, Certificate>) : AbsAdbConnectionManager() {
@@ -91,6 +114,8 @@ public class AdbLink(context: Context) {
         init {
             setApi(Build.VERSION.SDK_INT)
             setHostAddress(LOCALHOST)
+            // A port that accepts but never answers (another app's local server) must not hold Mode for good.
+            setTimeout(HANDSHAKE_S, java.util.concurrent.TimeUnit.SECONDS)
         }
 
         override fun getPrivateKey(): PrivateKey = privateKey
@@ -104,5 +129,9 @@ public class AdbLink(context: Context) {
         const val LOCALHOST = "127.0.0.1"
         /** No PTY, so nothing echoes back and binary-safe output. */
         const val EXEC = "exec:"
+        const val HANDSHAKE_S = 3L
+        const val DISCOVER_MS = 4_000L
+        /** Android 16: the last version whose mDNS discovery needs no picker. */
+        const val LAST_SDK_WITHOUT_PICKER = 36
     }
 }
