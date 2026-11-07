@@ -134,6 +134,7 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
         Route.Settings -> com.piyush.mode.app.settings.SettingsRoute(graph, nav::push, { nav.pop() }, overlays.openProviders, overlays.reset)
+        is Route.ModelPicker -> com.piyush.mode.app.settings.ModelPickerRoute(graph, route.stuck) { nav.pop() }
         Route.PhoneSetup -> com.piyush.mode.app.firstrun.PhoneSetupRoute(graph, pages, dots = null, onContinue = { nav.pop() }, onBack = { nav.pop() })
         is Route.TaskDebug -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = false, nav::push) { nav.pop() }
         is Route.TaskDebugAsk -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = true, nav::push) { nav.pop() }
