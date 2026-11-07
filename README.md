@@ -135,6 +135,42 @@ Mode Setup checks your computer before it starts and tells you if anything is mi
 
 <br>
 
+## Setting up your iPhone
+
+Mode Setup shows each of these on screen when it’s needed. Here they are in one place.
+
+### Turn on Developer Mode
+
+Mode uses Apple’s developer tools to see and tap your screen, the same ones app developers
+use to test their apps. They only work with Developer Mode on.
+
+1. Plug your iPhone into your computer with Mode Setup open, and tap **Trust** on the iPhone.
+   The Developer Mode switch is hidden until a computer shows it, and Mode Setup does that.
+2. On your iPhone, open **Settings → Privacy & Security**.
+3. Scroll to the bottom, tap **Developer Mode** and turn it on.
+4. Tap **Restart**. Keep the cable plugged in.
+5. After the restart, unlock your iPhone. When it asks *“Turn on Developer Mode?”*, tap
+   **Turn On** and enter your passcode.
+
+Mode Setup notices the restart and carries on by itself.
+
+> **No Developer Mode in Privacy & Security?** Unplug your iPhone, plug it back in with Mode
+> Setup open, and tap Trust again. Then close Settings and open it again.
+
+Developer Mode stays on until you turn it off, and it changes nothing else on your iPhone.
+
+### Trust your Apple account
+
+If your iPhone says **“Untrusted Developer”** when you first open Mode:
+
+1. Open **Settings → General → VPN & Device Management**.
+2. Tap your Apple account under *Developer App*.
+3. Tap **Trust**, then **Trust** again.
+
+This tells your iPhone that you signed Mode yourself. You only do it once per Apple account.
+
+<br>
+
 ## Good to know
 
 Mode is early, and it works around what iPhones normally allow. A few things to expect:
