@@ -156,7 +156,7 @@ public class Voices(
     public suspend fun speakOrHear(text: String, onPartial: (String) -> Unit = {}): Heard? {
         val line = text.trim()
         if (line.isEmpty()) return null
-        if (!settings.settings.value.bargeIn || block(VoiceKind.Device, hearing = true) != null || block(chosen(hearing = true), hearing = true) != null) {
+        if (!settings.settings.value.bargeIn || !device.hearsOverSpeech || block(VoiceKind.Device, hearing = true) != null || block(chosen(hearing = true), hearing = true) != null) {
             speak(line); return null
         }
         return telemetry.trace(Operation.VoiceSpeak, mapOf(Field.Entry to "interruptible")) { span -> kotlinx.coroutines.coroutineScope {

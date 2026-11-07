@@ -177,8 +177,11 @@ public class ListenPresenter(
     private var job: Job? = null
     private var taskId: String? = null
 
-    /** Started by voice: one task after another until they say "that's all", go quiet, or close it. */
-    private val keepsGoing = entry == "siri" || entry == "ask_mic"
+    /**
+     * Started by voice ("Hey Siri, start Mode" on the iPhone, holding power on Android) or Ask's mic: one task
+     * after another until they say "that's all", go quiet, or close it.
+     */
+    private val keepsGoing = entry in SESSION_ENTRIES
 
     /** Where the tasks go: the chat it opened in, else the first task's own chat, so a conversation stays together. */
     private var chat: String? = conversationId
@@ -555,6 +558,9 @@ public class ListenPresenter(
     private fun hour(): Int = Instant.fromEpochMilliseconds(clock.now()).toLocalDateTime(clock.zone()).hour
 
     internal companion object {
+        /** How talking mode opened when it should carry on after a task: Siri, Android's assistant, Ask's mic. */
+        val SESSION_ENTRIES = setOf("siri", "assistant", "ask_mic")
+
         /**
          * How long the AI may take to write what Mode says on taking a task. Long on purpose: the task is
          * already going, and the AI's own words late beat a fixed line on time.

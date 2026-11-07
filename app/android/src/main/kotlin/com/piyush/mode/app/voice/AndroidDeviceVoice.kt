@@ -68,6 +68,8 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         Voices.installReader { path -> File(path).takeIf { it.exists() }?.readBytes() }
         DeviceVoice.deviceLanguages = { listOf(Locale.getDefault().toLanguageTag()) }
         DeviceVoice.deviceInstalled = { listOf(Locale.getDefault().toLanguageTag()) }
+        // The recognizer would hear Mode's own voice from the speaker: speak, then listen.
+        DeviceVoice.hearsOverSpeech = false
         DeviceVoice.install(
             speechReady = { ttsReady },
             hearingState = ::hearingState,
@@ -199,6 +201,8 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                 override fun onEndOfSpeech() = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
                 override fun onPartialResults(partial: Bundle) {
+                    // A listen that was cancelled or replaced says nothing more.
+                    if (finished || recognizer !== r) return
                     heard = true
                     VoiceLevel.cantHear.value = false
                     partial.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let(onPartial)
@@ -310,8 +314,13 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         VoiceLevel.stopped()
         VoiceLevel.speaking.value = false
         recording?.cancel()
+        // The listen being cancelled is the one running now: a new one may start before this runs on the main
+        // thread, and must not be the one cancelled.
+        val current = recognizer
+        recognizer = null
         main.post {
-            recognizer?.cancel()
+            current?.cancel()
+            current?.destroy()
             player?.release()
             player = null
         }

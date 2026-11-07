@@ -34,6 +34,12 @@ public object DeviceVoice {
     public var transcribe: ((String, (String?) -> Unit) -> Unit)? = null
     public var deleteRecording: (String) -> Unit = {}
     public var cancel: () -> Unit = {}
+    /**
+     * The microphone can listen while Mode speaks without hearing Mode itself (the iPhone's voice processing
+     * cancels the speaker's echo). Android's speech recognizer doesn't, so there Mode speaks, then listens.
+     */
+    public var hearsOverSpeech: Boolean = true
+
     /** Stops what Mode is saying at once, and nothing else: the microphone, if open, stays open (talking over Mode). */
     public var hush: () -> Unit = {}
     /** Asks for the microphone and installs Apple's speech model: only when the user turns Apple hearing on. */

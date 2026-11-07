@@ -269,6 +269,16 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun androidsAssistantButtonStartsTheSameConversation() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "assistant", greeter = nextLines("Anything else?"))
+        talk.submitTyped("Turn on dark mode")
+        val next = talk.state.awaitState { it.greeting == "Anything else?" }
+        assertFalse(next.finished, "holding power, like Hey Siri, keeps the conversation going")
+    }
+
+    @Test
     fun openedFromTheAppTheScreenStillClosesAfterTheTask() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,

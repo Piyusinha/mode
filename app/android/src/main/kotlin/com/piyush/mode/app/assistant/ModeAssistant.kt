@@ -32,7 +32,10 @@ class ModeAssistantSession(context: Context) : VoiceInteractionSession(context) 
         AppLog.log("assistant", "started from the assistant button")
         val listen = Intent(Intent.ACTION_VIEW, Uri.parse("${DeepLink.SCHEME}://listen"), context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        runCatching { startAssistantActivity(listen) }
+        // A plain launch, not startAssistantActivity: an assistant activity goes with the session, and hiding the
+        // session (below) hid Mode with it on Android 16. While the session shows, Android lets Mode start.
+        runCatching { context.startActivity(listen) }
+            .recoverCatching { startAssistantActivity(listen) }
             .onFailure { AppLog.log("assistant", "couldn't open Mode: ${it::class.simpleName}") }
         hide()
     }
