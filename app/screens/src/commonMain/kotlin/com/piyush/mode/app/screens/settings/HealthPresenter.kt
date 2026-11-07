@@ -77,6 +77,7 @@ public class HealthPresenter(
     private val claude: ClaudeAccount?,
     /** The last lines of Mode's log, for Share report. */
     private val logTail: () -> String = { "" },
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
 ) : Presenter<HealthUiState>(parent, HealthUiState()) {
     private var job: Job? = null
     private val repaired = mutableSetOf<HealthItem>()
@@ -146,7 +147,7 @@ public class HealthPresenter(
         set(when (notes) {
             PermissionStatus.Allowed -> HealthRow(HealthItem.Notifications, HealthState.Ok, "On, for questions and results")
             PermissionStatus.NotAsked -> HealthRow(HealthItem.Notifications, HealthState.Warn, "Not allowed yet: Mode can't ask you while it works", HealthFix.Repair)
-            else -> HealthRow(HealthItem.Notifications, HealthState.Warn, "Off: turn them on in iPhone Settings › Mode", HealthFix.Open, "iphone-settings")
+            else -> HealthRow(HealthItem.Notifications, HealthState.Warn, "Off: turn them on in ${profile.settingsPath}", HealthFix.Open, "iphone-settings")
         })
     }
 
@@ -223,7 +224,7 @@ public class HealthPresenter(
         val v = voices
         val mic = DeviceVoice.hearingState()
         set(when (mic) {
-            "denied" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "Off: turn it on in iPhone Settings › Mode", HealthFix.Open, "iphone-settings")
+            "denied" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "Off: turn it on in ${profile.settingsPath}", HealthFix.Open, "iphone-settings")
             "permission" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "Not allowed yet", HealthFix.Repair)
             else -> HealthRow(HealthItem.Microphone, HealthState.Ok, "Allowed")
         })

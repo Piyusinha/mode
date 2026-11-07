@@ -131,6 +131,8 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         Route.LiveRun -> com.piyush.mode.app.live.LiveRoute(graph) { nav.pop() }
         is Route.RunScreens -> com.piyush.mode.app.screensrun.RunScreensRoute(graph, route.taskId) { nav.pop() }
         is Route.Repeat -> com.piyush.mode.app.repeat.RepeatRoute(graph, route.text) { nav.pop() }
+        is Route.TaskDebug -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = false, nav::push) { nav.pop() }
+        is Route.TaskDebugAsk -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = true, nav::push) { nav.pop() }
         else -> NotYet(nav)
     }
 }

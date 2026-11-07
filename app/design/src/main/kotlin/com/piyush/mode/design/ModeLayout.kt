@@ -208,6 +208,13 @@ public object ModeSize {
     public val timeWheel: Dp = 112.dp
     public val timeWheelRow: Dp = 38.dp
     public val timeWheelColumn: Dp = 64.dp
+    /** What went wrong: Mo by the title and an answer, a row, its tick; Ask about it's send and chips. */
+    public val moDebugHeader: Dp = 64.dp
+    public val moAnswer: Dp = 36.dp
+    public val debugRow: Dp = 60.dp
+    public val debugCheck: Dp = 22.dp
+    public val askSend: Dp = 42.dp
+    public val askChip: Dp = 34.dp
     /** The grab handle on top of a sheet. */
     public val sheetHandle: Dp = 36.dp
     public val sheetHandleHeight: Dp = 5.dp

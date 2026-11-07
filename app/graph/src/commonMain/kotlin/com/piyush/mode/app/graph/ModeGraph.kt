@@ -157,7 +157,7 @@ class ModeGraph(platform: PlatformServices) {
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
     val deviceLock: com.piyush.mode.core.platform.DeviceLock = platform.deviceLock
-    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope, lock = platform.deviceLock, background = platform.background, telemetry = telemetry).also { queue ->
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope, lock = platform.deviceLock, background = platform.background, telemetry = telemetry, deviceWord = if (platform.profile.id == "ios") "iPhone" else "phone").also { queue ->
         tasks.onFollowUp = { text, conversation -> queue.submit(text, com.piyush.mode.feature.tasks.domain.TaskSource.Voice, conversation, false) }
     }
 
@@ -212,6 +212,7 @@ class ModeGraph(platform: PlatformServices) {
         device = platform.device,
         backupService = backup,
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
+        profile = platform.profile,
     )
 
     /**

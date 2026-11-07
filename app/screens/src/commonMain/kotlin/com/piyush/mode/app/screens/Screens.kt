@@ -74,6 +74,8 @@ public class Screens(
     private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
     /** Backup and restore (null where there is none). */
     private val backupService: com.piyush.mode.feature.backup.data.BackupService? = null,
+    /** Words about the phone ("this iPhone", where its Settings are). */
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -92,7 +94,7 @@ public class Screens(
     /** What went wrong in a task that couldn't finish, and questions about it. */
     public fun taskDebug(taskId: String): com.piyush.mode.app.screens.debug.TaskDebugPresenter =
         com.piyush.mode.app.screens.debug.TaskDebugPresenter(
-            scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude,
+            scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude, profile,
         )
 
     /** Settings → Backup and restore. */
@@ -102,7 +104,7 @@ public class Screens(
     /** Settings → Health & repair. */
     public fun health(): com.piyush.mode.app.screens.settings.HealthPresenter =
         com.piyush.mode.app.screens.settings.HealthPresenter(
-            scope, settings, session, phoneChecks, runner, voices, permissions, providers, chatGpt, claude, logTail,
+            scope, settings, session, phoneChecks, runner, voices, permissions, providers, chatGpt, claude, logTail, profile,
         )
 
     /** Settings → Listening → Language. */

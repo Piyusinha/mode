@@ -66,6 +66,7 @@ public class TaskDebugPresenter(
     private val llm: LlmClient?,
     private val chatGpt: ChatGptAccount,
     private val claude: ClaudeAccount?,
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
 ) : Presenter<TaskDebugUiState>(parent, TaskDebugUiState()) {
     private var steps: List<JsonObject> = emptyList()
     private var spans: List<SpanRecord> = emptyList()
@@ -83,7 +84,7 @@ public class TaskDebugPresenter(
         spans = telemetry.recent?.let { r -> r.traceOfTask(taskId)?.let { r.trace(it).first } }.orEmpty()
         outcome = run?.outcome
         summary = run?.summary ?: task?.summary
-        val findings = TaskDiagnosis.of(outcome, summary, steps, spans) + live()
+        val findings = TaskDiagnosis.of(outcome, summary, steps, spans, profile.thisDevice, profile.osWord) + live()
         mutableState.value = mutableState.value.copy(
             loaded = true, title = task?.text.orEmpty(), startedAtMs = task?.startedAt ?: task?.createdAt,
             findings = findings, canRepair = findings.any { it.problem && it.kind in REPAIRABLE }, provider = providerName(),
@@ -92,8 +93,8 @@ public class TaskDebugPresenter(
 
     /** How things are now: phone control and the AI, so a repaired part shows as working. */
     private fun live(): List<Finding> = listOf(
-        if (phoneChecks.ready()) Finding(FindingKind.PhoneOk, "Phone control", "Paired with this iPhone", problem = false, ok = true)
-        else Finding(FindingKind.PhoneUnreachable, "Phone control", "Not paired: pair once from your Mac with Mode Setup", problem = true),
+        if (phoneChecks.ready()) Finding(FindingKind.PhoneOk, "Phone control", profile.controlOn, problem = false, ok = true)
+        else Finding(FindingKind.PhoneUnreachable, "Phone control", profile.controlOff, problem = true),
         if (settings.hasAccess(settings.settings.value.provider)) Finding(FindingKind.AiOk, providerName(), "Signed in", problem = false, ok = true)
         else Finding(FindingKind.AiFailed, providerName(), "Not connected: connect it in Settings", problem = true),
     )

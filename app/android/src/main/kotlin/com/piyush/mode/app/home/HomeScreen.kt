@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -122,11 +123,12 @@ fun HomeScreen(state: HomeState, running: Running?, showingUndo: Boolean, onEven
         }
         if (state.suggestions.isNotEmpty()) {
             Section(stringResource(R.string.home_suggested))
-            LazyRow(
-                Modifier.height(IntrinsicSize.Max).padding(bottom = ModeSpacing.m),
-                contentPadding = PaddingValues(horizontal = ModeSpacing.screenEdge),
+            // Cards as tall as the tallest: a plain scrolling row (a lazy one can't be measured that way).
+            androidx.compose.foundation.layout.Row(
+                Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()).height(IntrinsicSize.Max)
+                    .padding(horizontal = ModeSpacing.screenEdge).padding(bottom = ModeSpacing.m),
                 horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
-            ) { items(state.suggestions) { s -> ModeSuggestionCard(s.icon, s.title, s.subtitle, { onEvent(HomeEvent.Suggestion(s.title)) }) } }
+            ) { state.suggestions.forEach { s -> ModeSuggestionCard(s.icon, s.title, s.subtitle, { onEvent(HomeEvent.Suggestion(s.title)) }) } }
         }
         if (state.recent.isNotEmpty()) {
             Section(stringResource(R.string.home_recent))

@@ -32,6 +32,13 @@ data class PhoneProfile(
     val knowHow: String,
     /** Why a screen can be black or blank: who hides it. */
     val hiddenScreens: String,
+    /** What the user reads about the phone in Mode: "this iPhone", "this phone". */
+    val thisDevice: String = "this iPhone",
+    /** Where the user turns Mode's permissions on: "iPhone Settings › Mode". */
+    val settingsPath: String = "iPhone Settings › Mode",
+    /** Phone control, working and not, as Health and What went wrong say it. */
+    val controlOn: String = "Paired with this iPhone",
+    val controlOff: String = "Not paired: pair once from your Mac with Mode Setup",
 ) {
     companion object {
         val IPhone: PhoneProfile = PhoneProfile(
@@ -84,6 +91,10 @@ data class PhoneProfile(
                 - You can start from any screen: you do not need to go home first.
             """.trimIndent(),
             hiddenScreens = "apps hide bank, PIN and password screens from Mode",
+            thisDevice = "this phone",
+            settingsPath = "Settings › Apps › Mode",
+            controlOn = "On",
+            controlOff = "Off: turn Mode on in Settings › Accessibility",
         )
     }
 }
