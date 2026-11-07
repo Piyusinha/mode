@@ -7,7 +7,7 @@ members = ["setup-core", "setup-cli", "setup-app"]
 [workspace.package]
 edition = "2024"
 license = "MIT"
-version = "0.1.2"
+version = "0.1.3"
 
 [workspace.dependencies]
 idevice = { version = "0.1.68", features = ["usbmuxd", "house_arrest", "afc", "amfi", "installation_proxy", "core_device_proxy", "remote_pairing", "tcp", "tunnel_tcp_stack", "xpc", "rsd", "pair"] }

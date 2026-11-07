@@ -6,6 +6,14 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.3 · 7 Nov 2026
+
+Mode's first release of its own: Mode and Mode Setup are now released separately, each with its
+own version and changelog. Mode Setup installs this release, and any newer Mode, for you.
+
+- Mode itself is the same as in 0.1.2: voice and typed tasks in your apps, the Lock Screen and
+  Dynamic Island, memory, your own AI, repeats, and backup and restore.
+
 ## 0.1.2 · 7 Nov 2026
 
 Released together with Mode Setup 0.1.2. Mode is the same as in 0.1.0.

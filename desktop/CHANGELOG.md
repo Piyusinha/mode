@@ -6,10 +6,13 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
+## 0.1.3 · 7 Nov 2026
+
 - Tells you when a newer Mode Setup is out: a banner on the first page and the phone page, with
   a Download link for your computer. Settings › About shows the version and has Check for
   updates.
-- Finds Mode and Mode Setup releases separately, now that each has its own version.
+- Finds Mode and Mode Setup releases separately, now that each has its own version, and installs
+  the newest Mode release.
 
 ## 0.1.2 · 7 Nov 2026
 
