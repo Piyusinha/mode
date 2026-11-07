@@ -52,7 +52,13 @@ class MainActivity : ComponentActivity() {
         AppLog.log("link", link.traceName)
         shell.navigator.pending = when (link) {
             is DeepLink.Conversation -> Route.Conversation(link.id)
-            is DeepLink.Retry -> link.conversationId?.let { Route.Conversation(it) }
+            // As What went wrong's Try again: the same task again, in the same chat.
+            is DeepLink.Retry -> {
+                val presenter = ModeApplication.graph(this).screens.taskDebug(link.taskId)
+                presenter.retry()
+                presenter.close()
+                link.conversationId?.let { Route.Conversation(it) }
+            }
             is DeepLink.Run -> ModeApplication.graph(this).inbox.submit(link.text, com.piyush.mode.feature.tasks.domain.TaskSource.App)
                 ?.conversationId?.let { Route.Conversation(it) }
             else -> null
