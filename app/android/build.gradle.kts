@@ -42,6 +42,9 @@ dependencies {
     implementation(projects.app.graph)
     implementation(projects.app.screens)
     implementation(projects.app.devUi)
+    implementation(projects.engine.adbHelper)
+    // The debug probe drives the engine directly (another display, background mode).
+    debugImplementation(projects.engine.phoneAndroid)
     implementation(projects.core.network)
     implementation(projects.feature.connection)
     implementation(projects.app.design)

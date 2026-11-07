@@ -53,6 +53,17 @@ class DevProbe : BroadcastReceiver() {
                         graph.settings.apiKey = intent.getStringExtra("value") ?: "sk-or-probe"
                         "key set"
                     }
+                    // Looks at (and with x/y taps) another display, as background mode does: --ei display 2
+                    "on" -> {
+                        val service = com.piyush.mode.android.ServiceRegistry.service.value ?: error("phone control is off")
+                        val d = intent.getIntExtra("display", 0)
+                        val backend = com.piyush.mode.android.AccessibilityBackend(service, com.piyush.mode.android.AndroidImageTools(service::bitmapFor), displayId = d)
+                        if (intent.hasExtra("x")) backend.send(Op.Tap(intent.getFloatExtra("x", 0f).toDouble(), intent.getFloatExtra("y", 0f).toDouble()))
+                        val shot = backend.send(Op.ScreenCapture(maxSize = 1000)).jsonObject
+                        val text = backend.send(Op.ScreenText()) as JsonArray
+                        "display=$d bounds=${shot["bounds"]} private=${shot["private"]} jpeg=${shot["jpeg_b64"]?.toString()?.length} texts=${text.size}: " +
+                            text.take(12).joinToString(" | ") { it.jsonObject["text"].toString() + "@" + it.jsonObject["x"] + "," + it.jsonObject["y"] }
+                    }
                     "checks" -> buildString {
                         graph.phoneChecks.run { rows -> clear(); rows.forEach { append("${it.id}=${it.state} ") } }
                     }
