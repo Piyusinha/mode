@@ -36,7 +36,13 @@ import kotlin.uuid.Uuid
  * `files/logs/events.log` and logcat; backups are written to the cache folder
  * before the system picker copies them where the user chose.
  */
-fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Intent): ModeGraph {
+fun androidModeGraph(
+    app: Application,
+    notificationIcon: Int,
+    openApp: () -> Intent,
+    notifierWords: com.piyush.mode.core.platform.NotifierWords? = null,
+    notifierHooks: com.piyush.mode.core.platform.NotifierHooks? = null,
+): ModeGraph {
     val files = JavaFileStore(File(app.filesDir, "logs"))
     AppLog.install { line ->
         files.append("events.log", line + "\n")
@@ -73,7 +79,7 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
             secrets = KeystoreSecretStore(app),
             prefs = prefs,
             files = files,
-            notifier = AndroidNotifier(app, notificationIcon, openApp),
+            notifier = AndroidNotifier(app, notificationIcon, openApp, notifierWords, notifierHooks),
             background = AndroidBackgroundWork(app),
             deviceLock = AndroidDeviceLock(app),
             lifecycle = lifecycle,

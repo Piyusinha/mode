@@ -52,5 +52,7 @@
         </service>
 
         <receiver android:name=".StopReceiver" android:exported="false" />
+        <receiver android:name=".AnswerReceiver" android:exported="false" />
+        <receiver android:name=".ScheduleReceiver" android:exported="false" />
     </application>
 </manifest>

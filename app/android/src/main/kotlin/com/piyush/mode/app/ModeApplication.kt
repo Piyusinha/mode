@@ -3,7 +3,14 @@ package com.piyush.mode.app
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
+import com.piyush.mode.core.platform.NotifierHooks
+import com.piyush.mode.core.platform.NotifierWords
+import com.piyush.mode.core.platform.QuestionWords
 import com.piyush.mode.core.platform.WorkNotice
+import com.piyush.mode.core.platform.WorkProgress
+import com.piyush.mode.app.screens.run.ActivityUiState
+import com.piyush.mode.app.screens.run.PlanStepState
+import kotlinx.coroutines.launch
 import com.piyush.mode.app.graph.ModeGraph
 import com.piyush.mode.app.graph.androidModeGraph
 
@@ -14,9 +21,34 @@ class ModeApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        graph = androidModeGraph(this, R.drawable.ic_mode_notification) {
+        val words = NotifierWords(
+            needsYou = getString(R.string.question_title),
+            yourTurn = getString(R.string.question_your_turn),
+            question = QuestionWords(
+                yes = getString(R.string.question_yes), no = getString(R.string.question_no), always = getString(R.string.question_always),
+                entered = getString(R.string.question_entered), reply = getString(R.string.question_reply), somethingElse = getString(R.string.question_something_else),
+            ),
+            resultsChannel = getString(R.string.channel_results),
+            questionsChannel = getString(R.string.channel_questions),
+            schedulesChannel = getString(R.string.channel_schedules),
+        )
+        val hooks = NotifierHooks(
+            answer = { id, answer ->
+                Intent(this, AnswerReceiver::class.java).setAction("$ACTION_ANSWER$id:$answer")
+                    .putExtra(AnswerReceiver.QUESTION, id).apply { if (answer != null) putExtra(AnswerReceiver.ANSWER, answer) }
+            },
+            openConversation = { id ->
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse("${com.piyush.mode.app.shell.DeepLink.SCHEME}://conversation/$id"), this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            scheduled = { id, title, body ->
+                Intent(this, ScheduleReceiver::class.java).setAction("$ACTION_SCHEDULE$id")
+                    .putExtra(ScheduleReceiver.ID, id).putExtra(ScheduleReceiver.TITLE, title).putExtra(ScheduleReceiver.BODY, body)
+            },
+        )
+        graph = androidModeGraph(this, R.drawable.ic_mode_notification, {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+        }, words, hooks)
         // The working notification: opens Mode, and Stop ends the task.
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         WorkNotice.content = WorkNotice.plain(
@@ -26,9 +58,33 @@ class ModeApplication : Application() {
             open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), flags),
             stop = PendingIntent.getBroadcast(this, 0, Intent(this, StopReceiver::class.java), flags),
         )
+        followTheRunningTask()
+    }
+
+    /** The working notice follows the task: what it's doing now, the plan as a bar, how long it's been going. */
+    private fun followTheRunningTask() {
+        val activity = graph.screens.liveActivity()
+        kotlinx.coroutines.MainScope().launch {
+            activity.state.collect { s ->
+                WorkNotice.progress = when (s) {
+                    is ActivityUiState.Working -> WorkProgress(
+                        s.task,
+                        if (s.paused) getString(R.string.run_paused) else if (s.step > 0) getString(R.string.run_step_status, s.step, s.now) else s.now,
+                        s.plan.count { it.state == PlanStepState.Done }, s.plan.size, s.startedAtMs,
+                    )
+                    is ActivityUiState.WaitingForUnlock -> WorkProgress(s.task, getString(R.string.working_unlock), 0, 0, null)
+                    else -> null
+                }
+                WorkNotice.refresh(this@ModeApplication)
+            }
+        }
     }
 
     companion object {
+        /** Unique actions keep one PendingIntent per question button and per reminder. */
+        private const val ACTION_ANSWER = "mode.answer:"
+        private const val ACTION_SCHEDULE = "mode.schedule:"
+
         fun graph(context: android.content.Context): ModeGraph = (context.applicationContext as ModeApplication).graph
     }
 }

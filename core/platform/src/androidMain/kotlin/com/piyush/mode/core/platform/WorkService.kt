@@ -35,14 +35,26 @@ public class WorkService : Service() {
             return START_NOT_STICKY
         }
         runCatching { startForeground(NOTICE_ID, content(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE) }
-            .onSuccess { AppLog.log("app", "working notice shown") }
+            .onSuccess {
+                running = true
+                AppLog.log("app", "working notice shown")
+            }
             .onFailure { AppLog.log("app", "working notice failed: ${it::class.simpleName}: ${it.message}"); stopSelf() }
         return START_NOT_STICKY
     }
 
+    override fun onDestroy() {
+        running = false
+        super.onDestroy()
+    }
+
     public companion object {
-        /** The ongoing notification's id; the live progress later updates this same one. */
+        /** The ongoing notification's id; the live progress updates this same one. */
         public const val NOTICE_ID: Int = 7
+
+        /** The service is up with its notification showing. */
+        @Volatile public var running: Boolean = false
+            private set
     }
 }
 
@@ -52,15 +64,34 @@ public object WorkNotice {
 
     @Volatile public var content: ((Context) -> Notification)? = null
 
+    /** What the running task is doing, for the notice (null: the plain "working" line). */
+    @Volatile public var progress: WorkProgress? = null
+
+    /** Shows the latest [progress] on the notice, while the service is up. */
+    public fun refresh(context: Context) {
+        val build = content ?: return
+        if (!WorkService.running) return
+        runCatching { context.getSystemService(NotificationManager::class.java).notify(WorkService.NOTICE_ID, build(context)) }
+    }
+
     /** The plain "working" notice: title, tapping opens Mode, and Stop. */
     public fun plain(smallIcon: Int, title: String, stopLabel: String, open: PendingIntent, stop: PendingIntent): (Context) -> Notification = { context ->
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Working", NotificationManager.IMPORTANCE_LOW).apply {
             description = "While Mode works in your apps"
         })
+        val now = progress
         Notification.Builder(context, CHANNEL)
             .setSmallIcon(smallIcon)
-            .setContentTitle(title)
+            .setContentTitle(now?.title ?: title)
+            .apply {
+                if (now != null) {
+                    setContentText(now.text)
+                    if (now.total > 0) setProgress(now.total, now.done, false)
+                    now.startedAtMs?.let { setWhen(it).setShowWhen(true).setUsesChronometer(true) }
+                }
+            }
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, stopLabel, stop).build())
@@ -113,3 +144,6 @@ public class AndroidBackgroundWork(context: Context) : BackgroundWork {
         const val MAX_MS = 20 * 60_000L
     }
 }
+
+/** The running task as the working notice shows it: the task, what it's doing, the plan done so far. */
+public data class WorkProgress(val title: String, val text: String, val done: Int, val total: Int, val startedAtMs: Long?)

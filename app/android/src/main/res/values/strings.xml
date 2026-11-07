@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android-only strings, written by hand. The ones both apps share are generated into strings_mode.xml. -->
 <resources>
-    <!-- The working notification, until the live progress (Phase 4) takes over its text. -->
+    <!-- Notification channels, and the reply button on a question. -->
+    <string name="channel_results">Results</string>
+    <string name="channel_questions">Questions</string>
+    <string name="channel_schedules">Repeats</string>
+    <string name="channel_working">Working</string>
+    <string name="question_reply">Reply</string>
+
+    <!-- The working notification. -->
     <string name="working_title">Mode is working</string>
     <string name="working_stop">Stop</string>
+    <string name="working_unlock">Waiting for you to unlock your phone</string>
 
     <!-- Durations as the boards show them ("62 s"). -->
     <string name="format_seconds">%1$s s</string>

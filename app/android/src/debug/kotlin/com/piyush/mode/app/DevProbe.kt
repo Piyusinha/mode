@@ -35,6 +35,13 @@ class DevProbe : BroadcastReceiver() {
                         com.piyush.mode.core.platform.AndroidBackgroundWork(context).run { kotlinx.coroutines.delay(intent.getLongExtra("ms", 8000)) }
                         "held"
                     }
+                    // A question notification, as a task would post it (kind: YesNo, YesNoAlways, Choice, Text, YourTurn).
+                    "ask" -> {
+                        val kind = com.piyush.mode.core.platform.QuestionKind.valueOf(intent.getStringExtra("kind") ?: "YesNo")
+                        val options = intent.getStringExtra("options")?.split("|").orEmpty()
+                        graph.notifier.ask("probe", intent.getStringExtra("text") ?: "Pay ₹349 to Swiggy?", kind, options)
+                        "asked"
+                    }
                     // Walks setup past Connect your AI on a test phone: a key from the probe, or a stand-in.
                     "key" -> {
                         graph.settings.apiKey = intent.getStringExtra("value") ?: "sk-or-probe"

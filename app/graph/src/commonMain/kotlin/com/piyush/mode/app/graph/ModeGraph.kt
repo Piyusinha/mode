@@ -86,6 +86,9 @@ class PlatformServices(
  * take what they need from here; nothing else constructs features.
  */
 class ModeGraph(platform: PlatformServices) {
+    /** The platform's notifications (Android's receivers show scheduled ones through it). */
+    val notifier: Notifier = platform.notifier
+
     /** Lives as long as the app; work started here outlives any one screen. */
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val activity: ActivityTracker = ActivityTracker()
