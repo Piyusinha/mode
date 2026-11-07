@@ -105,6 +105,7 @@ private fun MainBar(nav: Navigator, run: RunStatus, overlays: Overlays) {
 private fun TabRoot(tab: AppTab, graph: ModeGraph, run: RunStatus, nav: Navigator, overlays: Overlays) {
     when (tab) {
         AppTab.Home -> HomeRoute(graph, run, nav::push, overlays.openLive)
+        AppTab.Tasks -> com.piyush.mode.app.tasks.TasksRoute(graph, nav::push)
         else -> NotYet(nav)
     }
 }

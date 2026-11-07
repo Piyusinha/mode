@@ -49,6 +49,37 @@ class Words(private val context: Context) {
         return get(R.string.format_seconds, number.format(value))
     }
 
+    /** "42 s", "3 min", "3 min 12 s". */
+    fun duration(seconds: Long): String = when {
+        seconds < 60 -> get(R.string.tasks_duration_seconds, seconds)
+        seconds % 60 == 0L -> get(R.string.tasks_duration_minutes, seconds / 60)
+        else -> get(R.string.tasks_duration_minutes_seconds, seconds / 60, seconds % 60)
+    }
+
+    /** "Today 19:00", "Tomorrow 9:00", "Thu, 7 Nov · 10:00". */
+    fun upcoming(epochMs: Long): String {
+        val zone = ZoneId.systemDefault()
+        val at = Instant.ofEpochMilli(epochMs).atZone(zone)
+        val today = java.time.LocalDate.now(zone)
+        val time = timeOfDay(epochMs)
+        return when (at.toLocalDate()) {
+            today -> "${get(R.string.day_today)} $time"
+            today.plusDays(1) -> "${get(R.string.day_tomorrow)} $time"
+            else -> DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "EEEdMMM"), locale).format(at) + " · " + time
+        }
+    }
+
+    /** "Every day", "Weekdays", "Weekends", or the days by name ("Mon, Wed and Fri"). */
+    fun days(isoDays: Set<Int>): String = when (isoDays) {
+        (1..7).toSet() -> get(R.string.repeat_every_day)
+        (1..5).toSet() -> get(R.string.repeat_weekdays)
+        setOf(6, 7) -> get(R.string.repeat_weekends)
+        else -> {
+            val names = isoDays.sorted().map { DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, locale) }
+            android.icu.text.ListFormatter.getInstance(locale).format(names)
+        }
+    }
+
     fun greeting(part: PartOfDay, name: String?): String = when (part) {
         PartOfDay.Morning -> if (name != null) get(R.string.home_greeting_morning_named, name) else get(R.string.home_greeting_morning)
         PartOfDay.Afternoon -> if (name != null) get(R.string.home_greeting_afternoon_named, name) else get(R.string.home_greeting_afternoon)

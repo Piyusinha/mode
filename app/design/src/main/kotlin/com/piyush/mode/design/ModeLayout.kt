@@ -158,6 +158,11 @@ public object ModeSize {
     public val stopSquare: Dp = 11.dp
     public val stopSquareRadius: Dp = 3.dp
     public val recentRow: Dp = 62.dp
+    /** Tasks: a row, and the Scheduled / Done pill switch. */
+    public val tasksRow: Dp = 72.dp
+    public val segmentsHeight: Dp = 42.dp
+    public val segmentsCompactHeight: Dp = 38.dp
+    public val segmentsInset: Dp = 3.dp
     public val tabBarClearance: Dp = 120.dp
     public val tryPill: Dp = 44.dp
     /** Home's tip cards: Mo, its badge and ring, the close button, the dots and their tap areas, Undo. */
