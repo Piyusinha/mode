@@ -38,4 +38,11 @@ public interface PhoneChecks {
 
     /** Whether the user has allowed phone control (on iOS, Mode's VPN). */
     public suspend fun permitted(): Boolean
+
+    /**
+     * Where each setting phone control needs stands now, read without touching the phone (no screenshot,
+     * no tap): for setup pages that refresh whenever Mode comes back from Settings. Empty where a phone
+     * has nothing to set up this way (the iPhone).
+     */
+    public suspend fun status(): List<PhoneCheckResult> = emptyList()
 }

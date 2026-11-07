@@ -221,18 +221,29 @@ public class Screens(
     public fun sessionActivity(): com.piyush.mode.app.screens.run.SessionActivityPresenter =
         com.piyush.mode.app.screens.run.SessionActivityPresenter(scope, runner, session, clock)
 
-    /** The first run: Welcome, Connect your AI, a first job (asking for the VPN and notifications as it starts). */
-    public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter =
-        com.piyush.mode.app.screens.firstrun.FirstRunPresenter(scope, settings, connectChatGpt(), queue) {
-            if (!phoneChecks.permitted()) {
-                try {
-                    session.reconnect()
-                } finally {
-                    session.disconnectAndRelease()
+    /** The first run: Welcome, Connect your AI, (on Android) phone control, a first job (asking for what is left as it starts). */
+    public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter {
+        val phoneStep = com.piyush.mode.feature.connection.domain.PhoneCheckId.Engine in phoneChecks.steps
+        return com.piyush.mode.app.screens.firstrun.FirstRunPresenter(
+            scope, settings, connectChatGpt(), queue,
+            prepare = {
+                // The iPhone asks for its VPN by connecting once; Android set phone control up in its own step.
+                if (!phoneStep && !phoneChecks.permitted()) {
+                    try {
+                        session.reconnect()
+                    } finally {
+                        session.disconnectAndRelease()
+                    }
                 }
-            }
-            permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
-        }
+                permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
+            },
+            phoneStep = phoneStep,
+        )
+    }
+
+    /** Setting up phone control (Android): the switches it needs, and a guide for each. */
+    public fun phoneSetup(): com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter =
+        com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter(scope, phoneChecks, permissions, lifecycle)
 
     /** Settings → Unlock by voice: the guide, and the check that it works. */
     public fun unlockVoice(): com.piyush.mode.app.screens.start.UnlockVoicePresenter =

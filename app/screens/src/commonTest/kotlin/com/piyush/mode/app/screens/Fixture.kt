@@ -53,6 +53,15 @@ internal class Notes : Notifier {
     override fun cancel(id: String) { scheduled.remove(id) }
 }
 
+/** A lifecycle the test moves by hand. */
+internal class FakeLifecycle : com.piyush.mode.core.platform.AppLifecycle {
+    private val foreground = mutableListOf<() -> Unit>()
+    override fun onBackground(action: () -> Unit) {}
+    override fun onForeground(action: () -> Unit) { foreground += action }
+    override fun onTerminate(action: () -> Unit) {}
+    fun cameBack() = foreground.forEach { it() }
+}
+
 internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
     val granted = mutableSetOf<com.piyush.mode.core.platform.Permission>()
     override suspend fun status(permission: com.piyush.mode.core.platform.Permission) =
@@ -66,6 +75,9 @@ internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
 internal class FakeChecks(var paired: Boolean = true) : com.piyush.mode.feature.connection.domain.PhoneChecks {
     var vpn = false
     override val steps = com.piyush.mode.feature.connection.domain.PhoneCheckId.entries.take(8)
+    /** What [status] reads (Android's quick look at its settings). */
+    var quick: List<com.piyush.mode.feature.connection.domain.PhoneCheckResult> = emptyList()
+    override suspend fun status() = quick
     override fun ready() = paired
     override suspend fun permitted() = vpn
     override suspend fun run(update: (List<com.piyush.mode.feature.connection.domain.PhoneCheckResult>) -> Unit) {

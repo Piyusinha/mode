@@ -35,6 +35,24 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
 
     override suspend fun permitted(): Boolean = enabled()
 
+    /** The switch, its lock and the battery setting, read from Android's settings without touching the screen. */
+    override suspend fun status(): List<PhoneCheckResult> {
+        val on = enabled()
+        val running = ServiceRegistry.service.value != null
+        val power = app.getSystemService(PowerManager::class.java)
+        return listOf(
+            PhoneCheckResult(PhoneCheckId.RestrictedSettings,
+                if (!on && sideloaded()) CheckState.Failed("locked until restricted settings are allowed", null) else CheckState.Passed(null)),
+            PhoneCheckResult(PhoneCheckId.Engine, when {
+                on && running -> CheckState.Passed(null)
+                on -> CheckState.Failed("on but not running", "Turn Mode off and on again in Settings › Accessibility.")
+                else -> CheckState.Failed("off", null)
+            }),
+            PhoneCheckResult(PhoneCheckId.Battery,
+                if (power.isIgnoringBatteryOptimizations(app.packageName)) CheckState.Passed(null) else CheckState.Failed("restricted", null)),
+        )
+    }
+
     override suspend fun run(update: (List<PhoneCheckResult>) -> Unit) {
         val results = steps.associateWith<PhoneCheckId, CheckState> { CheckState.NotChecked }.toMutableMap()
         fun report() = update(results.map { (id, state) -> PhoneCheckResult(id, state) })

@@ -13,8 +13,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-/** The first run (Mode v2): three screens, then a real task. */
-public enum class FirstRunStep { Welcome, Connect, FirstTask }
+/**
+ * The first run: Welcome, Connect your AI, then a real task. On Android, [Phone] comes before the task:
+ * phone control is a switch the user turns on in Settings, so it is set up rather than asked for.
+ */
+public enum class FirstRunStep { Welcome, Connect, Phone, FirstTask }
 
 /** Where connecting the AI is. */
 public sealed interface ConnectState {
@@ -67,6 +70,8 @@ public class FirstRunPresenter(
     private val inbox: TaskInbox? = null,
     /** Asks iOS for what the first task needs (the VPN, notifications); a refusal doesn't stop the task. */
     private val prepare: suspend () -> Unit = {},
+    /** Phone control has its own setup step (Android), between connecting the AI and the first job. */
+    private val phoneStep: Boolean = false,
 ) : Presenter<FirstRunUiState>(parent, FirstRunUiState(connected = settings.settings.value.hasModelAccess)) {
     private val step = MutableStateFlow(FirstRunStep.Welcome)
     private val starting = MutableStateFlow(false)
@@ -109,16 +114,32 @@ public class FirstRunPresenter(
     /** Continue: only once an AI is connected. */
     public fun next() {
         if (!state.value.connected) return
-        AppLog.log("firstrun", "connected: on to the first job")
-        step.value = FirstRunStep.FirstTask
+        when (step.value) {
+            FirstRunStep.Connect -> if (phoneStep) {
+                AppLog.log("firstrun", "connected: on to phone control")
+                step.value = FirstRunStep.Phone
+            } else {
+                AppLog.log("firstrun", "connected: on to the first job")
+                step.value = FirstRunStep.FirstTask
+            }
+            FirstRunStep.Phone -> {
+                AppLog.log("firstrun", "phone set up: on to the first job")
+                step.value = FirstRunStep.FirstTask
+            }
+            else -> Unit
+        }
     }
 
     public fun back() {
         step.value = when (step.value) {
-            FirstRunStep.FirstTask -> FirstRunStep.Connect
+            FirstRunStep.FirstTask -> if (phoneStep) FirstRunStep.Phone else FirstRunStep.Connect
+            FirstRunStep.Phone -> FirstRunStep.Connect
             else -> FirstRunStep.Welcome
         }
     }
+
+    /** How many steps the dots count (Welcome is not one): 2 on the iPhone, 3 with phone control. */
+    public val totalSteps: Int get() = if (phoneStep) 3 else 2
 
     /**
      * A first job was picked (or typed): ask for what it needs, put it in the queue, and finish setup so
