@@ -51,6 +51,8 @@ sealed interface DeepLink {
     data object Listen : DeepLink
     /** A mic in the app: talking mode, adding to [conversationId]'s chat (null: a new chat). */
     data class Talk(val conversationId: String?) : DeepLink
+    /** Run [text] as a new task and show its chat (the widget's suggestions). */
+    data class Run(val text: String) : DeepLink
     /** Try again: run a task that couldn't finish again, then show its chat. */
     data class Retry(val taskId: String, val conversationId: String?) : DeepLink
 
@@ -63,10 +65,14 @@ sealed interface DeepLink {
             Listen -> "assistant"
             is Talk -> if (conversationId == null) "ask_mic" else "chat_mic"
             is Retry -> "retry"
+            is Run -> "run"
         }
 
     companion object {
         const val SCHEME: String = "mode"
+
+        /** "mode://run/<task>", the task's words encoded. */
+        fun run(text: String): String = "$SCHEME://run/" + java.net.URLEncoder.encode(text, Charsets.UTF_8).replace("+", "%20")
 
         /** "mode://conversation/<id>", "mode://ask", "mode://retry/<task>/<chat>"…; null for anything else. */
         fun parse(link: String): DeepLink? {
@@ -81,6 +87,7 @@ sealed interface DeepLink {
                 "listen" -> Listen
                 "talk" -> Talk(parts.getOrNull(1))
                 "retry" -> parts.getOrNull(1)?.let { Retry(it, parts.getOrNull(2)) }
+                "run" -> parts.getOrNull(1)?.let { java.net.URLDecoder.decode(it, Charsets.UTF_8) }?.takeIf { it.isNotBlank() }?.let { Run(it) }
                 else -> null
             }
         }

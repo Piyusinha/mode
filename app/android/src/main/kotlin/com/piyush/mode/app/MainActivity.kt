@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
         val graph = ModeApplication.graph(this)
         val pages = SystemPages(this)
         val signIn = ChatGptSignIn(this, lifecycleScope, pages)
-        if (savedInstanceState == null) follow(intent)
+        // A link not yet followed (also when Android brings back a screen it had closed, with a new link).
+        follow(intent)
         setContent { ModeApp(graph, shell, pages, signIn) }
     }
 
@@ -39,6 +40,8 @@ class MainActivity : ComponentActivity() {
 
     /** A mode:// link: where it goes waits in the navigator until the tabs show. */
     private fun follow(intent: Intent) {
+        if (intent.getBooleanExtra(FOLLOWED, false)) return
+        intent.putExtra(FOLLOWED, true)
         val data = intent.dataString ?: return
         // OpenRouter's sign-in page answers here; the providers sheet finishes it.
         if (data.startsWith(com.piyush.mode.app.screens.onboarding.OnboardingPresenter.SIGN_IN_CALLBACK)) {
@@ -50,6 +53,8 @@ class MainActivity : ComponentActivity() {
         shell.navigator.pending = when (link) {
             is DeepLink.Conversation -> Route.Conversation(link.id)
             is DeepLink.Retry -> link.conversationId?.let { Route.Conversation(it) }
+            is DeepLink.Run -> ModeApplication.graph(this).inbox.submit(link.text, com.piyush.mode.feature.tasks.domain.TaskSource.App)
+                ?.conversationId?.let { Route.Conversation(it) }
             else -> null
         }
         if (link is DeepLink.Open) shell.navigator.select(AppTab.Home)
@@ -61,5 +66,10 @@ class MainActivity : ComponentActivity() {
             )
             else -> Unit
         }
+    }
+
+    private companion object {
+        /** Set on an intent once its link was followed, so a rotation doesn't follow it again. */
+        const val FOLLOWED = "mode.followed"
     }
 }

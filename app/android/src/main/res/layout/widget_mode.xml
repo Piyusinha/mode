@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen widget (board T03 "Home screen widget"): Mo, "What can I do for you?", the mic, two suggestions. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/widget_mo" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/setup_welcome_app_name"
+                android:textColor="@color/widget_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="2"
+                android:text="@string/widget_title"
+                android:textColor="@color/widget_text"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/widget_mic"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/widget_mic"
+            android:contentDescription="@string/widget_speak"
+            android:padding="15dp"
+            android:src="@drawable/ic_mode_microphone"
+            android:tint="@color/widget_on_ink" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_suggestions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_suggestion_1"
+            style="@style/WidgetChip"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/widget_suggestion_2"
+            style="@style/WidgetChip" />
+    </LinearLayout>
+</LinearLayout>

@@ -89,6 +89,8 @@ class ModeApplication : Application() {
                     else -> null
                 }
                 WorkNotice.refresh(this@ModeApplication)
+                // A task ended: the widget's suggestions may have changed.
+                if (s is ActivityUiState.Finished) com.piyush.mode.app.widget.ModeWidget.refresh(this@ModeApplication)
             }
         }
     }

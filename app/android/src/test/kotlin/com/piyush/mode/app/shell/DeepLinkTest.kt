@@ -16,12 +16,14 @@ class DeepLinkTest {
         assertEquals(DeepLink.Talk("c2"), DeepLink.parse("mode://talk/c2"))
         assertEquals(DeepLink.Retry("t1", "c3"), DeepLink.parse("mode://retry/t1/c3"))
         assertEquals(DeepLink.Retry("t1", null), DeepLink.parse("mode://retry/t1?from=notification"))
+        assertEquals(DeepLink.Run("Text Sam: I'm 10/15 min late & sorry?"), DeepLink.parse(DeepLink.run("Text Sam: I'm 10/15 min late & sorry?")))
     }
 
     @Test
     fun ignoresOtherLinks() {
         assertNull(DeepLink.parse("https://heymode.app"))
         assertNull(DeepLink.parse("mode://retry"))
+        assertNull(DeepLink.parse("mode://run"))
         assertNull(DeepLink.parse("mode://somewhere"))
     }
 

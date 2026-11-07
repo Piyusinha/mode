@@ -85,6 +85,12 @@
             <meta-data android:name="android.speech" android:resource="@xml/mode_recognition" />
         </service>
 
+        <receiver android:name=".widget.ModeWidget" android:exported="true" android:label="@string/setup_welcome_app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_mode_info" />
+        </receiver>
         <receiver android:name=".StopReceiver" android:exported="false" />
         <receiver android:name=".AnswerReceiver" android:exported="false" />
         <receiver android:name=".ScheduleReceiver" android:exported="false" />

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_card">#FF1E1E24</color>
+    <color name="widget_chip">#FF2A2A31</color>
+    <color name="widget_text">#FFF4F2EE</color>
+    <color name="widget_secondary">#FFA9A6B0</color>
+    <color name="widget_ink">#FFF4F2EE</color>
+    <color name="widget_on_ink">#FF121216</color>
+</resources>

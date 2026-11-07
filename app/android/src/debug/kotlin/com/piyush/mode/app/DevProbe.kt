@@ -35,6 +35,12 @@ class DevProbe : BroadcastReceiver() {
                         com.piyush.mode.core.platform.AndroidBackgroundWork(context).run { kotlinx.coroutines.delay(intent.getLongExtra("ms", 8000)) }
                         "held"
                     }
+                    // Asks the launcher to add Mode's widget to the home screen.
+                    "widget" -> {
+                        val manager = context.getSystemService(android.appwidget.AppWidgetManager::class.java)
+                        val asked = manager.requestPinAppWidget(android.content.ComponentName(context, com.piyush.mode.app.widget.ModeWidget::class.java), null, null)
+                        "pin asked: $asked"
+                    }
                     // A question notification, as a task would post it (kind: YesNo, YesNoAlways, Choice, Text, YourTurn).
                     "ask" -> {
                         val kind = com.piyush.mode.core.platform.QuestionKind.valueOf(intent.getStringExtra("kind") ?: "YesNo")

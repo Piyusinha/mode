@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home screen widget's colours (board "Home screen widget"): the Mo theme's card, ink and text. -->
+<resources>
+    <color name="widget_card">#FFFFFFFF</color>
+    <color name="widget_chip">#FFF1EEE9</color>
+    <color name="widget_text">#FF1A1A1F</color>
+    <color name="widget_secondary">#FF5E5C66</color>
+    <color name="widget_ink">#FF1A1A1F</color>
+    <color name="widget_on_ink">#FFFFFFFF</color>
+    <color name="widget_mo">#FFFF6B3D</color>
+    <color name="widget_mo_ink">#FF1A1A1F</color>
+</resources>
