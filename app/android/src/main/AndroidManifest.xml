@@ -3,6 +3,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- While a task runs: the working notification's service, and the CPU and screen kept on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- The apps Mode can open for the user: everything with a launcher icon. -->
     <queries>
@@ -30,5 +34,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name="com.piyush.mode.core.platform.WorkService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps Mode running while it does a task the user gave it in their other apps, with an ongoing notification and Stop." />
+        </service>
+
+        <receiver android:name=".StopReceiver" android:exported="false" />
     </application>
 </manifest>

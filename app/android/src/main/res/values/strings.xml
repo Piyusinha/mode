@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The working notification, until the live progress (Phase 4) takes over its text. -->
+    <string name="working_title">Mode is working</string>
+    <string name="working_stop">Stop</string>
+</resources>

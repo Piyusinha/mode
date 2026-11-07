@@ -11,7 +11,7 @@ import com.piyush.mode.core.platform.AndroidAppLifecycle
 import com.piyush.mode.core.platform.AndroidDeviceLock
 import com.piyush.mode.core.platform.AndroidNotifier
 import com.piyush.mode.core.platform.AndroidPermissions
-import com.piyush.mode.core.platform.PlainBackgroundWork
+import com.piyush.mode.core.platform.AndroidBackgroundWork
 import com.piyush.mode.core.storage.JavaFileStore
 import com.piyush.mode.core.storage.KeystoreSecretStore
 import com.piyush.mode.core.storage.SharedPrefsStore
@@ -74,7 +74,7 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
             prefs = prefs,
             files = files,
             notifier = AndroidNotifier(app, notificationIcon, openApp),
-            background = PlainBackgroundWork(),
+            background = AndroidBackgroundWork(app),
             deviceLock = AndroidDeviceLock(app),
             lifecycle = lifecycle,
             appInfo = AndroidAppInfo(app),

@@ -11,8 +11,10 @@ public class AndroidAppInfo(context: Context) : AppInfo {
 
 /**
  * The process lifecycle: Mode is in front while any of its activities is started.
- * Android never promises a "terminate" call, so [onTerminate] actions also run
- * when Mode goes to the background, which is the last moment they can be sure of.
+ * Android never says when it ends a process, so [onTerminate] actions never run:
+ * running them on every trip to the background would end Mode's session while it
+ * works in another app, which is most of a task. Nothing needs them on Android
+ * (the accessibility service lives on its own; there is no VPN to close).
  */
 public class AndroidAppLifecycle : AppLifecycle {
     private val background = mutableListOf<() -> Unit>()
@@ -33,15 +35,5 @@ public class AndroidAppLifecycle : AppLifecycle {
         foreground += action
     }
 
-    override fun onTerminate(action: () -> Unit) {
-        background += action
-    }
-}
-
-/**
- * Until the working service exists (the accessibility engine brings it), the work
- * simply runs; Android keeps a foreground process alive on its own.
- */
-public class PlainBackgroundWork : BackgroundWork {
-    override suspend fun <T> run(work: suspend () -> T): T = work()
+    override fun onTerminate(action: () -> Unit) {}
 }

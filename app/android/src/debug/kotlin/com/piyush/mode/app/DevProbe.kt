@@ -20,7 +20,7 @@ import kotlin.time.TimeSource
  *     adb shell am broadcast -n com.piyush.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 180 --ef y 400
  *
  * Ops: look, text, tap, back, home, recents, notifications, quick, launch (--es name …), type (--es s …),
- * enter, scroll (--es dir down|up), checks. Results go to logcat under the tag ModeProbe.
+ * enter, scroll (--es dir down|up), checks, hold (--el ms …). Results go to logcat under the tag ModeProbe.
  */
 class DevProbe : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,6 +30,11 @@ class DevProbe : BroadcastReceiver() {
             val started = TimeSource.Monotonic.markNow()
             val result = runCatching {
                 when (val name = intent.getStringExtra("op") ?: "look") {
+                    "hold" -> {
+                        // The working service and wake locks, held for a few seconds, as a task holds them.
+                        com.piyush.mode.core.platform.AndroidBackgroundWork(context).run { kotlinx.coroutines.delay(intent.getLongExtra("ms", 8000)) }
+                        "held"
+                    }
                     "checks" -> buildString {
                         graph.phoneChecks.run { rows -> clear(); rows.forEach { append("${it.id}=${it.state} ") } }
                     }
