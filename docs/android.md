@@ -67,7 +67,7 @@ nothing on Android; Mode goes to the background on every step of a task.
 
 The first run has one more step than the iPhone's: Welcome, Connect your AI, **Let Mode use your phone**, then the first job. Phone control is a switch the user turns on in Settings, so it is set up rather than asked for (`FirstRunStep.Phone`, shown when the phone's checks include `Engine`).
 
-- `PhoneSetupPresenter` (shared) lists Phone control (required), Notifications, the assistant button, Battery and the Microphone (asked later), each with its state from `PhoneChecks.status()` (a quick read of Android's settings, no screenshot or tap) and `Permissions`. A setting this build can't offer (the assistant, until Mode has its assistant service) is left out.
+- `PhoneSetupPresenter` (shared) lists Phone control (required), Notifications, the assistant button, Battery and the Microphone (asked later), each with its state from `PhoneChecks.status()` (a quick read of Android's settings, no screenshot or tap) and `Permissions`. A setting this build can't offer is left out.
 - Phone control, the assistant and battery each open a guide page (the S02–S05 boards). The guide's button opens Android's page; when Mode comes back to the front everything is read again, and a guide whose setting is now on closes itself.
 - An app not from a store has its accessibility switch locked by Android 13+: Phone control then opens the "Unlock Phone control" guide first (App info › ⋮ › Allow restricted settings).
 - Android pages and their fallbacks live in `SystemPages`: Mode's own accessibility switch is not openable directly on stock Android, so the Accessibility list opens; battery asks Android's one-tap question in the full build.
@@ -77,6 +77,18 @@ The first run has one more step than the iPhone's: Welcome, Connect your AI, **L
 To walk setup past Connect your AI on an emulator without an account: `adb shell am broadcast -n com.piyush.mode/.app.DevProbe --es op key` (debug builds only).
 
 Known gap: the Play build has no phone control, so its setup will need its own path (Phase 6).
+
+## Hands-free
+
+- **Notifications** (`AndroidNotifier`): results open their chat; Mode's questions go on a high-importance channel with buttons from `QuestionActions` (shared, tested): Yes / No, Always, up to three choices (more choices end in a typed "something else"), a typed reply (RemoteInput), or "I've entered it". `AnswerReceiver` answers the task without opening Mode and withdraws the notification.
+- **The working notice** follows the task (`WorkNotice.progress`, fed from the shared `LiveActivityPresenter`): what Mode is doing, the plan as a progress bar, a running clock, or waiting for the phone to unlock; Stop ends the task.
+- **Repeats** remind with an exact alarm (`SCHEDULE_EXACT_ALARM`; inexact when the user hasn't allowed it). `ScheduleReceiver` shows the reminder; `BootReceiver` re-arms every repeat after a restart, an update, or a clock or time zone change (`Scheduler.rearmAll`).
+- **Voice** (`AndroidDeviceVoice` behind the shared `DeviceVoice`): text-to-speech with the phone's voices (named "English (India) · Voice 2", the user's accent first); listening live with the speech recognizer, on the device when its speech pack is there, otherwise the phone's regular recognizer while Android downloads the pack; a 16 kHz WAV with echo cancelling for a cloud listener (Deepgram, Soniox). `VoiceLevel` feeds talking mode's orb and bars and its "can't hear you".
+- **Talking mode** (`talk/Talk.kt`, the Talking mode boards) over the shared `ListenPresenter`: from Ask's mic, a chat's mic, `mode://talk`, `mode://listen`, the assistant, and a spoken question in a running task.
+- **The assistant** (`assistant/ModeAssistant.kt`): holding power (or the assistant gesture) opens talking mode. Android requires an assistant to bring a speech recognizer and may make it the default, so `ModeRecognitionService` forwards to the phone's own one, and Mode's listening names the phone's recognizer directly. The user picks Mode in Settings › Default apps › Digital assistant (`ROLE_ASSISTANT` can't be requested by an app).
+- **The widget** (`widget/ModeWidget.kt`, board "Home screen widget"): the mic opens talking mode; two suggestions run at once through `mode://run/<task>` and open their chat. Redrawn after each task.
+
+To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT com.piyush.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
 
 ## Developing
 
