@@ -582,6 +582,8 @@ async function enter(screen) {
     }, 2500);
   }
   if (screen === 'device') {
+    // Look for a newer Mode once when the phone page opens, so "Update to …" shows without asking.
+    if (S.record && !S.update) checkForUpdates();
     poll(async () => {
       S.phones = (await call('phones')).filter(p => p.usb);
       if (!S.phone && S.phones.length) S.phone = S.phones.find(p => S.prefs.phones[p.udid]) ?? null;

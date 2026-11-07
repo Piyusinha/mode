@@ -74,6 +74,8 @@ public class Screens(
     private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
     /** Backup and restore (null where there is none). */
     private val backupService: com.piyush.mode.feature.backup.data.BackupService? = null,
+    /** Is a newer Mode out (Settings)? */
+    private val modeUpdates: com.piyush.mode.feature.settings.data.ModeUpdates? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -246,6 +248,10 @@ public class Screens(
         scope, settings, catalog, claude, claudeLlm, claudeModels = { claudeModels?.known?.value.orEmpty() },
         chatGptModels = { chatGpt.knownModels.value }, voices = voices,
     )
+
+    /** This Mode's version and a newer Mode, when one is out (Settings). */
+    public fun appUpdate(): com.piyush.mode.app.screens.settings.AppUpdatePresenter =
+        com.piyush.mode.app.screens.settings.AppUpdatePresenter(scope, modeUpdates)
 
     /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
     public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =

@@ -6,6 +6,11 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
+## 0.1.5 · 7 Nov 2026
+
+- The phone page looks for a newer Mode by itself when it opens, so "Update to …" shows without
+  pressing Check for updates.
+
 ## 0.1.4 · 7 Nov 2026
 
 - A saved Apple password that no longer works (changed since) is removed from this computer the

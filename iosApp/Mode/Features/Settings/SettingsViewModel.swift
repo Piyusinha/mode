@@ -2,6 +2,7 @@ import Foundation
 import ModeDesignSystem
 import ModeKit
 import Observation
+import UIKit
 
 /// Settings (its board): your name; the AI in use (providers in their own sheet) and its models; limits;
 /// memory. Also drives the model picker, which searches the provider's models.
@@ -61,8 +62,16 @@ final class SettingsViewModel {
         var showsBackup = BackupFeature.ready
     }
 
+    /// This Mode's version, and a newer Mode when one is out.
+    struct Update: Equatable {
+        var current = ""
+        var newer: String?
+        var notesUrl: URL?
+    }
+
     enum Event {
         case saveName
+        case openWhatsNew
         case chooseModel(String)
         case chooseStuck(String?)
         case search
@@ -87,6 +96,7 @@ final class SettingsViewModel {
     }
 
     private(set) var state = State()
+    private(set) var update = Update()
     /// The name field. It follows the saved name until the person types, and only what they typed is
     /// saved: saving the field as it was when this screen opened wiped the name from setup.
     var name = "" { didSet { if !syncingName { nameEdited = true } } }
@@ -101,6 +111,8 @@ final class SettingsViewModel {
     private var activeProvider: String { presenter.state.value.provider }
     private(set) var filter: Filter = .all
     private let presenter: SettingsPresenter
+    private let updatePresenter: AppUpdatePresenter
+    private var updateUpdates: Updates?
     private let navigate: (Route) -> Void
     private var updates: Updates?
 
@@ -112,12 +124,16 @@ final class SettingsViewModel {
 
     init(screens: Screens, navigate: @escaping (Route) -> Void, reset: (() async -> Void)? = nil) {
         presenter = screens.settings()
+        updatePresenter = screens.appUpdate()
         self.navigate = navigate
         self.reset = reset
         syncName(presenter.state.value.name)
         updates = observe(presenter.state) { [weak self] s in
             self?.state = Self.map(s)
             self?.syncName(s.name)
+        }
+        updateUpdates = observe(updatePresenter.state) { [weak self] s in
+            self?.update = Update(current: s.current, newer: s.newer, notesUrl: s.notesUrl.flatMap(URL.init(string:)))
         }
     }
 
@@ -135,6 +151,7 @@ final class SettingsViewModel {
             guard nameEdited else { return }
             nameEdited = false
             if name != presenter.state.value.name { presenter.setName(name: name) }
+        case .openWhatsNew: if let url = update.notesUrl { UIApplication.shared.open(url) }
         case let .chooseModel(id): presenter.chooseModel(id: id)
         case let .chooseStuck(id): presenter.chooseStuckModel(id: id)
         case .search: presenter.search(text: query)
@@ -193,6 +210,8 @@ final class SettingsViewModel {
 
     isolated deinit {
         updates?.cancel()
+        updateUpdates?.cancel()
+        updatePresenter.close()
         presenter.close()
     }
 

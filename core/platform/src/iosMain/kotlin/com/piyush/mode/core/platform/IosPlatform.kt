@@ -13,6 +13,7 @@ import platform.UIKit.UIBackgroundTaskInvalid
 
 public class IosAppInfo : AppInfo {
     override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode"
+    override val version: String = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: ""
 }
 
 public class IosAppLifecycle : AppLifecycle {

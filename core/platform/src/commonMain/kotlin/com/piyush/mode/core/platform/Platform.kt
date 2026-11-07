@@ -4,6 +4,9 @@ package com.piyush.mode.core.platform
 public interface AppInfo {
     /** This app's bundle id, to bring Mode back to the front after driving another app. */
     public val bundleId: String
+
+    /** This Mode's version ("0.1.3"), to tell whether a newer one is out. */
+    public val version: String get() = ""
 }
 
 /** The app moving between foreground, background and ending. */

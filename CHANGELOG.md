@@ -6,6 +6,12 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.4 · 7 Nov 2026
+
+- Tells you when a newer Mode is out: Settings shows "Mode 0.1.5 is available", how to update
+  it with Mode Setup, and What's new. It checks at most once a day.
+- Settings shows this Mode's version at the bottom.
+
 ## 0.1.3 · 7 Nov 2026
 
 Mode's first release of its own: Mode and Mode Setup are now released separately, each with its

@@ -146,7 +146,8 @@ test('Back from renewal sign-in returns to the device without reading saved cred
   await f.click('cancelSignIn');
   assert.equal(f.run('S.screen'), 'device');
   assert.equal(f.run('S.after'), null);
-  assert.deepEqual(f.calls.filter(c => !['phones', 'apps_on_phone'].includes(c)), ['active_account', 'cancel_sign_in']);
+  // check_update only reads the public release list: no sign-in or Keychain.
+  assert.deepEqual(f.calls.filter(c => !['phones', 'apps_on_phone', 'check_update'].includes(c)), ['active_account', 'cancel_sign_in']);
 });
 
 test('an active account session is reused for renewing signing', async () => {
@@ -360,4 +361,12 @@ test('a saved password that no longer works is dropped, and the field asks for t
   assert.equal(f.run('S.hasSaved'), false);
   assert.match(f.app.innerHTML, /saved password didn’t work/);
   assert.doesNotMatch(f.app.innerHTML, /Saved on this computer/);
+});
+
+test('the phone page looks for a newer Mode by itself when it opens', async () => {
+  const f = fixture({ check_update: { version: '0.1.4', ipaUrl: 'x', sha256: null } });
+  await f.run("S.record = { mode: { version: '0.1.3' }, ownVpn: false }; S.update = null; go('device')");
+  await new Promise(setImmediate);
+  assert.ok(f.calls.includes('check_update'));
+  assert.equal(f.run('S.update.available'), true);
 });
