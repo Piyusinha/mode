@@ -105,6 +105,14 @@ public class Scheduler(
         }
     }
 
+    /**
+     * Every repeat's reminder again, after the phone forgot them (Android drops its alarms on a restart, and a
+     * clock or time zone change moves them).
+     */
+    public fun rearmAll() {
+        rearm(schedules.all().map { it.id })
+    }
+
     /** Submits every schedule that is due, and works out when each is due next. */
     public fun checkDue() {
         val time = now()

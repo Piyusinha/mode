@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Speaking a task to Mode; asked the first time the user does. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Repeats remind on time after a restart, and at the exact minute when the user allows it. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- While a task runs: the working notification's service, and the CPU and screen kept on. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -90,6 +93,14 @@
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_mode_info" />
+        </receiver>
+        <receiver android:name=".BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
         </receiver>
         <receiver android:name=".StopReceiver" android:exported="false" />
         <receiver android:name=".AnswerReceiver" android:exported="false" />

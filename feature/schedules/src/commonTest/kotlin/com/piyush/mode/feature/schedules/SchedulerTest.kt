@@ -74,6 +74,18 @@ class SchedulerTest {
     }
 
     @Test
+    fun afterTheReminderIsForgottenRearmAllSetsEveryOnAgain() = runTest {
+        val s = scheduler(this)
+        val daily = s.add("Read my calendar", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))!!
+        val off = s.add("Water the plants", ScheduleRule(9, 0, ScheduleRule.EVERY_DAY))!!
+        s.setEnabled(off.id, false)
+        reminders.pending.clear()
+        s.rearmAll()
+        assertEquals(at(1, 8), reminders.pending["schedule-${daily.id}"]!!.second)
+        assertNull(reminders.pending["schedule-${off.id}"], "a switched-off repeat stays off")
+    }
+
+    @Test
     fun aRunMissedByHoursIsSkippedNotRunLate() = runTest {
         val s = scheduler(this)
         val added = s.add("Read my calendar", ScheduleRule(8, 0, ScheduleRule.EVERY_DAY))!!
