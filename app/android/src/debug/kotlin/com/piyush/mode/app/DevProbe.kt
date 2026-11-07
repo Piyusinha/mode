@@ -96,6 +96,11 @@ class DevProbe : BroadcastReceiver() {
                         val lines = com.piyush.mode.android.MlKitTextReader().read(shot.png)
                         "${lines.size} lines: " + lines.take(12).joinToString(" | ") { "${it.text}@${"%.2f".format(it.left)},${"%.2f".format(it.top)}" }
                     }
+                    // Pretends a background task runs, so leaving Mode shows its small window.
+                    "pip" -> {
+                        (context.applicationContext as ModeApplication).backgroundTask.value = intent.getBooleanExtra("on", true)
+                        "pip=${intent.getBooleanExtra("on", true)}"
+                    }
                     "tls" -> runCatching {
                         Class.forName("org.conscrypt.OpenSSLProvider").getDeclaredConstructor().newInstance().toString()
                     }.fold({ "bundled conscrypt ok: $it" }, { e -> "bundled conscrypt failed: ${e::class.java.name}: ${e.message} / ${e.cause?.let { c -> c::class.java.name + ": " + c.message }}" })

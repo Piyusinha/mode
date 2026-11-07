@@ -16,6 +16,7 @@ import com.piyush.mode.app.system.ChatGptSignIn
 import com.piyush.mode.app.system.SystemPages
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.platform.ActivityBridge
+import kotlinx.coroutines.launch
 
 /** The one activity; every screen is a Compose destination inside it. */
 class MainActivity : ComponentActivity() {
@@ -30,7 +31,39 @@ class MainActivity : ComponentActivity() {
         val signIn = ChatGptSignIn(this, lifecycleScope, pages)
         // A link not yet followed (also when Android brings back a screen it had closed, with a new link).
         follow(intent)
-        setContent { ModeApp(graph, shell, pages, signIn) }
+        setContent {
+            androidx.compose.foundation.layout.Box {
+                ModeApp(graph, shell, pages, signIn)
+                // In the small window, only the hidden screen and Mo (the app underneath keeps its place).
+                if (inPip.value) com.piyush.mode.design.ModeTheme { com.piyush.mode.app.live.PipRoute(graph) }
+            }
+        }
+        // While a task runs on the hidden screen, leaving Mode shrinks it to a small window.
+        lifecycleScope.launch {
+            (application as ModeApplication).backgroundTask.collect { running -> runCatching { setPictureInPictureParams(pipParams(running)) } }
+        }
+    }
+
+    private val inPip = androidx.compose.runtime.mutableStateOf(false)
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        inPip.value = isInPictureInPictureMode
+    }
+
+    /** Tall like the board's small window, with Stop. */
+    private fun pipParams(autoEnter: Boolean): android.app.PictureInPictureParams {
+        val stop = android.app.PendingIntent.getBroadcast(
+            this, 0, Intent(this, StopReceiver::class.java), android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val label = getString(R.string.working_stop)
+        val action = android.app.RemoteAction(android.graphics.drawable.Icon.createWithResource(this, com.piyush.mode.design.ModeIcon.Stop.res), label, label, stop)
+        return android.app.PictureInPictureParams.Builder()
+            .setAspectRatio(android.util.Rational(PIP_WIDTH, PIP_HEIGHT))
+            .setAutoEnterEnabled(autoEnter)
+            .setSeamlessResizeEnabled(true)
+            .setActions(listOf(action))
+            .build()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -75,6 +108,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private companion object {
+        /** The small window's shape (board R02: 164 × 332). */
+        const val PIP_WIDTH = 1
+        const val PIP_HEIGHT = 2
+
         /** Set on an intent once its link was followed, so a rotation doesn't follow it again. */
         const val FOLLOWED = "mode.followed"
     }

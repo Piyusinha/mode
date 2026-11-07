@@ -163,7 +163,8 @@ display isn't ready, so a task always runs.
   skipped there. The display ends with the task's session.
 - **The user's turn** (a PIN, a password, a private screen): the app comes to the user's screen and goes back once
   Mode carries on. The live run shows "Live · in the background", a "Hidden screen" tag, and Take over / Give back
-  to Mode (boards R01, R03).
+  to Mode (boards R01, R03). Leaving Mode while a task runs there shrinks it to a small floating window
+  (picture-in-picture, board R02): the hidden screen as Mode last saw it, Mo and the task, with Stop.
 
 Measured on the API 37 emulator: pairing about 1.2 s after the window opens; connecting, starting the helper and
 making the display 1.1–1.6 s (including switching Wireless debugging back on); a look on the hidden display

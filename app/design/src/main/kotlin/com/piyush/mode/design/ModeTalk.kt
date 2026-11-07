@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -531,4 +532,33 @@ private const val BAR_PHASE = 0.9f
 public fun ModeScreenTag(text: String, modifier: Modifier = Modifier) {
     val c = Mode.colors
     ModeText(text, ModeTextStyle.FootnoteEmphasis, modifier.background(c.fill, Capsule).padding(horizontal = ModeSpacing.m, vertical = ModeSpacing.xs), color = c.textSecondary)
+}
+
+/**
+ * Mode in a small floating window while it works on the hidden screen (board R02): the screen as Mode last saw
+ * it, and a dark bar with Mo at work and what it's in.
+ */
+@Composable
+public fun ModePipView(screen: androidx.compose.ui.graphics.ImageBitmap?, label: String, title: String, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Column(modifier.background(c.card)) {
+        Box(Modifier.weight(1f).fillMaxWidth(), Alignment.Center) {
+            if (screen != null) {
+                androidx.compose.foundation.Image(screen, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter)
+            } else {
+                ModeMo(MoMood.Working, ModeSize.talkMoCard)
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().background(c.hero).padding(horizontal = ModeSpacing.s, vertical = ModeSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ModeMo(MoMood.Working, ModeSize.talkMoCard)
+            Column(Modifier.weight(1f)) {
+                ModeText(label, ModeTextStyle.Caption, color = c.heroSecondary, maxLines = 1)
+                ModeText(title, ModeTextStyle.FootnoteEmphasis, color = c.heroText, maxLines = 1)
+            }
+        }
+    }
 }

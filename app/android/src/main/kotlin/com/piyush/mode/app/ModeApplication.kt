@@ -62,6 +62,9 @@ class ModeApplication : Application() {
         followTheRunningTask()
     }
 
+    /** A task is running on the hidden screen: Mode shrinks to a small window when the user leaves it. */
+    val backgroundTask = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     /** The user's turn came during a background task: its app is on their screen until they're done. */
     private var userHasTheApp = false
 
@@ -117,6 +120,7 @@ class ModeApplication : Application() {
                 }
                 WorkNotice.refresh(this@ModeApplication)
                 handOver(s)
+                backgroundTask.value = s is ActivityUiState.Working && com.piyush.mode.app.graph.background?.working == true
                 // A task ended: the widget's suggestions may have changed.
                 if (s is ActivityUiState.Finished) com.piyush.mode.app.widget.ModeWidget.refresh(this@ModeApplication)
             }
