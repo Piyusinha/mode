@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -45,7 +47,8 @@ class Overlays(val openLive: () -> Unit, val openAsk: () -> Unit)
 fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages) {
     val nav = shell.navigator
     val run = rememberRunStatus(graph)
-    val overlays = Overlays(openLive = { nav.push(Route.LiveRun) }, openAsk = { })
+    var asking by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val overlays = Overlays(openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true })
 
     LaunchedEffect(nav.pending) {
         val route = nav.pending ?: return@LaunchedEffect
@@ -66,6 +69,16 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages) {
             } else {
                 PresenterOwner(shell.presenters, entry.id) { Page(entry.route, graph, run, nav, pages, overlays) }
             }
+        }
+        if (asking) {
+            com.piyush.mode.app.ask.AskRoute(graph, onSent = { conversation ->
+                asking = false
+                nav.open(AppTab.Home, Route.Conversation(conversation))
+            }) { asking = false }
+        }
+        // Mode's question, wherever the user is (a spoken one is answered in talking mode).
+        run.state.question?.takeIf { !it.spoken }?.let { question ->
+            com.piyush.mode.app.run.QuestionSheet(question, run::answer, run::stopFromQuestion)
         }
         if (stack.isEmpty()) {
             Box(Modifier.align(Alignment.BottomCenter), contentAlignment = Alignment.BottomCenter) {

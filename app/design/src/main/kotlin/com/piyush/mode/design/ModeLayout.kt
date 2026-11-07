@@ -188,6 +188,9 @@ public object ModeSize {
     public val failedButton: Dp = 42.dp
     public val agendaTimeChat: Dp = 48.dp
     public val chatRing: Dp = 2.dp
+    /** The grab handle on top of a sheet. */
+    public val sheetHandle: Dp = 36.dp
+    public val sheetHandleHeight: Dp = 5.dp
     /** Tasks: a row, and the Scheduled / Done pill switch. */
     public val tasksRow: Dp = 72.dp
     public val segmentsHeight: Dp = 42.dp
