@@ -53,6 +53,7 @@ OVERRIDES = {
     "access.pinDetail": "Apps hide these screens from Mode",
     "setup.permissions.siri": "The assistant",
     "start.mo.faceID": "Fingerprint",
+    "voice.appleBanner": "**Free and private.** These voices run on your phone, even offline. Get more in Settings › Accessibility › Text-to-speech output.",
 }
 
 

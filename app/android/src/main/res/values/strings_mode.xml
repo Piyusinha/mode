@@ -834,7 +834,7 @@
     <string name="voice_all">All</string>
     <string name="voice_allow_mic">Allow mic</string>
     <string name="voice_apple">Android</string>
-    <string name="voice_apple_banner">**Free and private.** These voices run on your phone, even offline. Get more in phone Settings → Accessibility → Spoken Content → Voices.</string>
+    <string name="voice_apple_banner">**Free and private.** These voices run on your phone, even offline. Get more in Settings › Accessibility › Text-to-speech output.</string>
     <string name="voice_apple_hearing">Free · private, stays on this phone</string>
     <string name="voice_apple_speech">Free · on this phone · works offline</string>
     <string name="voice_asset">Downloading the speech model</string>

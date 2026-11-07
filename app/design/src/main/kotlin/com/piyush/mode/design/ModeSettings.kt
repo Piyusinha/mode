@@ -377,3 +377,49 @@ public fun ModeBadgeRow(title: String, subtitle: String, icon: ModeIcon, modifie
         }
     }
 }
+
+/** A voice to pick: the radio, its name with a tag, what it sounds like, and play (pause while it plays). */
+@Composable
+public fun ModeVoiceChoiceRow(
+    name: String,
+    traits: String,
+    tag: ModeChoiceTag?,
+    selected: Boolean,
+    playing: Boolean,
+    playLabel: String,
+    onSelect: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = Mode.colors
+    Row(modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.voiceChoiceRow).padding(vertical = ModeSpacing.s), horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).clickable(role = Role.RadioButton, indication = null, interactionSource = null, onClick = onSelect).semantics { this.selected = selected },
+            horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m), verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ModeRadio(selected)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s), verticalAlignment = Alignment.CenterVertically) {
+                    ModeText(name, ModeTextStyle.CalloutEmphasis, maxLines = 1)
+                    if (tag != null) ModeText(tag.text, ModeTextStyle.CaptionEmphasis, Modifier.background(tag.background, Capsule).padding(horizontal = ModeSpacing.s, vertical = ModeSpacing.xxs), color = tag.foreground)
+                }
+                if (traits.isNotEmpty()) ModeText(traits, ModeTextStyle.Footnote, color = c.textSecondary, maxLines = 1)
+            }
+        }
+        ModeIconButton(if (playing) ModeIcon.Pause else ModeIcon.Play, playLabel, onPlay, prominent = playing, size = ModeSize.playButton)
+    }
+}
+
+/** Example lines on a card ("You say … / Mode works on … / Mode says …"). */
+@Composable
+public fun ModeExampleCard(lines: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Column(modifier.fillMaxWidth().background(c.card, RoundedCornerShape(ModeRadius.card)).padding(ModeSpacing.l), verticalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
+        lines.forEach { (label, text) ->
+            Column(verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+                ModeText(label, ModeTextStyle.CaptionEmphasis, color = c.textSecondary)
+                ModeText(text, ModeTextStyle.Callout)
+            }
+        }
+    }
+}
