@@ -67,7 +67,8 @@ fun HomeRoute(graph: ModeGraph, run: RunStatus, navigate: (Route) -> Unit, openL
                 SetupTip.Voice -> navigate(Route.Voice)
                 SetupTip.Listening -> navigate(Route.Listening)
                 SetupTip.Access -> navigate(Route.Access)
-                SetupTip.StartWithoutOpening -> navigate(Route.UnlockVoice)
+                // Android starts Mode without opening it from the assistant button (Permissions), not Voice Control.
+                SetupTip.StartWithoutOpening -> navigate(Route.PhoneSetup)
                 SetupTip.Name -> navigate(Route.Settings)
                 null -> Unit
             }

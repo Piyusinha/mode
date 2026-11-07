@@ -151,7 +151,6 @@ fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: B
                 },
                 // Android: the switches phone control needs, as in setup.
                 { ModeRow(stringResource(R.string.settings_permissions), leading = ModeRowLeading.Icon(ModeIcon.Tap), onClick = { onEvent(SettingsEvent.Open(Route.PhoneSetup)) }) },
-                { ModeRow(stringResource(R.string.unlock_voice_title), leading = ModeRowLeading.Icon(ModeIcon.Lock), onClick = { onEvent(SettingsEvent.Open(Route.UnlockVoice)) }) },
             ))
             ModeSectionHeader(stringResource(R.string.settings_limits))
             if (state.showsCost) {
