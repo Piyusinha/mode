@@ -37,6 +37,8 @@ public object ModeRadius {
     /** A chat bubble's corners, and the small one by its tail. */
     public val bubble: Dp = 22.dp
     public val bubbleTail: Dp = 6.dp
+    /** The "Did you know?" cards on Home. */
+    public val tipBanner: Dp = 26.dp
     /** First-run cards (a provider, More options). */
     public val firstRunCard: Dp = 24.dp
     /** A tinted note on a setup guide. */
@@ -151,6 +153,25 @@ public object ModeSize {
     public val guideNumber: Dp = 28.dp
     public val guideStep: Dp = 60.dp
     public val waitingDot: Dp = 10.dp
+    /** Home: the running task's Mo in the bar, its stop square, a recent row, the room the tab bar takes. */
+    public val moBar: Dp = 34.dp
+    public val stopSquare: Dp = 11.dp
+    public val stopSquareRadius: Dp = 3.dp
+    public val recentRow: Dp = 62.dp
+    public val tabBarClearance: Dp = 120.dp
+    public val tryPill: Dp = 44.dp
+    /** Home's tip cards: Mo, its badge and ring, the close button, the dots and their tap areas, Undo. */
+    public val tipMo: Dp = 64.dp
+    public val tipBadge: Dp = 30.dp
+    public val tipBadgeRing: Dp = 3.dp
+    public val tipBadgeOffset: Dp = 5.dp
+    public val tipClose: Dp = 30.dp
+    public val tipDot: Dp = 8.dp
+    public val tipDotCurrent: Dp = 18.dp
+    public val tipDotHit: Dp = 16.dp
+    public val tipDotHitCurrent: Dp = 26.dp
+    public val tipDotHitHeight: Dp = 28.dp
+    public val tipToast: Dp = 56.dp
     /** A phone screen's width to height, for screenshot cells. */
     public const val screenAspect: Float = 9f / 19.5f
 }
@@ -173,5 +194,11 @@ public object ModeOpacity {
     public const val shimmer: Float = 0.55f
     public const val muted: Float = 0.28f
     public const val disabled: Float = 0.4f
+    /** Words and fills on ink (Undo). */
+    public const val toastDetail: Float = 0.72f
+    public const val toastButton: Float = 0.16f
+    /** Tip cards: the close chip and the dots not showing. */
+    public const val tipChip: Float = 0.08f
+    public const val tipDotOff: Float = 0.2f
     public val orbRings: List<Float> = listOf(0.08f, 0.14f, 0.22f)
 }

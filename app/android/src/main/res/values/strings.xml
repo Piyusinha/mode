@@ -5,6 +5,9 @@
     <string name="working_title">Mode is working</string>
     <string name="working_stop">Stop</string>
 
+    <!-- Durations as the boards show them ("62 s"). -->
+    <string name="format_seconds">%1$s s</string>
+
     <!-- Names, the same in every language. -->
     <string name="name_chatgpt" translatable="false">ChatGPT</string>
 

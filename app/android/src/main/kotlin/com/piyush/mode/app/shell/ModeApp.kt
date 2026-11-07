@@ -10,18 +10,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.piyush.mode.app.R
 import com.piyush.mode.app.firstrun.FirstRunRoute
 import com.piyush.mode.app.graph.ModeGraph
 import com.piyush.mode.app.system.ChatGptSignIn
 import com.piyush.mode.app.system.SystemPages
 import com.piyush.mode.design.Mode
 import com.piyush.mode.design.ModeTheme
-import com.piyush.mode.design.ModeText
-import com.piyush.mode.design.ModeTextStyle
 import com.piyush.mode.design.modeScreen
 
 /** The whole app: the first run until setup is done, then the tabs. */
@@ -43,17 +38,9 @@ fun ModeApp(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signIn:
                     )
                 }
             } else {
-                MainShell(shell)
+                PresenterOwner(shell.presenters, "shell") { MainShell(graph, shell, pages) }
             }
         }
-    }
-}
-
-/** The tabs (Home, Tasks, Ask, Settings), each with its own stack; the pages arrive in the next phase. */
-@Composable
-private fun MainShell(shell: ShellViewModel) {
-    Box(Modifier.fillMaxSize(), Alignment.Center) {
-        ModeText(stringResource(R.string.tab_home), ModeTextStyle.TabTitle)
     }
 }
 
