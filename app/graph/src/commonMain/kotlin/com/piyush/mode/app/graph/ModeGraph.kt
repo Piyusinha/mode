@@ -76,7 +76,7 @@ class PlatformServices(
     /** This build's version (CFBundleShortVersionString), written into backups. */
     val appVersion: String = "unknown",
     /** Where backups are written and picked ones read. */
-    val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles = com.piyush.mode.feature.backup.data.platformBackupFiles(),
+    val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles,
 )
 
 /**

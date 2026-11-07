@@ -44,7 +44,7 @@ public class BackupService(
     private val db: ModeDatabase,
     private val prefs: KeyValueStore,
     private val secrets: SecretStore,
-    private val files: BackupFiles = platformBackupFiles(),
+    private val files: BackupFiles,
     /** Shown on the restore preview ("Piyush’s iPhone"). */
     private val deviceName: () -> String = { "iPhone" },
     private val appVersion: String = "unknown",
