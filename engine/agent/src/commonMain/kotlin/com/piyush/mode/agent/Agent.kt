@@ -425,6 +425,21 @@ class Agent(
             onStatus(WORKING)
             val lookStarted = clock.markNow()
             var screen = telemetry.trace(Operation.ScreenLook) { look() }
+            if (screen.private) {
+                // The phone hides this screen (a bank, a PIN pad): only the user can do this step.
+                onStatus("Your turn")
+                val outcome = when (yourTurn(PRIVATE_SCREEN, screen)) {
+                    null -> return result(AgentOutcome.Stopped("Stopped at: $PRIVATE_SCREEN"), step)
+                    false -> return result(AgentOutcome.Stopped("Waited for you: $PRIVATE_SCREEN"), step)
+                    true -> "the user did it and the screen moved on. Carry on from this screen"
+                }
+                onStep(StepRecord(step, config.model, "wait_for_user", PRIVATE_SCREEN, outcome, 0.0, lookStarted.elapsedNow().inWholeMilliseconds))
+                trace.acted(step, "wait_for_user", null, outcome, lookStarted.elapsedNow().inWholeMilliseconds)
+                history += "$step. wait_for_user — $outcome"
+                lastWasPhoneAction = false
+                answeredSinceAction = false
+                continue
+            }
             // A frame identical to the one before the action is stale or the phone stalled: look once more.
             if (lastWasPhoneAction && lastJpeg?.contentEquals(screen.jpeg) == true) {
                 delay(RECAPTURE_MS)
@@ -1083,9 +1098,11 @@ class Agent(
         val boxes: List<ScreenLayout.Box>,
         /** How far down the status bar reaches, in points. */
         val statusBarPt: Double = STATUS_BAR_PT,
+        /** The phone would not show this screen (a bank, a PIN pad): no picture, the user's turn. */
+        val private: Boolean = false,
     ) {
-        /** Text with its centre in screenshot pixels. */
-        val texts: List<Triple<String, Int, Int>> = boxes.map { Triple(it.text, it.x, it.y) }
+        /** Text with its centre in screenshot pixels; the keyboard's own keys are left out when the phone marks them. */
+        val texts: List<Triple<String, Int, Int>> = boxes.filter { it.window != IME }.map { Triple(it.text, it.x, it.y) }
 
         /**
          * Text and rough position: a scroll changes it even when the words do not. The status
@@ -1095,8 +1112,13 @@ class Agent(
         val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(statusBarPt) && TICKING.matches(it.first.trim()) }
             .joinToString("|") { "${it.first}@${it.third / 12}" }
 
-        /** Where the keyboard starts (screenshot pixels) when it is up. */
-        val keyboardTop: Int? = Keyboard.top(texts, geometry.imageHeight)
+        /**
+         * Where the keyboard starts (screenshot pixels) when it is up: from the phone's keyboard window when it
+         * reports windows, else read off the screen's text.
+         */
+        val keyboardTop: Int? =
+            if (boxes.any { it.window != null }) boxes.filter { it.window == IME }.minOfOrNull { it.y - it.h / 2 }
+            else Keyboard.top(texts, geometry.imageHeight)
         val keyboardUp: Boolean get() = keyboardTop != null
 
         /** What the model is shown: the page's text, without the keyboard's keys. */
@@ -1104,7 +1126,7 @@ class Agent(
 
         /** What the model reads: the page's text without the status bar or the keyboard, numbered and grouped. */
         val layout: ScreenLayout = ScreenLayout.of(
-            boxes.filter { b -> b.y > geometry.toPixelsY(statusBarPt) && keyboardTop.let { it == null || b.y < it } },
+            boxes.filter { b -> b.window != IME && b.y > geometry.toPixelsY(statusBarPt) && keyboardTop.let { it == null || b.y < it } },
             lineHeight = geometry.toPixelsY(LINE_PT).roundToInt(),
         )
 
@@ -1115,13 +1137,18 @@ class Agent(
     @OptIn(ExperimentalEncodingApi::class)
     private suspend fun look(): Screen {
         val capture = phone.send(Op.ScreenCapture(maxSize = config.imageMaxSide)).jsonObject
-        val px = capture.getValue("img_px").jsonObject
         val bounds = capture.getValue("bounds").jsonObject
-        val g = AgentTools.Geometry(
-            px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int,
-            bounds.getValue("w").jsonPrimitive.double, bounds.getValue("h").jsonPrimitive.double,
-        )
-        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, screenBoxes(g), profile.statusBarPt)
+        val w = bounds.getValue("w").jsonPrimitive.double
+        val h = bounds.getValue("h").jsonPrimitive.double
+        val statusBar = bounds["top_inset"]?.jsonPrimitive?.doubleOrNull ?: profile.statusBarPt
+        if (capture["private"]?.jsonPrimitive?.booleanOrNull == true) {
+            // No picture to shrink: pixels are points, so the text still has positions.
+            val g = AgentTools.Geometry(w.roundToInt(), h.roundToInt(), w, h)
+            return Screen(ByteArray(0), g, runCatching { screenBoxes(g) }.getOrDefault(emptyList()), statusBar, private = true)
+        }
+        val px = capture.getValue("img_px").jsonObject
+        val g = AgentTools.Geometry(px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int, w, h)
+        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, screenBoxes(g), statusBar)
     }
 
     /**
@@ -1188,6 +1215,7 @@ class Agent(
                 g.toPixelsY(box.getValue("y").jsonPrimitive.double).roundToInt(),
                 box["w"]?.jsonPrimitive?.doubleOrNull?.let { w -> g.toPixelsX(w).roundToInt() } ?: 0,
                 box["h"]?.jsonPrimitive?.doubleOrNull?.let { h -> g.toPixelsY(h).roundToInt() } ?: 0,
+                box["window"]?.jsonPrimitive?.contentOrNull,
             )
         }
 
@@ -1421,8 +1449,10 @@ class Agent(
             repeat((WAIT_FOR_USER_MS / WAIT_POLL_MS).toInt()) {
                 delay(WAIT_POLL_MS)
                 val now = runCatching { look() }.getOrNull() ?: return@repeat
+                // A hidden screen that shows again: the user is through it.
+                if (before.private && !now.private) return@async true
                 // A new page: the PIN or password screen is gone. Typing on the same page is not enough.
-                if (ChangeLedger.similarity(page, ChangeLedger.page(now.pageTexts())) < SAME_PAGE) return@async true
+                if (!now.private && ChangeLedger.similarity(page, ChangeLedger.page(now.pageTexts())) < SAME_PAGE) return@async true
             }
             false
         }
@@ -1445,6 +1475,12 @@ class Agent(
     companion object {
         /** How long Mode waits for the user to enter a PIN or password before stopping. */
         const val WAIT_FOR_USER_MS: Long = 5 * 60_000L
+
+        /** The keyboard's window, as the phone names it in a text box. */
+        private const val IME = "ime"
+
+        /** What the user is told when the phone hides the screen from Mode. */
+        const val PRIVATE_SCREEN = "Finish this step yourself: this screen is private, so Mode cannot see it"
         private const val WAIT_POLL_MS: Long = 1_500L
 
         /** The rules that depend on what the user allowed: codes, screens only they can do, full access. */

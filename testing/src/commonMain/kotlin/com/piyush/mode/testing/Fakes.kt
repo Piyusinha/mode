@@ -30,13 +30,21 @@ public class FakePhone(
     /** Base64 frames handed out by successive captures; the last one repeats. */
     var frames: MutableList<String> = mutableListOf("AAAA")
     var captures = 0
+    /** Which window a text is in ("ime" for the keyboard's keys), for phones that report windows. */
+    var windows: Map<String, String> = emptyMap()
+    /** Screens (by index) the phone will not show: the capture says private. */
+    var privateScreens: Set<Int> = emptySet()
     private var screen = 0
     override val name = "fake"
     override suspend fun ops() = supported
     private fun frameFor(index: Int): String = kotlin.io.encoding.Base64.encode("frame $index".encodeToByteArray())
 
     override suspend fun send(op: Op): JsonElement = when (op) {
-        is Op.ScreenCapture -> buildJsonObject {
+        is Op.ScreenCapture -> if (screen in privateScreens) buildJsonObject {
+            captures++
+            put("private", true)
+            put("bounds", buildJsonObject { put("x", 0); put("y", 0); put("w", 402.0); put("h", 874.0); put("id", 0) })
+        } else buildJsonObject {
             captures++
             // A frame per screen, as a phone gives (the agent treats an identical frame after an action as stale).
             put("jpeg_b64", if (frames.size > 1) frames.removeAt(0) else if (frames.first() == "AAAA") frameFor(screen) else frames.first())
@@ -45,7 +53,10 @@ public class FakePhone(
         }
         is Op.ScreenText -> buildJsonArray {
             for ((text, at) in screens[screen.coerceAtMost(screens.lastIndex)]) add(
-                buildJsonObject { put("text", text); put("x", at.first); put("y", at.second); put("confidence", 1.0) },
+                buildJsonObject {
+                    put("text", text); put("x", at.first); put("y", at.second); put("confidence", 1.0)
+                    windows[text]?.let { put("window", it) }
+                },
             )
         }
         else -> {
