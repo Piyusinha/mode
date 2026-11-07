@@ -91,10 +91,15 @@ private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, background: Bac
             Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.l).padding(top = ModeSpacing.m, bottom = ModeSpacing.xxl),
             verticalArrangement = Arrangement.spacedBy(ModeSpacing.s + ModeSpacing.xxs),
         ) {
-            if (!state.ready) {
+            // From Settings (no step dots) this page is just closed: Done, and never held back.
+            val inSetup = dots != null
+            if (inSetup && !state.ready) {
                 ModeText(stringResource(R.string.phone_continue_hint), ModeTextStyle.Footnote, Modifier.fillMaxWidth(), color = c.textSecondary, align = TextAlign.Center)
             }
-            ModeButton(stringResource(R.string.phone_continue), { onEvent(PhoneSetupEvent.Continue) }, fullWidth = true, enabled = state.ready)
+            ModeButton(
+                stringResource(if (inSetup) R.string.phone_continue else R.string.common_done),
+                { onEvent(PhoneSetupEvent.Continue) }, fullWidth = true, enabled = state.ready || !inSetup,
+            )
         }
     }
 }

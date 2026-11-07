@@ -165,7 +165,7 @@ private fun map(s: ConversationUiState, w: Words): ConversationState {
                 steered = t.steered,
                 text = t.text,
                 blocks = t.parts.map { block(it, w) },
-                screens = if (t.screens > 0) t.taskId?.let { w.get(R.string.conversation_see_screens, t.screens) to it } else null,
+                screens = if (t.screens > 0) t.taskId?.let { (if (t.screens == 1) w.get(R.string.conversation_see_screen) else w.get(R.string.conversation_see_screens, t.screens)) to it } else null,
                 debugTaskId = t.badge?.takeIf { it != TaskBadge.Done }?.let { t.taskId },
                 mood = mood(t, s.turns.getOrNull(i - 1), s.running != null),
             )

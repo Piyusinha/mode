@@ -76,6 +76,8 @@
     <string name="live_in_control">You’re in control</string>
     <string name="live_in_control_body">Do your part in the app, then come back and hand it back.</string>
     <string name="live_give_back">Give back to Mode</string>
+    <!-- A chat's link to the one screen a short task saw ("See all 1 screens" otherwise). -->
+    <string name="conversation_see_screen">See the screen</string>
     <!-- The home screen widget. -->
     <string name="widget_title">What can I do for you?</string>
     <string name="widget_speak">Speak a task</string>
