@@ -212,14 +212,16 @@ const screens = {
   }),
 
   oldIos: () => page({
-    nav: stepsNav(0),
-    body: head('Mode needs iOS 27', `This iPhone has iOS ${esc(S.phone?.ios)}. Mode sees and taps your screen with Apple’s remote control, which starts in iOS 27.`)
+    nav: stepsNav(0), tight: true,
+    body: head('Mode needs iOS 27', `This iPhone has iOS ${esc(S.phone?.ios)}. Mode sees and taps your screen with Apple’s remote control, which starts in iOS 27. Updating is free and keeps your apps and data.`)
       + `<ol class="numbered">${[
-        ['Open Settings → General → Software Update', 'Keep your iPhone charging and on Wi-Fi.'],
-        ['Install iOS 27 or later', 'Your iPhone restarts when it’s done.'],
+        ['Plug your iPhone into power and connect to Wi-Fi', 'Updating takes 20 to 40 minutes and needs about 7 GB free.'],
+        ['Open Settings → General → Software Update', ''],
+        ['Choose iOS 27', 'If the top update is iOS 26, look further down for “Upgrade to iOS 27” and tap that.'],
+        ['Tap Update Now, then enter your passcode', 'Your iPhone downloads it, restarts and finishes on its own.'],
         ['Plug it in here again and press Check again', '']].map(([t, sub], i) =>
         `<li><span class="n">${i + 1}</span><span><b>${t}</b>${sub ? `<span>${sub}</span>` : ''}</span></li>`).join('')}</ol>`
-      + box(row('fail', esc(S.phone?.name ?? 'Your iPhone'), `${esc(model(S.phone?.model))} · iOS ${esc(S.phone?.ios)}`)),
+      + callout('<b>No iOS 27 in Software Update?</b> Check your iPhone is on <a class="inline" data-url="https://www.apple.com/ios/">Apple’s list of iPhones that get iOS 27</a>. Not enough space? Update with this computer instead: on a Mac, select your iPhone in Finder and click Check for Update; on Windows, use Apple Devices or iTunes.', '', 'warn'),
     left: btn('Back', 'welcome'), right: btn('Check again', 'checkIos', 'primary'),
   }),
 

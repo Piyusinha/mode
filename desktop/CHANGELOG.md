@@ -6,8 +6,10 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
-- Stops an iPhone on iOS 26 or earlier with "Mode needs iOS 27" and how to update, instead of
-  installing a Mode that can't see or tap the screen. Check again goes on after the update.
+- Stops an iPhone on iOS 26 or earlier with "Mode needs iOS 27", instead of installing a Mode
+  that can't see or tap the screen, and guides you through updating: Software Update, finding
+  "Upgrade to iOS 27", and what to do if it isn't offered or there isn't enough space. Check
+  again goes on after the update.
 - The steps on your iPhone include trusting your Apple account (Settings › General › VPN &
   Device Management), for when iOS says "Untrusted Developer".
 
