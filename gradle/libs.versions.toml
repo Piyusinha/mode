@@ -19,6 +19,10 @@ androidx-browser = "1.9.0"
 androidx-compose = "1.11.2"
 
 [libraries]
+# Background mode's link: wireless debugging from inside the phone.
+libadb-android = { module = "com.github.MuntashirAkon:libadb-android", version = "3.1.1" }
+conscrypt-android = { module = "org.conscrypt:conscrypt-android", version = "2.8.0" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk15to18", version = "1.81" }
 otel-core = { module = "io.opentelemetry.kotlin:core", version.ref = "opentelemetry-kotlin" }
 otel-implementation = { module = "io.opentelemetry.kotlin:implementation", version.ref = "opentelemetry-kotlin" }
 otel-protobuf = { module = "io.opentelemetry.kotlin:exporters-protobuf", version.ref = "opentelemetry-kotlin" }

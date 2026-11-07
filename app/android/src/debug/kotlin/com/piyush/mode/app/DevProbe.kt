@@ -64,6 +64,37 @@ class DevProbe : BroadcastReceiver() {
                         "display=$d bounds=${shot["bounds"]} private=${shot["private"]} jpeg=${shot["jpeg_b64"]?.toString()?.length} texts=${text.size}: " +
                             text.take(12).joinToString(" | ") { it.jsonObject["text"].toString() + "@" + it.jsonObject["x"] + "," + it.jsonObject["y"] }
                     }
+                    // Background mode's link: --es code 123456 pairs (Wireless debugging's pairing window open),
+                    // then connects and runs `id` as the shell user.
+                    "adb" -> {
+                        val link = adbLink ?: com.piyush.mode.adb.AdbLink(context).also { adbLink = it }
+                        val code = intent.getStringExtra("code")
+                        val paired = if (code != null) {
+                            val port = intent.getIntExtra("port", 0)
+                            "paired=${link.pair(code, port)} on $port ${link.lastError ?: ""}; "
+                        } else ""
+                        val connected = link.connect()
+                        paired + "connected=$connected port=${link.port} " + (if (connected) link.run("id").trim() else "")
+                    }
+                    // Starts the helper over the link, makes a hidden display and opens Settings there.
+                    "helper" -> {
+                        val link = adbLink ?: com.piyush.mode.adb.AdbLink(context).also { adbLink = it }
+                        check(link.connect()) { "not connected" }
+                        helper?.close()
+                        val session = com.piyush.mode.adb.HelperSession.start(link, context.applicationInfo.sourceDir).also { helper = it }
+                        val m = context.resources.displayMetrics
+                        val display = session.send(com.piyush.mode.adb.HelperCommand.display(m.widthPixels, m.heightPixels, m.densityDpi))
+                        val id = com.piyush.mode.adb.HelperAnswer.displayId(display) ?: error(display)
+                        "display=$id " + session.send(com.piyush.mode.adb.HelperCommand.start(id, intent.getStringExtra("component") ?: "com.android.settings/.Settings"))
+                    }
+                    "tls" -> runCatching {
+                        Class.forName("org.conscrypt.OpenSSLProvider").getDeclaredConstructor().newInstance().toString()
+                    }.fold({ "bundled conscrypt ok: $it" }, { e -> "bundled conscrypt failed: ${e::class.java.name}: ${e.message} / ${e.cause?.let { c -> c::class.java.name + ": " + c.message }}" })
+                    "helperstop" -> {
+                        helper?.close()
+                        helper = null
+                        "stopped"
+                    }
                     "checks" -> buildString {
                         graph.phoneChecks.run { rows -> clear(); rows.forEach { append("${it.id}=${it.state} ") } }
                     }
@@ -102,5 +133,7 @@ class DevProbe : BroadcastReceiver() {
     private companion object {
         const val TAG = "ModeProbe"
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        var adbLink: com.piyush.mode.adb.AdbLink? = null
+        var helper: com.piyush.mode.adb.HelperSession? = null
     }
 }

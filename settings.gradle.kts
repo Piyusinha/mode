@@ -26,6 +26,10 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        // libadb-android (background mode's link) is published only on JitPack: nothing else comes from there.
+        maven("https://jitpack.io") {
+            mavenContent { includeGroupAndSubgroups("com.github.MuntashirAkon") }
+        }
     }
 }
 
@@ -43,6 +47,7 @@ include(":engine:agent")
 include(":engine:phone-ios")
 include(":engine:phone-android")
 include(":engine:adb-helper")
+include(":engine:adb-link")
 include(":feature:conversations")
 include(":feature:memory")
 include(":feature:connection")
