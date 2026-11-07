@@ -1,11 +1,12 @@
-# Mode Setup for Windows and Linux. tools/release.sh makes the draft release on a Mac (Mode's .ipa
-# files and the Mac .dmg need Xcode) and pushes the tag; this adds the Windows and Linux installers
-# to that draft. Run it by hand (Actions → Run workflow) to build without a release.
+# Mode Setup for Windows and Linux. tools/release-setup.sh makes the draft release setup-v<version>
+# on a Mac (the .dmg is signed and notarized there) and pushes the tag; this adds the Windows and
+# Linux installers to that draft, each carrying the newest published Mode. Run it by hand
+# (Actions → Run workflow) to build without a release.
 name: Release · Mode Setup for Windows and Linux
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["setup-v*"]
   workflow_dispatch:
 
 permissions:
@@ -32,30 +33,14 @@ jobs:
             libssl-dev libdbus-1-dev libudev-dev pkg-config patchelf
       - name: Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
-      # Mode's .ipa files from the draft release tools/release.sh made (drafts aren't reachable by tag,
-      # so find it in the list), checked against their .sha256, to carry inside Mode Setup.
-      - name: Mode (.ipa) from the release
-        if: startsWith(github.ref, 'refs/tags/v')
+      # The newest published Mode (.ipa files, checked against their .sha256, and Mode.version), to
+      # carry inside Mode Setup: the same script the Mac build uses.
+      - name: The newest Mode, to carry inside
+        if: startsWith(github.ref, 'refs/tags/setup-v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          mkdir -p build/release
-          rel=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
-          [ -n "$rel" ] || { echo "no release for $GITHUB_REF_NAME"; exit 1; }
-          for name in Mode.ipa Mode.ipa.sha256 Mode-paid.ipa Mode-paid.ipa.sha256; do
-            asset=$(gh api "repos/$GITHUB_REPOSITORY/releases/$rel/assets" --jq ".[] | select(.name == \"$name\") | .id")
-            [ -n "$asset" ] || { echo "the release has no $name"; exit 1; }
-            gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "build/release/$name"
-          done
-          cd build/release
-          for ipa in Mode.ipa Mode-paid.ipa; do
-            want=$(cut -d' ' -f1 "$ipa.sha256")
-            got=$(sha256sum "$ipa" | cut -d' ' -f1)
-            [ "$want" = "$got" ] || { echo "$ipa checksum mismatch"; exit 1; }
-          done
-          ls -la
+        run: tools/latest-app-release.sh
       - name: Build Mode Setup
         working-directory: desktop/setup-app
         shell: bash
@@ -71,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir out
-          V=${GITHUB_REF_NAME#v}
+          V=${GITHUB_REF_NAME#setup-v}
           [ "$V" != "$GITHUB_REF_NAME" ] || V=dev
           if [ "$RUNNER_OS" = Windows ]; then OSN=windows; else OSN=linux; fi
           take() {  # $1 = pattern, $2 = extension
@@ -93,7 +78,7 @@ jobs:
           name: mode-setup-${{ runner.os }}
           path: out/*
       - name: Attach to the draft release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/setup-v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

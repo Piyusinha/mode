@@ -53,15 +53,34 @@ export default {
   },
 };
 
-/** The newest published release's tag (e.g. "v0.1.1"), checked at most once a minute; null if GitHub can't say. */
+/** The newest published Mode Setup release's tag (e.g. "setup-v0.1.3"), checked at most once a minute; null if
+    GitHub can't say. Mode and Mode Setup are released separately ("app-v…" and "setup-v…"); the first releases
+    ("v0.1.0" to "v0.1.2") held both. GitHub's own "Latest" is the newest Mode, so it isn't used here. */
 async function latestTag() {
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=50`, {
       headers: { 'User-Agent': 'heymode.app', Accept: 'application/vnd.github+json' },
       cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 60, '300-599': 0 } },
     });
-    return res.ok ? (await res.json()).tag_name : null;
+    if (!res.ok) return null;
+    let best = null;
+    for (const r of await res.json()) {
+      if (r.draft || r.prerelease || !r.assets.some((a) => a.name === FILES.mac.file)) continue;
+      const v = (r.tag_name.match(/^(?:setup-)?v(\d[\w.]*)$/) || [])[1];
+      if (v && (!best || newer(v, best.v))) best = { v, tag: r.tag_name };
+    }
+    return best ? best.tag : null;
   } catch { return null; }
+}
+
+/** "0.1.10" is newer than "0.1.9". */
+function newer(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d > 0;
+  }
+  return false;
 }
 
 /** Fetches a release file and sends it from heymode.app as a download. A file at a version's own address never

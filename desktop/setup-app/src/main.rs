@@ -222,8 +222,8 @@ fn progress(app: &AppHandle, what: &str) -> mode_setup_core::install::Progress {
 async fn mode_ipa(app: &AppHandle, paid: bool, update: bool) -> Res<PathBuf> {
     let name = if paid { "Mode-paid.ipa" } else { "Mode.ipa" };
     let inside = if update { None } else { bundled_ipa(app, name) };
-    // The copy inside is the Mode this app shipped with: release.sh keeps their versions equal.
-    let inside_version = app.package_info().version.to_string();
+    // Mode's version next to the copy inside (Mode.version, written when this app was built).
+    let inside_version = bundled_mode_version(app).unwrap_or_default();
     let rel = match release::latest_mode_variant(paid).await {
         Ok(rel) if inside.is_none() || release::is_newer(&rel.version, &inside_version) => rel,
         Ok(_) => return Ok(inside.expect("checked above")),
@@ -244,6 +244,13 @@ async fn mode_ipa(app: &AppHandle, paid: bool, update: bool) -> Res<PathBuf> {
         }
         (Err(e), None) => Err(err(e)),
     }
+}
+
+/// The version of the Mode inside this app, from the Mode.version file the release scripts pack
+/// next to it. Missing in a development build, whose own .ipa is then used as it is.
+fn bundled_mode_version(app: &AppHandle) -> Option<String> {
+    let p = app.path().resource_dir().ok()?.join("Mode.version");
+    std::fs::read_to_string(p).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
 /// The .ipa inside this app (release builds), or the one built in this repo (development).
@@ -269,7 +276,7 @@ struct SetupUpdate {
 #[tauri::command]
 async fn check_setup_update(app: AppHandle) -> Res<SetupUpdate> {
     let current = app.package_info().version.to_string();
-    let latest = release::latest_version().await.map_err(err)?;
+    let latest = release::latest_setup_version().await.map_err(err)?;
     let os = match std::env::consts::OS { "macos" => "mac", "windows" => "windows", _ => "linux" };
     Ok(SetupUpdate { available: release::is_newer(&latest, &current), current, latest, url: format!("https://heymode.app/download/{os}") })
 }
