@@ -525,3 +525,10 @@ private const val SWAY = 0.3f
 private const val SPEAK_SPEED = 5f
 private const val LISTEN_SPEED = 8f
 private const val BAR_PHASE = 0.9f
+
+/** A small grey tag on a picture of a screen ("Hidden screen", board R01). */
+@Composable
+public fun ModeScreenTag(text: String, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    ModeText(text, ModeTextStyle.FootnoteEmphasis, modifier.background(c.fill, Capsule).padding(horizontal = ModeSpacing.m, vertical = ModeSpacing.xs), color = c.textSecondary)
+}

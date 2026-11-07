@@ -55,10 +55,12 @@ public class AccessibilityPhoneLink(
         displayKeys = hidden?.let { mode -> { action -> mode.press(displayId, action) } },
     )
 
-    private companion object {
+    public companion object {
+        /** How the session shows a task running on the hidden display. */
+        public const val BACKGROUND_ROUTE: String = "In the background (hidden screen)"
+
         /** Android may be starting the service right now (just after boot, or after an update). */
-        const val WAIT_MS = 2_000L
-        const val ROUTE = "On your screen (accessibility)"
-        const val BACKGROUND_ROUTE = "In the background (hidden screen)"
+        private const val WAIT_MS = 2_000L
+        private const val ROUTE = "On your screen (accessibility)"
     }
 }

@@ -50,17 +50,36 @@ import com.piyush.mode.design.ModeSegmentState
 import com.piyush.mode.design.ModeSpacing
 import com.piyush.mode.design.ModeSpinner
 import com.piyush.mode.design.ModeText
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import androidx.compose.ui.text.style.TextAlign
+import com.piyush.mode.design.ModeSize
+import com.piyush.mode.design.MoMood
+import com.piyush.mode.design.ModeMo
+import com.piyush.mode.design.ModeVoiceButtonStyle
+import com.piyush.mode.design.ModeVoiceButton
+import com.piyush.mode.design.ModeTalkStatus
 import com.piyush.mode.design.ModeTextStyle
 import com.piyush.mode.design.modeShadow
 
 data class LiveRunning(val badge: String, val sinceMs: Long?, val paused: Boolean, val task: String, val now: String, val segments: List<ModeSegment>)
 data class LiveFinished(val badge: Triple<String, ModeIcon, ModeBadgeTone>, val reply: List<ModeReplyBlock>, val line: String)
-data class LiveState(val running: LiveRunning? = null, val screen: ImageBitmap? = null, val finished: LiveFinished? = null)
+data class LiveState(
+    val running: LiveRunning? = null,
+    val screen: ImageBitmap? = null,
+    val finished: LiveFinished? = null,
+    /** Background mode: the task runs on a hidden screen; [takenOver] while the user has its app. */
+    val background: Boolean = false,
+    val takenOver: Boolean = false,
+)
 
 sealed interface LiveEvent {
     data object Stop : LiveEvent
     data object TogglePause : LiveEvent
     data object Close : LiveEvent
+    /** Background mode: the user takes the app (Mode pauses), then gives it back. */
+    data object TakeOver : LiveEvent
+    data object GiveBack : LiveEvent
 }
 
 /** Live run, as on its board: the screen Mode sees right now, and the panel with what it's doing. */
@@ -71,18 +90,43 @@ fun LiveScreen(state: LiveState, onEvent: (LiveEvent) -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.screenEdge), verticalAlignment = Alignment.CenterVertically) {
             ModeIconButton(ModeIcon.Back, stringResource(R.string.common_back), { onEvent(LiveEvent.Close) })
             Box(Modifier.weight(1f), Alignment.Center) {
-                state.running?.let { ModeRunBadge(it.badge, it.sinceMs, it.paused) }
+                when {
+                    state.running != null && state.takenOver -> ModeTalkStatus(stringResource(R.string.live_in_control_pill), c.info)
+                    state.running != null && state.background -> ModeTalkStatus(stringResource(R.string.live_background_pill), c.brand)
+                    else -> state.running?.let { ModeRunBadge(it.badge, it.sinceMs, it.paused) }
+                }
             }
             ModeIconButton(ModeIcon.Shrink, stringResource(R.string.run_shrink), { onEvent(LiveEvent.Close) })
         }
         val screen = state.screen
         when {
+            state.running != null && state.takenOver -> Column(
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = ModeSpacing.xl),
+                verticalArrangement = Arrangement.spacedBy(ModeSpacing.l, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ModeMo(MoMood.YourTurn, ModeSize.talkMo)
+                ModeText(stringResource(R.string.live_in_control), ModeTextStyle.Title2, align = TextAlign.Center)
+                ModeText(stringResource(R.string.live_in_control_body), ModeTextStyle.Subheadline, color = c.textSecondary, align = TextAlign.Center)
+                ModeVoiceButton(stringResource(R.string.live_give_back), ModeVoiceButtonStyle.Ink, { onEvent(LiveEvent.GiveBack) }, height = ModeSize.primaryButton)
+            }
             screen != null -> {
                 val frame = RoundedCornerShape(ModeRadius.liveScreen)
                 Box(
                     Modifier.weight(1f).fillMaxWidth().padding(horizontal = ModeSpacing.xl).modeShadow(frame).background(c.card, frame).padding(ModeSpacing.l),
                     Alignment.Center,
-                ) { Image(screen, null, Modifier.clip(RoundedCornerShape(ModeRadius.card)), contentScale = ContentScale.Fit) }
+                ) {
+                    Image(screen, null, Modifier.clip(RoundedCornerShape(ModeRadius.card)), contentScale = ContentScale.Fit)
+                    if (state.background) {
+                        com.piyush.mode.design.ModeScreenTag(stringResource(R.string.live_hidden_screen), Modifier.align(Alignment.TopStart))
+                    }
+                }
+                if (state.background && state.running != null) {
+                    ModeVoiceButton(
+                        stringResource(R.string.live_take_over), ModeVoiceButtonStyle.Raised, { onEvent(LiveEvent.TakeOver) },
+                        Modifier.padding(horizontal = ModeSpacing.xl),
+                    )
+                }
             }
             state.running == null && state.finished != null -> {
                 val f = state.finished
@@ -114,11 +158,26 @@ fun LiveRoute(graph: ModeGraph, close: () -> Unit) {
     val words = rememberWords()
     val screen = remember(ui.screen) { ui.screen?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
     val state = remember(ui, screen) { map(ui, screen, words) }
-    LiveScreen(state) { event ->
+    // Background mode: whether this task runs on the hidden screen, and whether the user has taken its app.
+    val connection by graph.session.state.collectAsStateWithLifecycle()
+    val background = (connection as? com.piyush.mode.feature.connection.domain.ConnectionState.Connected)?.route ==
+        com.piyush.mode.feature.connection.data.AccessibilityPhoneLink.BACKGROUND_ROUTE
+    var takenOver by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    LiveScreen(state.copy(background = background, takenOver = takenOver)) { event ->
         when (event) {
             LiveEvent.Stop -> presenter.stop()
             LiveEvent.TogglePause -> if (state.running?.paused == true) presenter.resume() else presenter.pause()
             LiveEvent.Close -> close()
+            LiveEvent.TakeOver -> scope.launch {
+                presenter.pause()
+                if (com.piyush.mode.app.graph.background?.bringToUser() == true) takenOver = true else presenter.resume()
+            }
+            LiveEvent.GiveBack -> scope.launch {
+                com.piyush.mode.app.graph.background?.giveBack()
+                takenOver = false
+                presenter.resume()
+            }
         }
     }
 }

@@ -68,6 +68,14 @@
     <string name="bg_linked_3">Restarts by itself after a reboot, once you’re on Wi-Fi</string>
     <string name="bg_linked_open">Continue</string>
     <string name="bg_turn_off">Turn off background mode</string>
+    <!-- Live run in background mode (boards R01, R03). -->
+    <string name="live_background_pill">Live · in the background</string>
+    <string name="live_hidden_screen">Hidden screen</string>
+    <string name="live_take_over">Take over</string>
+    <string name="live_in_control_pill">Paused · you’re in control</string>
+    <string name="live_in_control">You’re in control</string>
+    <string name="live_in_control_body">Do your part in the app, then come back and hand it back.</string>
+    <string name="live_give_back">Give back to Mode</string>
     <!-- The home screen widget. -->
     <string name="widget_title">What can I do for you?</string>
     <string name="widget_speak">Speak a task</string>
