@@ -27,7 +27,15 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
     /** The user set it up and hasn't turned it off. */
     public var enabled: Boolean
         get() = prefs.getString(ENABLED) == "true" && link.hasKey
-        set(value) = prefs.putString(ENABLED, value.toString())
+        set(value) {
+            prefs.putString(ENABLED, value.toString())
+            on.value = enabled
+        }
+
+    private val on = kotlinx.coroutines.flow.MutableStateFlow(prefs.getString(ENABLED) == "true" && link.hasKey)
+
+    /** [enabled], as it changes. */
+    public val enabledFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = on
 
     private var lastPort: Int?
         get() = prefs.getString(PORT)?.toIntOrNull()
@@ -104,6 +112,7 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
         stop()
         link.forget()
         enabled = false
+        on.value = false
         lastPort = null
     }
 

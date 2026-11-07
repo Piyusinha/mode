@@ -29,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.stateIn
 import java.io.File
 import kotlin.uuid.Uuid
 
@@ -82,7 +83,8 @@ fun androidModeGraph(
             files = files,
             notifier = AndroidNotifier(app, notificationIcon, openApp, notifierWords, notifierHooks),
             background = AndroidBackgroundWork(app),
-            deviceLock = AndroidDeviceLock(app),
+            // In background mode a locked phone needn't hold tasks back: the hidden display is always unlocked.
+            deviceLock = background?.let { HiddenDisplayLock(AndroidDeviceLock(app), it, exportScope) } ?: AndroidDeviceLock(app),
             lifecycle = lifecycle,
             appInfo = AndroidAppInfo(app),
             http = okHttpClient(),
@@ -106,6 +108,17 @@ private fun declaresPhoneControl(app: Application): Boolean = runCatching {
     app.packageManager.getServiceInfo(component, 0)
     true
 }.getOrDefault(false)
+
+/** The phone's lock as tasks see it: locked only when background mode can't work on the hidden display. */
+private class HiddenDisplayLock(
+    real: com.piyush.mode.core.platform.DeviceLock,
+    mode: BackgroundMode,
+    scope: CoroutineScope,
+) : com.piyush.mode.core.platform.DeviceLock {
+    override val locked: kotlinx.coroutines.flow.StateFlow<Boolean> =
+        kotlinx.coroutines.flow.combine(real.locked, mode.enabledFlow) { locked, background -> locked && !background }
+            .stateIn(scope, kotlinx.coroutines.flow.SharingStarted.Eagerly, real.locked.value && !mode.enabled)
+}
 
 /** Background mode, in builds that can drive the phone (the app's setup screens use it). */
 var background: BackgroundMode? = null

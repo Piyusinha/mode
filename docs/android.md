@@ -161,6 +161,9 @@ display isn't ready, so a task always runs.
   go through the helper, because the accessibility service's own actions always hit the user's screen; the
   notification shade and quick settings are refused on the hidden display. Coming back to Mode after a task is
   skipped there. The display ends with the task's session.
+- **A locked phone**: the hidden display is always unlocked, so with background mode on, tasks don't wait for the
+  user to unlock (`HiddenDisplayLock` tells the task queue the phone is unlocked while background mode is on).
+  Checked: a task started at once on a PIN-locked emulator and read its app on the hidden display.
 - **The user's turn** (a PIN, a password, a private screen): the app comes to the user's screen and goes back once
   Mode carries on. The live run shows "Live · in the background", a "Hidden screen" tag, and Take over / Give back
   to Mode (boards R01, R03). Leaving Mode while a task runs there shrinks it to a small floating window
