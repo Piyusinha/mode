@@ -20,6 +20,8 @@ import com.piyush.mode.core.telemetry.LocalTelemetry
 import com.piyush.mode.core.telemetry.Telemetry
 import com.piyush.mode.core.telemetry.TelemetryResource
 import com.piyush.mode.feature.backup.data.AndroidBackupFiles
+import com.piyush.mode.feature.connection.data.AccessibilityPhoneChecks
+import com.piyush.mode.feature.connection.data.AccessibilityPhoneLink
 import com.piyush.mode.feature.connection.data.UnavailablePhoneChecks
 import com.piyush.mode.feature.connection.data.UnavailablePhoneLink
 import kotlinx.coroutines.CoroutineScope
@@ -64,6 +66,8 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
         if (telemetry is LocalTelemetry) exportScope.launch { telemetry.flush() }
     }
     lifecycle.onForeground { telemetry.event(Event.Foreground) }
+    // The full build declares Mode's accessibility service; the Play build has none and cannot drive the phone.
+    val link = if (declaresPhoneControl(app)) AccessibilityPhoneLink(telemetry) else null
     return ModeGraph(
         PlatformServices(
             secrets = KeystoreSecretStore(app),
@@ -75,14 +79,23 @@ fun androidModeGraph(app: Application, notificationIcon: Int, openApp: () -> Int
             lifecycle = lifecycle,
             appInfo = AndroidAppInfo(app),
             http = okHttpClient(),
-            phoneLink = UnavailablePhoneLink(),
+            phoneLink = link ?: UnavailablePhoneLink(PLAY_BUILD),
             telemetry = telemetry,
             database = AndroidDatabaseFactory(app),
             permissions = AndroidPermissions(app),
-            phoneChecks = UnavailablePhoneChecks(),
+            phoneChecks = link?.let { AccessibilityPhoneChecks(app, it) } ?: UnavailablePhoneChecks(PLAY_BUILD),
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
             profile = com.piyush.mode.agent.PhoneProfile.Android,
         ),
     )
 }
+
+private const val PLAY_BUILD = "This version of Mode can't use your phone's apps. Install Mode from heymode.app to let it."
+
+/** Whether this build's manifest has Mode's accessibility service. */
+private fun declaresPhoneControl(app: Application): Boolean = runCatching {
+    val component = android.content.ComponentName(app, "com.piyush.mode.android.ModeAccessibilityService")
+    app.packageManager.getServiceInfo(component, 0)
+    true
+}.getOrDefault(false)

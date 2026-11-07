@@ -24,6 +24,11 @@ import kotlin.time.TimeSource
  * screen and touching it. Stops at the first that fails, with the fix.
  */
 public class CoreDevicePhoneChecks : PhoneChecks {
+    override val steps: List<PhoneCheckId> = listOf(
+        PhoneCheckId.PairingFile, PhoneCheckId.Vpn, PhoneCheckId.Reach, PhoneCheckId.Paired,
+        PhoneCheckId.DeveloperMode, PhoneCheckId.DiskImage, PhoneCheckId.Screen, PhoneCheckId.Hands,
+    )
+
     override fun ready(): Boolean = PairingFile.load() != null
 
     /** False when iOS can't say (the simulator has no VPN settings): asking again shows the prompt. */
@@ -36,7 +41,7 @@ public class CoreDevicePhoneChecks : PhoneChecks {
     }
 
     override suspend fun run(update: (List<PhoneCheckResult>) -> Unit) {
-        val results = PhoneCheckId.entries.associateWith<PhoneCheckId, CheckState> { CheckState.NotChecked }.toMutableMap()
+        val results = steps.associateWith<PhoneCheckId, CheckState> { CheckState.NotChecked }.toMutableMap()
         fun report() = update(results.map { (id, state) -> PhoneCheckResult(id, state) })
         suspend fun <T> step(id: PhoneCheckId, block: suspend () -> T): T {
             results[id] = CheckState.Running

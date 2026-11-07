@@ -1,7 +1,19 @@
 package com.piyush.mode.feature.connection.domain
 
-/** The parts of reaching this iPhone, checked one by one, in order (the Diagnose screen). */
-public enum class PhoneCheckId { PairingFile, Vpn, Reach, Paired, DeveloperMode, DiskImage, Screen, Hands }
+/**
+ * The parts of reaching the phone, checked one by one, in order (the Diagnose screen). Each phone runs
+ * its own [PhoneChecks.steps]: the iPhone the pairing file to the disk image; Android whether its
+ * settings allow the service, the service itself and the battery. Both end with seeing and touching.
+ */
+public enum class PhoneCheckId {
+    PairingFile, Vpn, Reach, Paired, DeveloperMode, DiskImage, Screen, Hands,
+    /** Android 13+: a sideloaded app's accessibility switch is locked until "Allow restricted settings". */
+    RestrictedSettings,
+    /** Android: Mode's accessibility service is on and running. */
+    Engine,
+    /** Android: Mode may run in the background (battery unrestricted). */
+    Battery,
+}
 
 public sealed interface CheckState {
     public data object NotChecked : CheckState
@@ -19,7 +31,7 @@ public interface PhoneChecks {
     public suspend fun run(update: (List<PhoneCheckResult>) -> Unit)
 
     /** The checks this phone runs, in order. */
-    public val steps: List<PhoneCheckId> get() = PhoneCheckId.entries
+    public val steps: List<PhoneCheckId>
 
     /** Whether what phone control needs is in place (on iOS, the pairing file made once with a Mac). */
     public fun ready(): Boolean

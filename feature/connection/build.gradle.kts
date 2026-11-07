@@ -13,6 +13,9 @@ kotlin {
         iosMain.dependencies {
             implementation(projects.engine.phoneIos)
         }
+        androidMain.dependencies {
+            implementation(projects.engine.phoneAndroid)
+        }
         commonTest.dependencies {
             implementation(projects.testing)
         }

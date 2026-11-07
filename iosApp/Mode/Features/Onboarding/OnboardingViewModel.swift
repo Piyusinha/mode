@@ -468,6 +468,8 @@ final class OnboardingViewModel {
         case .diskImage: L10n.Setup.checkDiskImage
         case .screen: L10n.Setup.checkScreen
         case .hands: L10n.Setup.checkHands
+        // Android's checks; the iPhone never runs them.
+        case .restrictedSettings, .engine, .battery: L10n.Setup.checkReach
         }
         switch onEnum(of: check.state) {
         case .notChecked: return CheckRow(id: index, title: title, leading: .pending, detail: nil, trailing: String(localized: L10n.Setup.notChecked))

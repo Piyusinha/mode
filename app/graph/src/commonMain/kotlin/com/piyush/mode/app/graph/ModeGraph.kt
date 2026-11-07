@@ -101,6 +101,8 @@ class ModeGraph(platform: PlatformServices) {
     /** The models to pick from: OpenRouter's live list, cached for a day. */
     val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
     val session: PhoneSession = PhoneSession(platform.phoneLink, telemetry = telemetry)
+    /** Each part of reaching the phone, checked in order (Diagnose, Health). */
+    val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks = platform.phoneChecks
     val runs: RunRepository = RunRepository(platform.files, database)
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)

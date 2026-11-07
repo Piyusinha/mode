@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_control_label">Mode</string>
+    <string name="phone_control_summary">Lets Mode use your apps for you while a task runs</string>
+    <string name="phone_control_description">Mode sees the screen and taps, types and scrolls for you, only while a task you gave it is running. What it sees goes to the AI you chose and nowhere else. Screens an app keeps private, such as a bank or a PIN pad, stay hidden from Mode: it asks you to do those steps.</string>
+</resources>
