@@ -11,7 +11,7 @@ your apps until it’s done, then tells you how it went.
 
 <br>
 
-<a href="https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode Setup for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
+<a href="https://heymode.app/download/mac"><img src="https://img.shields.io/badge/Download_Mode_installer_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode installer for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
 <sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
 
@@ -104,7 +104,7 @@ to try another way.
 
 **1 · Download Mode Setup**
 
-[Download for Mac](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg) (or [Windows](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-windows.exe), [Linux](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.AppImage)). This downloads **Mode Setup**, a small app that installs Mode on your iPhone for you.
+[Download Mode installer for Mac](https://heymode.app/download/mac) (or [Windows](https://heymode.app/download/windows), [Linux](https://heymode.app/download/linux)). This downloads **Mode Setup**, a small app that installs Mode on your iPhone for you.
 
 </td>
 <td width="33%" valign="top">
@@ -127,11 +127,30 @@ Open Mode on your iPhone, connect your AI, and give it its first task. Then try 
 **You’ll need:** an iPhone on iOS 27 or later · a computer, once, for setup · a free or paid
 Apple account · a ChatGPT or Claude plan, or an OpenRouter key. No Xcode needed.
 
-**On Windows or Linux?** Get [Mode Setup for Windows](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-windows.exe)
+**On Windows or Linux?** Get [Mode installer for Windows](https://heymode.app/download/windows)
 (it needs Apple’s [iTunes from apple.com](https://www.apple.com/itunes/download/win64) for the iPhone driver) or
-[for Linux](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.AppImage)
-([.deb](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.deb); it needs `usbmuxd`).
+[for Linux](https://heymode.app/download/linux)
+([.deb](https://heymode.app/download/linux-deb); it needs `usbmuxd`).
 Mode Setup checks your computer before it starts and tells you if anything is missing.
+
+<br>
+
+## Why isn’t Mode on the App Store?
+
+**Because Apple doesn’t allow it.** App Store apps aren’t allowed to see or tap other apps, and
+using your apps for you is exactly what Mode does.
+
+- **So you install it yourself.** Mode uses Apple’s developer tools on your own iPhone, the same
+  ones Xcode uses to test apps. Mode Setup signs it with your own Apple account and installs it
+  over a cable, once. That’s why setup needs a computer.
+- **Nothing is hidden.** Every line of Mode is in this repository, so anyone can read exactly what
+  it does. It has no server and no account of its own ([privacy](https://heymode.app/privacy)).
+- **Free Apple account? Renew weekly.** Apple asks for apps installed this way to be re-signed
+  every 7 days. Mode Setup or SideStore does it for you. A paid developer account lasts a year.
+
+We’re working on an App Store version with the parts Apple does allow, like asking by voice or
+Siri, your calendar, reminders and contacts, and Shortcuts. Using your other apps on screen will
+stay in this version.
 
 <br>
 
@@ -200,19 +219,6 @@ Mode is early, and it works around what iPhones normally allow. A few things to 
 <br>
 Yes. Mode is free and open source. It uses the AI you already pay for (a ChatGPT or
 Claude plan), or an OpenRouter key where you pay the provider per use.
-</details>
-
-<details>
-<summary><b>Why isn’t Mode on the App Store?</b></summary>
-<br>
-To work in your other apps, Mode uses Apple’s developer tools on your own iPhone: the
-same ones Xcode uses to test apps. App Store apps aren’t allowed to see or tap other
-apps, so Mode is installed with your own Apple account instead, which is why setup
-needs a computer once.
-<br><br>
-We’re working on an App Store version with the parts Apple does allow, like asking by
-voice or Siri, your calendar, reminders and contacts, and Shortcuts. Using other apps
-on screen will stay in this version.
 </details>
 
 <details>
