@@ -55,6 +55,16 @@ class SystemPages(private val activity: Activity) {
     }
 
     /** Mode's notification settings, once Android stops asking. */
+    /** About phone, where tapping Build number turns on Developer options. */
+    fun aboutPhone() = open("about phone", Intent(Settings.ACTION_DEVICE_INFO_SETTINGS))
+
+    /** Developer options, scrolled to Wireless debugging. */
+    fun wirelessDebugging() = open(
+        "wireless debugging",
+        Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).putExtra(HIGHLIGHT, WIRELESS_DEBUGGING),
+        Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
+    )
+
     fun notifications() = open("notifications", Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, pkg))
 
     /** A web page in a browser tab inside Mode. */
@@ -84,5 +94,9 @@ class SystemPages(private val activity: Activity) {
         /** Settings › Accessibility › one service (public on Android 13+, missing on some phones). */
         const val ACTION_ACCESSIBILITY_DETAILS = "android.settings.ACCESSIBILITY_DETAILS_SETTINGS"
         const val ACCESSIBILITY_SERVICE = "com.piyush.mode.android.ModeAccessibilityService"
+
+        /** Settings scrolls to (and highlights) the preference with this key. */
+        const val HIGHLIGHT = ":settings:fragment_args_key"
+        const val WIRELESS_DEBUGGING = "toggle_adb_wireless"
     }
 }

@@ -51,13 +51,16 @@ sealed interface PhoneSetupEvent {
 
 /** The hub, or the guide open over it. [dots] is null outside the first run (Settings › Phone control). */
 @Composable
-fun PhoneSetupScreen(state: PhoneSetupUiState, dots: StepDots?, onEvent: (PhoneSetupEvent) -> Unit) {
+fun PhoneSetupScreen(state: PhoneSetupUiState, dots: StepDots?, background: BackgroundRow? = null, onEvent: (PhoneSetupEvent) -> Unit) {
     val guide = state.guide
-    if (guide != null) GuideScreen(guide, onEvent) else HubScreen(state, dots, onEvent)
+    if (guide != null) GuideScreen(guide, onEvent) else HubScreen(state, dots, background, onEvent)
 }
 
+/** Background mode's row (Settings only, not first setup): on or not, and where it goes. */
+class BackgroundRow(val on: Boolean, val open: () -> Unit)
+
 @Composable
-private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, onEvent: (PhoneSetupEvent) -> Unit) {
+private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, background: BackgroundRow?, onEvent: (PhoneSetupEvent) -> Unit) {
     val c = Mode.colors
     Column(Modifier.fillMaxSize()) {
         ModeSetupHeader(
@@ -74,6 +77,15 @@ private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, onEvent: (Phone
                 if (state.ready) MoMood.Done else MoMood.YourTurn, Modifier.padding(horizontal = ModeSpacing.s),
             )
             ModeCard(lifted = true, rows = state.rows.map { row -> { PhoneRow(row, onEvent) } })
+            if (background != null) {
+                ModeCard(lifted = true, rows = listOf {
+                    ModePermissionRow(
+                        stringResource(R.string.bg_row_title), stringResource(R.string.bg_row_why), ModeIcon.Background,
+                        if (background.on) ModeStatusAction.Done(stringResource(R.string.bg_row_on)) else ModeStatusAction.Quiet(stringResource(R.string.bg_row_set)),
+                        background.open,
+                    )
+                })
+            }
         }
         Column(
             Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.l).padding(top = ModeSpacing.m, bottom = ModeSpacing.xxl),

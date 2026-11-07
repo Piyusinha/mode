@@ -62,6 +62,11 @@ class ModeApplication : Application() {
         followTheRunningTask()
     }
 
+    /** Background mode's setup, made when first opened. */
+    val backgroundSetup: com.piyush.mode.app.background.BackgroundSetup? by lazy {
+        com.piyush.mode.app.graph.background?.let { com.piyush.mode.app.background.BackgroundSetup(this, it) }
+    }
+
     /** The phone's voice is installed before anything speaks or listens. */
     private val voice by lazy {
         com.piyush.mode.app.voice.AndroidDeviceVoice(
@@ -101,5 +106,9 @@ class ModeApplication : Application() {
         private const val ACTION_SCHEDULE = "mode.schedule:"
 
         fun graph(context: android.content.Context): ModeGraph = (context.applicationContext as ModeApplication).graph
+
+        /** Background mode's setup, in builds that can drive the phone. */
+        fun backgroundSetup(context: android.content.Context): com.piyush.mode.app.background.BackgroundSetup? =
+            (context.applicationContext as ModeApplication).backgroundSetup
     }
 }

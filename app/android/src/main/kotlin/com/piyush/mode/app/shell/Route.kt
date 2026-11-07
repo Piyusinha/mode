@@ -34,6 +34,8 @@ sealed interface Route {
     data class MemoryEdit(val id: String) : Route
     /** Settings › Unlock by voice: the guide, and the check that it works. */
     data object UnlockVoice : Route
+    /** Settings › Permissions › Work in the background. */
+    data object Background : Route
     /** Settings › Backup and restore. */
     data object Backup : Route
     /** Repeat a task on a schedule (from a chat's More). */

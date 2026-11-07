@@ -42,7 +42,10 @@ public class AccessibilityPhoneLink(
         return PhoneConnection(backend(service), route = ROUTE, attempts = "$ROUTE: connected")
     }
 
-    override suspend fun release() {}
+    /** The task is over: the helper ends and its hidden display goes with it (the link stays for next time). */
+    override suspend fun release() {
+        background?.stop()
+    }
 
     private fun backend(service: ModeAccessibilityService, displayId: Int = 0, hidden: BackgroundMode? = null) = AccessibilityBackend(
         hands = service,

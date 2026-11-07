@@ -82,14 +82,17 @@ fun FirstRunRoute(
 
 /** "Let Mode use your phone": in the first run ([dots]), and from Settings › Phone control. */
 @Composable
-fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onContinue: () -> Unit, onBack: () -> Unit) {
+fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onContinue: () -> Unit, onBack: () -> Unit, openBackground: (() -> Unit)? = null) {
     val presenter: PhoneSetupPresenter = rememberPresenter("phoneSetup") { graph.screens.phoneSetup() }
     val state by presenter.state.collectAsStateWithLifecycle()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { presenter.refresh() }
     BackHandler { if (state.guide != null) presenter.closeGuide() else onBack() }
 
-    PhoneSetupScreen(state, dots) { event ->
+    val setup = com.piyush.mode.app.ModeApplication.backgroundSetup(androidx.compose.ui.platform.LocalContext.current)
+    val step = setup?.step?.collectAsStateWithLifecycle()?.value
+    val background = if (openBackground != null && setup != null) BackgroundRow(step == com.piyush.mode.app.background.BackgroundStep.Linked && setup.enabled, openBackground) else null
+    PhoneSetupScreen(state, dots, background) { event ->
         when (event) {
             is PhoneSetupEvent.Allow -> when {
                 // Android stops asking after two refusals: its settings page is the only way left.

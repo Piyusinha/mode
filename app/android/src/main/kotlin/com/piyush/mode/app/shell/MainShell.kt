@@ -175,6 +175,8 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         Route.Listening -> com.piyush.mode.app.settings.VoiceRoute(graph, hearing = true, pages, nav::push) { nav.pop() }
         Route.Language -> com.piyush.mode.app.settings.LanguageRoute(graph) { nav.pop() }
         is Route.VoicePicker -> com.piyush.mode.app.settings.VoicePickerRoute(graph, route.provider) { nav.pop() }
+        Route.Background -> com.piyush.mode.app.ModeApplication.backgroundSetup(androidx.compose.ui.platform.LocalContext.current)
+            ?.let { com.piyush.mode.app.background.BackgroundRoute(it, pages) { nav.pop() } } ?: NotYet(nav)
         Route.Developer -> com.piyush.mode.app.settings.DeveloperRoute(graph) { nav.pop() }
         Route.Backup -> com.piyush.mode.app.settings.BackupRoute(graph) { nav.pop() }
         Route.Access -> com.piyush.mode.app.settings.AccessRoute(graph) { nav.pop() }
@@ -186,7 +188,7 @@ private fun Page(route: Route, graph: ModeGraph, run: RunStatus, nav: Navigator,
         is Route.MemoryApp -> com.piyush.mode.app.memory.MemoryRoute(graph, com.piyush.mode.app.memory.MemoryPage.App(route.name), nav::push) { nav.pop() }
         is Route.MemoryEdit -> com.piyush.mode.app.memory.MemoryRoute(graph, com.piyush.mode.app.memory.MemoryPage.Edit(route.id), nav::push) { nav.pop() }
         is Route.ModelPicker -> com.piyush.mode.app.settings.ModelPickerRoute(graph, route.stuck) { nav.pop() }
-        Route.PhoneSetup -> com.piyush.mode.app.firstrun.PhoneSetupRoute(graph, pages, dots = null, onContinue = { nav.pop() }, onBack = { nav.pop() })
+        Route.PhoneSetup -> com.piyush.mode.app.firstrun.PhoneSetupRoute(graph, pages, dots = null, onContinue = { nav.pop() }, onBack = { nav.pop() }) { nav.push(Route.Background) }
         is Route.TaskDebug -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = false, nav::push) { nav.pop() }
         is Route.TaskDebugAsk -> com.piyush.mode.app.debug.TaskDebugRoute(graph, route.taskId, startAsking = true, nav::push) { nav.pop() }
         else -> NotYet(nav)

@@ -51,6 +51,7 @@ class DevProbe : BroadcastReceiver() {
                     // Walks setup past Connect your AI on a test phone: a key from the probe, or a stand-in.
                     "key" -> {
                         graph.settings.apiKey = intent.getStringExtra("value") ?: "sk-or-probe"
+                        graph.settings.selectProvider(com.piyush.mode.llm.ModelProvider.OpenRouter)
                         "key set"
                     }
                     // Looks at (and with x/y taps) another display, as background mode does: --ei display 2
@@ -94,8 +95,11 @@ class DevProbe : BroadcastReceiver() {
                     // Turns background mode on or off (after pairing with op=adb), then the next look shows the route.
                     "background" -> {
                         val mode = com.piyush.mode.app.graph.background ?: error("no background mode in this build")
-                        mode.enabled = intent.getBooleanExtra("on", true)
-                        if (!mode.enabled) mode.stop()
+                        if (intent.getBooleanExtra("forget", false)) mode.turnOff()
+                        else {
+                            mode.enabled = intent.getBooleanExtra("on", true)
+                            if (!mode.enabled) mode.stop()
+                        }
                         "background=${mode.enabled}"
                     }
                     "route" -> graph.session.phone().let { "state=${graph.session.state.value}" }
