@@ -215,26 +215,43 @@ fn progress(app: &AppHandle, what: &str) -> mode_setup_core::install::Progress {
     })
 }
 
-/// The Mode app file to install: bundled with this app, else the one built in this repo, else the
-/// latest release (checked against its published SHA-256).
+/// The Mode app file to install. Always the newest Mode: the latest release when it is newer than the
+/// copy inside this app (checked against its published SHA-256), else that copy. The copy inside is
+/// also the fallback when GitHub can't be reached, so a first install works offline. An update
+/// (`update`) only ever uses the latest release.
 async fn mode_ipa(app: &AppHandle, paid: bool, update: bool) -> Res<PathBuf> {
     let name = if paid { "Mode-paid.ipa" } else { "Mode.ipa" };
-    if !update {
-        if let Ok(dir) = app.path().resource_dir() {
-            let p = dir.join(name);
-            if p.exists() { return Ok(p); }
-        }
-        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/release").join(name);
-        if dev.exists() { return Ok(dev); }
-    }
-    let rel = release::latest_mode_variant(paid).await.map_err(err)?;
+    let inside = if update { None } else { bundled_ipa(app, name) };
+    // The copy inside is the Mode this app shipped with: release.sh keeps their versions equal.
+    let inside_version = app.package_info().version.to_string();
+    let rel = match release::latest_mode_variant(paid).await {
+        Ok(rel) if inside.is_none() || release::is_newer(&rel.version, &inside_version) => rel,
+        Ok(_) => return Ok(inside.expect("checked above")),
+        Err(e) => return inside.ok_or_else(|| err(e)),
+    };
     let dest = std::env::temp_dir().join("ModeSetup").join(name);
     let handle = app.clone();
-    release::download(&rel.ipa_url, &dest, rel.sha256.as_deref(), move |f| {
+    let got = release::download(&rel.ipa_url, &dest, rel.sha256.as_deref(), move |f| {
         let _ = handle.emit("progress", ProgressEvent { what: "mode".into(), stage: "download".into(), fraction: f });
     })
-    .await
-    .map_err(err)
+    .await;
+    match (got, inside) {
+        (Ok(path), _) => Ok(path),
+        // A failed or mismatched download never installs; the copy inside this app does instead.
+        (Err(e), Some(inside)) => {
+            eprintln!("Mode {}: download failed ({e}); installing the copy inside Mode Setup", rel.version);
+            Ok(inside)
+        }
+        (Err(e), None) => Err(err(e)),
+    }
+}
+
+/// The .ipa inside this app (release builds), or the one built in this repo (development).
+fn bundled_ipa(app: &AppHandle, name: &str) -> Option<PathBuf> {
+    if let Some(p) = app.path().resource_dir().ok().map(|d| d.join(name)).filter(|p| p.exists()) {
+        return Some(p);
+    }
+    Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/release").join(name)).filter(|p| p.exists())
 }
 
 /// A read-only update check; it does not authenticate or access the Keychain.

@@ -108,6 +108,23 @@ pub async fn download(url: &str, dest: &Path, sha256: Option<&str>, progress: im
     Ok(dest.to_path_buf())
 }
 
+/// Whether release version [candidate] is newer than [current] ("0.1.10" > "0.1.9"; a leading "v" is
+/// ignored). Unreadable versions are never newer.
+pub fn is_newer(candidate: &str, current: &str) -> bool {
+    fn parts(v: &str) -> Option<Vec<u64>> {
+        v.trim().trim_start_matches('v').split('.').map(|p| p.parse().ok()).collect()
+    }
+    match (parts(candidate), parts(current)) {
+        (Some(mut a), Some(mut b)) => {
+            let n = a.len().max(b.len());
+            a.resize(n, 0);
+            b.resize(n, 0);
+            a > b
+        }
+        _ => false,
+    }
+}
+
 pub fn matches_sha256(bytes: &[u8], expected: &str) -> bool {
     hex::encode(Sha256::digest(bytes)).eq_ignore_ascii_case(expected.trim())
 }
@@ -115,6 +132,18 @@ pub fn matches_sha256(bytes: &[u8], expected: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compares_release_versions() {
+        assert!(is_newer("0.1.2", "0.1.1"));
+        assert!(is_newer("v0.2.0", "0.1.9"));
+        assert!(is_newer("0.1.10", "0.1.9"));
+        assert!(is_newer("0.1.1", "0.1"));
+        assert!(!is_newer("0.1.1", "0.1.1"));
+        assert!(!is_newer("0.1.0", "0.1"));
+        assert!(!is_newer("0.1.0", "0.1.1"));
+        assert!(!is_newer("next", "0.1.1"));
+    }
 
     #[test]
     fn checks_the_published_hash() {

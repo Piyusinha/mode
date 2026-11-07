@@ -675,7 +675,8 @@ function stagesFor() {
 const stage = (id, patch) => { const s = S.stages.find(x => x.id === id); if (s) Object.assign(s, patch); if (S.screen === 'install') render(); };
 listen('progress', p => {
   if (p.what === 'sidestore') { stage('sidestore', { state: 'wait', fraction: p.fraction, sub: p.stage === 'download' ? 'Downloading' : p.stage === 'signing' ? 'Signing' : 'Installing' }); return; }
-  if (p.stage === 'signing') stage('signing', { state: 'wait', fraction: p.fraction });
+  if (p.stage === 'download') stage('signing', { state: 'wait', fraction: p.fraction, sub: 'Getting the latest Mode' });
+  if (p.stage === 'signing') stage('signing', { state: 'wait', fraction: p.fraction, sub: '' });
   if (p.stage === 'installing') { stage('signing', { state: 'done', fraction: null }); stage('installing', { state: 'wait', fraction: p.fraction }); }
 });
 
