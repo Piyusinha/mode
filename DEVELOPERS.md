@@ -416,6 +416,21 @@ Mode and Mode Setup are released separately, each with its own version and chang
   (`tools/latest-app-release.sh`), so it installs offline too.
 - heymode.app's download links serve the newest Mode Setup release (`website/worker`).
 
+## 14b. Android
+
+The Android app is `app/android` (Compose over the same shared presenters as the iPhone), its design
+library `app/design`, and the engine `engine/phone-android` (Mode's accessibility service). Background
+mode adds `engine/adb-link` and `engine/adb-helper`. Everything, from setup to background mode, is in
+[docs/android.md](docs/android.md).
+
+```sh
+./gradlew :app:android:installFullDebug      # onto a phone or emulator with USB debugging
+tools/build-apk.sh                           # a release APK into dist/ (signing: see docs/android.md)
+```
+
+Debug builds have an adb probe (`DevProbe`) that drives the engine, posts sample notifications and
+walks setup on an emulator; docs/android.md lists its commands.
+
 ## 15. More documents
 
 | Document | What it covers |

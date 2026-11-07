@@ -539,3 +539,42 @@ screens an app marks sensitive stay hidden from it, and a secure screen answers 
 agent turns into the user's turn. Background mode (Phase 5) reuses libadb-android and a scrcpy server
 fork rather than new code (see android.md).
 
+
+## D46. Android screens: Compose without Material3, strings generated from the iPhone's (2026-11-07)
+
+The Android app draws every screen with `app:design`, a port of the iPhone's ModeDesignSystem (tokens,
+components, Mo), on plain Compose foundation: no Material3, so nothing looks like a stock Android app
+and nothing differs from the boards. Screens are dumb views over the shared presenters, with a literal
+check (`tools/check-ui-literals-android.sh`) like the iPhone's. Strings both apps share are generated
+from the iPhone's `L10n*.swift` by `tools/gen-android-strings.py`, swapping iPhone words for Android's;
+Android-only strings are written by hand in `strings.xml`. Navigation is a small per-tab stack
+(`Navigator`) with presenters released when their page goes, rather than a navigation library.
+Shared names that end up in the iPhone's Objective-C header avoid Objective-C keywords (`YES`, `NO`).
+
+## D47. The assistant role, and an assistant's speech recognizer (2026-11-07)
+
+Holding power (or the assistant gesture) opens Mode's talking mode through a `VoiceInteractionService`
+whose session only starts Mode's own screen: Mode doesn't draw an assistant overlay. Android requires an
+assistant to declare a speech recognizer and may make it the phone's default, so `ModeRecognitionService`
+forwards to the phone's own recognizer (voice typing elsewhere keeps working) and Mode's listening names the
+phone's recognizer directly. `ROLE_ASSISTANT` can't be requested by an app; Mode opens Default apps.
+
+## D48. Repeats on Android: exact alarms, re-armed after a restart (2026-11-07)
+
+A repeat's reminder is an exact alarm (`SCHEDULE_EXACT_ALARM`; inexact when the user hasn't allowed it).
+Android drops alarms on a restart, so `BootReceiver` re-arms every enabled repeat after a restart, an update,
+or a clock or time zone change (`Scheduler.rearmAll`, shared and tested). As on the iPhone, the reminder is a
+notification the user taps; the task runs when Mode is open.
+
+## D49. Background mode: Mode's own Wireless debugging link and a hidden display (2026-11-07)
+
+Mode pairs with its own phone's Wireless debugging (libadb-android, Conscrypt 2.8.0 for 16 KB-page phones)
+and starts a small helper as the shell user from its own APK (scrcpy's approach, no socket: one `exec:`
+stream). The helper only makes a trusted, always-unlocked virtual display with its own focus, presses Back
+and Home there, and moves the user's-turn app between displays; Mode keeps reading and tapping through its
+accessibility service, which takes a display id, so one engine serves both modes. No mDNS (Android 17 shows
+a picker that closes the pairing window): the port is found on 127.0.0.1, and the pairing code is read off
+the screen by phone control, with a notification as the fallback. Mode grants itself `WRITE_SECURE_SETTINGS`
+over the link to switch Wireless debugging back on after a restart. When the hidden display isn't ready, the
+task runs on the user's screen instead, so background mode never makes a task fail. With it on, a locked
+phone doesn't hold tasks back.
