@@ -7,7 +7,10 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import com.piyush.mode.core.platform.PhoneQuirks
+import com.piyush.mode.core.platform.QuirkPage
 import androidx.browser.customtabs.CustomTabsIntent
 import com.piyush.mode.core.common.AppLog
 
@@ -45,14 +48,24 @@ class SystemPages(private val activity: Activity) {
      */
     fun battery() {
         val ask = activity.checkSelfPermission(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED
+        val exempt = activity.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(pkg)
+        // Xiaomi, Samsung, OPPO, vivo, Huawei… stop apps with their own savers too: once Android lets Mode run,
+        // the next tap opens the maker's page (battery, then autostart), whichever this phone has.
+        val brand = PhoneQuirks.of(Build.MANUFACTURER, Build.BRAND)
+        val brandPages = brand?.let { (it.battery + it.autostart).map(::page) }.orEmpty()
         open(
             "battery",
             *listOfNotNull(
-                if (ask) Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", pkg, null)) else null,
+                if (ask && !exempt) Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.fromParts("package", pkg, null)) else null,
+                *(if (exempt || !ask) brandPages.toTypedArray() else emptyArray()),
                 Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
             ).toTypedArray(),
         )
     }
+
+    /** A maker's own page, with Mode's name for the pages that take it (Xiaomi's battery saver). */
+    private fun page(p: QuirkPage): Intent = Intent().setClassName(p.packageName, p.className)
+        .putExtra(EXTRA_PACKAGE_NAME, pkg).putExtra(EXTRA_PACKAGE_LABEL, activity.applicationInfo.loadLabel(activity.packageManager))
 
     /** Mode's notification settings, once Android stops asking. */
     /** About phone, where tapping Build number turns on Developer options. */
@@ -98,5 +111,7 @@ class SystemPages(private val activity: Activity) {
         /** Settings scrolls to (and highlights) the preference with this key. */
         const val HIGHLIGHT = ":settings:fragment_args_key"
         const val WIRELESS_DEBUGGING = "toggle_adb_wireless"
+        const val EXTRA_PACKAGE_NAME = "package_name"
+        const val EXTRA_PACKAGE_LABEL = "package_label"
     }
 }
