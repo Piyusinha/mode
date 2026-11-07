@@ -104,14 +104,14 @@ to try another way.
 
 **1 · Download Mode Setup**
 
-[Download for Mac](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg). This downloads **Mode Setup**, a small Mac app that installs Mode on your iPhone for you.
+[Download for Mac](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-mac.dmg) (or [Windows](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-windows.exe), [Linux](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.AppImage)). This downloads **Mode Setup**, a small app that installs Mode on your iPhone for you.
 
 </td>
 <td width="33%" valign="top">
 
 **2 · Plug in your iPhone**
 
-Open Mode Setup and connect your iPhone with a cable. It walks you through each step, signs Mode with your Apple account and installs it. A few minutes, once.
+Open Mode Setup. It checks your computer first, then asks you to connect your iPhone with a cable. It walks you through each step, signs Mode with your Apple account and installs it. A few minutes, once.
 
 </td>
 <td width="33%" valign="top">
@@ -124,9 +124,14 @@ Open Mode on your iPhone, connect your AI, and give it its first task. Then try 
 </tr>
 </table>
 
-**You’ll need:** an iPhone on iOS 27 or later · a Mac, once, for setup · a free or paid
-Apple account · a ChatGPT or Claude plan, or an OpenRouter key.
-<sub>Windows and Linux versions of Mode Setup are on the [releases page](https://github.com/Piyusinha/mode/releases/latest).</sub>
+**You’ll need:** an iPhone on iOS 27 or later · a computer, once, for setup · a free or paid
+Apple account · a ChatGPT or Claude plan, or an OpenRouter key. No Xcode needed.
+
+**On Windows or Linux?** Get [Mode Setup for Windows](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-windows.exe)
+(it needs Apple’s [iTunes from apple.com](https://www.apple.com/itunes/download/win64) for the iPhone driver) or
+[for Linux](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.AppImage)
+([.deb](https://github.com/Piyusinha/mode/releases/latest/download/Mode-Setup-linux.deb); it needs `usbmuxd`).
+Mode Setup checks your computer before it starts and tells you if anything is missing.
 
 <br>
 
@@ -167,7 +172,7 @@ Claude plan), or an OpenRouter key where you pay the provider per use.
 To work in your other apps, Mode uses Apple’s developer tools on your own iPhone: the
 same ones Xcode uses to test apps. App Store apps aren’t allowed to see or tap other
 apps, so Mode is installed with your own Apple account instead, which is why setup
-needs a Mac once.
+needs a computer once.
 <br><br>
 We’re working on an App Store version with the parts Apple does allow, like asking by
 voice or Siri, your calendar, reminders and contacts, and Shortcuts. Using other apps
@@ -175,9 +180,9 @@ on screen will stay in this version.
 </details>
 
 <details>
-<summary><b>Does my phone need to stay plugged into the Mac?</b></summary>
+<summary><b>Does my phone need to stay plugged into the computer?</b></summary>
 <br>
-No. The Mac is only for the first install. With a free Apple account, Apple asks for
+No. The computer is only for the first install. With a free Apple account, Apple asks for
 apps like Mode to be re-signed every 7 days. Mode Setup does that, or you can let
 SideStore renew it on the iPhone. With a paid developer account, it lasts a year.
 </details>

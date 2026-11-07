@@ -43,6 +43,12 @@ fn err(e: impl std::fmt::Display) -> String {
 
 // ---- iPhone -----------------------------------------------------------------------------------
 
+/// Is this computer ready (iPhone driver, internet)? Shown before setup starts.
+#[tauri::command]
+async fn check_computer() -> mode_setup_core::system::ComputerCheck {
+    mode_setup_core::system::check_computer().await
+}
+
 #[tauri::command]
 async fn phones() -> Res<Vec<Phone>> {
     device::phones().await.map_err(err)
@@ -397,7 +403,7 @@ fn main() {
     tauri::Builder::default()
         .manage(App::default())
         .invoke_handler(tauri::generate_handler![
-            phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
+            check_computer, phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
             mode_vpn_turn_on, mode_vpn_status, install_mode, install_sidestore, phone_control, prefs, set_helper, open_url, diagnostics,
             local_dev_vpn_qr, debug_start
         ])

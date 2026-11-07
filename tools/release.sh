@@ -4,7 +4,8 @@
 #
 #   tools/release.sh 0.1.0          # → draft release v0.1.0
 #
-# The release holds, for Mode Setup to download (it checks each .ipa against its .sha256):
+# The release holds (Mode Setup carries both .ipa files inside it, and downloads newer ones from here
+# for updates, checking each against its .sha256):
 #   Mode.ipa, Mode.ipa.sha256             the free build (LocalDevVPN)
 #   Mode-paid.ipa, Mode-paid.ipa.sha256   with Mode's own VPN, for paid Apple accounts
 #   Mode Setup for Mac (.dmg), then Windows (.msi, .exe) and Linux (.deb, .AppImage) from CI
@@ -55,7 +56,9 @@ if [ -n "$MODE_SIGN_IDENTITY" ]; then
 fi
 # Universal: Apple silicon and Intel. CI=true skips Finder's window styling, which needs automation access.
 "$HOME/.cargo/bin/rustup" target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null
-(cd desktop/setup-app && CI=true "$CARGO" tauri build --bundles dmg --target universal-apple-darwin)
+# tauri.release.conf.json puts both .ipa files inside the app, so setup works offline and needs
+# nothing from GitHub (updates still come from the latest release).
+(cd desktop/setup-app && CI=true "$CARGO" tauri build --bundles dmg --target universal-apple-darwin --config tauri.release.conf.json)
 DMG=$(ls desktop/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
 [ -f "$DMG" ] || die "no .dmg was built"
 if [ -n "${MODE_NOTARY_PROFILE:-}" ]; then
@@ -75,10 +78,16 @@ echo "== Draft release $TAG"
 NOTES=$(mktemp)
 cat > "$NOTES" <<EOF
 ## Install
-1. Download **Mode Setup** for your computer below (Mac: .dmg, Windows: .msi or .exe, Linux: .deb or .AppImage).
-2. Connect your iPhone with a cable and follow Mode Setup. It downloads Mode from this release and checks it.
+1. Download **Mode Setup** for your computer:
+   - Mac: \`Mode-Setup-mac.dmg\` (Apple silicon and Intel, signed and notarized)
+   - Windows: \`Mode-Setup-windows.exe\` (or the .msi)
+   - Linux: \`Mode-Setup-linux.AppImage\` (or the .deb)
+2. Open it. It checks your computer first: on Windows it needs Apple's iTunes from apple.com, on
+   Linux usbmuxd, and it tells you if either is missing. Xcode is not needed.
+3. Connect your iPhone with a cable and follow the steps. Mode is inside Mode Setup, so nothing
+   else is downloaded.
 
-Mode needs an iPhone on iOS 27 or later with Developer Mode on. See the README.
+Mode needs an iPhone on iOS 27 or later. See the README.
 
 ## Files
 - \`Mode.ipa\`, \`Mode-paid.ipa\`: Mode, unsigned. Mode Setup signs it with your Apple account.

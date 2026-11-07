@@ -32,14 +32,61 @@ jobs:
             libssl-dev libdbus-1-dev libudev-dev pkg-config patchelf
       - name: Tauri CLI
         run: cargo install tauri-cli --version "^2" --locked
+      # Mode's .ipa files from the draft release tools/release.sh made (drafts aren't reachable by tag,
+      # so find it in the list), checked against their .sha256, to carry inside Mode Setup.
+      - name: Mode (.ipa) from the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/release
+          rel=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          [ -n "$rel" ] || { echo "no release for $GITHUB_REF_NAME"; exit 1; }
+          for name in Mode.ipa Mode.ipa.sha256 Mode-paid.ipa Mode-paid.ipa.sha256; do
+            asset=$(gh api "repos/$GITHUB_REPOSITORY/releases/$rel/assets" --jq ".[] | select(.name == \"$name\") | .id")
+            [ -n "$asset" ] || { echo "the release has no $name"; exit 1; }
+            gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "build/release/$name"
+          done
+          cd build/release
+          for ipa in Mode.ipa Mode-paid.ipa; do
+            want=$(cut -d' ' -f1 "$ipa.sha256")
+            got=$(sha256sum "$ipa" | cut -d' ' -f1)
+            [ "$want" = "$got" ] || { echo "$ipa checksum mismatch"; exit 1; }
+          done
+          ls -la
       - name: Build Mode Setup
         working-directory: desktop/setup-app
-        run: cargo tauri build
+        shell: bash
+        run: |
+          if [ -f ../../build/release/Mode.ipa ]; then
+            cargo tauri build --config tauri.release.conf.json
+          else
+            cargo tauri build   # a test build by hand: Mode is downloaded at setup instead
+          fi
+      # Fixed names, so the README can link to releases/latest/download/<name>, plus versioned copies.
       - name: Collect installers
         shell: bash
         run: |
+          set -euo pipefail
           mkdir out
-          find desktop/target/release/bundle \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.rpm' \) -exec cp {} out/ \;
+          V=${GITHUB_REF_NAME#v}
+          [ "$V" != "$GITHUB_REF_NAME" ] || V=dev
+          if [ "$RUNNER_OS" = Windows ]; then OSN=windows; else OSN=linux; fi
+          take() {  # $1 = pattern, $2 = extension
+            f=$(find desktop/target/release/bundle -name "$1" | head -1)
+            [ -n "$f" ] || { echo "no $1"; exit 1; }
+            cp "$f" "out/Mode-Setup-$OSN.$2"
+            cp "$f" "out/Mode-Setup-$V-$OSN.$2"
+          }
+          if [ "$OSN" = windows ]; then
+            take '*-setup.exe' exe
+            take '*.msi' msi
+          else
+            take '*.AppImage' AppImage
+            take '*.deb' deb
+          fi
           ls -la out
       - uses: actions/upload-artifact@v4
         with:

@@ -42,6 +42,13 @@
     "longDescription": "Mode Setup signs and installs Mode on your iPhone with your Apple account, turns on phone control, and keeps Mode signed.",
     "macOS": {
       "minimumSystemVersion": "13.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "usbmuxd"
+        ]
+      }
     }
   }
 }

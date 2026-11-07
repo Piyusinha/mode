@@ -250,3 +250,48 @@ test('Done on Ready offers the optional Unlock by voice step, which skips or fin
   await f.click('device');
   assert.equal(f.run('S.screen'), 'device');
 });
+
+// ---- this computer, checked before setup starts ---------------------------------------------------
+const WIN_MISSING = { os: 'windows', ready: false, checks: [
+  { id: 'driver', state: 'missing', title: 'iTunes (iPhone driver)', detail: 'Install Apple’s iTunes from apple.com.', fix: { label: 'Download iTunes', url: 'https://www.apple.com/itunes/download/win64' } },
+  { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] };
+const MAC_READY = { os: 'macos', ready: true, checks: [
+  { id: 'driver', state: 'ok', title: 'iPhone connection', detail: 'Built in to macOS.' },
+  { id: 'xcode', state: 'ok', title: 'Xcode', detail: 'Not needed. Mode Setup brings everything it uses.' },
+  { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] };
+
+test('Windows without iTunes: the download link shows and Get started stays off', async () => {
+  let result = WIN_MISSING;
+  const f = fixture({ check_computer: () => result });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Download iTunes/);
+  assert.match(f.app.innerHTML, /apple\.com\/itunes\/download\/win64/);
+  assert.match(f.app.innerHTML, /data-act="start" disabled/);
+  await f.click('start');
+  assert.equal(f.run('S.screen'), 'welcome');
+  // iTunes installed: Check again turns it green and lets setup start.
+  result = { ...WIN_MISSING, ready: true, checks: WIN_MISSING.checks.map(c => ({ ...c, state: 'ok', fix: null })) };
+  await f.click('checkComputer');
+  assert.doesNotMatch(f.app.innerHTML, /data-act="start" disabled/);
+  await f.click('start');
+  assert.notEqual(f.run('S.screen'), 'welcome'); // on to Connect (and on to Trust: the test phone is plugged in)
+});
+
+test('Mac: says Xcode is not needed, and setup can start', async () => {
+  const f = fixture({ check_computer: MAC_READY });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /Xcode/);
+  assert.match(f.app.innerHTML, /Not needed/);
+  assert.doesNotMatch(f.app.innerHTML, /data-act="start" disabled/);
+});
+
+test('Linux without usbmuxd shows the command to copy', async () => {
+  const f = fixture({ check_computer: { os: 'linux', ready: false, checks: [
+    { id: 'driver', state: 'missing', title: 'usbmuxd (iPhone driver)', detail: 'Install usbmuxd.', command: 'sudo apt install usbmuxd' }] } });
+  await f.run("go('welcome')");
+  await new Promise(setImmediate);
+  assert.match(f.app.innerHTML, /sudo apt install usbmuxd/);
+  assert.match(f.app.innerHTML, /data-act="copyCheck:0"/);
+});

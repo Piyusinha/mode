@@ -15,7 +15,17 @@
     { id: 'control', title: 'Connecting phone control', sub: 'So Mode can see and tap your screen', state: 'todo' },
   ];
   window.MOCKS = {
-    welcome: {},
+    welcome: { computer: { os: 'macos', ready: true, checks: [
+      { id: 'driver', state: 'ok', title: 'iPhone connection', detail: 'Built in to macOS.' },
+      { id: 'xcode', state: 'ok', title: 'Xcode', detail: 'Not needed. Mode Setup brings everything it uses.' },
+      { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] } },
+    welcomeChecking: {},
+    welcomeWindows: { computer: { os: 'windows', ready: false, checks: [
+      { id: 'driver', state: 'missing', title: 'iTunes (iPhone driver)', detail: 'Install Apple’s iTunes from apple.com (not the Microsoft Store version). It brings the driver this app uses to talk to your iPhone. You don’t need to open it.', fix: { label: 'Download iTunes', url: 'https://www.apple.com/itunes/download/win64' } },
+      { id: 'internet', state: 'ok', title: 'Internet', detail: 'Connected.' }] } },
+    welcomeLinux: { computer: { os: 'linux', ready: false, checks: [
+      { id: 'driver', state: 'missing', title: 'usbmuxd (iPhone driver)', detail: 'Install usbmuxd, the service Linux uses to talk to iPhones, then plug your iPhone in. On Fedora: sudo dnf install usbmuxd.', command: 'sudo apt install usbmuxd' },
+      { id: 'internet', state: 'missing', title: 'Internet', detail: 'Connect to the internet. Setup signs Mode with your Apple account, online.' }] } },
     connect: { screen: 'connect' },
     pickPhone: { screen: 'pickPhone', phones: [phone, { udid: 'x', name: 'Test iPhone', model: 'iPhone17,3', ios: '26.4', usb: true }], phone },
     trust: { screen: 'trust', phone, readiness: 'needsTrust' },
