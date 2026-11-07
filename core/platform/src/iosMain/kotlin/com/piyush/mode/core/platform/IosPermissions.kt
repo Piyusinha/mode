@@ -36,7 +36,7 @@ public class IosPermissions : Permissions {
             AVAudioApplicationRecordPermissionDenied -> PermissionStatus.Denied
             else -> PermissionStatus.NotAsked
         }
-        Permission.Siri -> PermissionStatus.Allowed
+        Permission.Assistant -> PermissionStatus.Allowed
     }
 
     override suspend fun request(permission: Permission): PermissionStatus {
@@ -48,7 +48,7 @@ public class IosPermissions : Permissions {
             Permission.Microphone -> suspendCancellableCoroutine { cont ->
                 AVAudioApplication.requestRecordPermissionWithCompletionHandler { _ -> cont.resume(Unit) }
             }
-            Permission.Siri -> Unit
+            Permission.Assistant -> Unit
         }
         return status(permission)
     }

@@ -92,7 +92,7 @@ public class TaskDebugPresenter(
 
     /** How things are now: phone control and the AI, so a repaired part shows as working. */
     private fun live(): List<Finding> = listOf(
-        if (phoneChecks.hasPairingFile()) Finding(FindingKind.PhoneOk, "Phone control", "Paired with this iPhone", problem = false, ok = true)
+        if (phoneChecks.ready()) Finding(FindingKind.PhoneOk, "Phone control", "Paired with this iPhone", problem = false, ok = true)
         else Finding(FindingKind.PhoneUnreachable, "Phone control", "Not paired: pair once from your Mac with Mode Setup", problem = true),
         if (settings.hasAccess(settings.settings.value.provider)) Finding(FindingKind.AiOk, providerName(), "Signed in", problem = false, ok = true)
         else Finding(FindingKind.AiFailed, providerName(), "Not connected: connect it in Settings", problem = true),

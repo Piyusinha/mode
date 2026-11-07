@@ -85,7 +85,7 @@ public class Screens(
     public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
         com.piyush.mode.app.screens.settings.VoicePickerPresenter(
             scope, settings, voices!!,
-            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple,
+            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Device,
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
@@ -224,7 +224,7 @@ public class Screens(
     /** The first run: Welcome, Connect your AI, a first job (asking for the VPN and notifications as it starts). */
     public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter =
         com.piyush.mode.app.screens.firstrun.FirstRunPresenter(scope, settings, connectChatGpt(), queue) {
-            if (!phoneChecks.vpnAllowed()) {
+            if (!phoneChecks.permitted()) {
                 try {
                     session.reconnect()
                 } finally {

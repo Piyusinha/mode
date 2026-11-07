@@ -23,7 +23,7 @@ class VoiceScreensTest {
         DeviceVoice.voices = {
             listOf(VoiceOption("ava", "Ava", "Female · English (US) · Premium", "English (US)"), VoiceOption("rishi", "Rishi", "Male · English (India)", "English (India)"))
         }
-        val p = VoicePickerPresenter(backgroundScope, f.settings, Voices(f.settings, HttpClient(MockEngine { error("offline") })), VoiceKind.Apple)
+        val p = VoicePickerPresenter(backgroundScope, f.settings, Voices(f.settings, HttpClient(MockEngine { error("offline") })), VoiceKind.Device)
         val listed = p.state.awaitState { !it.loading }
         assertEquals("ava", listed.selected, "the first voice until one is picked")
         assertEquals(listOf("English (US)", "English (India)"), listed.groups)

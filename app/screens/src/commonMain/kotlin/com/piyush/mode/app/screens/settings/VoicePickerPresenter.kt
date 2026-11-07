@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 public data class VoicePickerUiState(
     /** Apple, ElevenLabs or Fish Audio ([VoiceKind.id]). */
-    val provider: String = VoiceKind.Apple.id,
+    val provider: String = VoiceKind.Device.id,
     val query: String = "",
     /** Groups to filter by (languages or kinds of voice), most voices first; null filter: all. */
     val groups: List<String> = emptyList(),
@@ -40,7 +40,7 @@ public class VoicePickerPresenter(
     parent: CoroutineScope,
     private val settings: SettingsRepository,
     private val voices: Voices,
-    start: VoiceKind = VoiceKind.Apple,
+    start: VoiceKind = VoiceKind.Device,
 ) : Presenter<VoicePickerUiState>(parent, VoicePickerUiState(provider = start.id)) {
     private val provider = MutableStateFlow(start)
     private val query = MutableStateFlow("")

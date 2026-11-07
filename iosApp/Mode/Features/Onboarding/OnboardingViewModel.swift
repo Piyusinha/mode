@@ -435,9 +435,9 @@ final class OnboardingViewModel {
 
     private static func permission(_ p: ModeKit.PermissionRow) -> PermissionRow {
         let (title, why, icon, background, foreground): (LocalizedStringResource, LocalizedStringResource, ModeIcon, Color, Color) = switch p.kind {
-        case .vpn: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .vpn, ModeColor.tileGray, ModeColor.textPrimary)
+        case .phoneControl: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .vpn, ModeColor.tileGray, ModeColor.textPrimary)
         case .notifications: (L10n.Setup.notifications, L10n.Setup.notificationsWhy, .bell, ModeColor.tileRed, ModeColor.danger)
-        case .siri: (L10n.Setup.siri, L10n.Setup.siriWhy, .siriWave, ModeColor.tileOrange, ModeColor.tileOrangeText)
+        case .assistant: (L10n.Setup.siri, L10n.Setup.siriWhy, .siriWave, ModeColor.tileOrange, ModeColor.tileOrangeText)
         case .microphone: (L10n.Setup.microphone, L10n.Setup.microphoneWhy, .microphone, ModeColor.tileGray, ModeColor.textPrimary)
         }
         let action: ModeStatusAction = switch p.status {

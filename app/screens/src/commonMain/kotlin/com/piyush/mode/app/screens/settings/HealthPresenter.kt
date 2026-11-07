@@ -230,11 +230,11 @@ public class HealthPresenter(
         if (v == null) return
         val problem = v.problem.value
         val language = SpeechLanguage.fromId(settings.settings.value.language)
-        val listener = v.listener() ?: VoiceKind.Apple
+        val listener = v.listener() ?: VoiceKind.Device
         val hearing = problem?.takeIf { it.hearing }
         set(if (hearing != null) {
             HealthRow(HealthItem.Listening, HealthState.Warn, "${name(hearing.kind)}: ${trouble(hearing.trouble)}", HealthFix.Open, "listening")
-        } else if (listener == VoiceKind.Apple && mic == "asset") {
+        } else if (listener == VoiceKind.Device && mic == "asset") {
             HealthRow(HealthItem.Listening, HealthState.Warn, "Apple's speech model isn't downloaded yet", HealthFix.Repair)
         } else {
             HealthRow(HealthItem.Listening, HealthState.Ok, name(listener) + " · " + language.english)
@@ -249,7 +249,7 @@ public class HealthPresenter(
     }
 
     private fun name(kind: VoiceKind): String = when (kind) {
-        VoiceKind.Apple -> "Apple"
+        VoiceKind.Device -> "Apple"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Fish -> "Fish Audio"
         VoiceKind.Deepgram -> "Deepgram"

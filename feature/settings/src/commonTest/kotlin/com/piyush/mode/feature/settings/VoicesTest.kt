@@ -139,7 +139,7 @@ class VoicesTest {
         val eleven = Voices.withOurPick(VoiceKind.ElevenLabs, list)
         assertEquals(listOf("r", "a", "g"), eleven.map { it.id })
         assertEquals(Voices.OUR_PICK, eleven.first().tag)
-        assertEquals(list, Voices.withOurPick(VoiceKind.Apple, list))
+        assertEquals(list, Voices.withOurPick(VoiceKind.Device, list))
         assertEquals(VoiceKind.ElevenLabs, VoiceKind.MOST_HUMAN)
         assertEquals(VoiceKind.Deepgram, VoiceKind.MOST_ACCURATE)
     }

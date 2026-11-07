@@ -108,7 +108,7 @@ public class VoicePresenter(
         val kind = VoiceKind.fromId(id) ?: return
         val wasChosen = voices.chosen(hearing) == kind
         settings.setVoiceKey(kind, null)
-        if (wasChosen) moveTo(VoiceKind.Apple.id, 0)
+        if (wasChosen) moveTo(VoiceKind.Device.id, 0)
     }
 
     public fun saveKey(id: String, key: String) {
@@ -165,7 +165,7 @@ public class VoicePresenter(
      * Turns Apple hearing on when the user asks: the microphone permission prompt, then Apple's speech model.
      * The row follows along until it is ready, denied, or a minute has passed.
      */
-    public fun prepareApple() {
+    public fun prepareDevice() {
         DeviceVoice.prepare()
         scope.launch {
             repeat(PREPARE_CHECKS) {

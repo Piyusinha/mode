@@ -451,7 +451,7 @@ public class ListenPresenter(
                 delay(1_000)
                 val state = DeviceVoice.hearingState()
                 // Soniox and Deepgram need only the microphone; Apple also needs its speech model.
-                val cloud = voices.listener()?.let { it != com.piyush.mode.feature.settings.domain.VoiceKind.Apple } == true
+                val cloud = voices.listener()?.let { it != com.piyush.mode.feature.settings.domain.VoiceKind.Device } == true
                 if (cloud && state != "permission" && state != "denied") { begin(); return@launch }
                 when (state) {
                     "ready" -> { begin(); return@launch }

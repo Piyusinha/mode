@@ -11,6 +11,7 @@ flowchart TB
         kit["app:kit<br/>ModeKit.framework (+ SKIE)"]
         devui["app:dev-ui<br/>Compose developer screens"]
         graph["app:graph<br/>ModeGraph: builds and wires everything"]
+        androidapp["app:android<br/>the Android app (Compose)"]
     end
     subgraph feature["feature: one module per feature"]
         tasks["tasks<br/>TaskRunner, questions"]
@@ -24,6 +25,7 @@ flowchart TB
         agent["agent<br/>look → decide → act"]
         llm["llm<br/>LlmClient, OpenRouter"]
         ops["ops<br/>Op, PhoneBackend"]
+        screen["screen<br/>the screen in points, text boxes, ScreenJson"]
         ios["phone-ios<br/>CoreDevice backend, VPN, pairing"]
     end
     subgraph core["core: plumbing, no product logic"]
@@ -33,6 +35,7 @@ flowchart TB
         network["network<br/>HTTP client"]
     end
     kit --> devui --> graph
+    androidapp --> graph
     graph --> tasks & compare & diag
     compare --> tasks
     tasks --> conn & settings & runs
@@ -41,7 +44,7 @@ flowchart TB
     agent --> llm & ops
     conn --> ops
     conn -. iOS .-> ios
-    ios --> ops
+    ios --> screen --> ops
     ios -- "cinterop" --> native["native/modecore (Rust)"]
     feature --> core
 ```
@@ -50,16 +53,25 @@ flowchart TB
 module depends on a layer above it. `:testing` (fakes shared by tests) sits
 outside the layers and is used only by test source sets.
 
+Every shared module builds for the iPhone, for Android and for the JVM (the
+JVM only runs the tests). The convention plugin adds the targets; a module
+opts out in its `gradle.properties` (`mode.android=false` for the iPhone
+engine, `mode.ios=false` for an Android-only engine). Platform code lives in
+`iosMain` and `androidMain` behind interfaces declared in `commonMain`; there
+are no `expect` declarations except the time-of-day helper and the test
+database.
+
 | Layer | Module | Role |
 |---|---|---|
 | core | `core:common` | `AppLog` (event timeline), time ids, `ActivityTracker` (is anything using the phone?), `SecretFilter`, `systemLog` on iOS |
-| core | `core:storage` | `SecretStore`, `KeyValueStore`, `FileStore`; iOS: Keychain, UserDefaults, Documents |
-| core | `core:platform` | `AppInfo`, `AppLifecycle`, `BackgroundWork`, `Notifier`; iOS: KeepAwake, background task, notifications |
-| core | `core:network` | The HTTP client (Darwin on iOS) |
-| core | `core:database` | The on-device SQLite database (SQLDelight, schema v3, upgrades checked): conversations, turns, tasks, the run index, memory, schedules; `mode.db` on iOS |
+| core | `core:storage` | `SecretStore`, `KeyValueStore`, `FileStore`; iOS: Keychain, UserDefaults, Documents; Android: the Keystore (`KeystoreSecretStore`, AES-GCM, `SealedValue`), SharedPreferences, the app's files |
+| core | `core:platform` | `AppInfo`, `AppLifecycle`, `BackgroundWork`, `Notifier`, `Permissions`, `DeviceLock`; iOS: KeepAwake, background task, notifications; Android: the process lifecycle, the keyguard, permission prompts through `ActivityBridge` |
+| core | `core:network` | The HTTP client (Darwin on iOS, OkHttp on Android) |
+| core | `core:database` | The on-device SQLite database (SQLDelight, schema v3, upgrades checked): conversations, turns, tasks, the run index, memory, schedules; `mode.db` on both phones |
 | engine | `engine:ops` | What can be asked of a phone: `Op`, `PhoneBackend`, `ResilientBackend`, `FakeBackend` |
+| engine | `engine:screen` | What every phone engine shares: `ScreenInfo` (points), `TextReader` and `RecognizedText`, `ImageTools`, `AppNames`, `ScreenJson` (the answers' shapes), `ShotCache` |
 | engine | `engine:llm` | `LlmClient`, `OpenRouterClient`, and `OpenRouterModels` (the live model catalogue) |
-| engine | `engine:agent` | The agent loop, its tools, `ContextBuilder` (what the model sees), `StuckDetector` and `AgentTrace` |
+| engine | `engine:agent` | The agent loop, its tools, `ContextBuilder` (what the model sees), `StuckDetector`, `AgentTrace` and `PhoneProfile` (what differs per phone) |
 | engine | `engine:phone-ios` | The iPhone backend over CoreDevice, the VPN and the pairing file |
 | feature | `feature:connection` | `PhoneSession` (one shared session, `ConnectionState`), the `PhoneLink` port, `IdleDisconnectPolicy` |
 | feature | `feature:settings` | `SettingsRepository` (typed `ModeSettings`, including the per-task cost limit) and `ModelCatalog` (usable models with cost per task, cached a day) |
@@ -72,7 +84,8 @@ outside the layers and is used only by test source sets.
 | feature | `feature:backup` | `BackupService`: one `.modebackup` file with every table and the settings (and, locked with a password, the sign-ins); restore merges, never deletes (D40) |
 | feature | `feature:compare` | `CompareRunner` |
 | app | `app:screens` | One presenter per screen (`StateFlow<UiState>` plus intents): Home, Conversation, Live run, Run screens, Tasks, Repeat, Memory, Settings, Onboarding; `Screens` makes them. Shared with a future Android UI |
-| app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` wires the iOS implementations |
+| app | `app:graph` | `ModeGraph`, the one composition root; `iosModeGraph` and `androidModeGraph` wire each platform's implementations |
+| app | `app:android` | The Android app: Compose screens over the shared presenters, and the services and receivers Android needs in the app itself (`full` and `play` flavours) |
 | app | `app:dev-ui` | The Compose developer screens (Agent, Compare, Logs, Settings, Hands), reachable from Settings › Developer |
 | app | `app:kit` | Builds `ModeKit.framework` for Swift (SKIE on, analytics off); `IosEntryKt.MainViewController()` |
 | — | `native/modecore` | Rust: the live connection to the phone's services |
@@ -154,6 +167,16 @@ names are phone-harness's, so the same ops could drive its cloud iPhone host.
 | `Tree` | `tree` | ❌ Unsupported (no accessibility tree on this path) |
 | `CurrentApp` | `apps.current` | ❌ Unsupported |
 | `OpenUrl(url)` | `url.open` | ❌ Unsupported (a background app cannot open URLs) |
+| `Back` | `nav.back` | ❌ Unsupported (iOS has no Back; the agent swipes from the edge) |
+| `Recents` | `nav.recents` | ❌ Unsupported |
+| `OpenNotifications` | `notifications.open` | ❌ Unsupported |
+| `OpenQuickSettings` | `quicksettings.open` | ❌ Unsupported (iOS has Control Center, opened by a drag) |
+
+The last four are Android's: its accessibility service does them as global
+actions. A text box may carry `window` (`"app"`, `"ime"` for the keyboard,
+`"system"`) when the phone knows which window it is in; a capture may answer
+`{"private": true, bounds}` for a screen the phone will not show (a bank, a
+PIN pad), which the agent treats as the user's turn.
 
 `PhoneBackend` is the one seam every phone sits behind:
 
@@ -175,8 +198,21 @@ A backend never fakes what it cannot do. A guessed result the caller cannot
 tell from a real one is worse than an honest `Unsupported`.
 
 **Coordinates** are screen points with a top-left origin (402 × 874 on an
-iPhone 17 Pro). The backend maps them to the touchscreen's own space,
-0..65535 on each axis.
+iPhone 17 Pro; on Android, dp). The iPhone backend maps them to the
+touchscreen's own space, 0..65535 on each axis.
+
+## Two phones, one agent: `PhoneProfile`
+
+The agent is the same on both phones. What differs is a `PhoneProfile`
+(`engine:agent`), passed in by the platform through `PlatformServices` and
+down to `TaskRunner`: the words in the prompts ("iPhone", "Android phone"),
+how far down the status bar reaches, whether going back is an op (`nav.back`)
+or an edge swipe, which quick panel exists (Control Center, Quick Settings)
+and whether the user's Shortcuts can be run. The tools offered follow the
+profile and the ops the phone answers: on Android `back`, `quick_settings`
+and `notifications`; on the iPhone `back` (a drag), `control_center` and
+`run_shortcut`. The iPhone profile is the default, and a test keeps its
+prompt and tool list as they were.
 
 ## Inside `CoreDeviceBackend`
 

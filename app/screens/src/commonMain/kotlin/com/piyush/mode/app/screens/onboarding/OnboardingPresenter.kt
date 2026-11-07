@@ -32,7 +32,7 @@ public enum class OnboardingStep(public val number: Int?) {
     Welcome(null), Name(1), Key(2), Model(3), Permissions(4), Voice(5), Test(6), Result(null), Diagnose(null), Finished(null)
 }
 
-public enum class PermissionKind { Vpn, Notifications, Siri, Microphone }
+public enum class PermissionKind { PhoneControl, Notifications, Assistant, Microphone }
 
 public data class PermissionRow(
     val kind: PermissionKind,
@@ -153,13 +153,13 @@ public class OnboardingPresenter(
         // A new setup starts with ChatGPT picked (the user's plan, no cost per task) unless one is connected already.
         if (com.piyush.mode.llm.ModelProvider.entries.none(settings::hasAccess)) settings.selectProvider(com.piyush.mode.llm.ModelProvider.ChatGpt)
         val s = settings.settings.value
-        set { it.copy(paired = phoneChecks.hasPairingFile(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
+        set { it.copy(paired = phoneChecks.ready(), callName = s.userName.orEmpty(), hasSavedKey = s.hasApiKey) }
         // "Come back here" ticks the moment Mode is in front again, not when the run ends:
         // the agent reads this screen to know it's finished.
         lifecycle.onForeground {
             if (!scope.isActive) return@onForeground
             // Paired from the Mac (Mode Setup) while setup was open: the Welcome row turns green on return.
-            set { it.copy(paired = phoneChecks.hasPairingFile()) }
+            set { it.copy(paired = phoneChecks.ready()) }
             scope.launch { runCatching { refreshPermissions() } }
             if (state.value.step == OnboardingStep.Voice) loadVoices()
             cameBack()
@@ -273,9 +273,9 @@ public class OnboardingPresenter(
     public fun allow(kind: PermissionKind) {
         scope.launch {
             when (kind) {
-                PermissionKind.Vpn -> connectVpn()
+                PermissionKind.PhoneControl -> connectVpn()
                 PermissionKind.Notifications -> permissions.request(Permission.Notifications)
-                PermissionKind.Siri -> permissions.request(Permission.Siri)
+                PermissionKind.Assistant -> permissions.request(Permission.Assistant)
                 PermissionKind.Microphone -> permissions.request(Permission.Microphone)
             }
             runCatching { refreshPermissions() }
@@ -472,7 +472,7 @@ public class OnboardingPresenter(
 
     /** Who speaks now: the first ready provider (Apple until another is connected and first). */
     private fun speakingKind(): com.piyush.mode.feature.settings.domain.VoiceKind =
-        voices?.speaker()?.first ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+        voices?.speaker()?.first ?: com.piyush.mode.feature.settings.domain.VoiceKind.Device
 
     /** Reads who speaks and listens again (after a picker sheet changed them) and that speaker's voices. */
     public fun refreshVoices() {
@@ -484,7 +484,7 @@ public class OnboardingPresenter(
     private fun loadVoices() {
         val v = voices ?: return
         val kind = speakingKind()
-        val listener = v.listener() ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple
+        val listener = v.listener() ?: com.piyush.mode.feature.settings.domain.VoiceKind.Device
         val generation = ++voiceLoadGeneration
         val changed = state.value.voiceProvider != kind.id
         if (changed) stopVoice()
@@ -531,9 +531,9 @@ public class OnboardingPresenter(
 
     private suspend fun refreshPermissions() {
         val rows = listOf(
-            PermissionRow(PermissionKind.Vpn, if (phoneChecks.vpnAllowed()) PermissionStatus.Allowed else PermissionStatus.NotAsked, optional = false, later = false),
+            PermissionRow(PermissionKind.PhoneControl, if (phoneChecks.permitted()) PermissionStatus.Allowed else PermissionStatus.NotAsked, optional = false, later = false),
             PermissionRow(PermissionKind.Notifications, permissions.status(Permission.Notifications), optional = false, later = false),
-            PermissionRow(PermissionKind.Siri, permissions.status(Permission.Siri), optional = true, later = false),
+            PermissionRow(PermissionKind.Assistant, permissions.status(Permission.Assistant), optional = true, later = false),
             PermissionRow(PermissionKind.Microphone, permissions.status(Permission.Microphone), optional = false, later = true),
         )
         set { it.copy(permissions = rows) }

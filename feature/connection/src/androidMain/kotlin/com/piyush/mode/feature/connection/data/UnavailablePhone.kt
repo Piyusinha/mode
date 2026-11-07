@@ -19,6 +19,6 @@ public class UnavailablePhoneChecks(private val reason: String = "This build can
         update(listOf(PhoneCheckResult(PhoneCheckId.Reach, CheckState.Failed(reason, null))))
     }
 
-    override fun hasPairingFile(): Boolean = false
-    override suspend fun vpnAllowed(): Boolean = false
+    override fun ready(): Boolean = false
+    override suspend fun permitted(): Boolean = false
 }

@@ -128,14 +128,14 @@ public class Voices(
     }
 
     /** The provider chosen for speaking or hearing. */
-    public fun chosen(hearing: Boolean): VoiceKind = order(hearing).firstOrNull() ?: VoiceKind.Apple
+    public fun chosen(hearing: Boolean): VoiceKind = order(hearing).firstOrNull() ?: VoiceKind.Device
 
     private fun blockTrouble(b: VoiceBlock): VoiceTrouble = if (b == VoiceBlock.NoKey) VoiceTrouble.NoKey else VoiceTrouble.NotReady
 
     public fun block(kind: VoiceKind, hearing: Boolean): VoiceBlock? = when {
         kind.needsKey && settings.voiceKey(kind).isNullOrBlank() -> VoiceBlock.NoKey
-        kind == VoiceKind.Apple && !hearing && !device.speechReady() -> VoiceBlock.Unsupported
-        kind == VoiceKind.Apple && hearing -> when (device.hearingState()) {
+        kind == VoiceKind.Device && !hearing && !device.speechReady() -> VoiceBlock.Unsupported
+        kind == VoiceKind.Device && hearing -> when (device.hearingState()) {
             "ready" -> null
             "denied" -> VoiceBlock.Denied
             "permission" -> VoiceBlock.Permission
@@ -156,7 +156,7 @@ public class Voices(
     public suspend fun speakOrHear(text: String, onPartial: (String) -> Unit = {}): Heard? {
         val line = text.trim()
         if (line.isEmpty()) return null
-        if (!settings.settings.value.bargeIn || block(VoiceKind.Apple, hearing = true) != null || block(chosen(hearing = true), hearing = true) != null) {
+        if (!settings.settings.value.bargeIn || block(VoiceKind.Device, hearing = true) != null || block(chosen(hearing = true), hearing = true) != null) {
             speak(line); return null
         }
         return telemetry.trace(Operation.VoiceSpeak, mapOf(Field.Entry to "interruptible")) { span -> kotlinx.coroutines.coroutineScope {
@@ -203,7 +203,7 @@ public class Voices(
             when (kind) {
                 VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path, language.code)
                 VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path, language.code)
-                else -> Transcript.Text(device.transcribeApple(path))
+                else -> Transcript.Text(device.transcribeOnDevice(path))
             }
         }
         val text = (result as? Transcript.Text)?.text?.trim().orEmpty()
@@ -260,7 +260,7 @@ public class Voices(
         val kind = chosen(hearing = true)
         block(kind, hearing = true)?.let { failed(kind, hearing = true, blockTrouble(it)); return Heard.Nothing }
         // Apple's live words show while the user speaks, whichever provider writes the final text.
-        val appleLive = block(VoiceKind.Apple, hearing = true) == null
+        val appleLive = block(VoiceKind.Device, hearing = true) == null
         val language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(settings.settings.value.language)
         device.listenLanguage = language.takeUnless { it == com.piyush.mode.feature.settings.domain.SpeechLanguage.Auto }?.id
         val heard = telemetry.trace(Operation.VoiceRecord, mapOf(Field.Provider to kind.id)) { span ->
@@ -273,7 +273,7 @@ public class Voices(
                 })
             }
         }
-        if (kind == VoiceKind.Apple && heard.path == null) {
+        if (kind == VoiceKind.Device && heard.path == null) {
             return if (heard.text.isNullOrBlank()) Heard.Silence else Heard.Words(heard.text.trim()).also { worked(hearing = true) }
         }
         val path = heard.path ?: return Heard.Silence
@@ -281,7 +281,7 @@ public class Voices(
             val result = telemetry.trace(Operation.VoiceTranscribe, mapOf(Field.Provider to kind.id)) { span ->
                 (withTimeoutOrNull(PER_HEAR) {
                     when (kind) {
-                        VoiceKind.Apple -> Transcript.Text(heard.text ?: device.transcribeApple(path))
+                        VoiceKind.Device -> Transcript.Text(heard.text ?: device.transcribeOnDevice(path))
                         VoiceKind.Soniox -> soniox(settings.voiceKey(kind)!!, path, language.code)
                         VoiceKind.Deepgram -> deepgram(settings.voiceKey(kind)!!, path, language.code)
                         else -> Transcript.Text(null)
@@ -326,7 +326,7 @@ public class Voices(
                 VoiceKind.Fish -> http.get("https://api.fish.audio/wallet/self/api-credit") { header("Authorization", "Bearer $k") }
                 VoiceKind.Deepgram -> http.get("https://api.deepgram.com/v1/projects") { header("Authorization", "Token $k") }
                 VoiceKind.Soniox -> http.get("https://api.soniox.com/v1/models") { header("Authorization", "Bearer $k") }
-                VoiceKind.Apple -> return KeyCheck.Valid
+                VoiceKind.Device -> return KeyCheck.Valid
             }
             when {
                 response.status.isSuccess() -> KeyCheck.Valid
@@ -343,7 +343,7 @@ public class Voices(
     private suspend fun say(kind: VoiceKind, voiceId: String?, line: String): Said {
         val speed = settings.settings.value.speechSpeed.factor
         return when (kind) {
-            VoiceKind.Apple -> if (device.speakLine(line, voiceId, speed)) Said.Started else Said.Failed(VoiceTrouble.NotReady)
+            VoiceKind.Device -> if (device.speakLine(line, voiceId, speed)) Said.Started else Said.Failed(VoiceTrouble.NotReady)
             VoiceKind.Fish -> cloudSpeak(FISH_TTS, settings.voiceKey(kind)!!, fish = true, line, voiceId, speed)
             VoiceKind.ElevenLabs -> cloudSpeak(elevenUrl(voiceId), settings.voiceKey(kind)!!, fish = false, line, voiceId, speed)
             else -> Said.Failed(VoiceTrouble.NotReady)
@@ -358,7 +358,7 @@ public class Voices(
 
     /** The voices [kind] offers: Apple's on this iPhone; ElevenLabs' library and Fish Audio's public voices with a key. */
     public suspend fun options(kind: VoiceKind): VoiceList {
-        if (kind == VoiceKind.Apple) return VoiceList(device.voices())
+        if (kind == VoiceKind.Device) return VoiceList(device.voices())
         val key = settings.voiceKey(kind) ?: return VoiceList(emptyList(), VoiceListError.NoKey)
         return try {
             VoiceList(if (kind == VoiceKind.ElevenLabs) elevenVoices(key) else fishVoices(key))

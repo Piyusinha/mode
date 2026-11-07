@@ -18,9 +18,12 @@ public data class PhoneCheckResult(val id: PhoneCheckId, val state: CheckState)
 public interface PhoneChecks {
     public suspend fun run(update: (List<PhoneCheckResult>) -> Unit)
 
-    /** Whether the pairing file (made once with a Mac) is on this iPhone. */
-    public fun hasPairingFile(): Boolean
+    /** The checks this phone runs, in order. */
+    public val steps: List<PhoneCheckId> get() = PhoneCheckId.entries
 
-    /** Whether the user has allowed Mode's VPN. */
-    public suspend fun vpnAllowed(): Boolean
+    /** Whether what phone control needs is in place (on iOS, the pairing file made once with a Mac). */
+    public fun ready(): Boolean
+
+    /** Whether the user has allowed phone control (on iOS, Mode's VPN). */
+    public suspend fun permitted(): Boolean
 }

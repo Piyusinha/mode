@@ -31,8 +31,8 @@ public enum class SetupTip {
      * Unlock by voice set up; and so on.
      */
     internal fun done(s: ModeSettings): Boolean = when (this) {
-        Voice -> s.voices.isNotEmpty() || s.speechOrder.firstOrNull() != VoiceKind.Apple.id
-        Listening -> s.hearingOrder.firstOrNull() != VoiceKind.Apple.id
+        Voice -> s.voices.isNotEmpty() || s.speechOrder.firstOrNull() != VoiceKind.Device.id
+        Listening -> s.hearingOrder.firstOrNull() != VoiceKind.Device.id
         Access -> s.fullAccess || s.askBeforeRisky != RiskConfirmation.OnlyVeryRisky
         StartWithoutOpening -> s.voiceUnlock
         Name -> !s.userName.isNullOrBlank()

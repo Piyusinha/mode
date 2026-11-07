@@ -65,8 +65,8 @@ internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
 
 internal class FakeChecks(var paired: Boolean = true) : com.piyush.mode.feature.connection.domain.PhoneChecks {
     var vpn = false
-    override fun hasPairingFile() = paired
-    override suspend fun vpnAllowed() = vpn
+    override fun ready() = paired
+    override suspend fun permitted() = vpn
     override suspend fun run(update: (List<com.piyush.mode.feature.connection.domain.PhoneCheckResult>) -> Unit) {
         update(listOf(
             com.piyush.mode.feature.connection.domain.PhoneCheckResult(com.piyush.mode.feature.connection.domain.PhoneCheckId.PairingFile, com.piyush.mode.feature.connection.domain.CheckState.Passed(null)),

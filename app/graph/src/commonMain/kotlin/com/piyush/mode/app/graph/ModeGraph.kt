@@ -180,7 +180,7 @@ class ModeGraph(platform: PlatformServices) {
      */
     private val backup = com.piyush.mode.feature.backup.data.BackupService(
         database, platform.prefs, platform.secrets, platform.backupFiles,
-        deviceName = { settings.settings.value.userName?.let { "$it’s iPhone" } ?: "iPhone" },
+        deviceName = { settings.settings.value.userName?.let { "$it’s ${platform.profile.deviceWord}" } ?: platform.profile.deviceWord },
         appVersion = platform.appVersion,
         onRestored = { report ->
             settings.reload()

@@ -14,25 +14,29 @@ import kotlin.math.round
  */
 @OptIn(ExperimentalEncodingApi::class)
 object ScreenJson {
-    /** `screen.bounds`: the whole screen in points, with the window id the old tree path had. */
-    fun bounds(screen: ScreenInfo): JsonObject = buildJsonObject {
+    /**
+     * `screen.bounds`: the whole screen in points, with the window id the old tree path had, and
+     * `top_inset` (how far down the status bar reaches) when the phone knows it.
+     */
+    fun bounds(screen: ScreenInfo, topInsetPt: Double? = null): JsonObject = buildJsonObject {
         put("x", 0)
         put("y", 0)
         put("w", screen.widthPt)
         put("h", screen.heightPt)
         put("id", 0)
+        if (topInsetPt != null) put("top_inset", topInsetPt)
     }
 
     /** `screen.capture` without a size limit: the full PNG. */
-    fun capturePng(png: ByteArray, screen: ScreenInfo): JsonObject = buildJsonObject {
+    fun capturePng(png: ByteArray, screen: ScreenInfo, topInsetPt: Double? = null): JsonObject = buildJsonObject {
         put("png_b64", Base64.encode(png))
-        put("bounds", bounds(screen))
+        put("bounds", bounds(screen, topInsetPt))
     }
 
     /** `screen.capture` with a size limit: a JPEG for the model, with its pixel size. */
-    fun captureJpeg(small: ShrunkImage, screen: ScreenInfo): JsonObject = buildJsonObject {
+    fun captureJpeg(small: ShrunkImage, screen: ScreenInfo, topInsetPt: Double? = null): JsonObject = buildJsonObject {
         put("jpeg_b64", Base64.encode(small.jpeg))
-        put("bounds", bounds(screen))
+        put("bounds", bounds(screen, topInsetPt))
         put("img_px", buildJsonObject {
             put("w", small.widthPx)
             put("h", small.heightPx)
@@ -43,9 +47,9 @@ object ScreenJson {
      * `screen.capture` for a screen the phone will not show (a bank, a PIN pad):
      * no picture, so the agent hands the step to the user.
      */
-    fun capturePrivate(screen: ScreenInfo): JsonObject = buildJsonObject {
+    fun capturePrivate(screen: ScreenInfo, topInsetPt: Double? = null): JsonObject = buildJsonObject {
         put("private", true)
-        put("bounds", bounds(screen))
+        put("bounds", bounds(screen, topInsetPt))
     }
 
     /**

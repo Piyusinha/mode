@@ -20,14 +20,14 @@ public class AndroidPermissions(
     override suspend fun status(permission: Permission): PermissionStatus = when (permission) {
         Permission.Notifications -> runtime(Manifest.permission.POST_NOTIFICATIONS)
         Permission.Microphone -> runtime(Manifest.permission.RECORD_AUDIO)
-        Permission.Siri -> if (assistantHeld()) PermissionStatus.Allowed else PermissionStatus.NotAsked
+        Permission.Assistant -> if (assistantHeld()) PermissionStatus.Allowed else PermissionStatus.NotAsked
     }
 
     override suspend fun request(permission: Permission): PermissionStatus {
         val name = when (permission) {
             Permission.Notifications -> Manifest.permission.POST_NOTIFICATIONS
             Permission.Microphone -> Manifest.permission.RECORD_AUDIO
-            Permission.Siri -> return status(permission)
+            Permission.Assistant -> return status(permission)
         }
         if (runtime(name) != PermissionStatus.Allowed) {
             ActivityBridge.requestPermission(name)

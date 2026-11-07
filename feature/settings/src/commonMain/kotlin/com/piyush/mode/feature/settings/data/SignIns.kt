@@ -34,7 +34,7 @@ public object SignIns {
     public fun connected(secrets: SecretStore): List<SignIn> = all.filter { it.connected(secrets) }
 
     private fun voiceName(kind: VoiceKind): String = when (kind) {
-        VoiceKind.Apple -> "Apple"
+        VoiceKind.Device -> "Apple"
         VoiceKind.Fish -> "Fish Audio"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Soniox -> "Soniox"

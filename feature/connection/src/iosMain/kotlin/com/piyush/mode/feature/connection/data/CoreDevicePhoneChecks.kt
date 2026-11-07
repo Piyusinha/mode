@@ -24,10 +24,10 @@ import kotlin.time.TimeSource
  * screen and touching it. Stops at the first that fails, with the fix.
  */
 public class CoreDevicePhoneChecks : PhoneChecks {
-    override fun hasPairingFile(): Boolean = PairingFile.load() != null
+    override fun ready(): Boolean = PairingFile.load() != null
 
     /** False when iOS can't say (the simulator has no VPN settings): asking again shows the prompt. */
-    override suspend fun vpnAllowed(): Boolean = try {
+    override suspend fun permitted(): Boolean = try {
         LoopbackVpn.isAllowed()
     } catch (e: CancellationException) {
         throw e

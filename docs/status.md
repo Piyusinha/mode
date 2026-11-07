@@ -17,6 +17,22 @@ As of 2026-11-01.
 | P1 | Production step 1: modular clean architecture (layers, one module per feature, StateFlow state, ModeGraph, SKIE) | ✅ Done, 74 tests; on-phone check pending (see below) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
+## Android (started 2026-11-06, branch `mode-android`)
+
+The plan has eight phases (see the session plan and `docs/android.md` once it exists). Design: the
+Android canvas, 135 boards. Decisions D41–D43.
+
+| Phase | What | State |
+|---|---|---|
+| 0 | Foundations: Android target in the convention plugin, stores, platform adapters, OkHttp, the database driver, `app:android`, `androidModeGraph`, CI job | ✅ Done; the app starts on the API 37 emulator with the full graph |
+| 1 | Shared code for two phones: `engine:screen`, four new ops, `PhoneProfile`, keyboard and private screens from a tree, the renames | ✅ Done |
+| 2 | The accessibility engine (`engine:phone-android`): tree text, screenshots, gestures, the service, checks, the working service | ⏳ Next |
+| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | ⏳ |
+| 4 | Hands-free: notifications with answers, the assistant role, widget, exact-alarm schedules, Android voice | ⏳ |
+| 5 | Background mode: Mode's own ADB link, the helper, the hidden display | ⏳ |
+| 6 | Distribution: signed APK on GitHub, the `play` flavour, CI | ⏳ |
+| 7 | Quality: the task suite on phones, brand quirks, docs | ⏳ |
+
 ## Proven on the phone (iPhone 17 Pro, iOS 27.2)
 
 | What | Result |

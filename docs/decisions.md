@@ -490,3 +490,34 @@ the graph grows past what one file reads comfortably.
   transaction; nothing is deleted. Settings from the backup are applied (they are the user's setup). A
   sign-in comes back only for a provider with none here. A task that was queued or running in the backup
   comes back ended, so it never runs; added repeats get their next time from now and their reminder.
+
+## D41. Every shared module builds for Android too (2026-11-07)
+
+The convention plugin (`mode.kmp.library`) adds the Android library target to every shared module
+beside the iPhone and JVM targets, built against Android 17 (API 37) with Android 13 (API 33) as the
+floor. A module opts out in its own `gradle.properties`: `mode.android=false` for `engine:phone-ios`
+(its cinterop is iOS-only), `mode.ios=false` for Android-only engines; `mode.android.hostTests=true`
+also runs the common tests through the Android target on the host JVM. The backup files became a
+plain constructor argument instead of an `expect`, since Android's need a `Context`.
+
+## D42. One agent, a profile per phone (2026-11-07)
+
+The agent, its tools and the brain take a `PhoneProfile`: the device and OS words for the prompts,
+the status bar height, whether back is an op or an edge swipe, which quick panel exists and whether
+Shortcuts can run. The iPhone profile is the default and keeps the prompt text and tool list exactly
+as they were (a test asserts it); the Android profile offers `back`, `quick_settings` and
+`notifications` through four new ops (`nav.back`, `nav.recents`, `notifications.open`,
+`quicksettings.open`) that the iPhone backend refuses. A phone that reports windows marks the
+keyboard's keys (`window: "ime"`), so the agent knows the keyboard is up without guessing; a capture
+that says `private` is the user's turn at once, with no model call.
+
+## D43. Platform words out of the shared names (2026-11-07)
+
+`Permission.Siri` is `Assistant` (Siri's App Shortcuts on iOS, the assistant role on Android),
+`PermissionKind.Vpn` is `PhoneControl` (the VPN on iOS, Accessibility on Android),
+`LanguageReach.OnIphone` is `OnDevice`, `VoiceKind.Apple` is `Device` with its id still `"apple"`
+(settings and backups keep working), and `DeviceVoice.appleLanguages/appleInstalled` are
+`deviceLanguages/deviceInstalled`. `PhoneChecks.hasPairingFile()/vpnAllowed()` became
+`ready()/permitted()`, and `steps` says which checks a phone runs. The health rows for Android's
+own checks come with its engine.
+
