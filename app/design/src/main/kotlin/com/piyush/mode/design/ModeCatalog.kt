@@ -48,7 +48,7 @@ public fun ModeCatalog() {
                 ModeButton(it.name, {}, role = it) // literal-ok
             }
             ModeButton("Disabled", {}, enabled = false) // literal-ok
-            ModeIconButton(ModeIcon.Back, "Back", {}) // literal-ok
+            ModeBackButton("Back", {}) // literal-ok
             ModeIconButton(ModeIcon.Ask, "Speak", {}, prominent = true, size = ModeSize.speakButton) // literal-ok
         }
         Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {

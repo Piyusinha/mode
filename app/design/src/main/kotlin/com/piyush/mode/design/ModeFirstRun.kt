@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -57,7 +58,8 @@ public fun ModeStepDots(current: Int, total: Int, label: String, modifier: Modif
 public fun ModeSetupHeader(backLabel: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, step: Triple<Int, Int, String>? = null) {
     Box(modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch).padding(horizontal = ModeSpacing.screenEdge)) {
         if (step != null) ModeStepDots(step.first, step.second, step.third, Modifier.align(Alignment.Center))
-        if (onBack != null) ModeBackButton(backLabel, onBack, Modifier.align(Alignment.CenterStart))
+        // The setup titles sit ModeSpacing.s in from the edge; the arrow's glyph lines up with them.
+        if (onBack != null) ModeBackButton(backLabel, onBack, Modifier.align(Alignment.CenterStart).offset(x = ModeSpacing.s - ModeSize.backOverhang))
     }
 }
 

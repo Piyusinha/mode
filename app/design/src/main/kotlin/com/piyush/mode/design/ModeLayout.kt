@@ -311,6 +311,8 @@ public object ModeSize {
     public val switchOutline: Dp = 2.dp
     /** Android's back arrow touch target. */
     public val backButton: Dp = 48.dp
+    /** How far the back button's target starts before the content's left edge, so its glyph lines up with the title. */
+    public val backOverhang: Dp = 14.dp
     /** Health: a row, its tile and tick, the Fix button; the banner's Mo and button. */
     public val healthRow: Dp = 60.dp
     public val healthTile: Dp = 34.dp

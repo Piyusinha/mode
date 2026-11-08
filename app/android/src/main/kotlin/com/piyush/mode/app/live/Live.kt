@@ -40,6 +40,7 @@ import com.piyush.mode.design.ModeBadgeTone
 import com.piyush.mode.design.ModeEmptyState
 import com.piyush.mode.design.ModeIcon
 import com.piyush.mode.design.ModeIconButton
+import com.piyush.mode.design.ModeBackButton
 import com.piyush.mode.design.ModeRadius
 import com.piyush.mode.design.ModeReply
 import com.piyush.mode.design.ModeReplyBlock
@@ -88,7 +89,7 @@ fun LiveScreen(state: LiveState, onEvent: (LiveEvent) -> Unit) {
     val c = Mode.colors
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.screenEdge), verticalAlignment = Alignment.CenterVertically) {
-            ModeIconButton(ModeIcon.Back, stringResource(R.string.common_back), { onEvent(LiveEvent.Close) })
+            ModeBackButton(stringResource(R.string.common_back), { onEvent(LiveEvent.Close) })
             Box(Modifier.weight(1f), Alignment.Center) {
                 when {
                     state.running != null && state.takenOver -> ModeTalkStatus(stringResource(R.string.live_in_control_pill), c.info)

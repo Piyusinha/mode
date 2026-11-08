@@ -245,7 +245,8 @@ public fun ModeHairline(modifier: Modifier = Modifier) {
 @Composable
 public fun ModePageBar(backLabel: String, onBack: () -> Unit, modifier: Modifier = Modifier, trailing: @Composable () -> Unit = {}) {
     Row(
-        modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch).padding(horizontal = ModeSpacing.screenEdge),
+        modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch)
+            .padding(start = ModeSpacing.screenEdge + ModeSpacing.noteInset - ModeSize.backOverhang, end = ModeSpacing.screenEdge),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ModeBackButton(backLabel, onBack)
