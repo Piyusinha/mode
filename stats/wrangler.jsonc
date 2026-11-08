@@ -1,0 +1,37 @@
+// stats.heymode.app: the private analytics dashboard for heymode.app. Separate from the website (its own Worker).
+// Sign-in: email + password + a code sent by email; only ALLOWED_EMAIL can get in. Every check runs here, on Cloudflare.
+//
+// Secrets (set with `npx wrangler secret put <NAME>` in this folder, never committed):
+//   ALLOWED_EMAIL    the one email that may sign in
+//   PASSWORD_HASH    from `npm run set-password` (the password itself is never stored)
+//   SESSION_SECRET   random; changing it signs everyone out
+//   CF_API_TOKEN     Cloudflare API token with Account > Account Analytics > Read
+// Deploy with `npm run deploy`.
+{
+  "name": "heymode-stats",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Every request goes through the worker first, so nothing is served without a session.
+    "run_worker_first": true
+  },
+  "kv_namespaces": [
+    { "binding": "KV", "id": "c8e9d855374245c1b80c92fe7f24412f" }
+  ],
+  // Sends the sign-in code. Email Routing only delivers to verified addresses (Email Routing > Destination addresses).
+  "send_email": [
+    { "name": "EMAIL" }
+  ],
+  "vars": {
+    "ACCOUNT_ID": "d1e2d22eca5dfc286b0667d20964a427",
+    "DATASET": "heymode_events",
+    "FROM_EMAIL": "stats@heymode.app"
+  },
+  "routes": [
+    { "pattern": "stats.heymode.app", "custom_domain": true }
+  ]
+}

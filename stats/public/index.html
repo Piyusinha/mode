@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Mode stats</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%277%27 fill=%27%23eb6834%27/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <p class="brand"><span class="dot"></span>Mode stats <span class="muted">heymode.app</span></p>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Time range" id="ranges">
+        <button type="button" data-range="24h">24 hours</button>
+        <button type="button" data-range="7d">7 days</button>
+        <button type="button" data-range="30d">30 days</button>
+        <button type="button" data-range="90d">90 days</button>
+        <button type="button" data-range="custom">Custom</button>
+      </div>
+      <span class="custom" id="custom" hidden>
+        <label>From <input type="date" id="from"></label>
+        <label>To <input type="date" id="to"></label>
+      </span>
+      <label class="sel">Group by
+        <select id="step"><option value="hour">Hour</option><option value="day">Day</option><option value="week">Week</option></select>
+      </label>
+      <button type="button" class="btn" id="refresh">Refresh</button>
+      <button type="button" class="btn" id="customizeBtn">Customize</button>
+      <form method="post" action="/logout"><button type="submit" class="btn quiet">Sign out</button></form>
+    </div>
+  </header>
+
+  <div class="filters" id="filters">
+    <select id="addFilter" aria-label="Add a filter"><option value="">+ Filter</option></select>
+    <span id="chips"></span>
+    <label class="check"><input type="checkbox" id="test"> Show test visits</label>
+    <span class="status" id="status" aria-live="polite"></span>
+  </div>
+
+  <main id="main"></main>
+
+  <dialog id="customize">
+    <form method="dialog" class="dlg">
+      <header><h2>Customize</h2><button class="x" value="close" aria-label="Close">×</button></header>
+      <section>
+        <h3>Sections and charts</h3>
+        <p class="muted">Untick to hide. Arrows move a section. Saved for you on any device.</p>
+        <div id="panelList"></div>
+      </section>
+      <section>
+        <h3>Add your own chart</h3>
+        <div class="builder">
+          <label>Title<input id="cTitle" type="text" placeholder="e.g. Downloads by country"></label>
+          <label>What<select id="cEvent"></select></label>
+          <label>Count<select id="cMeasure">
+            <option value="visitors">Visitors (unique)</option><option value="events">Times it happened</option>
+            <option value="visits">Visits (unique)</option><option value="total">Sum of value (seconds, %, step)</option>
+          </select></label>
+          <label>Show by<select id="cBy"></select></label>
+          <label>Split by<select id="cSplit"></select></label>
+        </div>
+        <button type="button" class="btn ink" id="cAdd">Add chart</button>
+        <div id="customList"></div>
+      </section>
+      <section>
+        <h3>Default view</h3>
+        <p class="muted">Open the dashboard with the current range, grouping and filters.</p>
+        <button type="button" class="btn" id="saveDefault">Use current view as default</button>
+        <button type="button" class="btn quiet" id="resetAll">Reset everything</button>
+      </section>
+      <section>
+        <h3>Your own visits</h3>
+        <p class="muted">To stop counting yourself, open <code>heymode.app/?notrack</code> once in each browser you use (<code>?track</code> turns it back on).</p>
+      </section>
+    </form>
+  </dialog>
+
+  <div class="tip" id="tip" role="status" hidden></div>
+</body>
+</html>

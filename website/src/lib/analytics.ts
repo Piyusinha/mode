@@ -5,13 +5,22 @@
      visitor. Another browser, a private window or clearing site data starts a new one.
    - Visit: a random ID for this browser tab (sessionStorage).
    - Browsers that send Do Not Track or Global Privacy Control are not counted.
+   - heymode.app/?notrack stops counting this browser for good (for the site's owner); ?track turns it back on.
 
    Any element with data-ev="event" is tracked on click, with data-where / data-target / data-detail.
    Sections with data-section="name" send section_view once, the first time half of it is on screen. */
 
 type Ev = { e: string; p?: string; a?: string; t?: string; d?: string; x?: string; val?: number };
 
-const off = typeof navigator !== 'undefined' && (navigator.doNotTrack === '1' || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true);
+const optOut = (() => {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('notrack')) localStorage.setItem('mode.notrack', '1');
+    if (q.has('track')) localStorage.removeItem('mode.notrack');
+    return localStorage.getItem('mode.notrack') === '1';
+  } catch { return false; }
+})();
+const off = optOut || (typeof navigator !== 'undefined' && (navigator.doNotTrack === '1' || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true));
 
 const store = (kind: 'local' | 'session', key: string, make: () => string): [string, boolean] => {
   try {
