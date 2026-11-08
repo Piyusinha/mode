@@ -63,6 +63,7 @@ public object Helper {
         "start" -> start(parts[1].toInt(), parts[2])
         "key" -> key(parts[1].toInt(), parts[2].toInt())
         "bring" -> bring(parts[1].toInt())
+        "top" -> topTask(parts[1].toInt())?.let { "top $it" } ?: "error nothing on display ${parts[1]}"
         "send" -> move(parts[1].toInt(), parts[2].toInt()).let { if (it == null) "sent" else "error $it" }
         "release" -> {
             release()
@@ -123,12 +124,15 @@ public object Helper {
 
     /** Moves the top task of [displayId] to the user's screen (a private step only they can do, or take over). */
     private fun bring(displayId: Int): String {
-        val list = run("cmd", "activity", "stack", "list") ?: return "error no task list"
-        // "RootTask id=87 bounds=[…] displayId=11 …": the first one on that display is its top task.
-        val task = list.lineSequence().mapNotNull { ROOT_TASK.find(it) }
-            .firstOrNull { it.groupValues[2].toInt() == displayId }?.groupValues?.get(1)?.toInt()
-            ?: return "error nothing on display $displayId"
+        val task = topTask(displayId) ?: return "error nothing on display $displayId"
         return move(task, USER_DISPLAY)?.let { "error $it" } ?: "brought $task"
+    }
+
+    /** The top task on [displayId]: "RootTask id=87 bounds=[…] displayId=11 …", the first one listed for it. */
+    private fun topTask(displayId: Int): Int? {
+        val list = run("cmd", "activity", "stack", "list") ?: return null
+        return list.lineSequence().mapNotNull { ROOT_TASK.find(it) }
+            .firstOrNull { it.groupValues[2].toInt() == displayId }?.groupValues?.get(1)?.toInt()
     }
 
     /** Null when moved, else why not. */

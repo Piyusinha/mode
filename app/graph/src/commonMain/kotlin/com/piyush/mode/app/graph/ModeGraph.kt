@@ -150,7 +150,7 @@ class ModeGraph(platform: PlatformServices) {
         appInfo = platform.appInfo,
         activity = activity,
         scope = scope,
-        memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
+        memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory, platform.profile.deviceWord), taskHistory, ::startOfTodayMillis),
         voices = voices,
         telemetry = telemetry,
         narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),

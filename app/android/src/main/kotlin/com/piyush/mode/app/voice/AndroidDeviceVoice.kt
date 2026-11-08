@@ -84,7 +84,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
             cancel = ::cancel,
             prepare = { scope.launch { ActivityBridge.requestPermission(Manifest.permission.RECORD_AUDIO) } },
             listen = ::listen,
-            hush = { tts.stop() },
+            hush = ::hush,
         )
     }
 
@@ -103,8 +103,23 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         tts.voices?.firstOrNull { it.name == voiceId }?.let { tts.voice = it }
         tts.setSpeechRate(speed.toFloat())
         val id = UUID.randomUUID().toString()
+        // QUEUE_FLUSH drops whatever was still being said: those lines are over.
+        finishAllSpeaking()
         synchronized(speaking) { speaking[id] = done }
         if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finishSpeaking(id, false)
+    }
+
+    /** Stops speaking: every line still being said ends now (not every engine reports a stopped line). */
+    private fun hush() {
+        tts.stop()
+        finishAllSpeaking()
+    }
+
+    private fun finishAllSpeaking() {
+        val pending = synchronized(speaking) { speaking.values.toList().also { speaking.clear() } }
+        if (pending.isEmpty()) return
+        VoiceLevel.speaking.value = false
+        main.post { pending.forEach { it(false) } }
     }
 
     private fun finishSpeaking(id: String, ok: Boolean) {
@@ -310,7 +325,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     }
 
     private fun cancel() {
-        tts.stop()
+        hush()
         VoiceLevel.stopped()
         VoiceLevel.speaking.value = false
         recording?.cancel()

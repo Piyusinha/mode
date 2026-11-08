@@ -36,6 +36,8 @@ import kotlinx.serialization.json.putJsonObject
 public class Reflector(
     private val llm: LlmClient,
     private val memory: MemoryRepository,
+    /** The phone Mode runs on, as the prompt names it ("iPhone", "Android phone"). */
+    private val device: String = "iPhone",
 ) {
     public enum class Outcome { Done, GaveUp, Stopped, Failed }
 
@@ -185,7 +187,7 @@ public class Reflector(
             known.forEach { append("- id=").append(it.id).append(" [").append(it.kind.stored).append("] ").append(it.title).append(": ").append(it.text.replace('\n', ' ')).append('\n') }
             append("\nThe screenshot is the final screen. Decide what to remember and call save_memory.")
         }
-        return listOf(ChatMessage("system", SYSTEM), ChatMessage("user", user, input.finalScreen))
+        return listOf(ChatMessage("system", SYSTEM.onDevice(device)), ChatMessage("user", user, input.finalScreen))
     }
 
     private fun JsonObject.str(name: String): String = (this[name] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()

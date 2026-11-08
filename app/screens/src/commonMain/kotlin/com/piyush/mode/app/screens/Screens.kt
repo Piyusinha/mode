@@ -120,12 +120,12 @@ public class Screens(
     /** Mode's first words when started by voice, written by the fast model with what's coming up in their day. */
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Greeter(llm, memory) {
+            com.piyush.mode.feature.memory.data.Greeter(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 com.piyush.mode.feature.settings.domain.ProviderModels.fast(
                     s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
                 )
-            }
+            })
         }
     }
 
@@ -155,13 +155,13 @@ public class Screens(
     /** What Mode says when handed a spoken task, written by the fast model (phone control's). */
     private val acknowledger: com.piyush.mode.feature.memory.data.Acknowledger? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Acknowledger(llm, memory) {
+            com.piyush.mode.feature.memory.data.Acknowledger(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 // One spoken line needs no thinking: the model's lowest effort, so it comes back in time.
                 com.piyush.mode.feature.settings.domain.ProviderModels.fast(
                     s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
                 )
-            }
+            })
         }
     }
 
@@ -207,10 +207,10 @@ public class Screens(
     /** Turns what the user teaches into tips, written by the brain's model. */
     private val teacher: com.piyush.mode.feature.memory.data.Teacher? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Teacher(llm, memory) {
+            com.piyush.mode.feature.memory.data.Teacher(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 (s.strongModel ?: s.model) to s.provider
-            }
+            })
         }
     }
 

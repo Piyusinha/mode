@@ -17,6 +17,7 @@ public object HelperCommand {
     public const val KEY_HOME: Int = 3
     public fun key(displayId: Int, keyCode: Int): String = "key $displayId $keyCode"
     public fun bring(displayId: Int): String = "bring $displayId"
+    public fun top(displayId: Int): String = "top $displayId"
     public fun send(taskId: Int, displayId: Int): String = "send $taskId $displayId"
 }
 
@@ -29,5 +30,8 @@ public object HelperAnswer {
     public fun ok(answer: String): Boolean = !answer.startsWith("error")
 
     /** The task moved to the user's screen, from "brought 87". */
+    /** The top task on a display, from "top 87". */
+    public fun topTask(answer: String): Int? = answer.takeIf { it.startsWith("top ") }?.substringAfter(' ')?.trim()?.toIntOrNull()
+
     public fun broughtTask(answer: String): Int? = answer.takeIf { it.startsWith("brought ") }?.substringAfter(' ')?.trim()?.toIntOrNull()
 }

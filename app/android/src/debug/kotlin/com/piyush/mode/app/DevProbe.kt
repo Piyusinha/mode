@@ -41,6 +41,21 @@ class DevProbe : BroadcastReceiver() {
                         val asked = manager.requestPinAppWidget(android.content.ComponentName(context, com.piyush.mode.app.widget.ModeWidget::class.java), null, null)
                         "pin asked: $asked"
                     }
+                    // The agent overlay over whatever app is in front: --es task "…" starts with that task.
+                    "overlay" -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        val app = context.applicationContext as android.app.Application
+                        "summoned=${com.piyush.mode.app.overlay.OverlayController.summon(app, intent.getStringExtra("task"), "probe")}"
+                    }
+                    // Words for the overlay's conversation, as if said: --es text "…"
+                    "heard" -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        com.piyush.mode.app.overlay.OverlayController.say(intent.getStringExtra("text") ?: "")
+                        "heard"
+                    }
+                    // What the overlay shows now (or that it's closed): --ez close true closes it.
+                    "overlaystate" -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (intent.getBooleanExtra("close", false)) com.piyush.mode.app.overlay.OverlayController.close("probe")
+                        com.piyush.mode.app.overlay.OverlayController.describe()
+                    }
                     // A question notification, as a task would post it (kind: YesNo, YesNoAlways, Choice, Text, YourTurn).
                     "ask" -> {
                         val kind = com.piyush.mode.core.platform.QuestionKind.valueOf(intent.getStringExtra("kind") ?: "YesNo")
@@ -64,7 +79,20 @@ class DevProbe : BroadcastReceiver() {
                         val shot = backend.send(Op.ScreenCapture(maxSize = 1000)).jsonObject
                         val text = backend.send(Op.ScreenText()) as JsonArray
                         "display=$d bounds=${shot["bounds"]} private=${shot["private"]} jpeg=${shot["jpeg_b64"]?.toString()?.length} texts=${text.size}: " +
-                            text.take(12).joinToString(" | ") { it.jsonObject["text"].toString() + "@" + it.jsonObject["x"] + "," + it.jsonObject["y"] }
+                            text.take(intent.getIntExtra("n", 12)).joinToString(" | ") { it.jsonObject["text"].toString() + "@" + it.jsonObject["x"] + "," + it.jsonObject["y"] }
+                    }
+                    // The text field typing would go to on a display: --ei display 2 (a tap with x/y first)
+                    "focus" -> {
+                        val service = com.piyush.mode.android.ServiceRegistry.service.value ?: error("phone control is off")
+                        val d = intent.getIntExtra("display", 0)
+                        if (intent.hasExtra("x")) {
+                            val backend = com.piyush.mode.android.AccessibilityBackend(service, com.piyush.mode.android.AndroidImageTools(service::bitmapFor), displayId = d)
+                            backend.send(Op.Tap(intent.getFloatExtra("x", 0f).toDouble(), intent.getFloatExtra("y", 0f).toDouble()))
+                            kotlinx.coroutines.delay(800)
+                        }
+                        val global = service.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT)
+                        "front=${service.appInFront(d)} field=${service.focusedEditable(d)?.let { it.className + " '" + it.text + "'" }} " +
+                            "global=${global?.className}@${global?.window?.displayId} editable=${global?.isEditable}"
                     }
                     // Background mode's link: --es code 123456 pairs (Wireless debugging's pairing window open),
                     // then connects and runs `id` as the shell user.

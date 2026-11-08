@@ -25,9 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -55,7 +57,7 @@ public fun ModeOverlaySheet(modifier: Modifier = Modifier, content: @Composable 
     val c = Mode.colors
     val shape = RoundedCornerShape(ModeRadius.overlay)
     Box(modifier.fillMaxWidth().padding(ModeSpacing.s)) {
-        Box(Modifier.matchParentSize().blur(ModeSize.overlayGlowBlur).alpha(GLOW_ALPHA).background(glow(), shape))
+        Glow(shape)
         Column(
             Modifier.fillMaxWidth().clip(shape).background(c.card, shape).border(ModeSize.overlayRing, c.separator, shape)
                 .padding(start = ModeSpacing.l, end = ModeSpacing.l, top = ModeSpacing.l, bottom = ModeSpacing.m),
@@ -63,6 +65,15 @@ public fun ModeOverlaySheet(modifier: Modifier = Modifier, content: @Composable 
             content = content,
         )
     }
+}
+
+/** The soft glow behind the sheet or bar: blurred past its own edge, so it follows the curve, with no box round it. */
+@Composable
+private fun BoxScope.Glow(shape: RoundedCornerShape) {
+    Box(
+        Modifier.matchParentSize().padding(ModeSize.overlayGlowInset)
+            .blur(ModeSize.overlayGlowBlur, BlurredEdgeTreatment.Unbounded).alpha(GLOW_ALPHA).background(glow(), shape),
+    )
 }
 
 /** How the overlay's status reads: its dot and words. */
@@ -108,9 +119,21 @@ public fun ModeOverlayHeader(
             }
             if (sub.isNotEmpty()) ModeText(sub, ModeTextStyle.Footnote, color = c.textSecondary, maxLines = 1)
         }
-        ModeIconButton(ModeIcon.Chevron, slimLabel, onSlim)
-        ModeIconButton(ModeIcon.Close, closeLabel, onClose)
+        HeaderButton(ModeIcon.Chevron, slimLabel, onSlim, QUARTER_TURN)
+        HeaderButton(ModeIcon.Close, closeLabel, onClose)
     }
+}
+
+/** A round grey button in the sheet's header (shrink points down). */
+@Composable
+private fun HeaderButton(icon: ModeIcon, label: String, onClick: () -> Unit, turn: Float = 0f) {
+    val c = Mode.colors
+    val (press, alpha) = rememberPress()
+    Box(
+        Modifier.size(ModeSize.touch).alpha(alpha).background(c.fill, CircleShape).semantics { contentDescription = label }
+            .clickable(press, indication = null, role = Role.Button, onClick = onClick),
+        Alignment.Center,
+    ) { ModeIconImage(icon, ModeIconSize.small, c.textPrimary, Modifier.rotate(turn)) }
 }
 
 /** A chip Mode suggests or offers ("Read today's calendar", "Try again"): tapping it is like saying it. */
@@ -212,7 +235,7 @@ public fun ModeOverlayBar(
     val working = kind == ModeOverlayBarKind.Working
     val shape = RoundedCornerShape(ModeRadius.overlay)
     Box(modifier.fillMaxWidth().padding(ModeSpacing.s)) {
-        Box(Modifier.matchParentSize().blur(ModeSize.overlayGlowBlur).alpha(GLOW_ALPHA).background(glow(), shape))
+        Glow(shape)
         Row(
             Modifier.fillMaxWidth().height(ModeSize.overlayBar).clip(shape).background(if (working) c.hero else c.card, shape)
                 .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onMain)
@@ -230,7 +253,7 @@ public fun ModeOverlayBar(
                     Modifier.size(ModeSize.touch).background(c.heroFill, CircleShape).semantics { contentDescription = expandLabel }
                         .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onMain),
                     Alignment.Center,
-                ) { ModeIconImage(ModeIcon.Chevron, ModeIconSize.small, c.heroText) }
+                ) { ModeIconImage(ModeIcon.Chevron, ModeIconSize.small, c.heroText, Modifier.rotate(-QUARTER_TURN)) }
                 Box(
                     Modifier.size(ModeSize.touch).background(c.stopRed, CircleShape).semantics { contentDescription = action }
                         .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onAction),
@@ -291,5 +314,6 @@ public fun ModeOverlayLine(text: String, modifier: Modifier = Modifier, quiet: B
 }
 
 private const val GLOW_ALPHA = 0.55f
+private const val QUARTER_TURN = 90f
 private const val GLOW_SPREAD = 6f
 private const val STRIP_BARS = 8

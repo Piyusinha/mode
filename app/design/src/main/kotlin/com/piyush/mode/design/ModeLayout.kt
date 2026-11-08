@@ -220,6 +220,8 @@ public object ModeSize {
     public val overlayChip: Dp = 40.dp
     public val overlayAnswer: Dp = 46.dp
     public val overlayGlowBlur: Dp = 14.dp
+    /** The glow starts a little inside the sheet, so blurred it peeks out evenly all round. */
+    public val overlayGlowInset: Dp = 2.dp
     public val overlayGlowEdge: Dp = 3.dp
     public val overlayRing: Dp = 1.5.dp
     public val overlayBubbleMax: Dp = 220.dp

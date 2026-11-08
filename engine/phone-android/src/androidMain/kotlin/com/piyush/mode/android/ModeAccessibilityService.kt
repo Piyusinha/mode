@@ -107,6 +107,16 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
         }.filter { it.kind != WindowKind.Other || it.root != null }
     }
 
+    /**
+     * The app in front on [displayId] (its package), null when none: a quick look that leaves what the agent is
+     * reading alone (unlike [windows]).
+     */
+    fun appInFront(displayId: Int): String? {
+        // Not `windows`: with a hidden display that is the list of whichever display was touched last.
+        val list = windowsOnAllDisplays.get(displayId).orEmpty()
+        return list.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }.maxByOrNull { it.layer }?.root?.packageName?.toString()
+    }
+
     /** Mode's own overlay window (the agent overlay): the agent never reads or acts on it. */
     private fun isOwnOverlay(window: AccessibilityWindowInfo): Boolean =
         window.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && window.root?.packageName == packageName
@@ -223,10 +233,25 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
     )
 
     override fun focusedEditable(displayId: Int): NodeSnapshot? = synchronized(nodes) {
-        val focus = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
-        if (!focus.isEditable) return null
-        if (displayId != Display.DEFAULT_DISPLAY && focus.window?.displayId != displayId) return null
+        typingDisplay = displayId
+        val focus = inputFocus(displayId) ?: return null
         snapshot(focus, depth = MAX_DEPTH, budget = intArrayOf(1))
+    }
+
+    /** The display Mode last looked for a text field on (its field is the one typing goes to). */
+    @Volatile private var typingDisplay = Display.DEFAULT_DISPLAY
+
+    /**
+     * The text field with the keyboard's focus on [displayId]. The phone-wide focus follows the display the user last
+     * touched (their own screen, or Mode's overlay on it), so a hidden display's field is looked up in its own windows.
+     */
+    private fun inputFocus(displayId: Int): AccessibilityNodeInfo? {
+        if (displayId == Display.DEFAULT_DISPLAY) return findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+        val global = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (global != null && global.isEditable && global.window?.displayId == displayId) return global
+        return windowsOnAllDisplays.get(displayId).orEmpty()
+            .sortedByDescending { it.isFocused }
+            .firstNotNullOfOrNull { window -> window.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable } }
     }
 
     override fun setText(node: NodeSnapshot, text: String): Boolean {
@@ -252,7 +277,7 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
 
     private fun live(node: NodeSnapshot): AccessibilityNodeInfo? =
         synchronized(nodes) { nodes[node.id] }?.takeIf { it.refresh() }
-            ?: findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+            ?: inputFocus(typingDisplay)
 
     // Apps ------------------------------------------------------------------------------------
 

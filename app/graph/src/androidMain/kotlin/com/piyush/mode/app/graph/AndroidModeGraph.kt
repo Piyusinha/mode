@@ -44,6 +44,7 @@ fun androidModeGraph(
     openApp: () -> Intent,
     notifierWords: com.piyush.mode.core.platform.NotifierWords? = null,
     notifierHooks: com.piyush.mode.core.platform.NotifierHooks? = null,
+    presence: com.piyush.mode.core.platform.ModePresence = com.piyush.mode.core.platform.ModePresence.None,
 ): ModeGraph {
     val files = JavaFileStore(File(app.filesDir, "logs"))
     AppLog.install { line ->
@@ -81,7 +82,7 @@ fun androidModeGraph(
             secrets = KeystoreSecretStore(app),
             prefs = prefs,
             files = files,
-            notifier = AndroidNotifier(app, notificationIcon, openApp, notifierWords, notifierHooks),
+            notifier = AndroidNotifier(app, notificationIcon, openApp, notifierWords, notifierHooks, presence),
             background = AndroidBackgroundWork(app),
             // In background mode a locked phone needn't hold tasks back: the hidden display is always unlocked.
             deviceLock = background?.let { HiddenDisplayLock(AndroidDeviceLock(app), it, exportScope) } ?: AndroidDeviceLock(app),
@@ -98,6 +99,7 @@ fun androidModeGraph(
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
             profile = com.piyush.mode.agent.PhoneProfile.Android,
+            presence = presence,
         ),
     )
 }

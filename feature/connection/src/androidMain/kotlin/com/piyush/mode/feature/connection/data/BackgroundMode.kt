@@ -104,6 +104,25 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
         return ok
     }
 
+    /**
+     * The user opened, on their own screen, the app Mode was using: Android moved its task there (an app has one
+     * window). Remembers that task so [giveBack] returns it to the hidden display.
+     */
+    public suspend fun userOpenedIt(): Boolean {
+        if (withUser != null) return true
+        val session = helper ?: return false
+        val task = HelperAnswer.topTask(session.send(HelperCommand.top(USER_DISPLAY))) ?: return false
+        withUser = task
+        AppLog.log("background", "the user opened the app Mode was using")
+        return true
+    }
+
+    /** The app Mode was using is on the user's screen (their turn, they took over, or they opened it). */
+    public val withTheUser: Boolean get() = withUser != null
+
+    /** The hidden display, while there is one. */
+    public val hiddenDisplay: Int? get() = display
+
     /** A task is on the hidden display right now. */
     public val working: Boolean get() = display != null && helper?.open == true
 
@@ -138,6 +157,7 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
 
     public companion object {
         private const val ENABLED = "background.enabled"
+        private const val USER_DISPLAY = 0
         private const val PORT = "background.port"
         private const val ADB_WIFI = "adb_wifi_enabled"
         private const val STARTING_TRIES = 3

@@ -49,7 +49,7 @@ class ModeApplication : Application() {
         )
         graph = androidModeGraph(this, R.drawable.ic_mode_notification, {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }, words, hooks)
+        }, words, hooks, com.piyush.mode.app.overlay.OverlayPresence)
         // The working notification: opens Mode, and Stop ends the task.
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         WorkNotice.content = WorkNotice.plain(
@@ -60,6 +60,9 @@ class ModeApplication : Application() {
             stop = PendingIntent.getBroadcast(this, 0, Intent(this, StopReceiver::class.java), flags),
         )
         followTheRunningTask()
+        com.piyush.mode.app.graph.background?.let {
+            com.piyush.mode.app.background.UserTakeover.watch(it, graph.screens.liveActivity(), graph.screens.liveRun(), packageName)
+        }
     }
 
     /** A task is running on the hidden screen: Mode shrinks to a small window when the user leaves it. */

@@ -53,6 +53,8 @@ public class AndroidNotifier(
     private val openApp: () -> Intent,
     private val words: NotifierWords? = null,
     private val hooks: NotifierHooks? = null,
+    /** While Mode's overlay shows, it asks the questions itself. */
+    private val presence: ModePresence = ModePresence.None,
 ) : Notifier {
     private val app = context.applicationContext
     private val manager = app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -89,6 +91,8 @@ public class AndroidNotifier(
     override fun ask(id: String, text: String, kind: QuestionKind, options: List<String>) {
         val w = words
         val h = hooks
+        // Mode's overlay over the user's app is asking (and listening): a notification too would only pull Mode's app up.
+        if (presence.overlay) return
         if (!allowed || w == null || h == null) return super.ask(id, text, kind, options)
         val open = PendingIntent.getActivity(app, id.hashCode(), openApp(), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val builder = base(QUESTIONS, if (kind == QuestionKind.YourTurn) w.yourTurn else w.needsYou, text)

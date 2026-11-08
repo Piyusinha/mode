@@ -126,6 +126,9 @@ public data class VoiceNotice(val provider: String, val hearing: Boolean, val tr
     }
 }
 
+/** The entry for Mode's agent overlay over the user's app (Android): a hands-free session that speaks typed tasks too. */
+public const val OVERLAY_ENTRY: String = "overlay"
+
 public class ListenPresenter(
     parent: CoroutineScope,
     private val voices: Voices,
@@ -604,7 +607,7 @@ public class ListenPresenter(
 
     internal companion object {
         /** How talking mode opened when it should carry on after a task: Siri, Android's assistant, Ask's mic. */
-        const val OVERLAY = "overlay"
+        const val OVERLAY = OVERLAY_ENTRY
         val SESSION_ENTRIES = setOf("siri", "assistant", "ask_mic", OVERLAY)
         const val ANYTHING_ELSE = "Anything else?"
         const val PART_DONE = "I did part of it. Anything else?"

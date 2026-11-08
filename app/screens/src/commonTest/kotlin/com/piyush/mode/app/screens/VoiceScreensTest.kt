@@ -167,7 +167,7 @@ class VoiceScreensTest {
                     put("line", kotlinx.serialization.json.JsonPrimitive("On it, Alex. Dark Mode, coming right up."))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             acknowledger = ack)
 
@@ -190,7 +190,7 @@ class VoiceScreensTest {
                     put("line", kotlinx.serialization.json.JsonPrimitive(greeting))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val day = com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20", events = listOf("Thu 6 Nov 19:00–21:00 · Dinner with Priya"))
         val before = DeviceVoice.hearingState
         DeviceVoice.hearingState = { "ready" }
@@ -237,7 +237,7 @@ class VoiceScreensTest {
                     }
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        return com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        return com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
     }
 
     @Test

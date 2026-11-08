@@ -28,6 +28,8 @@ public class Acknowledger(
     private val memory: MemoryRepository?,
     /** The fast model (phone control's) and its provider: the line has to come back in about a second. */
     private val model: () -> Pair<String, ModelProvider>?,
+    /** The phone Mode runs on, as the prompt names it ("iPhone", "Android phone"). */
+    private val device: String = "iPhone",
 ) {
     /** The model the last line was asked of ("gpt-6-luna@low"), for the log. */
     public var lastModel: String? = null
@@ -60,7 +62,7 @@ public class Acknowledger(
                     if (!private && day.isNotEmpty()) append("THEIR CALENDAR FROM NOW:\n").append(day.take(EVENTS).joinToString("\n") { "- $it" }).append('\n')
                     append("WHAT THEY JUST ASKED: ").append(said)
                 }
-                val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
+                val system = (language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM).onDevice(device)
                 val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 ((args?.get("line") as? JsonPrimitive)?.contentOrNull ?: reply.text).let(::clean)

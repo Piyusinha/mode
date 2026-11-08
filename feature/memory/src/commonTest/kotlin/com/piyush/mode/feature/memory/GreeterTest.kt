@@ -67,7 +67,7 @@ class GreeterTest {
     @Test
     fun aSlowOrUnusableAnswerFallsBackToModesOwnGreeting() = runTest {
         assertNull(Greeter(Model("Too late.", waitMs = Greeter.BUDGET_MS + 500), memory, fast).line("Alex", 18, evening))
-        assertNull(Greeter(Model("x"), memory) { null }.line("Alex", 18, evening), "no AI connected")
+        assertNull(Greeter(Model("x"), memory, model = { null }).line("Alex", 18, evening), "no AI connected")
         assertNull(Greeter(Model((1..40).joinToString(" ") { "word" }), memory, fast).line("Alex", 18, evening), "too long to say")
     }
 

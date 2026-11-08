@@ -39,7 +39,7 @@ class TeacherTest {
                 ))), "", Usage(10, 5, 0.0),
             )
         }
-        val lesson = Teacher(llm, memory) { "m" to ModelProvider.OpenRouter }.teach("Next time use Control Center for this", "Turn off Dark Mode")!!
+        val lesson = Teacher(llm, memory, model = { "m" to ModelProvider.OpenRouter }).teach("Next time use Control Center for this", "Turn off Dark Mode")!!
         assertEquals("Got it. Next time I'll switch Dark Mode from Control Center.", lesson.reply)
         val tip = memory.ofKind(MemoryKind.Tip).single()
         assertEquals("Settings", tip.app)
@@ -51,7 +51,7 @@ class TeacherTest {
     fun withoutTheModelTheirWordsAreKept() = runTest {
         val memory = MemoryRepository(com.piyush.mode.testing.testDatabase())
         val offline = LlmClient { _, _, _ -> error("offline") }
-        val lesson = Teacher(offline, memory) { "m" to ModelProvider.OpenRouter }.teach("Always search Settings for Dark Mode", "Turn off Dark Mode", "step 8: scroll up")!!
+        val lesson = Teacher(offline, memory, model = { "m" to ModelProvider.OpenRouter }).teach("Always search Settings for Dark Mode", "Turn off Dark Mode", "step 8: scroll up")!!
         assertEquals("Always search Settings for Dark Mode", lesson.item.text)
         assertTrue("step 8" in lesson.item.evidence)
     }
