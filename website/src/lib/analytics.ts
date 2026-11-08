@@ -8,7 +8,7 @@
    - heymode.app/?notrack stops counting this browser for good (for the site's owner); ?track turns it back on.
 
    Any element with data-ev="event" is tracked on click, with data-where / data-target / data-detail.
-   Sections with data-section="name" send section_view once, the first time half of it is on screen. */
+   Sections with data-section="name" send section_view once, the first time it reaches the middle of the screen. */
 
 type Ev = { e: string; p?: string; a?: string; t?: string; d?: string; x?: string; val?: number };
 
@@ -87,6 +87,8 @@ export function startAnalytics() {
     if (!el) return;
     const d = el.dataset;
     track(d.ev!, { a: d.where, t: d.target, d: d.detail });
+    // Send right away: a tap often starts a navigation or a download, and a delayed send can be lost.
+    clearTimeout(timer); flush();
   }, true);
 
   // Scroll depth: 25 / 50 / 75 / 100 % of the page, once each.
@@ -97,10 +99,10 @@ export function startAnalytics() {
   };
   addEventListener('scroll', depth, { passive: true });
 
-  // Sections seen (half on screen), once each.
+  // Sections seen: once a section reaches the middle of the screen (works for sections taller than the screen too).
   const io = new IntersectionObserver((es) => es.forEach((x) => {
     if (x.isIntersecting) { const n = (x.target as HTMLElement).dataset.section!; trackOnce(`sec-${n}`, 'section_view', { t: n }); io.unobserve(x.target); }
-  }), { threshold: 0.3 });
+  }), { rootMargin: '-50% 0px -50% 0px' });
   const watchSections = () => document.querySelectorAll('[data-section]').forEach((el) => io.observe(el));
   watchSections(); setTimeout(watchSections, 1500);
 

@@ -206,7 +206,7 @@ const SECTIONS = [
   { id: 'funnel', title: 'Getting to a download', panels: [
     { id: 'reach', title: 'How far visitors get', sub: 'Unique visitors who did each thing, as a share of everyone who visited.', w: 6, html: () => reachBars(), csv: () => reach() },
     { id: 'rate', title: 'Download rates', w: 6, html: () => { const v = ev('page_view').u || 0; return tiles([
-      { label: 'Visitors who clicked download', text: pct(fun('download_click') + fun('release_download'), v), value: 0 },
+      { label: 'Visitors who clicked download', text: pct(data.funnelClick?.[0]?.u ?? fun('download_click') + fun('release_download'), v), value: 0 },
       { label: 'Visitors whose download started', text: pct(fun('download_sent'), v), value: 0 },
       { label: 'Clicks that became downloads', text: pct(ev('download_sent').v, ev('download_click').n + ev('release_download').n), value: 0 },
       { label: 'Downloads from links outside the site', value: data.downloadsFrom.filter((d) => !d.button).reduce((a, d) => a + d.n, 0) },
@@ -287,7 +287,7 @@ const trendCsv = () => { const s = trend(); return s[0].points.map((p, i) => Obj
 function reach() {
   return [
     ['Visited', ev('page_view').u], ['Film played', fun('film_play')], ['Turned film sound on', fun('film_sound')], ['Started the tour', fun('tour_step')],
-    ['Finished the tour', fun('tour_complete')], ['Saw the download section', data.funnelGet[0]?.u || 0], ['Clicked download', fun('download_click') + fun('release_download')],
+    ['Finished the tour', fun('tour_complete')], ['Saw the download section', data.funnelGet[0]?.u || 0], ['Clicked download', data.funnelClick?.[0]?.u ?? fun('download_click') + fun('release_download')],
     ['Download started', fun('download_sent')],
   ].map(([step, visitors]) => ({ step, visitors }));
 }
@@ -411,7 +411,7 @@ async function loadOptions() {
   try {
     const o = await api(`/api/options?${query()}`);
     $('addFilter').innerHTML = '<option value="">+ Filter</option>' + FILTER_FIELDS.map((f) => `<optgroup label="${esc(FIELD_NAMES[f])}">${(o[f] || []).map((r) =>
-      `<option value="${esc(f)}\u0000${esc(r.k)}">${esc(f === 'country' ? countryName(r.k) : none(r.k))} (${fmt(r.u)})</option>`).join('')}</optgroup>`).join('');
+      `<option value="${esc(f)}=${esc(encodeURIComponent(r.k))}">${esc(f === 'country' ? countryName(r.k) : none(r.k))} (${fmt(r.u)})</option>`).join('')}</optgroup>`).join('');
   } catch { /* the menu just stays empty */ }
 }
 
@@ -441,7 +441,12 @@ for (const id of ['from', 'to']) $(id).addEventListener('change', () => {
 $('step').addEventListener('change', () => { state.step = $('step').value; load(); });
 $('test').addEventListener('change', () => { state.test = $('test').checked; load(); });
 $('refresh').addEventListener('click', load);
-$('addFilter').addEventListener('change', (e) => { const [k, v] = e.target.value.split('\u0000'); if (k) { state.filters[k] = v ?? ''; load(); } e.target.value = ''; });
+$('addFilter').addEventListener('change', (e) => {
+  const s = e.target.value, i = s.indexOf('='); e.target.value = '';
+  if (i < 1) return;
+  const k = s.slice(0, i); if (!FILTER_FIELDS.includes(k)) return;
+  state.filters[k] = decodeURIComponent(s.slice(i + 1)); load();
+});
 
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-unfilter],[data-filter],[data-hide],[data-csv],[data-line]');

@@ -86,6 +86,8 @@ export async function report(env, s) {
     series: `SELECT toUnixTimestamp(toStartOfInterval(timestamp, ${s.step})) AS t, blob1 AS e, SUM(_sample_interval) AS n, count(DISTINCT blob3) AS u ${F} ${W(s, "blob1 IN ('page_view', 'download_click', 'release_download', 'download_sent')")} GROUP BY t, e ORDER BY t`,
     funnel: `SELECT blob1 AS e, count(DISTINCT blob3) AS u ${F} ${W(s, "blob3 != ''", "blob1 IN ('page_view', 'film_play', 'film_sound', 'tour_step', 'tour_complete', 'download_click', 'release_download', 'download_sent')")} GROUP BY e`,
     funnelGet: `SELECT count(DISTINCT blob3) AS u ${F} ${W(s, "blob1 = 'section_view'", "blob15 = 'get'")}`,
+    // a visitor whose download started clearly clicked, even if the click event itself was lost
+    funnelClick: `SELECT count(DISTINCT blob3) AS u ${F} ${W(s, "blob3 != ''", "blob1 IN ('download_click', 'release_download', 'download_sent')")}`,
     downloads: `SELECT blob16 AS version, blob17 AS file, blob15 AS how, double1 AS ready, SUM(_sample_interval) AS n ${F} ${W(s, "blob1 = 'download_sent'")} GROUP BY version, file, how, ready ORDER BY n DESC`,
     downloadsFrom: `SELECT blob9 AS site, blob14 AS button, SUM(_sample_interval) AS n ${F} ${W(s, "blob1 = 'download_sent'")} GROUP BY site, button ORDER BY n DESC LIMIT 50`,
     buttons: `SELECT blob1 AS e, blob14 AS place, blob15 AS target, blob16 AS detail, SUM(_sample_interval) AS n, count(DISTINCT blob3) AS u ${F} ${W(s, "blob1 IN ('download_click', 'release_download', 'get_mode_click')")} GROUP BY e, place, target, detail ORDER BY n DESC LIMIT 200`,
