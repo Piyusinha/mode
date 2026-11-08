@@ -57,6 +57,8 @@ fun HealthRoute(graph: ModeGraph, pages: SystemPages, navigate: (Route) -> Unit,
             "listening" -> navigate(Route.Listening)
             "providers" -> navigate(Route.Settings)
             "phone-setup" -> navigate(Route.PhoneSetup)
+            "background" -> navigate(Route.Background)
+            "google-app" -> pages.store(GOOGLE_APP)
             else -> pages.appInfo()
         }
     }
@@ -113,6 +115,9 @@ private fun canRepair(s: HealthUiState, w: Words): String {
     }
 }
 
+/** Google's app holds the speech recognizer most phones use. */
+private const val GOOGLE_APP = "com.google.android.googlequicksearchbox"
+
 /** The iPhone's pairing, VPN and reach rows don't exist on Android. */
 private val IPHONE_ONLY = setOf(HealthItem.Paired, HealthItem.Vpn, HealthItem.Reach)
 
@@ -124,6 +129,10 @@ private fun rows(s: HealthUiState, w: Words): List<HealthRowView> = s.rows.filte
         HealthItem.Unlocked -> w.get(R.string.health_unlocked) to ModeIcon.Lock
         HealthItem.Engine -> w.get(R.string.phone_control) to ModeIcon.Tap
         HealthItem.Battery -> w.get(R.string.phone_battery) to ModeIcon.Battery
+        HealthItem.Sleeping -> w.get(R.string.phone_sleeping) to ModeIcon.Moon
+        HealthItem.Autostart -> w.get(R.string.phone_autostart) to ModeIcon.Rocket
+        HealthItem.Popups -> w.get(R.string.phone_popups) to ModeIcon.Popup
+        HealthItem.BackgroundLink -> w.get(R.string.bg_row_title) to ModeIcon.Background
         HealthItem.Screen -> w.get(R.string.health_screen) to ModeIcon.Screens
         HealthItem.Ai -> w.get(R.string.health_ai) to ModeIcon.Sparkle
         HealthItem.Actions -> w.get(R.string.health_actions) to ModeIcon.Tap

@@ -59,8 +59,8 @@ public class AccessibilityPhoneChecks(
                 if (locked(on)) CheckState.Failed("locked until restricted settings are allowed", null) else CheckState.Passed(null)),
             PhoneCheckResult(PhoneCheckId.Engine, when {
                 on && running -> CheckState.Passed(null)
-                on -> CheckState.Failed("on but not running", "Turn Mode off and on again in Settings › Accessibility.")
-                else -> CheckState.Failed("off", null)
+                on -> CheckState.Failed(DeviceStatus.ENGINE_STOPPED, "Turn Mode off and on again in Settings › Accessibility.")
+                else -> CheckState.Failed(DeviceStatus.ENGINE_OFF, null)
             }),
             PhoneCheckResult(PhoneCheckId.Battery,
                 if (power.isIgnoringBatteryOptimizations(app.packageName)) CheckState.Passed(null) else CheckState.Failed("restricted", null)),

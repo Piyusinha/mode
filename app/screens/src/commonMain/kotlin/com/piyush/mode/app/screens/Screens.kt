@@ -199,6 +199,10 @@ public class Screens(
 
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
 
+    /** The warning banner at the top (boards W01–W06); [brand] names the phone's maker when the words need it. */
+    public fun warnings(brand: () -> String? = { null }): com.piyush.mode.app.screens.home.WarningsPresenter =
+        com.piyush.mode.app.screens.home.WarningsPresenter(scope, phoneChecks, settings, lifecycle, now = clock.now, brand = brand)
+
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)
 
     public fun conversation(conversationId: String): ConversationPresenter =

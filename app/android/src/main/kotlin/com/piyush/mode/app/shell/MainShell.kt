@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import com.piyush.mode.app.R
 import com.piyush.mode.app.graph.ModeGraph
 import com.piyush.mode.app.home.HomeRoute
+import com.piyush.mode.app.home.WarningBannerHost
 import com.piyush.mode.app.home.runningWords
 import com.piyush.mode.app.run.RunStatus
 import com.piyush.mode.app.run.rememberRunStatus
@@ -73,7 +74,10 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     BackHandler(enabled = nav.stack(nav.tab).isNotEmpty()) { nav.pop() }
 
     val stack = nav.stack(nav.tab)
-    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+        // What stopped working since setup, over every tab; the page below makes room for it.
+        WarningBannerHost(graph, pages, navigate = { nav.push(it) })
+        Box(Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = nav.tab to stack.lastOrNull(),
             transitionSpec = { fadeIn(tween(ModeMotion.quickMs)) togetherWith fadeOut(tween(ModeMotion.quickMs)) },
@@ -120,6 +124,7 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
                     onClose = close,
                 )
             }
+        }
         }
     }
 }

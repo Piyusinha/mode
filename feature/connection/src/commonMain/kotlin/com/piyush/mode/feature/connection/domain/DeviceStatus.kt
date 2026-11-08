@@ -69,6 +69,10 @@ public object DeviceStatus {
 
     /** Android 14: a hidden display with its own focus. */
     public const val BACKGROUND_MIN_SDK: Int = 34
+    /** Phone control's switch is off. */
+    public const val ENGINE_OFF: String = "off"
+    /** The switch is on but Android isn't running the service (a force stop, an update, a battery manager). */
+    public const val ENGINE_STOPPED: String = "on but not running"
     public const val NO_WIFI: String = "waiting for Wi-Fi"
     public const val LINK_LOST: String = "not reachable"
     private const val SHELL = "com.android.shell"

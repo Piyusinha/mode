@@ -225,6 +225,10 @@ public object ModeSize {
     public val overlayGlowEdge: Dp = 3.dp
     public val overlayRing: Dp = 1.5.dp
     public val overlayBubbleMax: Dp = 220.dp
+
+    // The warning banner at the top (boards W01–W06).
+    public val warningIcon: Dp = 36.dp
+    public val warningIconRadius: Dp = 12.dp
     public val readableWidth: Dp = 520.dp
     public val edgeFadeTop: Dp = 120.dp
     public val edgeFadeBottom: Dp = 150.dp

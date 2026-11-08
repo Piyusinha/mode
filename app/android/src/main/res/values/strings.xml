@@ -151,6 +151,28 @@
     <string name="overlay_mic_body">Allow the microphone once, and you can talk to Mode from any app.</string>
     <string name="overlay_mic_allow">Allow microphone</string>
     <string name="overlay_time">%1$d:%2$02d</string>
+    <!-- Warnings at the top while Mode is open (boards W01–W06). -->
+    <string name="warn_close">Hide this for a few days</string>
+    <string name="warn_locked_title">Phone control is locked</string>
+    <string name="warn_locked_detail">Android locks it for apps not from the Play Store. Unlock it once.</string>
+    <string name="warn_locked_action">Unlock</string>
+    <string name="warn_off_title">Phone control is off</string>
+    <string name="warn_off_detail">Mode can’t see or tap for you until it’s on.</string>
+    <string name="warn_off_action">Turn on</string>
+    <string name="warn_stopped_title">Phone control stopped</string>
+    <string name="warn_stopped_detail">Your phone stopped Mode. Turn it off and on in Accessibility.</string>
+    <string name="warn_stopped_detail_brand">%1$s put Mode to sleep. Turn it off and on in Accessibility.</string>
+    <string name="warn_stopped_action">Fix</string>
+    <string name="warn_link_title">Background mode lost its link</string>
+    <string name="warn_link_detail">Wireless debugging went off. Tasks run on your screen for now.</string>
+    <string name="warn_link_action">Reconnect</string>
+    <string name="warn_wifi_title">Background mode is waiting for Wi-Fi</string>
+    <string name="warn_wifi_detail">Until then, Mode works on your screen.</string>
+    <string name="warn_wifi_action">Why</string>
+    <string name="warn_speech_title">No speech recognition on this phone</string>
+    <string name="warn_speech_detail">Type to Mode, or install the Google app to talk.</string>
+    <string name="warn_speech_action">How</string>
+
     <!-- The home screen widget. -->
     <string name="widget_title">What can I do for you?</string>
     <string name="widget_speak">Speak a task</string>

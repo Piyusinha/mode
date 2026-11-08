@@ -72,6 +72,13 @@ class SystemPages(private val activity: Activity) {
     /** Xiaomi's permission editor for Mode, where pop-ups in the background live (board D05). */
     fun popups() = open("background pop-ups", *brand()?.popups.orEmpty().map(::page).toTypedArray())
 
+    /** An app's page in the store (the Google app, for speech recognition). */
+    fun store(packageName: String) = open(
+        "store",
+        Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")),
+        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")),
+    )
+
     /** Wi-Fi settings: background mode's link needs a network. */
     fun wifi() = open("wi-fi", Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_WIRELESS_SETTINGS))
 

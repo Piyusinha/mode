@@ -38,10 +38,19 @@ public enum class HealthItem(public val group: String) {
     Paired("phone"), Vpn("phone"), Reach("phone"), Screen("phone"),
     /** Android: the accessibility switch's lock, the switch itself, and the battery setting. */
     Unlocked("phone"), Engine("phone"), Battery("phone"),
+    /** Android, some makers: steps the user confirmed (Mode can't read them), and background mode's link. */
+    Sleeping("phone"), Autostart("phone"), Popups("phone"), BackgroundLink("phone"),
     Ai("ai"), Actions("ai"),
     Microphone("voice"), Listening("voice"), Speaking("voice"),
     Notifications("iphone"),
 }
+
+/** Health rows for the steps the user confirms, by the check that reads them. */
+internal val MANUAL_ITEMS: Map<PhoneCheckId, HealthItem> = mapOf(
+    PhoneCheckId.Sleeping to HealthItem.Sleeping,
+    PhoneCheckId.Autostart to HealthItem.Autostart,
+    PhoneCheckId.Popups to HealthItem.Popups,
+)
 
 /** Waiting: not checked because a part before it failed (not a problem of its own). */
 public enum class HealthState { Checking, Ok, Warn, Repaired, Busy, Waiting }
@@ -136,7 +145,7 @@ public class HealthPresenter(
         HealthItem.Notifications -> permissions.request(Permission.Notifications) == PermissionStatus.Allowed
         HealthItem.Listening, HealthItem.Speaking -> { voices?.clearProblem(); false }
         // Settings the user turns on; Mode can't flip them itself.
-        HealthItem.Unlocked, HealthItem.Battery -> false
+        HealthItem.Unlocked, HealthItem.Battery, HealthItem.Sleeping, HealthItem.Autostart, HealthItem.Popups, HealthItem.BackgroundLink -> false
     }
 
     private fun set(row: HealthRow) {
@@ -194,6 +203,7 @@ public class HealthPresenter(
             set(row(HealthItem.Engine, listOf(PhoneCheckId.Engine), "On"))
             set(row(HealthItem.Screen, listOf(PhoneCheckId.Screen, PhoneCheckId.Hands), "Checked just now"))
             set(row(HealthItem.Battery, listOf(PhoneCheckId.Battery), "Unrestricted"))
+            checkDevice()
             return
         }
         val reachMs = (results.firstOrNull { it.id == PhoneCheckId.Reach }?.state as? CheckState.Passed)?.ms
@@ -236,12 +246,38 @@ public class HealthPresenter(
         })
     }
 
+    /**
+     * The maker's steps only the user can confirm, and background mode's link: from the quick status, only on a
+     * phone that has them (a plain phone, or one without background mode, shows no such rows).
+     */
+    private suspend fun checkDevice() {
+        val status = runCatching { phoneChecks.status() }.getOrDefault(emptyList()).associate { it.id to it.state }
+        MANUAL_ITEMS.forEach { (id, item) ->
+            val state = status[id] as? CheckState.Unverifiable ?: return@forEach
+            set(
+                if (state.confirmed) HealthRow(item, HealthState.Ok, "You confirmed it")
+                else HealthRow(item, HealthState.Warn, "Not confirmed yet: open it from Phone control", HealthFix.Open, "phone-setup"),
+            )
+        }
+        when (val link = status[PhoneCheckId.BackgroundLink]) {
+            is CheckState.Passed -> set(HealthRow(HealthItem.BackgroundLink, HealthState.Ok, "Linked · restarts by itself"))
+            is CheckState.Failed -> set(HealthRow(
+                HealthItem.BackgroundLink, HealthState.Warn,
+                if (link.reason == com.piyush.mode.feature.connection.domain.DeviceStatus.NO_WIFI) "Waiting for Wi-Fi: until then Mode works on your screen"
+                else "Wireless debugging can't be reached: tasks run on your screen for now",
+                HealthFix.Open, "background",
+            ))
+            else -> Unit
+        }
+    }
+
     private fun checkVoice() {
         val v = voices
         val mic = DeviceVoice.hearingState()
         set(when (mic) {
             "denied" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "Off: turn it on in ${profile.settingsPath}", HealthFix.Open, "iphone-settings")
             "permission" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "Not allowed yet", HealthFix.Repair)
+            "unsupported" -> HealthRow(HealthItem.Microphone, HealthState.Warn, "No speech recognition on this phone: type to Mode, or install the Google app", HealthFix.Open, "google-app")
             else -> HealthRow(HealthItem.Microphone, HealthState.Ok, "Allowed")
         })
         if (v == null) return
