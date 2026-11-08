@@ -583,3 +583,18 @@ the screen by phone control, with a notification as the fallback. Mode grants it
 over the link to switch Wireless debugging back on after a restart. When the hidden display isn't ready, the
 task runs on the user's screen instead, so background mode never makes a task fail. With it on, a locked
 phone doesn't hold tasks back.
+
+## D50. Device checks: verify what can be verified, confirm the rest, and warn at the top (2026-11-08)
+
+Phones differ in what stops Mode: Samsung puts unused apps to sleep, Xiaomi needs Autostart and a
+pop-up permission, Android 13 locks a sideloaded app's accessibility switch, battery managers freeze
+the service while its toggle still reads "on", background mode needs Android 14 and Wi-Fi, and some
+phones have no speech recognizer. The rule: anything Mode can read becomes a check with a way to
+fix it in setup (and a requirement where it has to be, like Android 14 for background mode); anything
+it can't read (the makers' switches, which Android hides from apps) becomes a row that says so and a
+guide ending in "I've done this", kept in settings and never required; and anything that breaks after
+setup shows as one banner at the top over every tab while Mode is open, the most serious first, red
+ones staying until fixed and orange ones closable for three days. No silent fallbacks: when background
+mode falls back to the screen, the banner says why. The rules live in shared, tested code
+(`DeviceStatus`, `WarningsPresenter`); Android only reads the inputs and opens the pages
+(`PhoneQuirks` holds each maker's pages, by component or by action).

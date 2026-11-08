@@ -69,12 +69,34 @@ nothing on Android; Mode goes to the background on every step of a task.
    update or a force stop it can be on but not running: off and on again fixes it).
 3. **Sees the screen** (one screenshot) and **taps** (on Mode's own title area).
 4. **Battery.** Unrestricted, so Android doesn't stop a task halfway. A warning only.
+5. **The maker's own switches** (`PhoneQuirks.manualSteps`, boards D01–D05): Samsung's Never
+   sleeping apps; Xiaomi's Autostart and "Display pop-up windows while running in the
+   background". Android gives no way to read them, so each is a row the user opens and
+   confirms ("I've done this", kept in `deviceSteps`); the row says plainly that Mode can't
+   check it. Never required.
+6. **Background mode's link** (only when it's on): Wi-Fi connected, and the last connect
+   worked. **Speech**: the phone has a speech recognizer (Google's app, usually).
+
+What can't be read at all: whether "Allow restricted settings" was tapped (inferred from the
+installer: a browser-downloaded APK is locked, a store or adb install isn't) and Samsung's
+Auto Blocker, which stops the install itself and so belongs to the download page.
+
+### Warnings at the top (boards W01–W06)
+
+Anything that stops working after setup shows as one banner over every tab while Mode is open
+(`WarningsPresenter`, shared and tested; `WarningBannerHost` in the shell), the most serious
+first: phone control locked or off (red: stays until fixed), phone control stopped by the
+system, background mode's link lost or waiting for Wi-Fi (orange: ✕ hides it for three days,
+`warningSnoozes`), no speech recognizer (plain). It's read again whenever Mode comes to the
+front, the accessibility service connects or disconnects, the network changes, or background
+mode is switched. On a Samsung the "stopped" banner says it put Mode to sleep and its button
+opens Accessibility.
 
 ## Setup on Android
 
 The first run has one more step than the iPhone's: Welcome, Connect your AI, **Let Mode use your phone**, then the first job. Phone control is a switch the user turns on in Settings, so it is set up rather than asked for (`FirstRunStep.Phone`, shown when the phone's checks include `Engine`).
 
-- `PhoneSetupPresenter` (shared) lists Phone control (required), Notifications, the assistant button, Battery and the Microphone (asked later), each with its state from `PhoneChecks.status()` (a quick read of Android's settings, no screenshot or tap) and `Permissions`. A setting this build can't offer is left out.
+- `PhoneSetupPresenter` (shared) lists Phone control (required), Notifications, the assistant button, Battery, the maker's own switches (Samsung, Xiaomi: confirmed by the user, never required) and the Microphone (asked later), each with its state from `PhoneChecks.status()` (a quick read of Android's settings, no screenshot or tap) and `Permissions`. A setting this build can't offer is left out.
 - Phone control, the assistant and battery each open a guide page (the S02–S05 boards). The guide's button opens Android's page; when Mode comes back to the front everything is read again, and a guide whose setting is now on closes itself.
 - An app not from a store has its accessibility switch locked by Android 13+: Phone control then opens the "Unlock Phone control" guide first (App info › ⋮ › Allow restricted settings).
 - Android pages and their fallbacks live in `SystemPages`: Mode's own accessibility switch is not openable directly on stock Android, so the Accessibility list opens; battery asks Android's one-tap question in the full build.
@@ -180,3 +202,13 @@ Measured on the API 37 emulator: pairing about 1.2 s after the window opens; con
 making the display 1.1–1.6 s (including switching Wireless debugging back on); a look on the hidden display
 130–170 ms, Back 117 ms. Debug probes: `--es op adb` (pair with `--es code … --ei port …`, or connect),
 `helper`, `on --ei display N`, `background --ez on true|false` / `--ez forget true`, `route`, `bring`, `giveback`.
+
+### What has to be true first (boards D06–D08)
+
+`BackgroundMode.block()` (rules in `DeviceStatus.backgroundBlock`, tested): **Android 14 or
+newer** (below it a virtual display can't have its own focus, so Mode's taps would steal the
+keyboard from the user's screen: the hub's row reads "Not on this phone"), **Developer options
+allowed** (a work or school policy can turn them off), and **Wi-Fi connected** (the link
+listens only on one; setup waits and carries on by itself when a network connects). Pairing
+also checks that the `WRITE_SECURE_SETTINGS` grant stuck; when it didn't, the setup says so
+instead of pretending it worked.
