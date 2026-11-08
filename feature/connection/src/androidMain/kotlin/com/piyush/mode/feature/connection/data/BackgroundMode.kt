@@ -138,8 +138,12 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
     /** A Wi-Fi network is connected: Wireless debugging only listens on one. */
     public fun wifiConnected(): Boolean {
         val manager = app.getSystemService(ConnectivityManager::class.java) ?: return false
-        val caps = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
-        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        // Any connected Wi-Fi, not only the active network: a phone that prefers mobile data still has its Wi-Fi up.
+        @Suppress("DEPRECATION")
+        return manager.allNetworks.any { network ->
+            val caps = manager.getNetworkCapabilities(network) ?: return@any false
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        }
     }
 
     /** Developer options aren't turned off by a work or school policy. */
