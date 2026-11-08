@@ -33,6 +33,10 @@ val iosModeGraph: ModeGraph by lazy {
     }
     AppLog.log("app", "Mode started (${if (LoopbackVpn.builtIn) "paid build, own VPN" else "free build, LocalDevVPN"})")
     val prefs = UserDefaultsStore()
+    val secrets = KeychainSecretStore()
+    // First, before anything is saved: a fresh install starts signed out, even though iOS kept the last
+    // install's Keychain (settings are deleted with the app, so none at all means a fresh install).
+    if (com.piyush.mode.core.storage.FreshInstall.clearLeftovers(prefs, secrets)) AppLog.log("app", "fresh install: earlier sign-ins removed")
     val bundle = NSBundle.mainBundle
     val installationId = prefs.getString("telemetry.installation_id") ?: Uuid.random().toString().also {
         prefs.putString("telemetry.installation_id", it)
@@ -57,7 +61,7 @@ val iosModeGraph: ModeGraph by lazy {
     lifecycle.onForeground { telemetry.event(Event.Foreground) }
     ModeGraph(
         PlatformServices(
-            secrets = KeychainSecretStore(),
+            secrets = secrets,
             prefs = prefs,
             files = files,
             notifier = IosNotifier(),

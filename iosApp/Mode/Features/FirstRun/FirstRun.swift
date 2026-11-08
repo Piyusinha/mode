@@ -8,7 +8,8 @@ import SwiftUI
 @MainActor
 @Observable
 final class FirstRunModel {
-    enum Connect: Equatable { case choose, waiting, checking, connected, notEligible, failed(String) }
+    /// `connected` carries the AI that is connected and in use (a ModelProvider id: "chatgpt", "claude_oauth", "openrouter").
+    enum Connect: Equatable { case choose, waiting, checking, connected(String), notEligible, failed(String) }
     enum Step: Equatable { case welcome, connect, firstTask }
 
     struct State: Equatable {
@@ -89,7 +90,7 @@ final class FirstRunModel {
         case .choose: .choose
         case .waiting: .waiting
         case .checking: .checking
-        case .connected: .connected
+        case let .connected(c): .connected(c.provider)
         case let .failed(f): f.notEligible ? .notEligible : .failed(f.message)
         }
         return State(step: step, connect: connect, connected: s.connected, jobs: s.firstJobs, starting: s.starting, started: s.started)
@@ -159,6 +160,15 @@ struct ConnectAIScreen: View {
         .modeScreen()
     }
 
+    /// The connected AI's logo and name, by its ModelProvider id.
+    private static func provider(_ id: String) -> (ModeLogo, String) {
+        switch id {
+        case "claude_oauth": (.claude, String(localized: L10n.Providers.claude))
+        case "openrouter": (.openRouter, String(localized: L10n.Providers.openRouter))
+        default: (.openAI, L10n.FirstRun.chatGPT)
+        }
+    }
+
     @ViewBuilder private var card: some View {
         switch state.connect {
         case .choose:
@@ -170,8 +180,9 @@ struct ConnectAIScreen: View {
                              detail: L10n.FirstRun.waitingDetail) {
                 ModeButton(L10n.FirstRun.cancel, role: .other) { onEvent(.cancelSignIn) }
             }
-        case .connected:
-            ModeProviderCard(logo: .openAI, title: L10n.FirstRun.chatGPT, tag: nil, detail: L10n.FirstRun.connected) { EmptyView() }
+        case let .connected(provider):
+            let (logo, title) = Self.provider(provider)
+            ModeProviderCard(logo: logo, title: title, tag: nil, detail: L10n.FirstRun.connected) { EmptyView() }
         case .notEligible:
             ModeProviderCard(logo: .openAI, title: L10n.FirstRun.notEligible, tag: nil, detail: L10n.FirstRun.notEligibleDetail, warning: true) {
                 VStack(spacing: ModeSpacing.s) {

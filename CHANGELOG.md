@@ -6,6 +6,12 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+- Fixed: "Connect your AI" showed "ChatGPT · Connected" whichever AI you connected. It now shows
+  the one you connected (Claude, OpenRouter or ChatGPT).
+- Fixed: after deleting Mode and installing it again, sign-ins from the earlier install (kept by
+  iOS in the Keychain) came back, so an AI you hadn't connected showed as connected. A fresh
+  install now starts signed out; updating keeps your sign-ins.
+
 ## 0.1.4 · 7 Nov 2026
 
 - Tells you when a newer Mode is out: Settings shows "Mode 0.1.5 is available", how to update

@@ -20,6 +20,7 @@ struct ScreenSample: Identifiable {
         switch id.replacingOccurrences(of: "-bottom", with: "") {
         case "welcome": WelcomeScreen(onEvent: { _ in })
         case "connect": ConnectAIScreen(state: .init(step: .connect, connect: .choose, connected: false, jobs: []), onEvent: { _ in })
+        case "connect-claude": ConnectAIScreen(state: .init(step: .connect, connect: .connected("claude_oauth"), connected: true, jobs: []), onEvent: { _ in })
         case "connect-failed": ConnectAIScreen(state: .init(step: .connect, connect: .notEligible, connected: false, jobs: []), onEvent: { _ in })
         case "firsttask": FirstTaskScreen(jobs: ["Turn on Do Not Disturb", "Turn off Wi-Fi", "Set an alarm for 7 am"], starting: false, onEvent: { _ in })
         case "firsttask-starting": FirstTaskScreen(jobs: ["Turn on Do Not Disturb", "Turn off Wi-Fi", "Set an alarm for 7 am"], starting: true, onEvent: { _ in })
