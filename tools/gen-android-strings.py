@@ -63,6 +63,8 @@ def android_name(key):
 
 
 def swift_unescape(value):
+    # Swift's \u{201C} (any 1–8 hex digits) is one character; the rest are the usual escapes.
+    value = re.sub(r"\\u\{([0-9A-Fa-f]{1,8})\}", lambda m: chr(int(m.group(1), 16)), value)
     return value.replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\")
 
 
