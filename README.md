@@ -133,6 +133,10 @@ Apple account · a ChatGPT or Claude plan, or an OpenRouter key. No Xcode needed
 ([.deb](https://heymode.app/download/linux-deb); it needs `usbmuxd`).
 Mode Setup checks your computer before it starts and tells you if anything is missing.
 
+> **Windows says “Windows protected your PC”?** Mode Setup isn’t signed with a paid Windows
+> certificate yet, so SmartScreen doesn’t know it. Click **More info**, then **Run anyway**.
+> It’s the same open-source app as on this page, built by GitHub from this repository.
+
 <br>
 
 ## Why isn’t Mode on the App Store?
