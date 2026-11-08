@@ -13,7 +13,7 @@ settings:
   CODE_SIGN_STYLE: Automatic
   # Your team and app ID come from iosApp/Signing.env (see Signing.example.env); tools/gen-project.sh reads it.
   DEVELOPMENT_TEAM: ${MODE_TEAM}
-  MARKETING_VERSION: "0.1.4"
+  MARKETING_VERSION: "0.1.5"
   CURRENT_PROJECT_VERSION: "1"
 targets:
   Mode:

@@ -6,6 +6,8 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.5 · 8 Nov 2026
+
 - Fixed: "Connect your AI" showed "ChatGPT · Connected" whichever AI you connected. It now shows
   the one you connected (Claude, OpenRouter or ChatGPT).
 - Fixed: after deleting Mode and installing it again, sign-ins from the earlier install (kept by
