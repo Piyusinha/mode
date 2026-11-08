@@ -7,6 +7,7 @@
  * card of the current chapter get classes s1..sN (steps reached) and cN (the current step); CSS
  * does the rest. Past the last step the page scrolls normally again.
  */
+import { trackOnce } from '../lib/analytics';
 import { clamp, reduced } from '../lib/anim';
 
 /** Phone-width screens (they get a little more scroll per step). */
@@ -14,7 +15,9 @@ const narrow = () => matchMedia('(max-width: 900px)').matches;
 /** Screen heights of scroll per step. */
 const B = () => (narrow() ? 0.85 : 0.7);
 
-export function startTour(steps: number[]): () => void {
+export function startTour(steps: number[], names: string[] = []): () => void {
+  // Analytics: how the visitor moved to the step they're on (wheel, swipe, key, jump, fling or plain scroll).
+  let how = 'scroll';
   const ac = new AbortController();
   const on = <K extends keyof WindowEventMap>(type: K, fn: (e: WindowEventMap[K]) => void, opts: AddEventListenerOptions = {}) =>
     addEventListener(type, fn, { ...opts, signal: ac.signal });
@@ -63,7 +66,7 @@ export function startTour(steps: number[]): () => void {
   // Anything with data-go="<chapter>" jumps to that chapter: the hero button, the chapter list, the rail.
   document.addEventListener('click', (e) => {
     const b = (e.target as Element).closest<HTMLElement>('[data-go]');
-    if (b) tweenTo(stopAt(FIRST[+b.dataset.go!]));
+    if (b) { how = 'jump'; tweenTo(stopAt(FIRST[+b.dataset.go!])); }
   }, { signal: ac.signal });
 
   on('wheel', (e) => {
@@ -73,7 +76,7 @@ export function startTour(steps: number[]): () => void {
     if (stopFor(dir) === undefined) return;            // past the last step: scroll the page normally
     e.preventDefault();
     const now = performance.now(), fresh = now - lastWheel > 160; lastWheel = now;
-    if (fresh) stepCh(dir);                             // a new scroll always moves, even mid-move; trackpad glide doesn't
+    if (fresh) { how = 'wheel'; stepCh(dir); }                             // a new scroll always moves, even mid-move; trackpad glide doesn't
   }, { passive: false });
 
   // One swipe, one step: inside the tour the finger doesn't scroll the page; the swipe's direction picks the next step.
@@ -85,7 +88,7 @@ export function startTour(steps: number[]): () => void {
     if (!tdir) { if (Math.abs(dy) < 8) return; tdir = Math.sign(dy); held = stopFor(tdir) !== undefined; }
     if (held) e.preventDefault();
   }, { passive: false });
-  on('touchend', () => { touching = false; if (held && tdir) stepCh(tdir); ty = null; held = false; }, { passive: true });
+  on('touchend', () => { touching = false; if (held && tdir) { how = 'swipe'; stepCh(tdir); } ty = null; held = false; }, { passive: true });
 
   on('keydown', (e) => {
     if ((e.target as Element).closest?.('input,textarea,summary,video,button,a')) return;
@@ -93,6 +96,7 @@ export function startTour(steps: number[]): () => void {
     const next = ['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key), prev = ['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key);
     if (!next && !prev) return;
     e.preventDefault();
+    how = 'key';
     if (!stepCh(next ? 1 : -1) && next) scrollBy({ top: vh() * 0.8, behavior: 'smooth' });
   });
 
@@ -109,11 +113,19 @@ export function startTour(steps: number[]): () => void {
     for (let k = 1; k <= 4; k++) { el.classList.toggle('s' + k, k <= s); el.classList.toggle('c' + k, k === s); }
   };
   let last = '';
+  let seenTimer = 0;
   function frame() {
     const k = clamp(Math.round((scrollY - story.offsetTop) / (B() * vh())), 0, BEATS.length - 1);
     const [ci, s] = BEATS[k];
     $('hint').classList.toggle('on', k === 0 && scrollY < story.offsetTop + 8);
     railFills.forEach((f, i) => { f.style.transform = `scaleX(${i < ci ? 1 : i === ci ? s / steps[ci] : 0})`; });
+    // Analytics: a step counts once the visitor stops on it (scrolling straight past the tour doesn't count).
+    clearTimeout(seenTimer);
+    if (scrollY > story.offsetTop - 2 && scrollY < stopAt(BEATS.length - 1) + vh() * 0.5) seenTimer = window.setTimeout(() => {
+      trackOnce(`tour-${k}`, 'tour_step', { t: names[ci] || String(ci + 1), d: `${s}/${steps[ci]}`, x: how, val: k + 1 });
+      if (k === BEATS.length - 1) trackOnce('tour-done', 'tour_complete', { val: BEATS.length });
+      how = 'scroll';
+    }, 400);
     const key = ci + ':' + s; if (key === last) return; last = key;
     // Load screens one chapter ahead (and anything you jumped past), so the page doesn't fetch them all up front.
     layers.slice(0, ci + 2).forEach((L) => L.querySelectorAll<HTMLImageElement>('img[data-src]').forEach((img) => {
@@ -135,6 +147,7 @@ export function startTour(steps: number[]): () => void {
   document.addEventListener('click', (e) => { if ((e.target as Element).closest('a[href*="#"]')) navUntil = performance.now() + 2500; }, { signal: ac.signal });
   // Stopping the page's own momentum first (overflow hidden for two frames) keeps it from carrying on past the step.
   const land = (y: number) => {
+    how = 'fling';
     const html = document.documentElement;
     html.style.overflow = 'hidden';
     scrollTo({ top: y, behavior: 'instant' });
@@ -158,6 +171,7 @@ export function startTour(steps: number[]): () => void {
   document.fonts?.ready.then(() => { if (!ac.signal.aborted) { fit(); frame(); } });
 
   return () => {
+    clearTimeout(seenTimer);
     ac.abort(); ro.disconnect();
     cancelAnimationFrame(tween); cancelAnimationFrame(raf);
     document.documentElement.classList.remove('tween');

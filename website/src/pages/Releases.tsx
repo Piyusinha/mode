@@ -4,6 +4,7 @@
 import { marked } from 'marked';
 import { useEffect, useMemo, useState } from 'react';
 import { PlatformIcon } from '../components/DownloadButton';
+import { track, withVisitor } from '../lib/analytics';
 import { detectPlatform, type Platform } from '../lib/platform';
 import { Page } from './Page';
 
@@ -50,13 +51,15 @@ function toSetups(list: Release[]): Setup[] {
     .sort((a, b) => (newer(a.version, b.version) ? -1 : 1));
 }
 
-const href = (s: Setup, key: string) => `/download/v/${s.tag}/${s.files.get(key)!.name}`;
+const href = (s: Setup, key: string) => withVisitor(`/download/v/${s.tag}/${s.files.get(key)!.name}`, 'releases');
+/** data-* for analytics on a version's download link. */
+const ev = (s: Setup, key: string) => ({ 'data-ev': 'release_download', 'data-where': 'releases', 'data-target': key, 'data-detail': s.version });
 
 export function Releases() {
   const [list, setList] = useState<Release[] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    fetch('/api/releases').then((r) => (r.ok ? r.json() : Promise.reject())).then(setList).catch(() => setFailed(true));
+    fetch('/api/releases').then((r) => (r.ok ? r.json() : Promise.reject())).then(setList).catch(() => { setFailed(true); track('releases_error'); });
   }, []);
   const setups = useMemo(() => (list ? toSetups(list) : null), [list]);
   const mine = useMemo(detectPlatform, []);
@@ -79,14 +82,14 @@ export function Releases() {
           </header>
           <div className="files">
             {order(latest).map((m, i) => (
-              <a key={m.key} className={`btn ${i === 0 ? 'ink' : 'soft'} dl`} href={href(latest, m.key)}>
+              <a key={m.key} className={`btn ${i === 0 ? 'ink' : 'soft'} dl`} href={href(latest, m.key)} {...ev(latest, m.key)}>
                 <PlatformIcon p={m.platform} />{m.label}<small>{mb(latest.files.get(m.key)!.size)}</small>
               </a>
             ))}
           </div>
           {EXTRA.some((x) => latest.files.has(x.key)) && (
             <p className="also">Also: {EXTRA.filter((x) => latest.files.has(x.key)).map((x, i) => (
-              <span key={x.key}>{i > 0 && ' · '}<a href={href(latest, x.key)}>{x.label}</a></span>
+              <span key={x.key}>{i > 0 && ' · '}<a href={href(latest, x.key)} {...ev(latest, x.key)}>{x.label}</a></span>
             ))}</p>
           )}
           {latest.notes && <><h3>What's new</h3><div className="md" dangerouslySetInnerHTML={{ __html: html(latest.notes) }} /></>}
@@ -97,12 +100,12 @@ export function Releases() {
         <section className="rel-old" aria-label="Earlier versions">
           <h3>Earlier versions</h3>
           {older.map((s) => (
-            <details key={s.tag}>
+            <details key={s.tag} onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) track('release_open', { t: s.version }); }}>
               <summary>
                 <b>{s.version}</b><span className="when">{day(s.date)}</span>
                 <span className="links">
                   {[...MAIN, ...EXTRA.map((x) => ({ ...x, platform: null }))].filter((m) => s.files.has(m.key)).map((m) => (
-                    <a key={m.key} href={href(s, m.key)} onClick={(e) => e.stopPropagation()}>{m.label}</a>
+                    <a key={m.key} href={href(s, m.key)} {...ev(s, m.key)} onClick={(e) => e.stopPropagation()}>{m.label}</a>
                   ))}
                 </span>
               </summary>

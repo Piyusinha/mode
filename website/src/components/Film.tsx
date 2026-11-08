@@ -15,6 +15,7 @@
  * It also grows from a rounded card to full width as you scroll to it.
  */
 import { useEffect, useRef, useState } from 'react';
+import { track, trackOnce } from '../lib/analytics';
 import { clamp, ease, reduced } from '../lib/anim';
 import { FILM_FALLBACK } from '../links';
 import { Mo } from './Mo';
@@ -24,6 +25,7 @@ const TALL = { src: `${import.meta.env.BASE_URL}story-vertical.mp4`, length: '0:
 
 export function Film({ tall = false }: { tall?: boolean }) {
   const { src: SRC, length } = tall ? TALL : WIDE;
+  const variant = tall ? 'tall' : 'wide';   // for analytics: the vertical phone cut or the landscape film
   const boxRef = useRef<HTMLDivElement>(null), inRef = useRef<HTMLDivElement>(null);
   const scrRef = useRef<HTMLDivElement>(null), vRef = useRef<HTMLVideoElement>(null);
   const [sound, setSound] = useState(false);
@@ -56,6 +58,7 @@ export function Film({ tall = false }: { tall?: boolean }) {
     // Play while half or more is visible; pause otherwise.
     const seen = new IntersectionObserver((es) => {
       for (const e of es) inView.current = e.intersectionRatio >= 0.5;
+      if (inView.current) trackOnce('film-seen', 'film_seen', { t: variant });
       sync();
     }, { threshold: [0, 0.5, 1] });
     seen.observe(box);
@@ -64,10 +67,33 @@ export function Film({ tall = false }: { tall?: boolean }) {
     document.addEventListener('visibilitychange', onVisibility);
 
     // A pause we didn't cause is the viewer's own; a play clears it.
-    const onPause = () => { if (autoPausing.current) autoPausing.current = false; else if (!v.ended) userPaused.current = true; };
+    const onPause = () => {
+      if (autoPausing.current) autoPausing.current = false;
+      else if (!v.ended) { userPaused.current = true; track('film_pause', { t: variant, d: mode(), val: Math.round(v.currentTime) }); }
+    };
     const onPlay = () => { userPaused.current = false; };
     v.addEventListener('pause', onPause);
     v.addEventListener('play', onPlay);
+
+    // Analytics: the silent loop starting, how far it's watched (25/50/75/100 %, silent and with sound separately),
+    // and the seconds watched in each mode, reported when the page is hidden or closed.
+    const mode = () => (soundRef.current ? 'sound' : 'silent');
+    let last = 0; const watched = { silent: 0, sound: 0 };
+    const onPlaying = () => { if (!soundRef.current) trackOnce('film-silent-play', 'film_play', { t: variant, d: 'silent' }); };
+    const onTime = () => {
+      const t = v.currentTime, d = v.duration || 0;
+      if (!v.paused && t > last && t - last < 1.5) watched[mode()] += t - last;
+      last = t;
+      if (d) for (const m of [25, 50, 75, 100]) if (t / d >= m / 100 - 0.01) trackOnce(`film-${mode()}-${m}`, 'film_progress', { t: variant, d: mode(), val: m });
+    };
+    const report = () => {
+      for (const k of ['silent', 'sound'] as const) if (watched[k] >= 1) { track('film_watch', { t: variant, d: k, val: Math.round(watched[k]) }); watched[k] = 0; }
+    };
+    const onHide = () => { if (document.hidden) report(); };
+    v.addEventListener('playing', onPlaying);
+    v.addEventListener('timeupdate', onTime);
+    document.addEventListener('visibilitychange', onHide);
+    addEventListener('pagehide', report);
 
     // Grow from a rounded card to full size as it scrolls into view.
     let raf = 0;
@@ -87,13 +113,16 @@ export function Film({ tall = false }: { tall?: boolean }) {
       near.disconnect(); seen.disconnect(); cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVisibility);
       v.removeEventListener('pause', onPause); v.removeEventListener('play', onPlay);
+      v.removeEventListener('playing', onPlaying); v.removeEventListener('timeupdate', onTime);
+      document.removeEventListener('visibilitychange', onHide); removeEventListener('pagehide', report); report();
       removeEventListener('scroll', onScroll); removeEventListener('resize', grow);
     };
   }, [SRC]);
 
   const playWithSound = () => {
-    if (broken) { open(FILM_FALLBACK, '_blank'); return; }
+    if (broken) { track('film_fallback', { t: variant }); open(FILM_FALLBACK, '_blank'); return; }
     const v = vRef.current!;
+    track('film_sound', { t: variant, val: Math.round(v.currentTime) });
     if (!v.src) setSrc(SRC);
     soundRef.current = true; userPaused.current = false; setSound(true);
     v.muted = false; v.loop = false; v.currentTime = 0; v.controls = true;
@@ -101,11 +130,13 @@ export function Film({ tall = false }: { tall?: boolean }) {
     // On phones, go full screen so the film fills the display (iOS has its own call for video).
     if (matchMedia('(max-width: 900px)').matches) {
       const fs = v as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+      track('film_fullscreen', { t: variant });
       if (v.requestFullscreen) v.requestFullscreen().catch(() => fs.webkitEnterFullscreen?.());
       else fs.webkitEnterFullscreen?.();
     }
   };
   const ended = () => {
+    if (soundRef.current) track('film_end', { t: variant, d: 'sound' });
     const v = vRef.current!;
     soundRef.current = false; userPaused.current = false; setSound(false);
     v.muted = true; v.loop = true; v.controls = false; v.currentTime = 0;
@@ -118,7 +149,7 @@ export function Film({ tall = false }: { tall?: boolean }) {
         <Mo mood={sound ? 'listening' : 'idle'} className="reel-mo" />
         <div className="reel-scr" ref={scrRef}>
           <video ref={vRef} src={src} muted loop playsInline preload={src ? 'metadata' : 'none'}
-            onLoadedData={sync} onError={() => { if (src) setBroken(true); }} onEnded={ended}
+            onLoadedData={sync} onError={() => { if (src) { setBroken(true); track('film_error', { t: variant }); } }} onEnded={ended}
             aria-label={tall ? 'Mode, the short film: texting Sam and ordering the usual coffee, by voice from the car' : 'Mode, the film: three errands done by voice from the car'} />
           <span className="reel-shade" />
           <button className="snd" type="button" onClick={playWithSound}>

@@ -10,7 +10,7 @@ const POINTS: [string, string][] = [
 
 export function AppStore() {
   return (
-    <section className="sec wrap" id="appstore" aria-labelledby="appstore-h">
+    <section className="sec wrap" id="appstore" data-section="appstore" aria-labelledby="appstore-h">
       <p className="kick rv">Before you install</p>
       <Words id="appstore-h">Why isn’t Mode <em>on the App Store?</em></Words>
       <ol className="why">

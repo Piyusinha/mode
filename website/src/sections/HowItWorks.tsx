@@ -18,7 +18,7 @@ const STEPS: { icon: ReactNode; title: string; text: string }[] = [
 
 export function HowItWorks() {
   return (
-    <section className="sec wrap" id="how" aria-labelledby="how-h">
+    <section className="sec wrap" id="how" data-section="how" aria-labelledby="how-h">
       <p className="kick rv">Under the hood</p>
       <Words id="how-h">No plugins. No per-app setup. <em>It just looks.</em></Words>
       <p className="lead rv">Mode doesn't need every app to support it. It uses your phone the way you do, on the screen in front of you: look, decide, tap.</p>
@@ -46,7 +46,7 @@ export function HowItWorks() {
             <li><b>2</b><span>Plug in your iPhone with a cable and install Mode. A free Apple account works.</span></li>
             <li><b>3</b><span>Mode renews every 7 days from your computer, or on its own with SideStore.</span></li>
           </ol>
-          <div className="row"><a className="btn soft sm" href="/releases">Latest release</a><a className="btn soft sm" href="/#get">Setup guide</a></div>
+          <div className="row"><a className="btn soft sm" href="/releases" data-ev="nav_click" data-where="how" data-target="releases">Latest release</a><a className="btn soft sm" href="/#get" data-ev="nav_click" data-where="how" data-target="get">Setup guide</a></div>
         </div>
       </div>
     </section>

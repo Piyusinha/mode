@@ -1,4 +1,5 @@
 import { Words } from '../components/Words';
+import { track } from '../lib/analytics';
 
 const QA: [string, string, boolean?][] = [
   ['Is it safe to let Mode use my phone?', 'Mode works on your screen where you can see it, and every step shows in your Live Activity with a Stop button. Prefer to approve things? Switch to Ask first and it waits for your yes before it pays, books, orders or sends. Your passwords and PINs are only ever typed by you.', true],
@@ -13,11 +14,11 @@ const QA: [string, string, boolean?][] = [
 
 export function Faq() {
   return (
-    <section className="sec wrap" id="faq" aria-labelledby="faq-h">
+    <section className="sec wrap" id="faq" data-section="faq" aria-labelledby="faq-h">
       <p className="kick rv">Questions</p>
       <Words id="faq-h">Fair questions, <em>straight answers.</em></Words>
       <div className="faq rv">
-        {QA.map(([q, a, open]) => <details key={q} open={open}><summary>{q}</summary><p>{a}</p></details>)}
+        {QA.map(([q, a, open]) => <details key={q} open={open} onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && !open) track('faq_open', { t: q }); }}><summary>{q}</summary><p>{a}</p></details>)}
       </div>
     </section>
   );

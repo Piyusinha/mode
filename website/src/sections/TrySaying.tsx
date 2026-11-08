@@ -11,7 +11,7 @@ const IDEAS = [
 
 export function TrySaying() {
   return (
-    <section className="sec wrap" id="try" aria-labelledby="try-h">
+    <section className="sec wrap" id="try" data-section="try" aria-labelledby="try-h">
       <p className="kick rv">Try saying</p>
       <Words id="try-h">Start with the things <em>you keep putting off.</em></Words>
       <ul className="say-grid">
