@@ -40,6 +40,8 @@ public enum class ModeTextStyle(
     Title2(26f, 800, true, 31f),
     /** 20 bold display: the running task's name, Mo's line on a card. */
     Title3(20f, 700, true, 24f),
+    /** A "Did you know?" tip's title: small enough for the card to stay short. */
+    TipTitle(16f, 700, true, 20f),
     /** 18 bold display: section headings (Suggested, Recent, You, AI). */
     Section(18f, 700, true, 22f),
     /** 17 medium: a row that stands out, a primary button. */

@@ -101,8 +101,8 @@ private fun TipCard(
     val tone = tip.tone.colors()
     Column(
         Modifier.fillMaxWidth().background(tone.background, RoundedCornerShape(ModeRadius.tipBanner))
-            .padding(top = ModeSpacing.m + ModeSpacing.xxs, start = ModeSpacing.l, end = ModeSpacing.l, bottom = ModeSpacing.l),
-        verticalArrangement = Arrangement.spacedBy(ModeSpacing.s + ModeSpacing.xxs),
+            .padding(top = ModeSpacing.s + ModeSpacing.xxs, start = ModeSpacing.m + ModeSpacing.xxs, end = ModeSpacing.m + ModeSpacing.xxs, bottom = ModeSpacing.m),
+        verticalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs),
     ) {
         Row(Modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.tipClose), verticalAlignment = Alignment.CenterVertically) {
             ModeText(label.toUpperCase(LocaleList.current), ModeTextStyle.CaptionEmphasis, Modifier.weight(1f), color = tone.text)
@@ -114,36 +114,36 @@ private fun TipCard(
                     Alignment.Center,
                 ) {
                     Box(Modifier.size(ModeSize.tipClose).background(c.textPrimary.copy(alpha = ModeOpacity.tipChip), CircleShape), Alignment.Center) {
-                        ModeIconImage(ModeIcon.Close, ModeIconSize.chevron, tone.text)
+                        ModeIconImage(ModeIcon.Close, ModeIconSize.tiny, tone.text)
                     }
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m + ModeSpacing.xxs), verticalAlignment = Alignment.Top) {
+        Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m), verticalAlignment = Alignment.Top) {
             Box(Modifier.clearAndSetSemantics {}) {
                 ModeMo(tip.mood, ModeSize.tipMo)
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(ModeSize.tipBadgeOffset, ModeSpacing.xs).size(ModeSize.tipBadge)
                         .background(tone.badge, CircleShape).border(ModeSize.tipBadgeRing, tone.background, CircleShape),
                     Alignment.Center,
-                ) { ModeIconImage(tip.icon, ModeIconSize.chevron, c.onAccent) }
+                ) { ModeIconImage(tip.icon, ModeIconSize.tiny, c.onAccent) }
             }
-            Column(Modifier.weight(1f).padding(top = ModeSpacing.xxs), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xs)) {
-                ModeText(tip.title, ModeTextStyle.Title3, Modifier.semantics { heading() })
-                ModeText(tip.message, ModeTextStyle.Subheadline, color = c.textSecondary)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+                ModeText(tip.title, ModeTextStyle.TipTitle, Modifier.semantics { heading() })
+                ModeText(tip.message, ModeTextStyle.Footnote, color = c.textSecondary)
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = ModeSpacing.xxs), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             val (press, alpha) = rememberPress()
             Row(
-                Modifier.defaultMinSize(minHeight = ModeSize.touch).alpha(alpha).background(c.accent, Capsule)
+                Modifier.defaultMinSize(minHeight = ModeSize.tipButton).alpha(alpha).background(c.accent, Capsule)
                     .clickable(press, indication = null, role = Role.Button) { onAction(i) }
-                    .padding(horizontal = ModeSpacing.l + ModeSpacing.xxs),
-                horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s),
+                    .padding(horizontal = ModeSpacing.m + ModeSpacing.xxs),
+                horizontalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ModeText(tip.action, ModeTextStyle.SubheadlineEmphasis, color = c.onAccent, maxLines = 1)
-                ModeIconImage(ModeIcon.ArrowRight, ModeIconSize.chevron, c.onAccent)
+                ModeText(tip.action, ModeTextStyle.SmallEmphasis, color = c.onAccent, maxLines = 1)
+                ModeIconImage(ModeIcon.ArrowRight, ModeIconSize.tiny, c.onAccent)
             }
             Box(Modifier.weight(1f))
             if (count > 1) {

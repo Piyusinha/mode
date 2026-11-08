@@ -52,7 +52,7 @@ public object ModeRadius {
     public val overlay: Dp = 34.dp
     public val overlayMini: Dp = 18.dp
     /** The "Did you know?" cards on Home. */
-    public val tipBanner: Dp = 26.dp
+    public val tipBanner: Dp = 22.dp
     /** Chat cards (working, failed, a lesson), notices and the small tile on a lesson. */
     public val chatCard: Dp = 24.dp
     public val chatNotice: Dp = 22.dp
@@ -76,6 +76,8 @@ public object ModeRadius {
 
 /** Icon sizes, so an icon never borrows a text style's size. */
 public object ModeIconSize {
+    /** The badge glyph on a tip card's Mo, and the arrow in its small pill. */
+    public val tiny: Dp = 11.dp
     public val chevron: Dp = 14.dp
     public val small: Dp = 16.dp
     /** Most icons: in a circle, in a button, at the start of a row. */
@@ -331,16 +333,18 @@ public object ModeSize {
     public val tabBarClearance: Dp = 120.dp
     public val tryPill: Dp = 44.dp
     /** Home's tip cards: Mo, its badge and ring, the close button, the dots and their tap areas, Undo. */
-    public val tipMo: Dp = 64.dp
-    public val tipBadge: Dp = 30.dp
-    public val tipBadgeRing: Dp = 3.dp
+    public val tipMo: Dp = 44.dp
+    public val tipBadge: Dp = 22.dp
+    public val tipBadgeRing: Dp = 2.dp
     public val tipBadgeOffset: Dp = 5.dp
-    public val tipClose: Dp = 30.dp
-    public val tipDot: Dp = 8.dp
-    public val tipDotCurrent: Dp = 18.dp
-    public val tipDotHit: Dp = 16.dp
-    public val tipDotHitCurrent: Dp = 26.dp
-    public val tipDotHitHeight: Dp = 28.dp
+    public val tipClose: Dp = 24.dp
+    /** The tip's action pill: shorter than a normal button, so the card stays compact. */
+    public val tipButton: Dp = 36.dp
+    public val tipDot: Dp = 6.dp
+    public val tipDotCurrent: Dp = 16.dp
+    public val tipDotHit: Dp = 14.dp
+    public val tipDotHitCurrent: Dp = 24.dp
+    public val tipDotHitHeight: Dp = 24.dp
     public val tipToast: Dp = 56.dp
     /** A phone screen's width to height, for screenshot cells. */
     public const val screenAspect: Float = 9f / 19.5f
