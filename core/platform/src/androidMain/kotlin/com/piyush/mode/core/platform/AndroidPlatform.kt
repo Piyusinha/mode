@@ -35,5 +35,10 @@ public class AndroidAppLifecycle : AppLifecycle {
         foreground += action
     }
 
+    override fun watchForeground(action: () -> Unit): () -> Unit {
+        foreground += action
+        return { foreground -= action }
+    }
+
     override fun onTerminate(action: () -> Unit) {}
 }

@@ -24,6 +24,17 @@ class PhoneQuirksTest {
     }
 
     @Test
+    fun samsungAsksToBeKeptOutOfSleepAndXiaomiToAutostartAndShowPopups() {
+        assertEquals(listOf(ManualStep.Sleeping), PhoneQuirks.of("samsung")!!.manualSteps)
+        assertEquals(listOf(ManualStep.Autostart, ManualStep.Popups), PhoneQuirks.of("Xiaomi", "POCO")!!.manualSteps)
+        val sleeping = PhoneQuirks.of("samsung")!!.sleeping.first()
+        assertEquals("com.samsung.android.sm.ACTION_OPEN_CHECKABLE_LISTACTIVITY", sleeping.action)
+        assertEquals(2, sleeping.intExtras["activity_type"])
+        assertEquals("extra_pkgname", PhoneQuirks.of("Xiaomi")!!.popups.first().appPackageExtra)
+        assertTrue(PhoneQuirks.of("OnePlus")!!.manualSteps == listOf(ManualStep.Autostart))
+    }
+
+    @Test
     fun aPlainAndroidPhoneUsesAndroidsOwnSetting() {
         assertNull(PhoneQuirks.of("Google", "google"))
         assertNull(PhoneQuirks.of("motorola"))

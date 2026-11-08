@@ -14,6 +14,12 @@ public interface AppLifecycle {
     /** Calls [action] whenever Mode comes back to the front (opened, or a notification tapped). */
     public fun onForeground(action: () -> Unit) {}
 
+    /** As [onForeground], but the returned function stops the calls (for a presenter that closes). */
+    public fun watchForeground(action: () -> Unit): () -> Unit {
+        onForeground(action)
+        return {}
+    }
+
     /** Calls [action] when the OS is about to end Mode; it must finish quickly and not suspend. */
     public fun onTerminate(action: () -> Unit)
 }

@@ -6,6 +6,8 @@ import android.os.PowerManager
 import android.provider.Settings
 import com.piyush.mode.android.ModeAccessibilityService
 import com.piyush.mode.android.ServiceRegistry
+import com.piyush.mode.core.platform.PhoneQuirks
+import com.piyush.mode.feature.connection.domain.DeviceStatus
 import com.piyush.mode.feature.connection.domain.CheckState
 import com.piyush.mode.feature.connection.domain.PhoneCheckId
 import com.piyush.mode.feature.connection.domain.PhoneCheckResult
@@ -24,7 +26,18 @@ import kotlin.time.TimeSource
  * restricted settings"), the service itself, seeing the screen, touching it,
  * and the battery setting that keeps a task from being cut off.
  */
-public class AccessibilityPhoneChecks(context: Context, private val link: AccessibilityPhoneLink) : PhoneChecks {
+public class AccessibilityPhoneChecks(
+    context: Context,
+    private val link: AccessibilityPhoneLink,
+    /** Background mode, when this build has it (its link is one of the things checked). */
+    private val background: BackgroundMode? = null,
+    /** This phone's maker, for the steps only the user can confirm (null: a plain Android phone). */
+    private val brand: () -> PhoneQuirks.Brand? = { null },
+    /** The manual steps the user confirmed (ManualStep names), from settings. */
+    private val confirmed: () -> Set<String> = { emptySet() },
+    /** The phone has a speech recognizer (Google's app, usually). */
+    private val speechAvailable: () -> Boolean = { true },
+) : PhoneChecks {
     private val app = context.applicationContext
 
     override val steps: List<PhoneCheckId> = listOf(
@@ -40,9 +53,10 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
         val on = enabled()
         val running = ServiceRegistry.service.value != null
         val power = app.getSystemService(PowerManager::class.java)
+        val mode = background
         return listOf(
             PhoneCheckResult(PhoneCheckId.RestrictedSettings,
-                if (!on && sideloaded()) CheckState.Failed("locked until restricted settings are allowed", null) else CheckState.Passed(null)),
+                if (locked(on)) CheckState.Failed("locked until restricted settings are allowed", null) else CheckState.Passed(null)),
             PhoneCheckResult(PhoneCheckId.Engine, when {
                 on && running -> CheckState.Passed(null)
                 on -> CheckState.Failed("on but not running", "Turn Mode off and on again in Settings › Accessibility.")
@@ -50,6 +64,9 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
             }),
             PhoneCheckResult(PhoneCheckId.Battery,
                 if (power.isIgnoringBatteryOptimizations(app.packageName)) CheckState.Passed(null) else CheckState.Failed("restricted", null)),
+            PhoneCheckResult(PhoneCheckId.Speech, if (speechAvailable()) CheckState.Passed(null) else CheckState.Failed("no speech recognizer", null)),
+        ) + DeviceStatus.manual(brand(), confirmed()) + listOfNotNull(
+            mode?.takeIf { it.enabled }?.let { PhoneCheckResult(PhoneCheckId.BackgroundLink, DeviceStatus.backgroundLink(it.wifiConnected(), it.lastConnectFailed)) },
         )
     }
 
@@ -62,7 +79,7 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
 
         val on = enabled()
         // The lock only matters while the switch is off; once it is on, Android allowed it.
-        if (!on && sideloaded()) {
+        if (locked(on)) {
             fail(PhoneCheckId.RestrictedSettings,
                 "Android locks phone control for apps that don't come from the Play Store.",
                 "Open Mode's App info, tap ⋮ at the top right, then Allow restricted settings.")
@@ -128,11 +145,10 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
         return list.split(':').any { ComponentName.unflattenFromString(it) == mine }
     }
 
-    /** Installed from somewhere other than an app store Android trusts (a downloaded APK, adb). */
-    private fun sideloaded(): Boolean {
+    /** Android locks the switch for an app the user sideloaded (a downloaded APK); not for a store or adb install. */
+    private fun locked(on: Boolean): Boolean {
         val source = runCatching { app.packageManager.getInstallSourceInfo(app.packageName) }.getOrNull()
-        val installer = source?.initiatingPackageName ?: source?.installingPackageName
-        return installer !in STORES
+        return DeviceStatus.locked(source?.initiatingPackageName ?: source?.installingPackageName, on)
     }
 
     private suspend fun <T> timed(id: PhoneCheckId, results: MutableMap<PhoneCheckId, CheckState>, report: () -> Unit, block: suspend () -> T): T {
@@ -148,11 +164,5 @@ public class AccessibilityPhoneChecks(context: Context, private val link: Access
     private companion object {
         const val PROBE_SIDE = 400
         const val TAP_Y_DP = 120.0
-        /** Installers whose apps Android does not lock: the Play Store and the phone makers' stores. */
-        val STORES = setOf(
-            "com.android.vending", "com.google.android.packageinstaller.store",
-            "com.sec.android.app.samsungapps", "com.xiaomi.market", "com.huawei.appmarket",
-            "com.heytap.market", "com.oppo.market", "com.bbk.appstore",
-        )
     }
 }

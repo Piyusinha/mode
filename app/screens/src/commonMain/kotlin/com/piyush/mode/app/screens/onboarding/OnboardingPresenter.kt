@@ -378,6 +378,7 @@ public class OnboardingPresenter(
             CheckState.Running -> "running"
             is CheckState.Passed -> "ok" + (st.ms?.let { " ($it ms)" } ?: "")
             is CheckState.Failed -> "FAILED: ${st.reason}" + (st.fix?.let { " Fix: $it" } ?: "")
+            is CheckState.Unverifiable -> if (st.confirmed) "confirmed by the user" else "not confirmed"
         }
         "${r.id.name}: $s"
     }

@@ -1,6 +1,11 @@
 package com.piyush.mode.feature.connection.data
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
+import android.os.UserManager
 import android.provider.Settings
 import com.piyush.mode.adb.AdbLink
 import com.piyush.mode.adb.HelperAnswer
@@ -9,6 +14,8 @@ import com.piyush.mode.adb.HelperSession
 import com.piyush.mode.android.GlobalAction
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.core.storage.KeyValueStore
+import com.piyush.mode.feature.connection.domain.BackgroundBlock
+import com.piyush.mode.feature.connection.domain.DeviceStatus
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -54,6 +61,7 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
                 connected = link.connect(lastPort)
                 if (connected) break
             }
+            lastConnectFailed = !connected
             check(connected) { "Wireless debugging is off or not reachable (${link.lastError ?: "no port answered"})" }
         }
         // The port, for next time (also when setup connected): finding it again means searching for it.
@@ -119,6 +127,28 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
 
     /** The app Mode was using is on the user's screen (their turn, they took over, or they opened it). */
     public val withTheUser: Boolean get() = withUser != null
+
+    /** The last try to reach the phone failed (Wireless debugging off, or Wi-Fi gone): the banner's "lost its link". */
+    @Volatile public var lastConnectFailed: Boolean = false
+        private set
+
+    /** What keeps background mode from being set up or used on this phone right now, or null. */
+    public fun block(): BackgroundBlock? = DeviceStatus.backgroundBlock(Build.VERSION.SDK_INT, wifiConnected(), debuggingAllowed())
+
+    /** A Wi-Fi network is connected: Wireless debugging only listens on one. */
+    public fun wifiConnected(): Boolean {
+        val manager = app.getSystemService(ConnectivityManager::class.java) ?: return false
+        val caps = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    /** Developer options aren't turned off by a work or school policy. */
+    public fun debuggingAllowed(): Boolean =
+        app.getSystemService(UserManager::class.java)?.hasUserRestriction(UserManager.DISALLOW_DEBUGGING_FEATURES) != true
+
+    /** Setup granted Mode the right to write secure settings (so it can turn Wireless debugging back on). */
+    public fun holdsSecureSettings(): Boolean =
+        app.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
 
     /** The hidden display, while there is one. */
     public val hiddenDisplay: Int? get() = display

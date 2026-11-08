@@ -13,6 +13,16 @@ public enum class PhoneCheckId {
     Engine,
     /** Android: Mode may run in the background (battery unrestricted). */
     Battery,
+    /** Samsung: Mode is on the "Never sleeping apps" list (a manual step: Android can't read it). */
+    Sleeping,
+    /** Xiaomi and others: Mode may start by itself (manual). */
+    Autostart,
+    /** Xiaomi: Mode may open an app while in the background (manual). */
+    Popups,
+    /** Android: background mode is on and its link to the phone can be reached (Wi-Fi, Wireless debugging). */
+    BackgroundLink,
+    /** Android: the phone has a speech recognizer, so Mode can hear. */
+    Speech,
 }
 
 public sealed interface CheckState {
@@ -22,6 +32,8 @@ public sealed interface CheckState {
     public data class Passed(val ms: Long?) : CheckState
     /** Didn't work: why, and what fixes it. */
     public data class Failed(val reason: String, val fix: String?) : CheckState
+    /** Mode can't read this setting; the user [confirmed] it (or hasn't yet). */
+    public data class Unverifiable(val confirmed: Boolean) : CheckState
 }
 
 public data class PhoneCheckResult(val id: PhoneCheckId, val state: CheckState)

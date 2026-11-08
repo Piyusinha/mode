@@ -95,7 +95,14 @@ fun androidModeGraph(
             permissions = AndroidPermissions(
                 app, assistantHeld = { askModeOn(app) }, assistantAvailable = { declaresAskMode(app) }, turnOnAssistant = { setAskMode(app, true) },
             ),
-            phoneChecks = link?.let { AccessibilityPhoneChecks(app, it) } ?: UnavailablePhoneChecks(PLAY_BUILD),
+            phoneChecks = link?.let {
+                AccessibilityPhoneChecks(
+                    app, it, background,
+                    brand = { brandOf(prefs) },
+                    confirmed = { prefs.getString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEVICE_STEPS)?.split(',')?.filter(String::isNotBlank)?.toSet().orEmpty() },
+                    speechAvailable = { android.speech.SpeechRecognizer.isRecognitionAvailable(app) },
+                )
+            } ?: UnavailablePhoneChecks(PLAY_BUILD),
             appVersion = version,
             backupFiles = AndroidBackupFiles(app.cacheDir),
             profile = com.piyush.mode.agent.PhoneProfile.Android,
@@ -103,6 +110,11 @@ fun androidModeGraph(
         ),
     )
 }
+
+/** This phone's maker (a debug override first, so one phone can show another maker's setup rows). */
+public fun brandOf(prefs: SharedPrefsStore): com.piyush.mode.core.platform.PhoneQuirks.Brand? =
+    prefs.getString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEBUG_BRAND)?.takeIf { it.isNotBlank() }?.let { com.piyush.mode.core.platform.PhoneQuirks.of(it) }
+        ?: com.piyush.mode.core.platform.PhoneQuirks.of(android.os.Build.MANUFACTURER, android.os.Build.BRAND)
 
 private const val PLAY_BUILD = "This version of Mode can't use your phone's apps. Install Mode from heymode.app to let it."
 
