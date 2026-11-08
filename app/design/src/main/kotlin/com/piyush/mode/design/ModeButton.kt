@@ -116,6 +116,19 @@ private val LARGE = setOf(
     ModeButtonRole.Answer, ModeButtonRole.AnswerQuiet, ModeButtonRole.StopSoft,
 )
 
+/** Back, as Android draws it: a plain arrow in a 48 dp touch target, no card behind it. */
+@Composable
+public fun ModeBackButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    val (press, alpha) = rememberPress()
+    Box(
+        modifier.size(ModeSize.backButton).alpha(alpha)
+            .clickable(press, indication = null, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) { ModeIconImage(ModeIcon.Back, ModeIconSize.regular, c.textPrimary) }
+}
+
 /**
  * A round button with only an icon; [label] is read by TalkBack. A white card with a soft lift,
  * or ink when [prominent] (Speak, Send).

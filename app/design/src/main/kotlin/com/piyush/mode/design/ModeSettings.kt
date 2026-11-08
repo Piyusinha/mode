@@ -122,15 +122,22 @@ public fun ModeValueRow(title: String, value: String, modifier: Modifier = Modif
 @Composable
 public fun ModeSwitch(on: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, label: String? = null) {
     val c = Mode.colors
-    val track by animateColorAsState(if (on) c.success else c.track, label = "track")
-    val travel by animateDpAsState(if (on) ModeSize.switchWidth - ModeSize.switchThumb - (ModeSize.switchHeight - ModeSize.switchThumb) else ModeSpacing.none, label = "thumb")
+    val track by animateColorAsState(if (on) c.accent else c.track, label = "track")
+    val thumb by animateDpAsState(if (on) ModeSize.switchThumb else ModeSize.switchThumbOff, label = "thumbSize")
+    val inset = (ModeSize.switchHeight - thumb) / 2
+    val travel by animateDpAsState(if (on) ModeSize.switchWidth - ModeSize.switchHeight else ModeSpacing.none, label = "thumb")
     Box(
         modifier.size(ModeSize.switchWidth, ModeSize.switchHeight).background(track, Capsule)
+            .then(if (on) Modifier else Modifier.border(ModeSize.switchOutline, c.separator, Capsule))
             .clickable(role = Role.Switch, indication = null, interactionSource = null) { onChange(!on) }
             .semantics { if (label != null) contentDescription = label; stateDescription = if (on) "on" else "off" }
-            .padding((ModeSize.switchHeight - ModeSize.switchThumb) / 2),
+            .padding(inset),
         Alignment.CenterStart,
-    ) { Box(Modifier.offset(x = travel).size(ModeSize.switchThumb).background(Color.White, CircleShape)) }
+    ) {
+        Box(Modifier.offset(x = travel).size(thumb).background(if (on) c.onAccent else c.textSecondary, CircleShape), Alignment.Center) {
+            if (on) ModeIconImage(ModeIcon.Checkmark, ModeIconSize.chevron, c.accent)
+        }
+    }
 }
 
 /** A setting that's on or off: its name, a line under it, and the switch. */

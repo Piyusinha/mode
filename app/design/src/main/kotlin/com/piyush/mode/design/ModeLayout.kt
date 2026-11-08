@@ -305,7 +305,12 @@ public object ModeSize {
     public val filterChip: Dp = 34.dp
     public val switchWidth: Dp = 52.dp
     public val switchHeight: Dp = 32.dp
-    public val switchThumb: Dp = 26.dp
+    public val switchThumb: Dp = 24.dp
+    /** The thumb while the switch is off (Android's switch shrinks it). */
+    public val switchThumbOff: Dp = 16.dp
+    public val switchOutline: Dp = 2.dp
+    /** Android's back arrow touch target. */
+    public val backButton: Dp = 48.dp
     /** Health: a row, its tile and tick, the Fix button; the banner's Mo and button. */
     public val healthRow: Dp = 60.dp
     public val healthTile: Dp = 34.dp

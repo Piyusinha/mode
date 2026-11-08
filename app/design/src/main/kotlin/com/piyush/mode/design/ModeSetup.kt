@@ -248,7 +248,7 @@ public fun ModePageBar(backLabel: String, onBack: () -> Unit, modifier: Modifier
         modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch).padding(horizontal = ModeSpacing.screenEdge),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ModeIconButton(ModeIcon.Back, backLabel, onBack)
+        ModeBackButton(backLabel, onBack)
         Box(Modifier.weight(1f))
         trailing()
     }

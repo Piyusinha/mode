@@ -57,7 +57,7 @@ public fun ModeStepDots(current: Int, total: Int, label: String, modifier: Modif
 public fun ModeSetupHeader(backLabel: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, step: Triple<Int, Int, String>? = null) {
     Box(modifier.fillMaxWidth().defaultMinSize(minHeight = ModeSize.touch).padding(horizontal = ModeSpacing.screenEdge)) {
         if (step != null) ModeStepDots(step.first, step.second, step.third, Modifier.align(Alignment.Center))
-        if (onBack != null) ModeIconButton(ModeIcon.Back, backLabel, onBack, Modifier.align(Alignment.CenterStart))
+        if (onBack != null) ModeBackButton(backLabel, onBack, Modifier.align(Alignment.CenterStart))
     }
 }
 
