@@ -6,6 +6,8 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.6 · 8 Nov 2026
+
 - Settings no longer shows Developer (runs, logs, model comparison): it's for building Mode, so
   only builds made in Xcode have it.
 
