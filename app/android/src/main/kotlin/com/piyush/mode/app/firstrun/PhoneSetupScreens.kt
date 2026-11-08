@@ -44,6 +44,8 @@ sealed interface PhoneSetupEvent {
     data class Open(val guide: PhoneSetupGuide) : PhoneSetupEvent
     /** The guide's second button ("I've done this", "Skip for now"). */
     data class Alternative(val guide: PhoneSetupGuide) : PhoneSetupEvent
+    /** A manual guide's third way out: not now. */
+    data class Later(val guide: PhoneSetupGuide) : PhoneSetupEvent
     data object CloseGuide : PhoneSetupEvent
     data object Continue : PhoneSetupEvent
     data object Back : PhoneSetupEvent
@@ -56,8 +58,8 @@ fun PhoneSetupScreen(state: PhoneSetupUiState, dots: StepDots?, background: Back
     if (guide != null) GuideScreen(guide, onEvent) else HubScreen(state, dots, background, onEvent)
 }
 
-/** Background mode's row (Settings only, not first setup): on or not, and where it goes. */
-class BackgroundRow(val on: Boolean, val open: () -> Unit)
+/** Background mode's row (Settings only, not first setup): on or not, and where it goes; [unavailable] on Android 13. */
+class BackgroundRow(val on: Boolean, val open: () -> Unit, val unavailable: Boolean = false)
 
 @Composable
 private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, background: BackgroundRow?, onEvent: (PhoneSetupEvent) -> Unit) {
@@ -80,8 +82,13 @@ private fun HubScreen(state: PhoneSetupUiState, dots: StepDots?, background: Bac
             if (background != null) {
                 ModeCard(lifted = true, rows = listOf {
                     ModePermissionRow(
-                        stringResource(R.string.bg_row_title), stringResource(R.string.bg_row_why), ModeIcon.Background,
-                        if (background.on) ModeStatusAction.Done(stringResource(R.string.bg_row_on)) else ModeStatusAction.Quiet(stringResource(R.string.bg_row_set)),
+                        stringResource(R.string.bg_row_title),
+                        stringResource(if (background.unavailable) R.string.bg_row_needs_14 else R.string.bg_row_why), ModeIcon.Background,
+                        when {
+                            background.on -> ModeStatusAction.Done(stringResource(R.string.bg_row_on))
+                            background.unavailable -> ModeStatusAction.Note(stringResource(R.string.bg_row_unavailable))
+                            else -> ModeStatusAction.Quiet(stringResource(R.string.bg_row_set))
+                        },
                         background.open,
                     )
                 })
@@ -111,12 +118,13 @@ private fun PhoneRow(row: PhoneSetupRow, onEvent: (PhoneSetupEvent) -> Unit) {
     val status = when {
         allowed -> ModeStatusAction.Done(stringResource(words.done))
         row.later -> ModeStatusAction.Note(stringResource(R.string.phone_later))
+        row.manual -> ModeStatusAction.Open(stringResource(words.action))
         row.kind == PhoneSetupKind.PhoneControl -> ModeStatusAction.Prominent(stringResource(words.action))
         else -> ModeStatusAction.Quiet(stringResource(words.action))
     }
     ModePermissionRow(
         stringResource(words.title), stringResource(words.why), words.icon, status,
-        { onEvent(PhoneSetupEvent.Allow(row)) }, highlighted = row.kind == PhoneSetupKind.PhoneControl,
+        { onEvent(PhoneSetupEvent.Allow(row)) }, highlighted = row.kind == PhoneSetupKind.PhoneControl, caution = row.manual && !allowed,
     )
 }
 
@@ -128,6 +136,10 @@ private val ROWS = mapOf(
     PhoneSetupKind.Assistant to RowWords(R.string.phone_assistant, R.string.phone_assistant_why, ModeIcon.SiriWave, R.string.phone_turn_on, R.string.phone_on),
     PhoneSetupKind.Battery to RowWords(R.string.phone_battery, R.string.phone_battery_why, ModeIcon.Battery, R.string.phone_allow, R.string.phone_allowed),
     PhoneSetupKind.Microphone to RowWords(R.string.phone_microphone, R.string.phone_microphone_why, ModeIcon.Microphone, R.string.phone_allow, R.string.phone_allowed),
+    // The maker's own settings (boards D01, D02): Mode can't read them, so the row says so and the user confirms.
+    PhoneSetupKind.Sleeping to RowWords(R.string.phone_sleeping, R.string.phone_sleeping_why, ModeIcon.Moon, R.string.phone_open, R.string.phone_confirmed),
+    PhoneSetupKind.Autostart to RowWords(R.string.phone_autostart, R.string.phone_autostart_why, ModeIcon.Rocket, R.string.phone_open, R.string.phone_confirmed),
+    PhoneSetupKind.Popups to RowWords(R.string.phone_popups, R.string.phone_popups_why, ModeIcon.Popup, R.string.phone_open, R.string.phone_confirmed),
 )
 
 /** One guide page: what to do in Android's Settings, step by step, and the button that goes there. */
@@ -153,6 +165,9 @@ private fun GuideScreen(guide: PhoneSetupGuide, onEvent: (PhoneSetupEvent) -> Un
             if (g.alternative != null) {
                 ModeButton(stringResource(g.alternative), { onEvent(PhoneSetupEvent.Alternative(guide)) }, Modifier.fillMaxWidth(), role = ModeButtonRole.Link)
             }
+            if (g.later != null) {
+                ModeButton(stringResource(g.later), { onEvent(PhoneSetupEvent.Later(guide)) }, Modifier.fillMaxWidth(), role = ModeButtonRole.Plain)
+            }
         }
     }
 }
@@ -167,6 +182,8 @@ private class GuideWords(
     @StringRes val open: Int,
     @StringRes val alternative: Int? = null,
     @StringRes val waiting: Int? = null,
+    /** A third button on a manual guide: "Later". */
+    @StringRes val later: Int? = null,
 )
 
 private val GUIDES = mapOf(
@@ -189,5 +206,20 @@ private val GUIDES = mapOf(
         R.string.guide_battery_title, R.string.guide_battery_body, MoMood.Sleep,
         listOf(R.string.guide_battery_1, R.string.guide_battery_2),
         R.string.guide_battery_note, ModeNoteKind.Info, R.string.guide_battery_open, alternative = R.string.guide_skip,
+    ),
+    PhoneSetupGuide.Sleeping to GuideWords(
+        R.string.guide_sleeping_title, R.string.guide_sleeping_body, MoMood.Sleep,
+        listOf(R.string.guide_sleeping_1, R.string.guide_sleeping_2, R.string.guide_sleeping_3),
+        R.string.guide_sleeping_note, ModeNoteKind.Warning, R.string.guide_sleeping_open, alternative = R.string.guide_done, later = R.string.guide_later,
+    ),
+    PhoneSetupGuide.Autostart to GuideWords(
+        R.string.guide_autostart_title, R.string.guide_autostart_body, MoMood.YourTurn,
+        listOf(R.string.guide_autostart_1, R.string.guide_autostart_2, R.string.guide_autostart_3),
+        R.string.guide_autostart_note, ModeNoteKind.Info, R.string.guide_autostart_open, alternative = R.string.guide_done, later = R.string.guide_later,
+    ),
+    PhoneSetupGuide.Popups to GuideWords(
+        R.string.guide_popups_title, R.string.guide_popups_body, MoMood.YourTurn,
+        listOf(R.string.guide_popups_1, R.string.guide_popups_2, R.string.guide_popups_3),
+        R.string.guide_popups_note, ModeNoteKind.Info, R.string.guide_popups_open, alternative = R.string.guide_done, later = R.string.guide_later,
     ),
 )

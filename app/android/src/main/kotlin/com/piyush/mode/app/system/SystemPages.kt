@@ -51,7 +51,7 @@ class SystemPages(private val activity: Activity) {
         val exempt = activity.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(pkg)
         // Xiaomi, Samsung, OPPO, vivo, Huawei… stop apps with their own savers too: once Android lets Mode run,
         // the next tap opens the maker's page (battery, then autostart), whichever this phone has.
-        val brand = PhoneQuirks.of(Build.MANUFACTURER, Build.BRAND)
+        val brand = brand()
         val brandPages = brand?.let { (it.battery + it.autostart).map(::page) }.orEmpty()
         open(
             "battery",
@@ -63,9 +63,28 @@ class SystemPages(private val activity: Activity) {
         )
     }
 
-    /** A maker's own page, with Mode's name for the pages that take it (Xiaomi's battery saver). */
-    private fun page(p: QuirkPage): Intent = Intent().setClassName(p.packageName, p.className)
-        .putExtra(EXTRA_PACKAGE_NAME, pkg).putExtra(EXTRA_PACKAGE_LABEL, activity.applicationInfo.loadLabel(activity.packageManager))
+    /** Samsung's "Never sleeping apps" picker (board D03), else its battery page. */
+    fun sleeping() = open("never sleeping apps", *brand()?.sleeping.orEmpty().map(::page).toTypedArray())
+
+    /** The maker's Autostart list (board D04). */
+    fun autostart() = open("autostart", *brand()?.autostart.orEmpty().map(::page).toTypedArray())
+
+    /** Xiaomi's permission editor for Mode, where pop-ups in the background live (board D05). */
+    fun popups() = open("background pop-ups", *brand()?.popups.orEmpty().map(::page).toTypedArray())
+
+    /** Wi-Fi settings: background mode's link needs a network. */
+    fun wifi() = open("wi-fi", Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_WIRELESS_SETTINGS))
+
+    /** This phone's maker (the debug override first, so one phone can show another maker's pages). */
+    private fun brand(): PhoneQuirks.Brand? = com.piyush.mode.app.graph.brandOf(com.piyush.mode.core.storage.SharedPrefsStore(activity))
+
+    /** A maker's own page: a component, or an action its app answers; with Mode's name for the pages that take it. */
+    private fun page(p: QuirkPage): Intent {
+        val intent = if (p.action != null) Intent(p.action).setPackage(p.packageName) else Intent().setClassName(p.packageName, p.className)
+        p.intExtras.forEach { (key, value) -> intent.putExtra(key, value) }
+        p.appPackageExtra?.let { intent.putExtra(it, pkg) }
+        return intent.putExtra(EXTRA_PACKAGE_NAME, pkg).putExtra(EXTRA_PACKAGE_LABEL, activity.applicationInfo.loadLabel(activity.packageManager))
+    }
 
     /** Mode's notification settings, once Android stops asking. */
     /** About phone, where tapping Build number turns on Developer options. */

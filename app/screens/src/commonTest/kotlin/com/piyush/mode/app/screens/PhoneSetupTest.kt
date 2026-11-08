@@ -92,6 +92,52 @@ class PhoneSetupTest {
     }
 
     @Test
+    fun aMakersManualStepsAreRowsTheUserConfirmsAndNeverHoldUpContinue() = runTest {
+        val f = Fixture(this)
+        val manual = listOf(
+            PhoneCheckResult(PhoneCheckId.Autostart, CheckState.Unverifiable(confirmed = false)),
+            PhoneCheckResult(PhoneCheckId.Popups, CheckState.Unverifiable(confirmed = false)),
+        )
+        f.checks.quick = results(engine = true) + manual
+        val p = PhoneSetupPresenter(backgroundScope, f.checks, f.permissions, FakeLifecycle(), f.settings)
+        val s = p.state.awaitState { it.rows.isNotEmpty() }
+        assertEquals(
+            listOf(PhoneSetupKind.PhoneControl, PhoneSetupKind.Notifications, PhoneSetupKind.Assistant, PhoneSetupKind.Battery, PhoneSetupKind.Autostart, PhoneSetupKind.Popups, PhoneSetupKind.Microphone),
+            s.rows.map { it.kind },
+        )
+        assertTrue(s.ready, "unconfirmed maker steps don't block Continue")
+        val autostart = s.rows.first { it.kind == PhoneSetupKind.Autostart }
+        assertTrue(autostart.manual && autostart.optional)
+        assertEquals(PermissionStatus.NotAsked, autostart.status)
+
+        p.allow(PhoneSetupKind.Autostart)
+        assertEquals(PhoneSetupGuide.Autostart, p.state.value.guide)
+        // Coming back from the maker's page proves nothing: the guide stays until the user confirms.
+        f.checks.quick = results(engine = true) + manual
+        p.refresh()
+        assertEquals(PhoneSetupGuide.Autostart, p.state.awaitState { it.rows.isNotEmpty() }.guide)
+        p.done(PhoneSetupKind.Autostart)
+        assertNull(p.state.value.guide)
+        assertEquals(setOf("Autostart"), f.settings.settings.value.deviceSteps, "remembered, so the checks read it as confirmed")
+        f.checks.quick = results(engine = true) + listOf(
+            PhoneCheckResult(PhoneCheckId.Autostart, CheckState.Unverifiable(confirmed = true)),
+            PhoneCheckResult(PhoneCheckId.Popups, CheckState.Unverifiable(confirmed = false)),
+        )
+        p.refresh()
+        val after = p.state.awaitState { st -> st.rows.first { it.kind == PhoneSetupKind.Autostart }.status == PermissionStatus.Allowed }
+        assertEquals(PermissionStatus.NotAsked, after.rows.first { it.kind == PhoneSetupKind.Popups }.status)
+    }
+
+    @Test
+    fun aPlainPhoneHasNoManualRows() = runTest {
+        val f = Fixture(this)
+        f.checks.quick = results(engine = true)
+        val p = PhoneSetupPresenter(backgroundScope, f.checks, f.permissions, FakeLifecycle(), f.settings)
+        val s = p.state.awaitState { it.rows.isNotEmpty() }
+        assertTrue(s.rows.none { it.manual })
+    }
+
+    @Test
     fun withPhoneControlTheFirstRunHasAPhoneStepBeforeTheFirstJob() = runTest {
         val f = Fixture(this)
         val account = com.piyush.mode.feature.settings.data.ChatGptAccount(

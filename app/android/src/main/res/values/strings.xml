@@ -16,6 +16,35 @@
     <string name="bg_row_why">Mode works on a hidden screen while you use your phone. Optional.</string>
     <string name="bg_row_set">Set up</string>
     <string name="bg_row_on">On</string>
+    <string name="bg_row_needs_14">Needs Android 14. This phone runs Android 13, so Mode works on your screen.</string>
+    <string name="bg_row_unavailable">Not on this phone</string>
+    <!-- Background mode blocked (boards D06–D08) and a grant that didn't stick. -->
+    <string name="bg_req_version">Android 14 or newer</string>
+    <string name="bg_req_wifi">Wi-Fi</string>
+    <string name="bg_req_developer">Developer options allowed</string>
+    <string name="bg_req_version_ok">Yes</string>
+    <string name="bg_req_wifi_ok">Connected</string>
+    <string name="bg_req_developer_ok">Yes</string>
+    <string name="bg_req_version_fails">This phone: Android 13</string>
+    <string name="bg_req_wifi_fails">Not connected</string>
+    <string name="bg_req_developer_fails">Blocked by a policy</string>
+    <string name="bg_version_title">Background mode needs Android 14</string>
+    <string name="bg_version_body">This phone runs Android 13. Mode still does every task, on your screen.</string>
+    <string name="bg_version_note">On Android 13 a hidden screen would steal the keyboard and focus from what you’re doing, so Mode doesn’t offer it there.</string>
+    <string name="bg_blocked_back">Back to setup</string>
+    <string name="bg_wifi_title">Join a Wi-Fi network first</string>
+    <string name="bg_wifi_body">Mode links to the phone over Wi-Fi, once. After that, tasks work on mobile data too.</string>
+    <string name="bg_wifi_open">Open Wi-Fi settings</string>
+    <string name="bg_wifi_waiting">Waiting for Wi-Fi. Mode carries on by itself.</string>
+    <string name="bg_policy_title">Developer options are turned off</string>
+    <string name="bg_policy_body">A work or school profile on this phone doesn’t allow them. Mode can’t change that.</string>
+    <string name="bg_policy_note">Mode still works on your screen. If this is your own phone, ask whoever manages it.</string>
+    <string name="bg_nogrant_title">Mode couldn’t keep the link</string>
+    <string name="bg_nogrant_body">Pairing worked, but this phone didn’t let Mode turn Wireless debugging back on after a restart.</string>
+    <string name="bg_nogrant_1">Go back to Wireless debugging</string>
+    <string name="bg_nogrant_2">Tap Pair device with pairing code again</string>
+    <string name="bg_nogrant_3">Keep the window open while Mode pairs</string>
+    <string name="bg_nogrant_note">If it happens again, background mode still works, but you’ll turn Wireless debugging on yourself after each restart.</string>
     <string name="bg_channel">Background mode setup</string>
     <string name="bg_code_title">Type the 6-digit code here</string>
     <string name="bg_code_body">It’s in the window below. Keep that window open.</string>
@@ -195,6 +224,39 @@
     <string name="guide_battery_open">Open battery setting</string>
 
     <string name="guide_skip">Skip for now</string>
+
+    <!-- Your phone: the maker's settings Mode can't read back, confirmed by the user (boards D01–D05). -->
+    <string name="phone_open">Open</string>
+    <string name="phone_confirmed">Done</string>
+    <string name="phone_sleeping">Keep Mode out of sleep</string>
+    <string name="phone_sleeping_why">Samsung puts unused apps to sleep. Mode can’t check this one: you confirm it.</string>
+    <string name="phone_autostart">Autostart</string>
+    <string name="phone_autostart_why">Lets Mode wake up for a task. Mode can’t check this one: you confirm it.</string>
+    <string name="phone_popups">Pop-ups in the background</string>
+    <string name="phone_popups_why">Lets Mode open an app while you’re elsewhere. You confirm this one too.</string>
+    <string name="guide_done">I’ve done this</string>
+    <string name="guide_later">Later</string>
+    <string name="guide_sleeping_title">Keep Mode out of sleep</string>
+    <string name="guide_sleeping_body">Samsung stops apps you haven’t opened in a while. Mode runs only when you ask, so it would be first to go.</string>
+    <string name="guide_sleeping_1">Open Battery, then Background usage limits</string>
+    <string name="guide_sleeping_2">Tap Never sleeping apps, then +</string>
+    <string name="guide_sleeping_3">Add Mode</string>
+    <string name="guide_sleeping_note">Without this, Samsung can stop Mode in the middle of a task, or turn Phone control off while you sleep.</string>
+    <string name="guide_sleeping_open">Open Battery settings</string>
+    <string name="guide_autostart_title">Let Mode start by itself</string>
+    <string name="guide_autostart_body">This phone only lets apps on its Autostart list wake up on their own. Mode needs that for timed tasks and the assistant.</string>
+    <string name="guide_autostart_1">Open Autostart</string>
+    <string name="guide_autostart_2">Find Mode in the list</string>
+    <string name="guide_autostart_3">Turn its switch on</string>
+    <string name="guide_autostart_note">Mode can’t read this switch, so it takes your word for it. If Mode later stops mid-task, this is the first thing to check.</string>
+    <string name="guide_autostart_open">Open Autostart</string>
+    <string name="guide_popups_title">Let Mode open apps for you</string>
+    <string name="guide_popups_body">This phone blocks apps from opening anything while they’re in the background. Mode opens the app a task needs.</string>
+    <string name="guide_popups_1">Open Mode’s permissions</string>
+    <string name="guide_popups_2">Tap Other permissions</string>
+    <string name="guide_popups_3">Allow Display pop-up windows while running in the background</string>
+    <string name="guide_popups_note">Mode can’t read this switch either. Confirm it once you’ve allowed it.</string>
+    <string name="guide_popups_open">Open Mode’s permissions</string>
 
     <!-- Settings. -->
     <string name="backup_row">Backup and restore</string>

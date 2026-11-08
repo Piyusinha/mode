@@ -56,7 +56,11 @@ ANDROID_LOGOS = {"android": "https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/i
 ANDROID_ICONS = {
     "tap": ("touch_app", False), "power": ("power_settings_new", False), "battery": ("battery_full", False),
     "background": ("layers", False),
+    "moon": ("bedtime", False), "rocket": ("rocket_launch", False), "popup": ("picture_in_picture", False),
+    "linkOff": ("link_off", False),
 }
+# iPhone cases newer than this mapping, with their Material equivalent.
+ICONS.setdefault("backup", ("cloud_upload", False))
 
 
 def snake(name):

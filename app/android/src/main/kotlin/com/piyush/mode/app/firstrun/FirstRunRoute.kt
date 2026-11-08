@@ -92,7 +92,9 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
 
     val setup = com.piyush.mode.app.ModeApplication.backgroundSetup(androidx.compose.ui.platform.LocalContext.current)
     val step = setup?.step?.collectAsStateWithLifecycle()?.value
-    val background = if (openBackground != null && setup != null) BackgroundRow(step == com.piyush.mode.app.background.BackgroundStep.Linked && setup.enabled, openBackground) else null
+    val background = if (openBackground != null && setup != null) {
+        BackgroundRow(step == com.piyush.mode.app.background.BackgroundStep.Linked && setup.enabled, openBackground, unavailable = setup.neverOnThisPhone)
+    } else null
     PhoneSetupScreen(state, dots, background) { event ->
         when (event) {
             is PhoneSetupEvent.Allow -> when {
@@ -110,11 +112,19 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
                 PhoneSetupGuide.PhoneControl -> pages.accessibility()
                 PhoneSetupGuide.Assistant -> pages.defaultApps()
                 PhoneSetupGuide.Battery -> pages.battery()
+                PhoneSetupGuide.Sleeping -> pages.sleeping()
+                PhoneSetupGuide.Autostart -> pages.autostart()
+                PhoneSetupGuide.Popups -> pages.popups()
             }
             is PhoneSetupEvent.Alternative -> when (event.guide) {
                 PhoneSetupGuide.RestrictedSettings -> presenter.unlocked()
+                // "I've done this" on a step Mode can't read back.
+                PhoneSetupGuide.Sleeping -> presenter.done(PhoneSetupKind.Sleeping)
+                PhoneSetupGuide.Autostart -> presenter.done(PhoneSetupKind.Autostart)
+                PhoneSetupGuide.Popups -> presenter.done(PhoneSetupKind.Popups)
                 else -> presenter.closeGuide()
             }
+            is PhoneSetupEvent.Later -> presenter.closeGuide()
             PhoneSetupEvent.CloseGuide -> presenter.closeGuide()
             PhoneSetupEvent.Continue -> onContinue()
             PhoneSetupEvent.Back -> onBack()

@@ -81,8 +81,13 @@ public enum class ModeIcon(@DrawableRes public val res: Int) {
     Keyboard(R.drawable.ic_mode_keyboard),
     DragHandle(R.drawable.ic_mode_drag_handle),
     PersonalVoice(R.drawable.ic_mode_personal_voice),
+    Backup(R.drawable.ic_mode_backup),
     Tap(R.drawable.ic_mode_tap),
     Power(R.drawable.ic_mode_power),
     Battery(R.drawable.ic_mode_battery),
     Background(R.drawable.ic_mode_background),
+    Moon(R.drawable.ic_mode_moon),
+    Rocket(R.drawable.ic_mode_rocket),
+    Popup(R.drawable.ic_mode_popup),
+    LinkOff(R.drawable.ic_mode_link_off),
 }

@@ -158,6 +158,13 @@ class DevProbe : BroadcastReceiver() {
                         helper = null
                         "stopped"
                     }
+                    // Pretend this phone is another maker's, for its setup rows and guides: --es name samsung (empty: this phone)
+                    "brand" -> {
+                        com.piyush.mode.core.storage.SharedPrefsStore(context).putString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEBUG_BRAND, intent.getStringExtra("name").orEmpty())
+                        "brand=${com.piyush.mode.app.graph.brandOf(com.piyush.mode.core.storage.SharedPrefsStore(context))?.name ?: "none"}"
+                    }
+                    // What the quick settings read says now (no screenshot, no tap).
+                    "status" -> graph.phoneChecks.status().joinToString(" ") { "${it.id}=${it.state}" }
                     "checks" -> buildString {
                         graph.phoneChecks.run { rows -> clear(); rows.forEach { append("${it.id}=${it.state} ") } }
                     }

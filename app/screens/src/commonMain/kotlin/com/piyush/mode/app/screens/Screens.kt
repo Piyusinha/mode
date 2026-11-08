@@ -245,7 +245,7 @@ public class Screens(
 
     /** Setting up phone control (Android): the switches it needs, and a guide for each. */
     public fun phoneSetup(): com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter =
-        com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter(scope, phoneChecks, permissions, lifecycle)
+        com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter(scope, phoneChecks, permissions, lifecycle, settings)
 
     /** Settings → Unlock by voice: the guide, and the check that it works. */
     public fun unlockVoice(): com.piyush.mode.app.screens.start.UnlockVoicePresenter =

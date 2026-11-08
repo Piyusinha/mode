@@ -10,6 +10,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
 import android.provider.Settings
 import com.piyush.mode.adb.PairingWindow
 import com.piyush.mode.android.NodeSnapshot
@@ -19,6 +21,7 @@ import com.piyush.mode.app.ModeApplication
 import com.piyush.mode.app.R
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.feature.connection.data.BackgroundMode
+import com.piyush.mode.feature.connection.domain.BackgroundBlock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,8 +33,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** Where background mode's setup is (boards B01–B06). */
-enum class BackgroundStep { Intro, DevOptions, Wireless, Pair, Linking, Failed, Linked }
+/** Where background mode's setup is (boards B01–B06; the blocked pages are D06–D08). */
+enum class BackgroundStep {
+    Intro, DevOptions, Wireless, Pair, Linking, Failed, Linked,
+    /** This phone runs Android 13: no hidden display here. */
+    BlockedVersion,
+    /** No Wi-Fi: the link needs one (Mode carries on by itself when one connects). */
+    BlockedWifi,
+    /** A work or school policy turned Developer options off. */
+    BlockedPolicy,
+    /** Paired, but Mode didn't get the right to turn Wireless debugging back on. */
+    NoGrant,
+}
 
 /**
  * Background mode's setup: Developer options, Wireless debugging, then pairing. While the pairing window is
@@ -50,11 +63,22 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
 
     val enabled: Boolean get() = mode.enabled
 
+    /** Background mode can never work on this phone (Android 13): the hub says so instead of "Set up". */
+    val neverOnThisPhone: Boolean get() = mode.block() == BackgroundBlock.AndroidTooOld
+
+    private var wifiWatch: ConnectivityManager.NetworkCallback? = null
+
     private val developerOptions get() = Settings.Global.getInt(app.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
     private val wirelessDebugging get() = Settings.Global.getInt(app.contentResolver, ADB_WIFI, 0) == 1
 
-    /** Set it up: the first step that isn't done yet. */
+    /** Set it up: what blocks it, else the first step that isn't done yet. */
     fun begin() {
+        when (mode.block()) {
+            BackgroundBlock.AndroidTooOld -> return blocked(BackgroundStep.BlockedVersion)
+            BackgroundBlock.DebuggingBlocked -> return blocked(BackgroundStep.BlockedPolicy)
+            BackgroundBlock.NoWifi -> return blocked(BackgroundStep.BlockedWifi)
+            null -> stopWifiWatch()
+        }
         state.value = when {
             !developerOptions -> BackgroundStep.DevOptions
             !wirelessDebugging -> BackgroundStep.Wireless
@@ -68,8 +92,34 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
         when (state.value) {
             BackgroundStep.DevOptions -> if (developerOptions) begin()
             BackgroundStep.Wireless -> if (wirelessDebugging) begin()
+            BackgroundStep.BlockedWifi, BackgroundStep.BlockedPolicy -> if (mode.block() == null) begin()
             else -> Unit
         }
+    }
+
+    private fun blocked(step: BackgroundStep) {
+        AppLog.log("background", "setup blocked: $step")
+        state.value = step
+        if (step == BackgroundStep.BlockedWifi) watchWifi()
+    }
+
+    /** While waiting for Wi-Fi, carries on by itself the moment one connects (board D07). */
+    private fun watchWifi() {
+        if (wifiWatch != null) return
+        val manager = app.getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                scope.launch { if (state.value == BackgroundStep.BlockedWifi && mode.wifiConnected()) begin() }
+            }
+        }
+        wifiWatch = callback
+        runCatching { manager.registerDefaultNetworkCallback(callback) }
+    }
+
+    private fun stopWifiWatch() {
+        val callback = wifiWatch ?: return
+        wifiWatch = null
+        runCatching { app.getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback) }
     }
 
     /** "They're on already" on Developer options. */
@@ -85,6 +135,7 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
 
     fun reset() {
         stopWatching()
+        stopWifiWatch()
         state.value = if (mode.enabled) BackgroundStep.Linked else BackgroundStep.Intro
     }
 
@@ -135,7 +186,13 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
             return fail()
         }
         // The right to switch Wireless debugging back on after a restart, so Mode reconnects by itself.
-        runCatching { mode.link.run("pm grant ${app.packageName} $WRITE_SECURE_SETTINGS") }
+        val granted = runCatching { mode.link.run("pm grant ${app.packageName} $WRITE_SECURE_SETTINGS") }
+        if (!mode.holdsSecureSettings()) {
+            AppLog.log("background", "the grant didn't stick: ${granted.getOrNull()?.trim() ?: granted.exceptionOrNull()?.message}")
+            state.value = BackgroundStep.NoGrant
+            bringModeBack()
+            return
+        }
         mode.enabled = true
         val helper = runCatching { mode.display() }
         mode.stop()

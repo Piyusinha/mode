@@ -52,6 +52,8 @@ public sealed interface ModeStatusAction {
     public data class Done(val title: String) : ModeStatusAction
     /** Just a quiet word ("Later"). */
     public data class Note(val text: String) : ModeStatusAction
+    /** A grey button: a page Mode opens for a setting it can't read back ("Open"). */
+    public data class Open(val title: String) : ModeStatusAction
 }
 
 /** A permission on "Let Mode use your phone": its tile, its name and why, and what to do about it, top-aligned. */
@@ -64,6 +66,8 @@ public fun ModePermissionRow(
     onAllow: () -> Unit,
     modifier: Modifier = Modifier,
     highlighted: Boolean = false,
+    /** The why-line warns (orange): Mode can't check this one, the user confirms it. */
+    caution: Boolean = false,
 ) {
     val c = Mode.colors
     Row(
@@ -78,7 +82,7 @@ public fun ModePermissionRow(
         ) { ModeIconImage(icon, ModeIconSize.regular, if (highlighted) c.tint else c.textPrimary) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs + ModeSpacing.xxs / 2)) {
             ModeText(title, ModeTextStyle.CalloutEmphasis)
-            ModeText(why, ModeTextStyle.Footnote, color = c.textSecondary)
+            ModeText(why, ModeTextStyle.Footnote, color = if (caution) c.tokens.tileOrangeText else c.textSecondary)
         }
         ModeStatusView(status, onAllow)
     }
@@ -101,6 +105,14 @@ public fun ModeStatusView(action: ModeStatusAction, onTap: () -> Unit = {}) {
         }
         is ModeStatusAction.Note -> Box(Modifier.defaultMinSize(minHeight = ModeSize.permissionTile), Alignment.Center) {
             ModeText(action.text, ModeTextStyle.Subheadline, color = c.textSecondary)
+        }
+        is ModeStatusAction.Open -> {
+            val (press, alpha) = rememberPress()
+            Box(
+                Modifier.defaultMinSize(minHeight = ModeSize.pillButton).alpha(alpha).background(c.fill, Capsule)
+                    .clickable(press, indication = null, role = Role.Button, onClick = onTap).padding(horizontal = ModeSpacing.l),
+                Alignment.Center,
+            ) { ModeText(action.title, ModeTextStyle.SubheadlineEmphasis, maxLines = 1) }
         }
     }
 }
@@ -240,4 +252,42 @@ public fun ModePageBar(backLabel: String, onBack: () -> Unit, modifier: Modifier
         Box(Modifier.weight(1f))
         trailing()
     }
+}
+
+/** How one requirement stands (boards D06–D08). */
+public enum class ModeRequirementState { Met, Unmet, Waiting }
+
+/** One thing a feature needs: what it is, how this phone does ("Android 16", "Not connected"), and whether it's met. */
+public data class ModeRequirement(val title: String, val detail: String, val state: ModeRequirementState)
+
+/** A card of requirements with a tick, a cross or a clock for each. */
+@Composable
+public fun ModeRequirementList(rows: List<ModeRequirement>, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    ModeCard(
+        lifted = true,
+        modifier = modifier,
+        rows = rows.map { row ->
+            {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = ModeSpacing.m),
+                    horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val (fill, tint, icon) = when (row.state) {
+                        ModeRequirementState.Met -> Triple(c.tokens.tagGreen, c.success, ModeIcon.Checkmark)
+                        ModeRequirementState.Unmet -> Triple(c.tokens.tileRed, c.danger, ModeIcon.Close)
+                        ModeRequirementState.Waiting -> Triple(c.tokens.tileOrange, c.tokens.tileOrangeText, ModeIcon.Clock)
+                    }
+                    Box(Modifier.clearAndSetSemantics {}.size(ModeSize.guideNumber).background(fill, CircleShape), Alignment.Center) {
+                        ModeIconImage(icon, ModeIconSize.chevron, tint)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+                        ModeText(row.title, ModeTextStyle.Callout)
+                        ModeText(row.detail, ModeTextStyle.Footnote, color = if (row.state == ModeRequirementState.Met) c.textSecondary else tint)
+                    }
+                }
+            }
+        },
+    )
 }
