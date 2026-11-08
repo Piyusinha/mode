@@ -52,11 +52,12 @@ const prev = (s) => ({ ...s, from: s.from - (s.to - s.from), to: s.from });
 
 /** Runs one query; numbers come back as numbers. */
 export async function sql(env, text) {
+  if (!env.CF_API_TOKEN) throw new Error('CF_API_TOKEN is not set. Run: npx wrangler@4 secret put CF_API_TOKEN (in stats/)');
   const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}/analytics_engine/sql`, {
     method: 'POST', headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` }, body: `${text} FORMAT JSON`,
   });
   const body = await res.text();
-  if (!res.ok) throw new Error(`Analytics query failed (${res.status}): ${body.slice(0, 200)}`);
+  if (!res.ok) throw new Error(/9106|Authentication/.test(body) ? 'Cloudflare refused CF_API_TOKEN: it needs Account > Account Analytics > Read on this account.' : `Analytics query failed (${res.status}): ${body.slice(0, 200)}`);
   const j = JSON.parse(body);
   const num = new Set(j.meta.filter((m) => /Int|Float|Decimal/.test(m.type)).map((m) => m.name));
   return j.data.map((r) => { for (const k of num) r[k] = Number(r[k]); return r; });

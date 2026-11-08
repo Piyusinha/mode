@@ -110,7 +110,7 @@ async function handle(request, env) {
       return json({ error: 'not found' }, 404);
     } catch (e) {
       const msg = String(e.message || e);
-      return json({ error: /^bad /.test(msg) ? msg : 'The analytics query failed. Is CF_API_TOKEN set?' , detail: msg.slice(0, 300) }, /^bad /.test(msg) ? 400 : 502);
+      return json({ error: /^bad /.test(msg) ? msg : msg , detail: msg.slice(0, 300) }, /^bad /.test(msg) ? 400 : 502);
     }
   }
   return env.ASSETS.fetch(request);
