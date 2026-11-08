@@ -60,6 +60,8 @@ final class SettingsViewModel {
         var modelCount = 0
         /// Your data → Backup and restore (only once it's wired to its logic).
         var showsBackup = BackupFeature.ready
+        /// Developer: debug builds only, hidden in the release .ipa.
+        var showsDeveloper = DeveloperFeature.enabled
     }
 
     /// This Mode's version, and a newer Mode when one is out.
@@ -165,7 +167,7 @@ final class SettingsViewModel {
         case let .maxCost(usd): presenter.setMaxCostPerTask(usd: usd)
         case let .dailyCap(usd): presenter.setDailyCap(usd: usd > 0 ? KotlinDouble(value: usd) : nil)
         case let .learn(on): presenter.setLearn(on: on)
-        case .openDeveloper: navigate(.developer)
+        case .openDeveloper: if state.showsDeveloper { navigate(.developer) }
         case .openHealth: navigate(.health)
         case .openUnlockVoice: navigate(.unlockVoice)
         case .openBackup: navigate(.backup)

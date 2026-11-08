@@ -6,6 +6,9 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+- Settings no longer shows Developer (runs, logs, model comparison): it's for building Mode, so
+  only builds made in Xcode have it.
+
 ## 0.1.5 · 8 Nov 2026
 
 - Fixed: "Connect your AI" showed "ChatGPT · Connected" whichever AI you connected. It now shows
