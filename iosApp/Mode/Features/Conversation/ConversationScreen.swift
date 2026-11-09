@@ -3,6 +3,7 @@ import SwiftUI
 
 /// A conversation, as on the Chat board. Draws state, sends events.
 struct ConversationScreen: View {
+    @Environment(\.modeSessionBar) private var sessionBar
     let state: ConversationViewModel.State
     let thumbnails: [String: [Image]]
     @Binding var draft: String
@@ -72,6 +73,8 @@ struct ConversationScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: ModeSpacing.s) {
+                // An open voice session, minimised: above the message bar.
+                if let sessionBar { sessionBar }
                 if state.running { ModeWorkingTag(L10n.Conversation.modeIsWorking) }
                 ModeMessageBar(
                     text: $draft, isPrivate: state.isPrivate, canSend: canSend,

@@ -388,4 +388,42 @@ class VoiceScreensTest {
             DeviceVoice.hearingState = before
         }
     }
+
+    @Test
+    fun theMicPausesAndResumesWithoutEndingTheSession() = runTest {
+        val f = Fixture(backgroundScope)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner, entry = "siri", pausedEndMs = Long.MAX_VALUE)
+            talk.begin()
+            talk.state.awaitState { it.greeting.isNotEmpty() }
+            talk.pauseListening()
+            assertFalse(talk.state.awaitState { it.micPaused }.finished, "pausing keeps the session open")
+            talk.resumeListening()
+            assertFalse(talk.state.awaitState { !it.micPaused }.finished)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun endFinishesTheSessionAtOnce() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.sent }
+        talk.endNow()
+        talk.state.awaitState { it.finished }
+        f.runner.state.awaitState { !it.running }
+    }
+
+    @Test
+    fun aForgottenPausedSessionEndsByItself() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
+        talk.pauseListening()
+        talk.state.awaitState { it.micPaused }
+        talk.state.awaitState { it.finished }
+    }
 }

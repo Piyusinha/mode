@@ -129,6 +129,8 @@ public data class ListenUiState(
     val voiceName: String? = null,
     /** The microphone is off for Mode in iPhone Settings. */
     val micDenied: Boolean = false,
+    /** The session is open but not listening: paused from the session bar, or after a quiet spell. */
+    val micPaused: Boolean = false,
     /** The task was handed to the queue; [finished] once it ended (or, started by voice, once the conversation ended). */
     val sent: Boolean = false,
     val finished: Boolean = false,
@@ -174,6 +176,8 @@ public class ListenPresenter(
     private val lastStopped: suspend (conversationId: String?) -> StoppedTask? = { null },
     /** The chat so far, when the session continues one (started from its mic): shown and used for what Mode says. */
     private val chatSoFar: suspend (conversationId: String) -> ChatSoFar? = { null },
+    /** How long a paused session with nothing running stays open. */
+    private val pausedEndMs: Long = PAUSED_END_MS,
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     /** Their day, read once when this opened: the greeting and the reply to their task both use it. */
     private var today: com.piyush.mode.feature.memory.data.DayContext? = null
@@ -296,6 +300,11 @@ public class ListenPresenter(
      * task ([followUp]), [FOLLOW_UP_QUIET_MS] of quiet, or "that's all", ends the conversation.
      */
     private suspend fun converse(line: String, followUp: Boolean) {
+        // Mic paused: Mode still says its line, then waits for the mic to come back on.
+        if (own.value.micPaused) {
+            if (line.isNotBlank()) runCatching { voices.speak(line) }
+            return
+        }
         // Talking over the line: what they say is the task.
         val over = if (line.isBlank()) null else voices.speakOrHear(line) { words -> own.value = own.value.copy(phase = TalkPhase.Listening, partial = words) }
         if (over is Heard.Words) { heard(over.text); return }
@@ -311,7 +320,8 @@ public class ListenPresenter(
                     tries++
                     val quietLongEnough = if (followUp) clock.now() - since >= FOLLOW_UP_QUIET_MS else tries >= MAX_SILENT_LISTENS
                     if (quietLongEnough) {
-                        if (followUp) { end("QuietAfter"); return }
+                        // Quiet after a task: the session stays open with the mic paused (ending is the user's).
+                        if (followUp) { pausedByQuiet(); return }
                         outcome = "NothingHeard"
                         mark(com.piyush.mode.core.telemetry.Event.NothingHeard)
                         own.value = own.value.copy(phase = TalkPhase.Typing)
@@ -575,6 +585,58 @@ public class ListenPresenter(
         taskId?.let(queue::cancel)
     }
 
+    /** Session bar › mic: stop listening; the session stays open, a running task carries on. */
+    public fun pauseListening() {
+        if (own.value.micPaused) return
+        if (!own.value.sent) { job?.cancel(); job = null }
+        voices.stop()
+        own.value = own.value.copy(micPaused = true, partial = "")
+        com.piyush.mode.core.common.AppLog.log("talk", "mic paused")
+        endWhenForgotten()
+    }
+
+    /** A session left paused with nothing running ends by itself after a while (no mic, no Live Activity left on). */
+    private var forgotten: Job? = null
+    private fun endWhenForgotten() {
+        forgotten?.cancel()
+        forgotten = scope.launch {
+            delay(pausedEndMs)
+            if (own.value.micPaused && !runner.state.value.running) {
+                com.piyush.mode.core.common.AppLog.log("talk", "paused too long: the session ends")
+                end("PausedTooLong")
+            }
+        }
+    }
+
+    /** Session bar › mic again: listening comes back (not while a task is working: it listens after). */
+    public fun resumeListening() {
+        if (!own.value.micPaused) return
+        forgotten?.cancel()
+        own.value = own.value.copy(micPaused = false)
+        com.piyush.mode.core.common.AppLog.log("talk", "mic on again")
+        if (own.value.sent) return
+        job?.cancel()
+        job = scope.launch { inSession { converse("", followUp = false) } }
+    }
+
+    private fun pausedByQuiet() {
+        com.piyush.mode.core.common.AppLog.log("talk", "quiet: mic paused, the session stays open")
+        own.value = own.value.copy(micPaused = true, partial = "")
+        endWhenForgotten()
+    }
+
+    /**
+     * End, from the session bar's × or the voice screen: listening and speaking stop, a task sent from this session
+     * is cancelled, and the session is over.
+     */
+    public fun endNow() {
+        job?.cancel()
+        job = null
+        voices.stop()
+        taskId?.let { id -> if (own.value.sent) queue.cancel(id) }
+        end("Ended")
+    }
+
     /** Closes the screen: anything still being said or heard stops; a task already sent carries on. */
     public fun dismiss() {
         endSession()
@@ -648,6 +710,8 @@ public class ListenPresenter(
 
         /** After a task, this long with nothing said ends the conversation. */
         const val FOLLOW_UP_QUIET_MS = 20_000L
+        /** A paused session with nothing running ends after this long. */
+        const val PAUSED_END_MS: Long = 15 * 60_000L
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
         fun isWrapUp(text: String): Boolean {
