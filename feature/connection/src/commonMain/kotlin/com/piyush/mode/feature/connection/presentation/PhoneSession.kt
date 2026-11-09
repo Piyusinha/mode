@@ -42,11 +42,19 @@ public class PhoneSession(
 
     private val lock = Mutex()
     private var current: PhoneBackend? = null
+    /**
+     * Goes up with every new session. A close waits [releaseDelay] before releasing the link; if a new session
+     * started meanwhile, that release would pull Mode's VPN out from under it (seen on the phone, 9 Nov: setup's
+     * check closed, the first job connected 1 s later, and the check's late release made it fail). So the
+     * release only happens when no session has started since.
+     */
+    private var sessions = 0L
 
     /** The session, connecting first if needed. */
     public suspend fun phone(): PhoneBackend = telemetry.trace(Operation.PhoneAcquire) {
         telemetry.withLock(lock, Operation.PhoneLock) {
             current ?: run {
+                sessions++
                 val first = connectOnce()
                 var pending: PhoneBackend? = first
                 ResilientBackend(
@@ -63,16 +71,26 @@ public class PhoneSession(
      * connects again, which takes about a second.
      */
     public suspend fun disconnect(): Unit = telemetry.trace(Operation.PhoneDisconnect) {
-        val had = lock.withLock {
+        val (had, closedAt) = lock.withLock {
             val open = current != null
             close()
             mutableState.value = ConnectionState.Disconnected
-            open
+            open to sessions
         }
         if (had) {
             delay(releaseDelay)
+            if (releaseUnlessReused(closedAt)) AppLog.log("phone", "disconnected")
+        }
+    }
+
+    /** Releases the link after a close, unless a new session started since [closedAt]; true when it released. */
+    private suspend fun releaseUnlessReused(closedAt: Long): Boolean = lock.withLock {
+        if (current != null || sessions != closedAt) {
+            AppLog.log("phone", "kept Mode's VPN: a new session started while the last one was closing")
+            false
+        } else {
             runCatching { link.release() }
-            AppLog.log("phone", "disconnected")
+            true
         }
     }
 
@@ -82,16 +100,15 @@ public class PhoneSession(
      * stays in the status bar. Does not unpair.
      */
     public suspend fun disconnectAndRelease(): Unit = telemetry.trace(Operation.PhoneDisconnect) {
-        val had = lock.withLock {
+        val (had, closedAt) = lock.withLock {
             val open = current != null
             close()
             mutableState.value = ConnectionState.Disconnected
-            open
+            open to sessions
         }
         // A session's goodbye travels through the VPN: let it out first.
         if (had) delay(releaseDelay)
-        runCatching { link.release() }
-        AppLog.log("phone", "done with the phone: session closed, VPN off")
+        if (releaseUnlessReused(closedAt)) AppLog.log("phone", "done with the phone: session closed, VPN off")
     }
 
     /**

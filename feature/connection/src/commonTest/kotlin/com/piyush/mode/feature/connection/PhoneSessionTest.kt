@@ -120,3 +120,33 @@ class PhoneSessionTest {
         assertEquals(1, link.releases, "idle: disconnected")
     }
 }
+
+class PhoneSessionReuseTest {
+    @Test
+    fun aNewSessionDuringTheReleaseDelayKeepsTheVpn() = runTest {
+        // Setup's check closes; the first job connects a second later, before the check's 2 s release.
+        val link = FakeLink()
+        val session = PhoneSession(link, kotlin.time.Duration.parse("2s"))
+        session.phone()
+        val closing = launch { session.disconnectAndRelease() }
+        kotlinx.coroutines.delay(1000)
+        session.phone()
+        closing.join()
+        assertEquals(0, link.releases, "the late release must not stop the VPN under the new session")
+        assertEquals(ConnectionState.Connected("test route"), session.state.value)
+        // Closing the new one still releases it.
+        session.disconnect()
+        assertEquals(1, link.releases)
+    }
+
+    @Test
+    fun withNoNewSessionTheReleaseHappens() = runTest {
+        val link = FakeLink()
+        val session = PhoneSession(link, kotlin.time.Duration.parse("2s"))
+        session.phone()
+        session.disconnect()
+        assertEquals(1, link.releases)
+        session.disconnectAndRelease() // nothing open: the VPN is turned off anyway
+        assertEquals(2, link.releases)
+    }
+}
