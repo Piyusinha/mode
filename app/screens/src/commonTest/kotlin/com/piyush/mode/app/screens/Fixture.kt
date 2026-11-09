@@ -113,6 +113,13 @@ internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel()
 }
 
 /**
+ * A model that never answers: a task given to it keeps running until it is stopped. For tests that look at a
+ * running task: with the scripted model a task is over in a moment, so "sent" or "working" could come and go
+ * between two looks at the state (seen on CI, never on a fast Mac).
+ */
+internal val NeverAnswers = LlmClient { _, _, _ -> kotlinx.coroutines.awaitCancellation() }
+
+/**
  * Waits (in real time, up to 5 s) for the presenter's state to match: the
  * database flows behind it emit on a background thread, not the test's clock.
  */

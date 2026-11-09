@@ -91,7 +91,7 @@ class VoiceScreensTest {
 
     @Test
     fun aTaskSpokenFromAChatsMicGoesIntoThatChat() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val chat = f.conversations.create("Dark Mode")
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             conversationId = chat.id)
@@ -122,7 +122,7 @@ class VoiceScreensTest {
 
     @Test
     fun aTalkingSessionIsOneTraceFromHowItOpenedToHowItEnded() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val traces = Recorded()
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             telemetry = traces, entry = "chat_mic")
@@ -160,7 +160,7 @@ class VoiceScreensTest {
 
     @Test
     fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
             kotlinx.coroutines.delay(2_000)
             com.piyush.mode.llm.ChatResult(
@@ -328,7 +328,7 @@ class VoiceScreensTest {
 
     @Test
     fun aSessionOffersToCarryOnTheLastStoppedTaskInItsChat() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val before = DeviceVoice.hearingState
         DeviceVoice.hearingState = { "ready" }
         try {
@@ -353,7 +353,7 @@ class VoiceScreensTest {
 
     @Test
     fun yesToTheGreetingsOfferRunsTheOfferedTask() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val model = com.piyush.mode.llm.LlmClient { _, _, _ ->
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
@@ -464,7 +464,7 @@ class VoiceScreensTest {
 
     @Test
     fun endFinishesTheSessionAtOnce() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
         talk.submitTyped("Turn on dark mode")
         talk.state.awaitState { it.sent }
@@ -484,7 +484,7 @@ class VoiceScreensTest {
 
     @Test
     fun stoppingATaskKeepsTheSessionOpen() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             pausedEndMs = Long.MAX_VALUE)
         talk.submitTyped("Turn on dark mode")
