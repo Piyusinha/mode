@@ -208,13 +208,13 @@ struct ModelPickerScreen: View {
 
 struct SettingsRoute: View {
     let app: AppModel
-    @State private var model: SettingsViewModel
-    @State private var providers: ProvidersViewModel
+    @LazyState private var model: SettingsViewModel
+    @LazyState private var providers: ProvidersViewModel
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
         self.app = app
-        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate, reset: { [app] in await app.resetEverything() }))
-        _providers = State(initialValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
+        _model = LazyState(wrappedValue: SettingsViewModel(screens: app.screens, navigate: navigate, reset: { [app] in await app.resetEverything() }))
+        _providers = LazyState(wrappedValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
     }
 
     var body: some View {
@@ -247,12 +247,12 @@ struct SettingsRoute: View {
 }
 
 struct ModelPickerRoute: View {
-    @State private var model: SettingsViewModel
+    @LazyState private var model: SettingsViewModel
     let stuck: Bool
 
     init(app: AppModel, stuck: Bool, navigate: @escaping (Route) -> Void) {
         self.stuck = stuck
-        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate))
+        _model = LazyState(wrappedValue: SettingsViewModel(screens: app.screens, navigate: navigate))
     }
 
     var body: some View {

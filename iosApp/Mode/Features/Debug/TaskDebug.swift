@@ -249,20 +249,20 @@ enum TaskDebugModels {
 }
 
 struct TaskDebugRoute: View {
-    @State private var model: TaskDebugModel
+    @LazyState private var model: TaskDebugModel
 
     init(app: AppModel, taskId: String, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: TaskDebugModels.model(app: app, taskId: taskId, navigate: navigate))
+        _model = LazyState(wrappedValue: TaskDebugModels.model(app: app, taskId: taskId, navigate: navigate))
     }
 
     var body: some View { TaskDebugScreen(state: model.state, onEvent: model.send) }
 }
 
 struct TaskDebugAskRoute: View {
-    @State private var model: TaskDebugModel
+    @LazyState private var model: TaskDebugModel
 
     init(app: AppModel, taskId: String, navigate: @escaping (Route) -> Void = { _ in }) {
-        _model = State(initialValue: TaskDebugModels.model(app: app, taskId: taskId, navigate: navigate))
+        _model = LazyState(wrappedValue: TaskDebugModels.model(app: app, taskId: taskId, navigate: navigate))
     }
 
     var body: some View { TaskDebugAskScreen(state: model.state, onEvent: model.send) }

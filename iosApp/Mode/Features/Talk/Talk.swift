@@ -600,7 +600,7 @@ struct TalkScreen: View {
 /// Opens talking mode and closes it: when the user closes it, when a spoken task finishes, or (for a question)
 /// when MainTabs stops showing it.
 struct TalkRoute: View {
-    @State private var model: TalkModel
+    @LazyState private var model: TalkModel
     private let onClose: () -> Void
     private let onVoiceSettings: (Bool) -> Void
     private let onOpenChat: (String) -> Void
@@ -610,7 +610,7 @@ struct TalkRoute: View {
     init(app: AppModel, forQuestion: Bool, conversationId: String? = nil, entry: String = "siri",
          onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in },
          onOpenChat: @escaping (String) -> Void = { _ in }, onWhatWentWrong: @escaping (String) -> Void = { _ in }) {
-        _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId, entry: entry))
+        _model = LazyState(wrappedValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId, entry: entry))
         self.onClose = onClose
         self.onVoiceSettings = onVoiceSettings
         self.onOpenChat = onOpenChat

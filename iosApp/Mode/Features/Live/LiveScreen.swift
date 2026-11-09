@@ -74,10 +74,10 @@ struct LiveRoute: View {
 }
 
 private struct LiveContent: View {
-    @State private var model: LiveViewModel
+    @LazyState private var model: LiveViewModel
 
     init(app: AppModel, close: @escaping () -> Void) {
-        _model = State(initialValue: LiveViewModel(screens: app.screens, close: close))
+        _model = LazyState(wrappedValue: LiveViewModel(screens: app.screens, close: close))
     }
 
     var body: some View {

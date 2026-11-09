@@ -6,6 +6,11 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+- Fixed: iOS could close Mode in the middle of a task (seen on a payment page) for using too much
+  CPU in the background. Screens no longer rebuild their logic every time something on screen
+  changes, the encrypted link to the phone uses the iPhone's AES hardware, and Mode slows down
+  between steps if it gets close to iOS's limit.
+
 ## 0.1.7 · 9 Nov 2026
 
 - Fixed: the first task after setup could fail with "Could not reach this iPhone's developer

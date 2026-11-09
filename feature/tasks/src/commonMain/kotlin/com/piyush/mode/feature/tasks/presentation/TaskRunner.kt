@@ -105,6 +105,10 @@ public class TaskRunner(
     /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
     private val device: com.piyush.mode.ops.DeviceData? = null,
 ) {
+    /** Keeps a task under iOS's background CPU limit (see [CpuPacer]). */
+    private val pacerEpoch = kotlin.time.TimeSource.Monotonic.markNow()
+    private val cpuPacer = CpuPacer(appInfo::cpuTimeMs, now = { pacerEpoch.elapsedNow().inWholeMilliseconds })
+
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
     /** What to do with words said over Mode's spoken answer: a follow-up task in that chat (set by the graph). */
@@ -329,6 +333,7 @@ public class TaskRunner(
                 telemetry = telemetry,
                 memory = prepared?.agentMemory,
                 pause = gate,
+                pace = { cpuPacer.pace() },
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
                 device = device,

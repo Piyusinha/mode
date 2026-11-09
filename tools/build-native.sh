@@ -15,7 +15,9 @@ PROFILE=${PROFILE:-release}
 export IPHONEOS_DEPLOYMENT_TARGET=26.0
 # Bitcode would bloat the static library by ~140 MB for no gain. Never `strip -S`
 # the result: it corrupts ring's assembly objects and the link fails.
-export RUSTFLAGS="-C embed-bitcode=no"
+# aes_armv8: the AES crate (TLS-PSK to the phone's developer services) uses the iPhone's AES hardware instead
+# of software AES, which took ~23% of Mode's CPU while it read screenshots (profiled on the phone, 9 Nov).
+export RUSTFLAGS="-C embed-bitcode=no --cfg aes_armv8"
 
 cd "$ROOT/native/modecore"
 for target in aarch64-apple-ios aarch64-apple-ios-sim; do

@@ -9,7 +9,7 @@ struct MainTabs: View {
     let app: AppModel
     @State private var tab: AppTab = .home
     @State private var paths: [AppTab: [Route]] = [:]
-    @State private var run: RunStatusViewModel
+    @LazyState private var run: RunStatusViewModel
     @State private var showingLive = false
     @State private var showingAsk = false
     @State private var showingListen = false
@@ -29,7 +29,7 @@ struct MainTabs: View {
 
     init(app: AppModel) {
         self.app = app
-        _run = State(initialValue: RunStatusViewModel(screens: app.screens))
+        _run = LazyState(wrappedValue: RunStatusViewModel(screens: app.screens))
     }
 
     var body: some View {

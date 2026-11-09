@@ -1,5 +1,8 @@
 package com.piyush.mode.core.platform
 
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSBundle
@@ -14,6 +17,15 @@ import platform.UIKit.UIBackgroundTaskInvalid
 public class IosAppInfo : AppInfo {
     override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode"
     override val version: String = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: ""
+
+    /** What iOS counts against a background app's CPU limit (80% over 60 s, else it kills the app). */
+    @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+    override fun cpuTimeMs(): Long? = memScoped {
+        val usage = alloc<platform.posix.rusage>()
+        if (platform.posix.getrusage(platform.posix.RUSAGE_SELF, usage.ptr) != 0) return@memScoped null
+        fun ms(t: platform.posix.timeval) = t.tv_sec * 1000L + t.tv_usec / 1000L
+        ms(usage.ru_utime) + ms(usage.ru_stime)
+    }
 }
 
 public class IosAppLifecycle : AppLifecycle {

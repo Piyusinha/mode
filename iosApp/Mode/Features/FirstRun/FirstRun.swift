@@ -243,14 +243,14 @@ struct FirstTaskScreen: View {
 /// The first run. Once the first job is in the queue (or skipped), setup ends and Mode opens on that job's chat.
 struct FirstRunRoute: View {
     let app: AppModel
-    @State private var model: FirstRunModel
-    @State private var providers: ProvidersViewModel
+    @LazyState private var model: FirstRunModel
+    @LazyState private var providers: ProvidersViewModel
     @Environment(\.webAuthenticationSession) private var webAuthentication
 
     init(app: AppModel) {
         self.app = app
-        _model = State(initialValue: FirstRunModel(screens: app.screens))
-        _providers = State(initialValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
+        _model = LazyState(wrappedValue: FirstRunModel(screens: app.screens))
+        _providers = LazyState(wrappedValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
     }
 
     var body: some View {

@@ -176,6 +176,8 @@ class Agent(
     private val memory: AgentMemory? = null,
     /** Pausing between steps; null: the task can't be paused. */
     private val pause: PauseGate? = null,
+    /** Called before each step; may wait (to keep CPU under the phone's background limit). */
+    private val pace: (suspend () -> Unit)? = null,
     /** Each screenshot the agent looks at, for the live view. */
     private val onScreen: (ByteArray) -> Unit = {},
     /** The model's plan as items, each time it writes one, for progress on the Dynamic Island. */
@@ -419,6 +421,7 @@ class Agent(
                     gate.awaitRunning()
                 }
             }
+            pace?.invoke()
             val stepStarted = clock.markNow()
             onStatus(WORKING)
             val lookStarted = clock.markNow()

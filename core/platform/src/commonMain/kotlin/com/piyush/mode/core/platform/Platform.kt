@@ -7,6 +7,9 @@ public interface AppInfo {
 
     /** This Mode's version ("0.1.3"), to tell whether a newer one is out. */
     public val version: String get() = ""
+
+    /** CPU time this process has used so far (user and system, every thread), in milliseconds; null where unknown. */
+    public fun cpuTimeMs(): Long? = null
 }
 
 /** The app moving between foreground, background and ending. */

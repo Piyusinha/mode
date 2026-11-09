@@ -91,10 +91,10 @@ struct LanguageScreen: View {
 }
 
 struct LanguageRoute: View {
-    @State private var model: LanguageModel
+    @LazyState private var model: LanguageModel
 
     init(app: AppModel) {
-        _model = State(initialValue: LanguageModel(screens: app.screens))
+        _model = LazyState(wrappedValue: LanguageModel(screens: app.screens))
     }
 
     var body: some View {

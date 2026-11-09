@@ -110,12 +110,12 @@ struct HomeScreen: View {
 
 /// Connects Home to its ViewModel.
 struct HomeRoute: View {
-    @State private var model: HomeViewModel
+    @LazyState private var model: HomeViewModel
     private let run: RunStatusViewModel
 
     init(app: AppModel, run: RunStatusViewModel, navigate: @escaping (Route) -> Void, openLive: @escaping () -> Void) {
         self.run = run
-        _model = State(initialValue: HomeViewModel(screens: app.screens, run: run, navigate: navigate, openLive: openLive))
+        _model = LazyState(wrappedValue: HomeViewModel(screens: app.screens, run: run, navigate: navigate, openLive: openLive))
     }
 
     var body: some View {

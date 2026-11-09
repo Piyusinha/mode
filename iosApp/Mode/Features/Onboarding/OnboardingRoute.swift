@@ -7,14 +7,14 @@ import SwiftUI
 struct OnboardingRoute: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.webAuthenticationSession) private var webAuthentication
-    @State private var model: OnboardingViewModel
-    @State private var providers: ProvidersViewModel
+    @LazyState private var model: OnboardingViewModel
+    @LazyState private var providers: ProvidersViewModel
     let app: AppModel
 
     init(app: AppModel) {
         self.app = app
-        _model = State(initialValue: OnboardingViewModel(screens: app.screens, finished: { app.onboardingFinished() }))
-        _providers = State(initialValue: ProvidersViewModel(screens: app.screens, picksUnconnected: true))
+        _model = LazyState(wrappedValue: OnboardingViewModel(screens: app.screens, finished: { app.onboardingFinished() }))
+        _providers = LazyState(wrappedValue: ProvidersViewModel(screens: app.screens, picksUnconnected: true))
     }
 
     var body: some View {

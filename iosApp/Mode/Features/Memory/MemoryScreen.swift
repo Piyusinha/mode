@@ -238,12 +238,12 @@ struct MemoryEditScreen: View {
 // MARK: - Routes: each screen with its view model.
 
 struct MemoryRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
     let navigate: (Route) -> Void
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
         self.navigate = navigate
-        _model = State(initialValue: MemoryViewModel(screens: app.screens))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens))
     }
 
     var body: some View {
@@ -255,10 +255,10 @@ struct MemoryRoute: View {
 }
 
 struct MemoryAboutYouRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
     }
 
     var body: some View {
@@ -269,12 +269,12 @@ struct MemoryAboutYouRoute: View {
 }
 
 struct MemoryRoutinesRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
     let appName: String?
 
     init(app: AppModel, appName: String?, navigate: @escaping (Route) -> Void) {
         self.appName = appName
-        _model = State(initialValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
     }
 
     var body: some View {
@@ -285,12 +285,12 @@ struct MemoryRoutinesRoute: View {
 }
 
 struct MemoryAppsRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
     let navigate: (Route) -> Void
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
         self.navigate = navigate
-        _model = State(initialValue: MemoryViewModel(screens: app.screens))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens))
     }
 
     var body: some View {
@@ -299,14 +299,14 @@ struct MemoryAppsRoute: View {
 }
 
 struct MemoryAppRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
     let name: String
     let navigate: (Route) -> Void
 
     init(app: AppModel, name: String, navigate: @escaping (Route) -> Void) {
         self.name = name
         self.navigate = navigate
-        _model = State(initialValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens, openEditor: { navigate(.memoryEdit(id: $0)) }))
     }
 
     var body: some View {
@@ -315,13 +315,13 @@ struct MemoryAppRoute: View {
 }
 
 struct MemoryEditRoute: View {
-    @State private var model: MemoryViewModel
+    @LazyState private var model: MemoryViewModel
     @Environment(\.dismiss) private var dismiss
     let id: String
 
     init(app: AppModel, id: String) {
         self.id = id
-        _model = State(initialValue: MemoryViewModel(screens: app.screens))
+        _model = LazyState(wrappedValue: MemoryViewModel(screens: app.screens))
     }
 
     var body: some View {

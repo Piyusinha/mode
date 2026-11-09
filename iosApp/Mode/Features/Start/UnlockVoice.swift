@@ -194,10 +194,10 @@ struct UnlockVoiceScreen: View {
 }
 
 struct UnlockVoiceRoute: View {
-    @State private var model: UnlockVoiceModel
+    @LazyState private var model: UnlockVoiceModel
 
     init(app: AppModel) {
-        _model = State(initialValue: UnlockVoiceModel(screens: app.screens))
+        _model = LazyState(wrappedValue: UnlockVoiceModel(screens: app.screens))
     }
 
     var body: some View {

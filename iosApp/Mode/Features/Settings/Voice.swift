@@ -547,10 +547,10 @@ struct VoiceProviderPage: View {
 
 /// Mode's voice or Listening, with the key sheet and a provider's page.
 struct VoiceRoute: View {
-    @State private var model: VoiceListModel
+    @LazyState private var model: VoiceListModel
 
     init(app: AppModel, hearing: Bool, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: VoiceListModel(screens: app.screens, hearing: hearing, navigate: navigate))
+        _model = LazyState(wrappedValue: VoiceListModel(screens: app.screens, hearing: hearing, navigate: navigate))
     }
 
     var body: some View {
@@ -895,11 +895,11 @@ struct VoicePickerScreen: View {
 }
 
 struct VoicePickerRoute: View {
-    @State private var model: VoicePickerModel
+    @LazyState private var model: VoicePickerModel
     @Environment(\.dismiss) private var dismiss
 
     init(app: AppModel, provider: String) {
-        _model = State(initialValue: VoicePickerModel(screens: app.screens, provider: provider))
+        _model = LazyState(wrappedValue: VoicePickerModel(screens: app.screens, provider: provider))
     }
 
     var body: some View {
