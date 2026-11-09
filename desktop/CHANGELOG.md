@@ -8,10 +8,15 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## 0.1.6 · 9 Nov 2026
 
-- Paid accounts set up with LocalDevVPN can switch to Mode's own VPN from the phone page (Phone
-  control › Use Mode's own VPN): Mode Setup turns it on in your developer account and installs
-  the paid build over the current one, keeping everything in Mode. No LocalDevVPN app needed
-  after that.
+- Paid accounts always get Mode's own VPN: installing, updating or renewing turns it on and uses
+  it, instead of keeping LocalDevVPN from an earlier setup. LocalDevVPN is used only if turning it
+  on fails and you choose it. A phone set up with LocalDevVPN can also switch straight away from
+  the phone page (Phone control › Use Mode's own VPN).
+- Cancel while installing: the installing screen has a Cancel button. It stops the install (and
+  its download) and goes back to the phone page, or to the Apple account step during a first
+  setup.
+- Back after a failed install goes to the phone page for an update or renewal, and "Finish on
+  your iPhone" has Finish later.
 
 ## 0.1.5 · 7 Nov 2026
 

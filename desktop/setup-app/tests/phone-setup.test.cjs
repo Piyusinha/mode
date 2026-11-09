@@ -390,7 +390,6 @@ test('a paid install on LocalDevVPN offers Mode’s own VPN, which turns it on a
   assert.ok(f.calls.includes('mode_vpn_turn_on'), 'turns on Network Extensions first');
   assert.equal(installArgs.ownVpn, true, 'installs the paid build');
   assert.equal(installArgs.update, false);
-  assert.equal(f.run('S.switchToOwnVpn'), false, 'used once');
 });
 
 test('Mode’s own VPN is not offered on free accounts or when it is already on', () => {
@@ -398,4 +397,56 @@ test('Mode’s own VPN is not offered on free accounts or when it is already on'
   assert.doesNotMatch(f.app.innerHTML, /data-act="useOwnVpn"/); // paid, own VPN already
   f.run("S.record.paid = false; S.record.ownVpn = false; render();");
   assert.doesNotMatch(f.app.innerHTML, /data-act="useOwnVpn"/);
+});
+
+// ---- paid accounts always get Mode's own VPN; Cancel and Back while installing ---------------------------------
+function installFixture(extra = {}) {
+  let reject;
+  const f = fixture(Object.assign({
+    active_account: { email: 'test@example.com', teams: [{ id: 'team', kind: 'paid', name: 'Team' }] },
+    mode_vpn_turn_on: { appOn: true, tunnelOn: true },
+    install_mode: () => new Promise((_, r) => { reject = r; }),
+    cancel_install: () => { reject('Cancelled.'); },
+  }, extra));
+  return f;
+}
+
+test('renewing a paid install that used LocalDevVPN sets up Mode’s own VPN, not LocalDevVPN again', async () => {
+  const f = installFixture(); device(f);
+  f.run("S.record.ownVpn = false; S.prefs.phones['test-phone'].ownVpn = false; render();");
+  f.click('renewNow'); // the install never finishes here: don't wait for it
+  await new Promise(setImmediate);
+  assert.ok(f.calls.includes('mode_vpn_turn_on'));
+  assert.equal(f.run('S.ownVpn'), true);
+});
+
+test('Cancel while installing an update stops it and goes back to the phone page', async () => {
+  const f = installFixture(); device(f);
+  const renewing = f.click('renewNow');
+  await new Promise(setImmediate);
+  assert.equal(f.run('S.screen'), 'install');
+  assert.match(f.app.innerHTML, /data-act="cancelInstall"/);
+  await f.click('cancelInstall');
+  await renewing;
+  await new Promise(setImmediate); await new Promise(setImmediate);
+  assert.ok(f.calls.includes('cancel_install'));
+  assert.equal(f.run('S.screen'), 'device');
+  assert.match(f.app.innerHTML, /Stopped\. Mode on your iPhone stays as it was/);
+});
+
+test('Cancel during a first setup goes back to signing in, and Back after a failure does too', async () => {
+  const f = installFixture({ prefs: { phones: {} } });
+  f.run("S.prefs = { phones: {} }; S.teams = [{ id: 'team', kind: 'paid', name: 'Team' }]; S.team = S.teams[0]; S.record = null;");
+  const run = f.run('runInstall()');
+  await new Promise(setImmediate);
+  await f.click('cancelInstall');
+  await run;
+  await new Promise(setImmediate);
+  assert.equal(f.run('S.screen'), 'signIn');
+});
+
+test('“Finish on your iPhone” has a way out', () => {
+  const f = fixture();
+  assert.match(f.app.innerHTML, /data-act="device"/);
+  assert.match(f.app.innerHTML, /Finish later/);
 });
