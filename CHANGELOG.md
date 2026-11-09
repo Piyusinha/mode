@@ -4,12 +4,21 @@ What changed in each release of Mode, the phone app (iPhone now, Android next). 
 tagged `Mode-Mobile-Build-<version>`, and `tools/release-app.sh` won't make one without its section here.
 Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.md](desktop/CHANGELOG.md).
 
-## Unreleased
+## 0.1.8 · 9 Nov 2026
 
+- The voice session minimises instead of closing: ⌄ at the top left slides the voice screen down
+  into a session bar above the tab bar (or above a chat's message box). The mic, Mode and any task
+  carry on; tap the bar to open the same screen again. The bar always says what's happening:
+  listening, Mode speaking, working (with Stop), needs you (with Answer), or mic paused. Its mic
+  pauses or resumes listening, and × ends the session. It follows light and dark mode.
+- A session stays open until you end it (End, ×, or "that's all"), from Siri, the Ask mic or a
+  chat's mic. Going quiet after a task pauses the mic instead; a session left paused with nothing
+  running ends by itself after 15 minutes.
+- Stop answers at once: Mode stops talking, the task's card shows Stopped, and Mode asks what's
+  next with the mic already open, while the task lets go of the phone behind. Before, Stop could
+  stay stuck on "working", or take 5–10 seconds and still say the reply meant for the task.
 - A spoken session started from a chat continues that chat: it shows the chat's last messages, and
   Mode picks up from its last task instead of a fresh greeting.
-- Back to chat: once a spoken session has a chat, the top-left button takes you back to it (a task
-  carries on there), instead of only closing.
 - One Live Activity at a time: in a spoken session, each task's activity replaces the last one's
   answer, and "Mode is connected" waits until it's gone, instead of stacking one per task.
   Answers you already heard out loud no longer also arrive as a notification.
