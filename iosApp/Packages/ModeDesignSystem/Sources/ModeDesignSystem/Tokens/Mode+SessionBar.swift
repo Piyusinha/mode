@@ -16,10 +16,14 @@ extension ModeRadius {
 }
 
 extension ModeColor {
-    /// The bar's dark card, and its quiet second line.
-    static let sessionBar = ModeColor.hero
-    static let sessionBarText = ModeColor.heroText
-    static let sessionBarSecondary = ModeColor.heroSecondary
+    /// The bar follows the theme like the tab bar: the card (white in light, dark in dark), its words and second line.
+    static let sessionBar = ModeColor.card
+    static let sessionBarText = ModeColor.textPrimary
+    static let sessionBarSecondary = ModeColor.textSecondary
+    /// "Needs you": blue in both themes, with white words.
+    static let sessionBarAsk = ModeColor.info
+    static let sessionBarAskText = ModeColor.heroText
+    static let sessionBarAskSecondary = ModeColor.heroText.opacity(0.78)
 }
 
 extension ModeMotion {

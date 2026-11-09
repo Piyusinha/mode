@@ -210,7 +210,8 @@ public class ListenPresenter(
     private var taskId: String? = null
 
     /** Started by voice: one task after another until they say "that's all", go quiet, or close it. */
-    private val keepsGoing = entry == "siri" || entry == "ask_mic"
+    // Every voice session carries on after a task until it is ended (End, ×, "that's all"); a lone question doesn't.
+    private val keepsGoing = !forQuestion
 
     /** Where the tasks go: the chat it opened in, else the first task's own chat, so a conversation stays together. */
     private var chat: String? = conversationId
@@ -315,7 +316,12 @@ public class ListenPresenter(
         while (true) {
             when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
                 is Heard.Words -> { heard(heard.text); return }
-                Heard.Nothing -> { outcome = "HearingFailed"; own.value = own.value.copy(phase = TalkPhase.Typing); return }
+                Heard.Nothing -> {
+                    // After a task, the session's outcome stays the task's; hearing failing is the outcome only before one.
+                    if (own.value.doneSoFar.isEmpty() && !own.value.sent && taskId == null) outcome = "HearingFailed"
+                    own.value = own.value.copy(phase = TalkPhase.Typing)
+                    return
+                }
                 Heard.Silence -> {
                     tries++
                     val quietLongEnough = if (followUp) clock.now() - since >= FOLLOW_UP_QUIET_MS else tries >= MAX_SILENT_LISTENS
@@ -441,7 +447,13 @@ public class ListenPresenter(
             val card = t.card
             if (card != null && card.taskId == id) t.copy(card = ended(live(card, finishedState), result, finishedState.status)) else t
         })
-        if (result is com.piyush.mode.agent.AgentOutcome.Stopped) { end("Stopped"); return }
+        if (result is com.piyush.mode.agent.AgentOutcome.Stopped) {
+            if (forQuestion) { end("Stopped"); return }
+            // Stopped in a session: it stays open; Mode says so and listens for what's next.
+            com.piyush.mode.core.common.AppLog.log("talk", "task stopped: the session carries on")
+            nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE))
+            return
+        }
         if (done != null && done.stay) { end("LeftInApp"); return }
         lastTask = task
         lastDone = done?.success == true
@@ -578,10 +590,22 @@ public class ListenPresenter(
 
     /** Stops listening and speaking, and the task if it was sent from here. */
     public fun stop() {
-        if (!own.value.sent) outcome = "Stopped"
-        job?.cancel()
-        job = null
         voices.stop()
+        val running = own.value.sent && taskId != null
+        if (forQuestion || !running) {
+            if (!own.value.sent) outcome = "Stopped"
+            job?.cancel()
+            job = null
+            taskId?.let(queue::cancel)
+            // In a session nothing was running: the mic pauses; the session stays open.
+            if (!forQuestion) {
+                own.value = own.value.copy(micPaused = true, partial = "")
+                endWhenForgotten()
+            }
+            return
+        }
+        // A task is running: only the task stops. The session sees it end (afterTask), says so and listens again.
+        com.piyush.mode.core.common.AppLog.log("talk", "stop: the task stops, the session stays open")
         taskId?.let(queue::cancel)
     }
 
@@ -712,6 +736,8 @@ public class ListenPresenter(
         const val FOLLOW_UP_QUIET_MS = 20_000L
         /** A paused session with nothing running ends after this long. */
         const val PAUSED_END_MS: Long = 15 * 60_000L
+        /** What Mode says after a task in a session is stopped. */
+        const val STOPPED_LINE: String = "Okay, I stopped it. What next?"
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
         fun isWrapUp(text: String): Boolean {

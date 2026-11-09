@@ -57,18 +57,12 @@ public struct ModeSessionBar: View {
         self.onStop = onStop
     }
 
-    private var light: Bool { kind == .paused }
-    private var background: Color {
-        switch kind {
-        case .needsYou: ModeColor.info
-        case .paused: ModeColor.card
-        default: ModeColor.sessionBar
-        }
-    }
-    private var titleColor: Color { light ? ModeColor.textPrimary : ModeColor.sessionBarText }
-    private var subtitleColor: Color { light ? ModeColor.textSecondary : ModeColor.sessionBarSecondary }
-    private var actionFill: Color { light ? ModeColor.fill : ModeColor.onDarkFill }
-    private var actionTint: Color { light ? ModeColor.textPrimary : ModeColor.sessionBarText }
+    private var asking: Bool { kind == .needsYou }
+    private var background: Color { asking ? ModeColor.sessionBarAsk : ModeColor.sessionBar }
+    private var titleColor: Color { asking ? ModeColor.sessionBarAskText : ModeColor.sessionBarText }
+    private var subtitleColor: Color { asking ? ModeColor.sessionBarAskSecondary : ModeColor.sessionBarSecondary }
+    private var actionFill: Color { ModeColor.fill }
+    private var actionTint: Color { ModeColor.textPrimary }
 
     public var body: some View {
         HStack(spacing: ModeSpacing.s) {
@@ -94,7 +88,7 @@ public struct ModeSessionBar: View {
         .padding(.vertical, ModeSpacing.s)
         .background(background, in: .rect(cornerRadius: ModeRadius.sessionBar))
         .overlay {
-            if light { RoundedRectangle(cornerRadius: ModeRadius.sessionBar).strokeBorder(ModeColor.separator) }
+            if !asking { RoundedRectangle(cornerRadius: ModeRadius.sessionBar).strokeBorder(ModeColor.separator) }
         }
         .modeShadow(in: RoundedRectangle(cornerRadius: ModeRadius.sessionBar))
         .animation(ModeMotion.standard, value: kind)

@@ -174,8 +174,8 @@ class VoiceScreensTest {
         talk.submitTyped("Turn on dark mode")
         val sent = talk.state.awaitState { it.sent }
         assertEquals("", sent.reply)   // the task went before the line was written
-        val spoken = talk.state.awaitState { it.reply.isNotEmpty() }
-        assertEquals("On it, Alex. Dark Mode, coming right up.", spoken.reply)
+        // The session carries on after the task, so the reply is checked where it stays: in the conversation.
+        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == "On it, Alex. Dark Mode, coming right up." } }
     }
 
     @Test
@@ -269,13 +269,13 @@ class VoiceScreensTest {
     }
 
     @Test
-    fun openedFromTheAppTheScreenStillClosesAfterTheTask() = runTest {
+    fun aSessionFromAChatCarriesOnAfterItsTask() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
-            entry = "chat_mic", greeter = nextLines("Anything else?"))
+            entry = "chat_mic", greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
         talk.submitTyped("Turn on dark mode")
-        val done = talk.state.awaitState { it.finished }
-        assertTrue(done.doneSoFar.isEmpty())
+        val next = talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+        assertFalse(next.finished, "the session stays open until it is ended")
     }
 
     @Test
@@ -425,5 +425,27 @@ class VoiceScreensTest {
         talk.pauseListening()
         talk.state.awaitState { it.micPaused }
         talk.state.awaitState { it.finished }
+    }
+
+    @Test
+    fun stoppingATaskKeepsTheSessionOpen() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            pausedEndMs = Long.MAX_VALUE)
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.sent }
+        talk.stop()
+        val after = talk.state.awaitState { !it.sent }
+        assertFalse(after.finished, "stopping the task keeps the session open")
+        f.runner.state.awaitState { !it.running }
+    }
+
+    @Test
+    fun stopWithNothingRunningPausesTheMic() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            pausedEndMs = Long.MAX_VALUE)
+        talk.stop()
+        assertFalse(talk.state.awaitState { it.micPaused }.finished)
     }
 }
