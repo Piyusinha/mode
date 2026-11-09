@@ -22,5 +22,9 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
                 implementation(libs.findLibrary("kotlinx-coroutines-test").get())
             }
         }
+        // A failed test prints its whole exception: CI's log then shows the line that failed, not only its name.
+        tasks.withType(org.gradle.api.tasks.testing.Test::class.java).configureEach {
+            testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
     }
 }

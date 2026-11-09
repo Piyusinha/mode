@@ -343,6 +343,9 @@ public class ListenPresenter(
                         own.value = own.value.copy(phase = TalkPhase.Typing)
                         return
                     }
+                    // A listen that comes back at once (nothing to wait on) must not hold the thread until the quiet
+                    // runs out: everything else on it, the screen's state included, stood still for 20 s.
+                    kotlinx.coroutines.yield()
                 }
             }
         }
