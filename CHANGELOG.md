@@ -6,6 +6,13 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.7 · 9 Nov 2026
+
+- End, any time: the button at the top left of a conversation now ends everything at once
+  (listening, speaking and the task Mode is doing), and while Mode is telling you how it went
+  there's an End button too. Before, you could get stuck waiting, and iOS's own Stop Session,
+  which disconnects Mode until it's paired again, was the only quick way out.
+
 ## 0.1.6 · 8 Nov 2026
 
 - Settings no longer shows Developer (runs, logs, model comparison): it's for building Mode, so
