@@ -114,8 +114,23 @@ public class Screens(
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
-            acknowledger = acknowledger, greeter = greeter, day = ::dayContext, lastStopped = ::lastStopped,
+            acknowledger = acknowledger, greeter = greeter, day = ::dayContext, lastStopped = ::lastStopped, chatSoFar = ::chatSoFar,
         )
+
+    /** A chat's title, last [CHAT_SO_FAR_LINES] messages (one line each) and last task, for a session continuing it. */
+    private fun chatSoFar(conversationId: String): com.piyush.mode.app.screens.settings.ChatSoFar? {
+        val turns = conversations.turnsNow(conversationId)
+        if (turns.isEmpty()) return null
+        val oneLine = { text: String -> com.piyush.mode.core.common.PlainText.fromMarkdown(text, oneLine = true).take(CHAT_LINE_CHARS) }
+        val last = tasks.latest(CARRY_ON_LOOKBACK).firstOrNull { it.conversationId == conversationId }
+        return com.piyush.mode.app.screens.settings.ChatSoFar(
+            title = conversations.get(conversationId)?.title,
+            lines = turns.takeLast(CHAT_SO_FAR_LINES).map { (it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User) to oneLine(it.text) },
+            lastTask = last?.text,
+            lastDone = last?.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Done,
+            lastSaid = last?.summary?.let(oneLine),
+        )
+    }
 
     /**
      * The last task of this chat (or, with no chat, of the latest one) when it stopped before it was done in the
@@ -302,3 +317,6 @@ private const val CARRY_ON_WITHIN_MS: Long = 12L * 60 * 60 * 1000
 private const val CARRY_ON_LOOKBACK: Long = 50
 /** With no chat title, the request's first words name it. */
 private const val CARRY_ON_WORDS: Int = 8
+/** How much of a chat a spoken session shows when it continues it. */
+private const val CHAT_SO_FAR_LINES: Int = 4
+private const val CHAT_LINE_CHARS: Int = 160

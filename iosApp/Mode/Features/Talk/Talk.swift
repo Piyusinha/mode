@@ -11,6 +11,8 @@ import UIKit
 final class TalkModel {
     struct State: Equatable {
         var phase: TalkPhase = .greeting
+        /// The chat this session belongs to, once it has one: the top-left button goes back to it.
+        var chat: String?
         var greeting = ""
         /// The conversation so far: what they asked, what Mode said, and each task's card.
         var turns: [Turn] = []
@@ -154,7 +156,7 @@ final class TalkModel {
         // The newest word is still forming: it shows lighter until the next one comes.
         let words = s.partial.split(separator: " ").map(String.init)
         return State(
-            phase: s.phase, greeting: s.greeting,
+            phase: s.phase, chat: s.chat, greeting: s.greeting,
             turns: s.turns.map(turn), hasDone: !s.doneSoFar.isEmpty,
             settled: words.dropLast().joined(separator: " "), forming: words.last ?? "",
             task: s.task, reply: s.reply, working: s.working, question: s.question, options: s.options,
@@ -243,7 +245,12 @@ struct TalkScreen: View {
 
     private var header: some View {
         HStack {
-            ModeIconButton(.close, label: L10n.Talk.close, action: onClose)
+            // In a chat: back to it (a task carries on there). Before there is one: close.
+            if let chat = state.chat {
+                ModeIconButton(.back, label: L10n.Talk.backToChat) { onOpenChat(chat) }
+            } else {
+                ModeIconButton(.close, label: L10n.Talk.close, action: onClose)
+            }
             Spacer()
             if !hearingFailed { status }
             Spacer()

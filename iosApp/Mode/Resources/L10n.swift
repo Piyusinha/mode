@@ -796,6 +796,8 @@ enum L10n {
         static let speak = LocalizedStringResource("talk.speak", defaultValue: "Speak")
         static let stop = LocalizedStringResource("talk.stop", defaultValue: "Stop")
         static let close = LocalizedStringResource("talk.close", defaultValue: "Close")
+        /// Top left, once the conversation has a chat: back to it.
+        static let backToChat = LocalizedStringResource("talk.backToChat", defaultValue: "Back to chat")
         static let workingOnIt = LocalizedStringResource("talk.workingOnIt", defaultValue: "Working on it")
         static let inBackground = LocalizedStringResource("talk.inBackground", defaultValue: "Mode works in the background")
         static let ifNeeded = LocalizedStringResource("talk.ifNeeded", defaultValue: "If Mode needs you, it comes back here and asks out loud. You answer by voice and it carries on.")

@@ -6,6 +6,13 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+- A spoken session started from a chat continues that chat: it shows the chat's last messages, and
+  Mode picks up from its last task instead of a fresh greeting.
+- Back to chat: once a spoken session has a chat, the top-left button takes you back to it (a task
+  carries on there), instead of only closing.
+- One Live Activity at a time: in a spoken session, each task's activity replaces the last one's
+  answer, and "Mode is connected" waits until it's gone, instead of stacking one per task.
+  Answers you already heard out loud no longer also arrive as a notification.
 - Carry on where you stopped: when a spoken session starts and the last task of that chat (or,
   from Siri, of your latest session) stopped or was cut off in the last 12 hours, Mode first asks
   whether to carry on. Yes runs it again in the same chat, so the session continues.

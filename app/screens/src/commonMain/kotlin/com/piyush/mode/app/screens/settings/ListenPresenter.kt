@@ -86,6 +86,17 @@ public data class TalkResultRow(val title: String, val detail: String, val done:
 /** Mode offers to run [task]: [yes] ("Yes, look there") runs it, [no] ("Skip it") doesn't. */
 public data class TalkOffer(val task: String, val yes: String, val no: String)
 
+/** The chat a spoken session continues: its title, its last messages, and its last task and how it went. */
+public data class ChatSoFar(
+    val title: String?,
+    /** The last few messages, oldest first: true for what the user said. */
+    val lines: List<Pair<Boolean, String>>,
+    val lastTask: String?,
+    val lastDone: Boolean,
+    /** What Mode answered last, as one line. */
+    val lastSaid: String?,
+)
+
 /** The last task of a session that stopped before it was done (stopped, or cut off when Mode closed). */
 public data class StoppedTask(
     val task: String,
@@ -96,6 +107,8 @@ public data class StoppedTask(
 
 public data class ListenUiState(
     val phase: TalkPhase = TalkPhase.Greeting,
+    /** The chat this session belongs to, once it has one: Back goes there. */
+    val chat: String? = null,
     /** What Mode said first ("Hey Alex, good evening. What do you want me to do?"). */
     val greeting: String = "",
     /** The words heard so far (live), while listening or answering. */
@@ -159,6 +172,8 @@ public class ListenPresenter(
      * in the latest one. Mode then opens by asking to carry on; yes runs it again in that same chat.
      */
     private val lastStopped: suspend (conversationId: String?) -> StoppedTask? = { null },
+    /** The chat so far, when the session continues one (started from its mic): shown and used for what Mode says. */
+    private val chatSoFar: suspend (conversationId: String) -> ChatSoFar? = { null },
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     /** Their day, read once when this opened: the greeting and the reply to their task both use it. */
     private var today: com.piyush.mode.feature.memory.data.DayContext? = null
@@ -234,7 +249,7 @@ public class ListenPresenter(
         if (job?.isActive == true || own.value.sent) return
         val speaker = voices.speaker()
         val listener = voices.listener()
-        val base = ListenUiState(listener = listener?.id, speaker = speaker?.first?.id, voiceName = speaker?.second?.name)
+        val base = ListenUiState(listener = listener?.id, speaker = speaker?.first?.id, voiceName = speaker?.second?.name, chat = chat)
         session()
         if (listener == null) {
             val apple = DeviceVoice.hearingState()
@@ -258,8 +273,14 @@ public class ListenPresenter(
         job = scope.launch {
             inSession {
                 val stopped = if (forQuestion) null else runCatching { lastStopped(chat) }.getOrNull()
+                val soFar = chat?.takeIf { !forQuestion }?.let { runCatching { chatSoFar(it) }.getOrNull() }
+                soFar?.let(::showSoFar)
                 if (stopped != null) {
                     carryOn(stopped)
+                    return@inSession
+                }
+                if (soFar != null) {
+                    continueChat(soFar)
                     return@inSession
                 }
                 val greeting = greet()
@@ -342,12 +363,37 @@ public class ListenPresenter(
      */
     private suspend fun carryOn(stopped: StoppedTask) {
         if (chat == null) chat = stopped.conversationId
+        own.value = own.value.copy(chat = chat)
         val line = carryOnLine(stopped.name)
         val offer = TalkOffer(stopped.task, CARRY_ON_YES, CARRY_ON_NO)
         pendingOffer = offer
         com.piyush.mode.core.common.AppLog.log("talk", "offered to carry on a stopped task in ${stopped.conversationId}")
         own.value = own.value.copy(greeting = line, turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, line, offer = offer))
         converse(line, followUp = false)
+    }
+
+    /** The chat's last messages on screen, above this session's, and its last task for what Mode says next. */
+    private fun showSoFar(soFar: ChatSoFar) {
+        lastTask = soFar.lastTask.orEmpty()
+        lastDone = soFar.lastDone
+        lastSaid = soFar.lastSaid
+        val earlier = soFar.lines.map { (mine, text) -> TalkTurn(nextTurnId++, mine, TalkTurn.Kind.Said, text) }
+        own.value = own.value.copy(turns = earlier + own.value.turns)
+    }
+
+    /**
+     * Opening a session in a chat: Mode picks up from its last task (the AI's line, with an offer when it has
+     * one), else "Back to “title”. What next?". Then it listens, as after any task.
+     */
+    private suspend fun continueChat(soFar: ChatSoFar) {
+        val s = settings.settings.value
+        today = runCatching { kotlinx.coroutines.withTimeoutOrNull(DAY_WAIT_MS) { day() } }.getOrNull()
+        val next = soFar.lastTask?.let { task ->
+            greeter?.next(s.userName, hour(), today ?: com.piyush.mode.feature.memory.data.DayContext(""), task, soFar.lastDone, soFar.lastSaid,
+                budgetMs = GREET_WAIT_MS, language = speakLanguage())
+        }
+        com.piyush.mode.core.common.AppLog.log("talk", "continuing chat ${chat}: ${if (next != null) "AI line" else "Mode's own line"}")
+        nextLine(next ?: com.piyush.mode.feature.memory.data.NextLine(backToChatLine(soFar.title)))
     }
 
     /** Their tap on one of Mode's offered answers: as if they said it. */
@@ -555,6 +601,7 @@ public class ListenPresenter(
         val submitted = queue.submit(task, source, chat, false)
         taskId = submitted?.id
         if (chat == null) chat = submitted?.conversationId
+        own.value = own.value.copy(chat = chat)
         submitted?.let {
             val card = TalkTaskCard(it.id, it.conversationId, task.trim(), TalkTaskCard.State.Working, clock.now())
             own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Task, task.trim(), card = card))
@@ -646,6 +693,10 @@ public class ListenPresenter(
         private val QUESTION_PHASES = setOf(TalkPhase.Asking, TalkPhase.Answering, TalkPhase.Answered)
 
         /** "Hey Alex, good evening. What do you want me to do?" (by the hour; late at night just "Hey Alex."). */
+        /** "Back to “LinkedIn onboarding and paneer”. What next?" */
+        fun backToChatLine(title: String?): String =
+            title?.trim()?.takeIf { it.isNotEmpty() }?.let { "Back to \u201c${it.trimEnd('.')}\u201d. What next?" } ?: "Back to this chat. What next?"
+
         const val CARRY_ON_YES: String = "Yes, carry on"
         const val CARRY_ON_NO: String = "No, something else"
 

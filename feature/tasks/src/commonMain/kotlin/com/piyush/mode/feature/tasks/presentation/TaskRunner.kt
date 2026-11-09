@@ -359,15 +359,17 @@ public class TaskRunner(
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // Spoken while the microphone is off. The stream stays up.
-            if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
+            val saidAloud = spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done
+            if (saidAloud) {
                 // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
                 val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
                 // Spoken with the microphone off: the screen stream is still up, and a microphone opened beside it
                 // records only silence (seen on the phone, 5 Nov: 153 buffers, peak level 0.00).
                 runCatching { voices?.speak(said) }
             }
-            // The notification reads like the chat reply, as plain text (it can't draw Markdown).
-            notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
+            // The notification reads like the chat reply, as plain text (it can't draw Markdown). Not when the answer
+            // was just said out loud in a spoken session: one notification per task stacked up over a session.
+            if (!saidAloud) notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
             state.value.conversationId?.let(::retitle)
             // Come back so the user sees how it went, unless the task was to leave them where it ended
             // (a video playing, an app they asked to open): then Mode finishes in the background.

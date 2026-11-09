@@ -365,4 +365,27 @@ class VoiceScreensTest {
             DeviceVoice.hearingState = before
         }
     }
+
+    @Test
+    fun aSessionFromAChatShowsItAndCarriesOnFromIt() = runTest {
+        val f = Fixture(backgroundScope)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val soFar = com.piyush.mode.app.screens.settings.ChatSoFar(
+                title = "LinkedIn onboarding and paneer",
+                lines = listOf(true to "Check my LinkedIn onboarding email", false to "It says to fill in your new-hire details."),
+                lastTask = "Check my LinkedIn onboarding email", lastDone = true, lastSaid = "It says to fill in your new-hire details.",
+            )
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                conversationId = "chat-9", entry = "chat_mic", chatSoFar = { soFar })
+            talk.begin()
+            val s = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertEquals("Back to \u201cLinkedIn onboarding and paneer\u201d. What next?", s.greeting)
+            assertEquals(listOf("Check my LinkedIn onboarding email", "It says to fill in your new-hire details."), s.turns.take(2).map { it.text })
+            assertTrue(s.turns.first().mine)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
 }

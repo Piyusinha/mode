@@ -17,6 +17,9 @@ final class LiveActivityController {
     private var activity: Activity<ModeActivityAttributes>?
     private var taskId: String?
     private var shown: Content?
+    /// The last finished task's activity, still showing its answer. One Mode activity at a time: the next task's
+    /// replaces it at once, and "Mode is connected" waits until it's gone (a spoken session stacked one per task).
+    private var lingering: Activity<ModeActivityAttributes>?
     private let sessionPresenter: SessionActivityPresenter
     private var sessionUpdates: Updates?
     private var sessionActivity: Activity<ModeSessionAttributes>?
@@ -128,6 +131,7 @@ final class LiveActivityController {
                 presenter.log(message: "replaced the activity (\(previous.activityState))")
                 send { await previous.end(nil, dismissalPolicy: .immediate) }
             }
+            dismissLingering()
         } catch {
             if let previous {
                 // From the background iOS won't start a new one: the one showing carries on for this task
@@ -180,12 +184,30 @@ final class LiveActivityController {
         self.activity = nil
         taskId = nil
         shown = nil
+        lingering = activity
         let until = Date().addingTimeInterval(answerStays)
         send { [presenter] in
             await activity.end(ActivityContent(state: content, staleDate: nil), dismissalPolicy: .after(until))
             presenter.showing(on: false)
             presenter.log(message: "finished (\(content.outcome?.rawValue ?? ""))")
         }
+    }
+
+    /// The finished task's answer goes now: a newer activity takes its place.
+    private func dismissLingering() {
+        guard let old = lingering else { return }
+        lingering = nil
+        send { [presenter] in
+            await old.end(nil, dismissalPolicy: .immediate)
+            presenter.log(message: "dismissed the last task's answer (a newer activity replaced it)")
+        }
+    }
+
+    /// Still showing the last task's answer.
+    private var lingeringShows: Bool {
+        guard let lingering else { return false }
+        if lingering.activityState == .dismissed { self.lingering = nil; return false }
+        return true
     }
 
     /// "Mode is connected": shown while the session sits open with no task, gone the moment it closes
@@ -201,6 +223,8 @@ final class LiveActivityController {
             }
         case let .connected(c):
             if let current = sessionActivity, current.activityState == .active { return }
+            // One at a time: the running task, or the last task's answer, is already showing.
+            if activity != nil || lingeringShows { return }
             let since = Date(timeIntervalSince1970: TimeInterval(c.sinceMs) / 1000)
             do {
                 sessionActivity = try Activity.request(
