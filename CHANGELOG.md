@@ -6,6 +6,8 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+## 0.1.7 · 9 Nov 2026
+
 - Fixed: the first task after setup could fail with "Could not reach this iPhone's developer
   services". Setup's connection check switched Mode's VPN off a moment late, after the first
   task had already connected. Mode now keeps the VPN when a new task connects in that moment.
