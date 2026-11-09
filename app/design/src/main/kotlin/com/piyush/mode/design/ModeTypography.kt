@@ -82,7 +82,8 @@ public enum class ModeTextStyle(
         fontSize = size.sp,
         lineHeight = lineHeight.sp,
         fontWeight = FontWeight(weight),
-        fontFamily = if (display) bricolage(size, weight) else FontFamily.Default,
+        // One family for every word: Bricolage, its optical size following the text size (the iPhone's body is Bricolage too).
+        fontFamily = bricolage(size, weight),
         letterSpacing = if (display) (-0.02).em else 0.em,
     )
 }
