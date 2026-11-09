@@ -268,7 +268,7 @@ final class SettingsViewModel {
             speakerLogo: (VoiceService(id: s.speaker) ?? .apple).logo,
             listenerLogo: (VoiceService(id: s.listener) ?? .apple).logo,
             voiceValue: voiceValue(s),
-            speakerTag: VoiceService(id: s.speaker)?.recommendation,
+            speakerTag: nil,
             voiceNote: s.speakProblem != nil || s.listenProblem != nil ? L10n.Voice.sectionNoteFailed : L10n.Voice.sectionNote,
             query: s.query,
             modelCount: Int(s.modelCount)

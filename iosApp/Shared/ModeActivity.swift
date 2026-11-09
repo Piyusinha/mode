@@ -78,6 +78,7 @@ enum ModeLinks {
 
     /// Where each voice service makes an API key.
     static let elevenLabsKeys = URL(string: "https://elevenlabs.io/app/settings/api-keys")!
+    static let speechifyKeys = URL(string: "https://platform.speechify.ai/api-keys")!
     static let fishAudioKeys = URL(string: "https://fish.audio/app/api-keys/")!
     static let sonioxKeys = URL(string: "https://console.soniox.com")!
     static let deepgramKeys = URL(string: "https://console.deepgram.com")!

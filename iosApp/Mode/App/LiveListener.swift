@@ -186,7 +186,10 @@ final class LiveListener {
                 self.floor = level < self.floor ? level : self.floor * 0.995 + level * 0.005
                 // While Mode speaks, loudness is Mode's own voice (what echo cancellation leaves of it): only words count.
                 let modeSpeaking = VoiceLevel.shared.speaking
-                if modeSpeaking { lastSpokeAt = Date() }
+                // While Mode speaks the user's turn cannot have ended: words heard then are Mode's own voice (what echo
+                // cancellation left), or the start of talking over it, which hushes Mode first. Ending the listen here
+                // closed the microphone and switched the audio off mid-line.
+                if modeSpeaking { lastSpokeAt = Date(); self.silenceSince = nil; self.wordsChangedAt = Date() }
                 let speaking = !modeSpeaking && level > max(0.25, self.floor + 0.18)
                 if speaking { self.heardSpeech = true; self.silenceSince = nil }
                 // Nothing heard yet after a moment: say so (the microphone may be off or blocked). Not while Mode speaks.
@@ -197,7 +200,7 @@ final class LiveListener {
                     warned = true
                     VoiceAudio.shared.note(message: "no speech after \(LiveListener.cantHearAfter) s (peak level \(String(format: "%.2f", self.meter.report.peak)))")
                 }
-                else if self.heardSpeech {
+                else if self.heardSpeech && !modeSpeaking {
                     let since = self.silenceSince ?? Date()
                     self.silenceSince = since
                     // A thinking pause doesn't end the turn; words that stop mid-sentence wait longer (TurnEnd).
@@ -293,7 +296,8 @@ final class LiveListener {
         done = nil
         VoiceLevel.shared.level = 0
         VoiceLevel.shared.cantHear = false
-        VoiceAudio.shared.done()
+        // A line still playing keeps its audio: switching it off here cut Mode's voice mid-line.
+        if !VoiceOut.shared.playing { VoiceAudio.shared.done() }
         _Concurrency.Task {
             if keep { try? await analyzer?.finalizeAndFinishThroughEndOfInput() } else { await analyzer?.cancelAndFinishNow() }
             let text = keep ? await transcript?.value : nil
@@ -309,5 +313,125 @@ final class LiveListener {
         let callback = done
         done = nil
         callback?(nil, nil, "failed")
+    }
+}
+
+/// Plays Mode's cloud voices (Speechify streamed as it arrives; ElevenLabs and Fish Audio clips), buffer by buffer,
+/// on an engine of its own. (Playing through the microphone's engine, for its echo cancellation, left the microphone
+/// with no audio on the iPhone, 9 Nov; the listener's own guards deal with Mode's voice heard back instead.)
+@MainActor
+final class VoiceOut {
+    static let shared = VoiceOut()
+    /// Every line plays as 24 kHz mono: Speechify's stream as it comes, clips converted; the mixer matches the speaker.
+    nonisolated static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 24_000, channels: 1, interleaved: false)!
+
+    private var engine: AVAudioEngine?
+    private var node: AVAudioPlayerNode?
+    private var done: ((Bool) -> Void)?
+    private var queued = 0
+    private var ended = false
+    private var started = false
+    private var line = 0
+
+    var playing: Bool { done != nil }
+
+    /// Starts a line; [done] says, once, whether sound started.
+    func begin(done: @escaping (Bool) -> Void) {
+        stop()
+        line += 1
+        self.done = done
+        queued = 0
+        ended = false
+        started = false
+    }
+
+    func add(_ buffer: AVAudioPCMBuffer) {
+        guard done != nil, buffer.frameLength > 0 else { return }
+        if node == nil && !startEngine() { finish(); return }
+        schedule(buffer)
+    }
+
+    /// No more audio: the line ends once what's queued has played.
+    func end() {
+        ended = true
+        if queued == 0 { finish() }
+    }
+
+    /// Stops the line at once (the user talked over Mode, or it was cancelled).
+    func stop() { if done != nil { finish() } }
+
+    /// A whole clip (MP3 or WAV) as one buffer in [format]; nil when it can't be read.
+    nonisolated static func decode(_ data: Data) -> AVAudioPCMBuffer? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("mode-say-\(UUID().uuidString)")
+        guard (try? data.write(to: url)) != nil else { return nil }
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let file = try? AVAudioFile(forReading: url),
+              let source = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: source)) != nil, source.frameLength > 0 else { return nil }
+        if source.format == format { return source }
+        guard let converter = AVAudioConverter(from: source.format, to: format) else { return nil }
+        return LiveListener.convert(source, with: converter, to: format)
+    }
+
+    /// Raw 16-bit little-endian mono PCM at [format]'s rate, as a buffer.
+    nonisolated static func pcm16(_ data: Data) -> AVAudioPCMBuffer? {
+        let frames = data.count / 2
+        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames)),
+              let out = buffer.floatChannelData?[0] else { return nil }
+        data.withUnsafeBytes { raw in
+            for i in 0..<frames {
+                let sample = Int16(littleEndian: raw.loadUnaligned(fromByteOffset: i * 2, as: Int16.self))
+                out[i] = Float(sample) / 32_768
+            }
+        }
+        buffer.frameLength = AVAudioFrameCount(frames)
+        return buffer
+    }
+
+    private func startEngine() -> Bool {
+        // With the microphone open the audio already records and plays; otherwise it is set up for speech.
+        if !LiveListener.shared.active { VoiceAudio.shared.forSpeech() }
+        let engine = AVAudioEngine()
+        let player = AVAudioPlayerNode()
+        engine.attach(player)
+        engine.connect(player, to: engine.mainMixerNode, format: Self.format)
+        engine.prepare()
+        do { try engine.start() } catch {
+            VoiceAudio.shared.note(message: "voice engine did not start: \(error.localizedDescription)")
+            return false
+        }
+        self.engine = engine
+        node = player
+        player.play()
+        return true
+    }
+
+    private func schedule(_ buffer: AVAudioPCMBuffer) {
+        guard let node, done != nil else { return }
+        queued += 1
+        if !started { started = true; VoiceLevel.shared.speaking = true }
+        let current = line
+        node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+            _Concurrency.Task { @MainActor in self?.played(current) }
+        }
+    }
+
+    private func played(_ current: Int) {
+        guard current == line, done != nil else { return }
+        queued -= 1
+        if ended && queued == 0 { finish() }
+    }
+
+    private func finish() {
+        let callback = done
+        done = nil
+        line += 1
+        VoiceLevel.shared.speaking = false
+        node?.stop()
+        engine?.stop()
+        engine = nil
+        node = nil
+        if !LiveListener.shared.active { VoiceAudio.shared.done() }
+        callback?(started)
     }
 }

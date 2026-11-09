@@ -250,6 +250,7 @@ public class HealthPresenter(
 
     private fun name(kind: VoiceKind): String = when (kind) {
         VoiceKind.Apple -> "Apple"
+        VoiceKind.Speechify -> "Speechify"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Fish -> "Fish Audio"
         VoiceKind.Deepgram -> "Deepgram"

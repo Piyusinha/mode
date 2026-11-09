@@ -131,7 +131,7 @@ public class SettingsRepository(
         state.value = read()
     }
 
-    /** The pasted key for Fish, ElevenLabs, Soniox, or Deepgram. Null removes it. */
+    /** The pasted key for Speechify, Fish, ElevenLabs, Soniox, or Deepgram. Null removes it. */
     public fun voiceKey(kind: VoiceKind): String? = secrets.get(voiceSecret(kind))?.takeIf { it.isNotBlank() }
 
     public fun setVoiceKey(kind: VoiceKind, key: String?) {

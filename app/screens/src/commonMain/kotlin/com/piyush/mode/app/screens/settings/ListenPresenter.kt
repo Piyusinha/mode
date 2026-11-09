@@ -172,10 +172,10 @@ public class ListenPresenter(
     /** What's coming up in their day (calendar, repeats due, the last task), read when talking mode opens. */
     private val day: suspend () -> com.piyush.mode.feature.memory.data.DayContext? = { null },
     /**
-     * The session's last task when it stopped before it was done: in this chat, or (no chat yet, as from Siri)
-     * in the latest one. Mode then opens by asking to carry on; yes runs it again in that same chat.
+     * The chat's last task when it stopped before it was done, asked only for a session opened from that chat's
+     * mic (a new chat never looks back). Mode then opens by asking to carry on; yes runs it again in that chat.
      */
-    private val lastStopped: suspend (conversationId: String?) -> StoppedTask? = { null },
+    private val lastStopped: suspend (conversationId: String) -> StoppedTask? = { null },
     /** The chat so far, when the session continues one (started from its mic): shown and used for what Mode says. */
     private val chatSoFar: suspend (conversationId: String) -> ChatSoFar? = { null },
     /** How long a paused session with nothing running stays open. */
@@ -279,7 +279,8 @@ public class ListenPresenter(
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = "")
         job = scope.launch {
             inSession {
-                val stopped = if (forQuestion) null else runCatching { lastStopped(chat) }.getOrNull()
+                // Only a session opened from a chat's mic looks back: a new chat starts fresh, never "last time…".
+                val stopped = chat?.takeIf { !forQuestion }?.let { runCatching { lastStopped(it) }.getOrNull() }
                 val soFar = chat?.takeIf { !forQuestion }?.let { runCatching { chatSoFar(it) }.getOrNull() }
                 soFar?.let(::showSoFar)
                 if (stopped != null) {
@@ -291,9 +292,16 @@ public class ListenPresenter(
                     return@inSession
                 }
                 val greeting = greet()
-                own.value = own.value.copy(greeting = greeting)
-                say(false, greeting)
-                converse(greeting, followUp = false)
+                // The greeting may offer something ("Want me to set an alarm?"): yes then runs that task, not the word "yes".
+                val offer = greeting.offer?.let { TalkOffer(it.task, it.yes, it.no) }
+                pendingOffer = offer
+                own.value = own.value.copy(greeting = greeting.line)
+                if (offer != null) {
+                    own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, greeting.line, offer = offer))
+                } else {
+                    say(false, greeting.line)
+                }
+                converse(greeting.line, followUp = false)
             }
         }
     }
@@ -516,21 +524,21 @@ public class ListenPresenter(
      * Mode's first words: the AI's, with what's coming up in their day ([GREET_WAIT_MS] at most), else Mode's own
      * short greeting. Logs which, and how long it took, so a fixed line is never a mystery.
      */
-    private suspend fun greet(): String {
+    private suspend fun greet(): com.piyush.mode.feature.memory.data.NextLine {
         val s = settings.settings.value
         val started = clock.now()
         val context = runCatching { kotlinx.coroutines.withTimeoutOrNull(DAY_WAIT_MS) { day() } }.getOrNull()
         today = context
         val written = context?.let { c ->
             telemetry.trace(com.piyush.mode.core.telemetry.Operation.VoiceAcknowledge) { span ->
-                greeter?.line(s.userName, hour(), c, budgetMs = GREET_WAIT_MS, language = speakLanguage()).also {
+                greeter?.opening(s.userName, hour(), c, budgetMs = GREET_WAIT_MS, language = speakLanguage()).also {
                     span.fields(mapOf(com.piyush.mode.core.telemetry.Field.Outcome to if (it == null) "GreetingFallback" else "GreetingAI"))
                 }
             }
         }
         val ms = clock.now() - started
-        com.piyush.mode.core.common.AppLog.log("talk", if (written != null) "greeting by ${greeter?.lastModel} in $ms ms: \"$written\"" else "greeting: Mode's own line (${whyNot(ms, GREET_WAIT_MS)}, ${greeter?.lastModel})")
-        return written ?: greetingLine(s.userName, hour())
+        com.piyush.mode.core.common.AppLog.log("talk", if (written != null) "greeting by ${greeter?.lastModel} in $ms ms: \"${written.line}\"${written.offer?.let { " offers: ${it.task}" }.orEmpty()}" else "greeting: Mode's own line (${whyNot(ms, GREET_WAIT_MS)}, ${greeter?.lastModel})")
+        return written ?: com.piyush.mode.feature.memory.data.NextLine(greetingLine(s.userName, hour()))
     }
 
     private fun speakLanguage(): String? {
@@ -790,7 +798,7 @@ public class ListenPresenter(
             return rest.isBlank()
         }
 
-        private val YESES = listOf("yes", "yeah", "yep", "yup", "sure", "go ahead", "do it", "do that", "please do", "haan", "ha", "ji", "of course", "why not")
+        private val YESES = listOf("yes", "yeah", "yep", "yup", "sure", "go ahead", "go for it", "do it", "do that", "do this", "please do", "please do this", "please do that", "sounds good", "haan", "ha", "ji", "of course", "why not")
         private val DECLINES = listOf("no", "nope", "skip", "skip it", "no thanks", "no thank you", "leave it", "not now", "don't", "dont", "nahi", "rehne do", "never mind", "nevermind")
 
         private val FILLERS = listOf("mo", "mode", "ok", "okay", "please", "for now", "yeah", "yes", "sure")

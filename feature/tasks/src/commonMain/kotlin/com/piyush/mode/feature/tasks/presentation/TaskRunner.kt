@@ -370,7 +370,7 @@ public class TaskRunner(
             // The notification reads like the chat reply, as plain text (it can't draw Markdown). Not when the answer
             // was just said out loud in a spoken session: one notification per task stacked up over a session.
             if (!saidAloud) notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
-            state.value.conversationId?.let(::retitle)
+            state.value.conversationId?.let { retitle(it, latest = reply) }
             // Come back so the user sees how it went, unless the task was to leave them where it ended
             // (a video playing, an app they asked to open): then Mode finishes in the background.
             if ((finished.outcome as? AgentOutcome.Done)?.stay == true) {
@@ -499,13 +499,18 @@ public class TaskRunner(
      * Says a short update now and then while the task runs: when the plan moves on, paced by
      * [Narrator.Pacing], never over a spoken question, never the same thing twice.
      */
-    /** The chat's name, written again from all it asked, in the background (the old name stays if this fails). */
-    private fun retitle(conversationId: String) {
+    /**
+     * The chat's name, written again from all it asked and what Mode did ([latest]: the reply just given), in the
+     * background (the old name stays if this fails).
+     */
+    private fun retitle(conversationId: String, latest: String) {
         val titler = titler ?: return
         scope.launch {
-            val asked = runCatching { conversations.turnsNow(conversationId) }.getOrDefault(emptyList())
-                .filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User }.map { it.text }
-            val title = titler.title(asked) ?: return@launch
+            val turns = runCatching { conversations.turnsNow(conversationId) }.getOrDefault(emptyList())
+            val asked = turns.filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User }.map { it.text }
+            val done = (turns.filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.Mode }.map { it.text } + latest)
+                .map { PlainText.fromMarkdown(it, oneLine = true) }.distinct()
+            val title = titler.title(asked, done) ?: return@launch
             if (title == conversations.get(conversationId)?.title) return@launch
             runCatching { conversations.rename(conversationId, title) }
             AppLog.log("chat", "renamed $conversationId: \"$title\" (from ${asked.size} request(s))")

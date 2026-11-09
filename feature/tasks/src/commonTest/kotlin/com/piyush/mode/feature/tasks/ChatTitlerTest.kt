@@ -31,6 +31,15 @@ class ChatTitlerTest {
     }
 
     @Test
+    fun aRequestThatNamesNothingIsNamedFromWhatModeDid() = runTest {
+        val seen = mutableListOf<String>()
+        val title = titler("Latest email: LinkedIn jobs", seen)
+            .title(listOf("Sure, please do this."), done = listOf("Your latest email is a LinkedIn job recommendations email."))
+        assertEquals("Latest email: LinkedIn jobs", title)
+        assertTrue("WHAT MODE DID OR ANSWERED" in seen.single() && "LinkedIn job recommendations" in seen.single(), seen.single())
+    }
+
+    @Test
     fun aRamblingAnswerIsNotUsed() = runTest {
         assertNull(titler("This chat is about turning off dark mode and also replying to Sam on WhatsApp").title(listOf("x")))
     }

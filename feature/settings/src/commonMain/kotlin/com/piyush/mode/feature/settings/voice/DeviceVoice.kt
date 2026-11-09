@@ -24,6 +24,14 @@ public object DeviceVoice {
     public var finish: () -> Unit = {}
     public var play: ((ByteArray, (Boolean) -> Unit) -> Unit)? = null
     /**
+     * A line streamed as it is made: raw 16-bit little-endian mono PCM at the given rate. Begin says whether it can
+     * play (and later reports, once, whether sound started); each chunk plays as it arrives; end plays what's left.
+     * The phone plays it through the open microphone's audio when listening, so echo cancellation removes Mode's voice.
+     */
+    public var streamBegin: ((Int, (Boolean) -> Unit) -> Boolean)? = null
+    public var streamChunk: (ByteArray) -> Unit = {}
+    public var streamEnd: () -> Unit = {}
+    /**
      * Records once from the microphone until a pause after speech, the limit, Done or cancel. With live, Apple
      * transcribes as it goes: partial gets the words so far. Done gets the recording's path (null: nobody spoke, or
      * cancelled) and Apple's final text (null when not live or nothing was heard).
@@ -88,6 +96,32 @@ public object DeviceVoice {
         await { done -> speak?.invoke(text, voiceId, speed, done) ?: done(false) }
 
     public suspend fun playClip(bytes: ByteArray): Boolean = await { done -> play?.invoke(bytes, done) ?: done(false) }
+
+    /**
+     * Plays a stream of 16-bit PCM at [sampleRate] while [feed] reads it; true once sound started. A stream cut off
+     * part-way plays what came and counts as spoken; one that fails before any sound rethrows its error.
+     */
+    public suspend fun playStream(sampleRate: Int, feed: suspend (send: (ByteArray) -> Unit) -> Unit): Boolean {
+        val begin = streamBegin ?: return false
+        val finished = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        if (!begin(sampleRate) { ok -> finished.complete(ok) }) return false
+        try {
+            try {
+                feed { bytes -> if (bytes.isNotEmpty()) streamChunk(bytes) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                streamEnd()
+                if (!finished.await()) throw e
+                return true
+            }
+            streamEnd()
+            return finished.await()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            cancel()
+            throw e
+        }
+    }
 
     public suspend fun recordOnce(maxMs: Long, silenceMs: Long): String? = awaitNullable { done ->
         record?.invoke(maxMs, silenceMs, done) ?: done(null)

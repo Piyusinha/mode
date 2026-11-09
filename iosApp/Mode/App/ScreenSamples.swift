@@ -156,7 +156,7 @@ struct ScreenSample: Identifiable {
         var state = settingsState
         state.speaker = "elevenlabs"; state.voiceName = "Rachel"; state.voiceValue = "ElevenLabs · Rachel"
         state.speakerLogo = VoiceService.elevenlabs.logo
-        state.speakerTag = failed ? nil : VoiceService.elevenlabs.recommendation
+        state.speakerTag = nil
         state.listener = "deepgram"; state.listenerLabel = VoiceService.deepgram.title; state.listenerLogo = VoiceService.deepgram.logo
         state.speakProblem = failed ? VoiceTroubleText.short("PlanLimit", hearing: false) : nil
         state.voiceNote = failed ? L10n.Voice.sectionNoteFailed : L10n.Voice.sectionNote

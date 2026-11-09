@@ -83,7 +83,7 @@ public class Screens(
     public fun voice(hearing: Boolean): com.piyush.mode.app.screens.settings.VoicePresenter =
         com.piyush.mode.app.screens.settings.VoicePresenter(scope, settings, voices!!, hearing)
 
-    /** Choose a voice, starting on [provider] (Apple, ElevenLabs, Fish Audio). */
+    /** Choose a voice, starting on [provider] (Speechify, Apple, ElevenLabs, Fish Audio). */
     public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
         com.piyush.mode.app.screens.settings.VoicePickerPresenter(
             scope, settings, voices!!,
@@ -133,13 +133,11 @@ public class Screens(
     }
 
     /**
-     * The last task of this chat (or, with no chat, of the latest one) when it stopped before it was done in the
-     * last [CARRY_ON_WITHIN_MS]: stopped by the user, or cut off (Mode closed while it ran, marked failed on relaunch).
+     * The last task of this chat when it stopped before it was done in the last [CARRY_ON_WITHIN_MS]: stopped by
+     * the user, or cut off (Mode closed while it ran, marked failed on relaunch).
      */
-    private fun lastStopped(conversationId: String?): com.piyush.mode.app.screens.settings.StoppedTask? {
-        val recent = tasks.latest(CARRY_ON_LOOKBACK)
-        val last = (if (conversationId != null) recent.firstOrNull { it.conversationId == conversationId } else recent.firstOrNull())
-            ?: return null
+    private fun lastStopped(conversationId: String): com.piyush.mode.app.screens.settings.StoppedTask? {
+        val last = tasks.latest(CARRY_ON_LOOKBACK).firstOrNull { it.conversationId == conversationId } ?: return null
         val stopped = last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Stopped ||
             last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Failed
         val ended = last.endedAt ?: last.startedAt ?: last.createdAt
@@ -178,10 +176,8 @@ public class Screens(
                 "${s.text} at ${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
             }
             .take(DAY_ITEMS)
-        val last = tasks.latest(1).firstOrNull()
-            ?.takeIf { t -> clock.relativeDay(t.endedAt ?: t.createdAt) == com.piyush.mode.app.screens.common.RelativeDay.Today }
-            ?.let { t -> "${t.text} · ${t.status.name.lowercase()}" }
-        return com.piyush.mode.feature.memory.data.DayContext(label, events, repeats, last)
+        // No earlier task: a new session starts fresh. Only a session from a chat's mic carries that chat on (chatSoFar).
+        return com.piyush.mode.feature.memory.data.DayContext(label, events, repeats)
     }
 
     /** What Mode says when handed a spoken task, written by the fast model (phone control's). */

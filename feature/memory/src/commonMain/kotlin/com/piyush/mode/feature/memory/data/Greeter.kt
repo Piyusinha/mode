@@ -54,11 +54,15 @@ public class Greeter(
     public var lastModel: String? = null
         private set
 
-    public suspend fun line(
+    /**
+     * The first words, and, when they offer to do something, that task and the two answers: a "yes" to the
+     * greeting then runs the offered task (not the word "yes").
+     */
+    public suspend fun opening(
         name: String?, hour: Int, day: DayContext, budgetMs: Long = BUDGET_MS,
         /** The language to speak ("Hindi"); null: English. */
         language: String? = null,
-    ): String? {
+    ): NextLine? {
         val (id, provider) = model() ?: return null
         lastModel = id
         return try {
@@ -74,9 +78,14 @@ public class Greeter(
                     if (day.isEmpty) append("NOTHING IS COMING UP: just greet them and ask what they need.\n")
                 }
                 val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
-                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), TOOLS)
+                val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), NEXT_TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
-                clean((args?.get("line") as? JsonPrimitive)?.contentOrNull ?: reply.text)
+                fun arg(key: String) = (args?.get(key) as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+                clean(arg("line") ?: reply.text)?.let { line ->
+                    NextLine(line, arg("offer_task")?.let { t ->
+                        NextLine.Offer(t, arg("yes_label")?.take(LABEL_CHARS) ?: "Yes", arg("no_label")?.take(LABEL_CHARS) ?: "Not now")
+                    })
+                }
             }
         } catch (e: CancellationException) {
             throw e
@@ -170,7 +179,9 @@ public class Greeter(
             picking up the phone.
             - If something in their day is coming up soon (within about 3 hours) and you could clearly help with it
               on their phone, offer that ONE thing as a question ("Dinner with Priya's at 7. Want me to text her
-              you're on your way?"). Only use what is listed; never invent plans, people or times.
+              you're on your way?"). Only use what is listed; never invent plans, people or times. Whenever the line
+              offers to do something, also give offer_task (the whole task to run if they say yes, standing on its
+              own: "Text Priya that I'm on my way to dinner"), yes_label ("Yes, text her") and no_label ("Not now").
             - Otherwise greet them and ask what they need, in your own words, different each time.
             - Use their first name now and then, not always. Match the time of day.
             - Plain spoken words: no emoji, no markdown, no quotes, no lists. Speak English.
@@ -192,23 +203,6 @@ public class Greeter(
                             putJsonObject("offer_task") { put("type", "string"); put("description", "Only when the line offers to do something: that task, in the user's words, standing on its own.") }
                             putJsonObject("yes_label") { put("type", "string"); put("description", "The yes button, 1–3 words (\"Yes, look there\").") }
                             putJsonObject("no_label") { put("type", "string"); put("description", "The no button, 1–3 words (\"Skip it\").") }
-                        }
-                        putJsonArray("required") { add(JsonPrimitive("line")) }
-                    }
-                }
-            })
-        }
-
-        private val TOOLS = buildJsonArray {
-            add(buildJsonObject {
-                put("type", "function")
-                putJsonObject("function") {
-                    put("name", TOOL)
-                    put("description", "What Mode says out loud first.")
-                    putJsonObject("parameters") {
-                        put("type", "object")
-                        putJsonObject("properties") {
-                            putJsonObject("line") { put("type", "string"); put("description", "One short spoken line.") }
                         }
                         putJsonArray("required") { add(JsonPrimitive("line")) }
                     }

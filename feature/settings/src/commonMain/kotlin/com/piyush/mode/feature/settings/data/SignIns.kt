@@ -35,6 +35,7 @@ public object SignIns {
 
     private fun voiceName(kind: VoiceKind): String = when (kind) {
         VoiceKind.Apple -> "Apple"
+        VoiceKind.Speechify -> "Speechify"
         VoiceKind.Fish -> "Fish Audio"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Soniox -> "Soniox"
