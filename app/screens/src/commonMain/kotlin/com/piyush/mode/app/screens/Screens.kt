@@ -114,8 +114,25 @@ public class Screens(
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
-            acknowledger = acknowledger, greeter = greeter, day = ::dayContext,
+            acknowledger = acknowledger, greeter = greeter, day = ::dayContext, lastStopped = ::lastStopped,
         )
+
+    /**
+     * The last task of this chat (or, with no chat, of the latest one) when it stopped before it was done in the
+     * last [CARRY_ON_WITHIN_MS]: stopped by the user, or cut off (Mode closed while it ran, marked failed on relaunch).
+     */
+    private fun lastStopped(conversationId: String?): com.piyush.mode.app.screens.settings.StoppedTask? {
+        val recent = tasks.latest(CARRY_ON_LOOKBACK)
+        val last = (if (conversationId != null) recent.firstOrNull { it.conversationId == conversationId } else recent.firstOrNull())
+            ?: return null
+        val stopped = last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Stopped ||
+            last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Failed
+        val ended = last.endedAt ?: last.startedAt ?: last.createdAt
+        if (!stopped || clock.now() - ended > CARRY_ON_WITHIN_MS) return null
+        val title = last.conversationId?.let { conversations.get(it)?.title }?.trim()?.takeIf { it.isNotEmpty() }
+        val name = title ?: last.text.trim().split(Regex("\\s+")).take(CARRY_ON_WORDS).joinToString(" ")
+        return com.piyush.mode.app.screens.settings.StoppedTask(last.text, last.conversationId, name)
+    }
 
     /** Mode's first words when started by voice, written by the fast model with what's coming up in their day. */
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? by lazy {
@@ -279,3 +296,9 @@ private const val DAY_ITEMS = 5
 
 /** Repeats due within this long count as "coming up" for the greeting. */
 private const val REPEATS_AHEAD_MS = 3 * 60 * 60 * 1000L
+
+/** How far back a stopped task is offered again when a session starts. */
+private const val CARRY_ON_WITHIN_MS: Long = 12L * 60 * 60 * 1000
+private const val CARRY_ON_LOOKBACK: Long = 50
+/** With no chat title, the request's first words name it. */
+private const val CARRY_ON_WORDS: Int = 8

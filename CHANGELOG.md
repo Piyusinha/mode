@@ -6,6 +6,9 @@ Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.
 
 ## Unreleased
 
+- Carry on where you stopped: when a spoken session starts and the last task of that chat (or,
+  from Siri, of your latest session) stopped or was cut off in the last 12 hours, Mode first asks
+  whether to carry on. Yes runs it again in the same chat, so the session continues.
 - Fixed: iOS could close Mode in the middle of a task (seen on a payment page) for using too much
   CPU in the background. Screens no longer rebuild their logic every time something on screen
   changes, the encrypted link to the phone uses the iPhone's AES hardware, and Mode slows down

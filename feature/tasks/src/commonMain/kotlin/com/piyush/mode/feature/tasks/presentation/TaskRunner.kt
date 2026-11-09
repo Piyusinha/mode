@@ -333,7 +333,12 @@ public class TaskRunner(
                 telemetry = telemetry,
                 memory = prepared?.agentMemory,
                 pause = gate,
-                pace = { cpuPacer.pace() },
+                pace = {
+                    cpuPacer.pace(lastResort = {
+                        phone.send(Op.LaunchApp(appInfo.bundleId))
+                        delay(FRONT_FOR_CPU_MS)
+                    })
+                },
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
                 device = device,
@@ -717,3 +722,6 @@ private const val RESUME_LOOKBACK = 50L
 private const val RESUME_NOTES = 8
 private const val RESUME_STEPS = 5
 private const val RESUME_OUTCOME_CHARS = 120
+
+/** The last resort for CPU: how long Mode stays in front before the task carries on. */
+private const val FRONT_FOR_CPU_MS: Long = 2_000L

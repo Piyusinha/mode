@@ -44,3 +44,30 @@ class CpuPacerTest {
         assertEquals(0L, pacer.pace())
     }
 }
+
+class CpuPacerLastResortTest {
+    @Test
+    fun whenPausingIsNotEnoughModeComesToTheFrontOnceAMinute() = kotlinx.coroutines.test.runTest {
+        // CPU that pausing can't bring down (something keeps it busy even while the agent waits).
+        var now = 0L
+        var cpu = 0L
+        val pacer = CpuPacer({ cpu }, { now }, sleep = { ms -> now += ms; cpu += ms * 9 / 10 })
+        var fronts = 0
+        repeat(30) {
+            now += 4_000; cpu += 3_800
+            pacer.pace(lastResort = { fronts++ })
+        }
+        kotlin.test.assertTrue(fronts >= 1, "it came to the front")
+        kotlin.test.assertTrue(fronts <= (now / 60_000).toInt() + 1, "at most once a minute: $fronts in ${now / 1000} s")
+    }
+
+    @Test
+    fun normalWorkNeverComesToTheFront() = kotlinx.coroutines.test.runTest {
+        var now = 0L
+        var cpu = 0L
+        val pacer = CpuPacer({ cpu }, { now }, sleep = { ms -> now += ms })
+        var fronts = 0
+        repeat(30) { now += 4_000; cpu += 1_200; pacer.pace(lastResort = { fronts++ }) }
+        kotlin.test.assertEquals(0, fronts)
+    }
+}

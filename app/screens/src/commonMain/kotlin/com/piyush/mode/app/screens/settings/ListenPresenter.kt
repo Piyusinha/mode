@@ -86,6 +86,14 @@ public data class TalkResultRow(val title: String, val detail: String, val done:
 /** Mode offers to run [task]: [yes] ("Yes, look there") runs it, [no] ("Skip it") doesn't. */
 public data class TalkOffer(val task: String, val yes: String, val no: String)
 
+/** The last task of a session that stopped before it was done (stopped, or cut off when Mode closed). */
+public data class StoppedTask(
+    val task: String,
+    val conversationId: String?,
+    /** What to call it out loud: the chat's title when it has one ("LinkedIn onboarding and paneer"). */
+    val name: String,
+)
+
 public data class ListenUiState(
     val phase: TalkPhase = TalkPhase.Greeting,
     /** What Mode said first ("Hey Alex, good evening. What do you want me to do?"). */
@@ -146,6 +154,11 @@ public class ListenPresenter(
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? = null,
     /** What's coming up in their day (calendar, repeats due, the last task), read when talking mode opens. */
     private val day: suspend () -> com.piyush.mode.feature.memory.data.DayContext? = { null },
+    /**
+     * The session's last task when it stopped before it was done: in this chat, or (no chat yet, as from Siri)
+     * in the latest one. Mode then opens by asking to carry on; yes runs it again in that same chat.
+     */
+    private val lastStopped: suspend (conversationId: String?) -> StoppedTask? = { null },
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     /** Their day, read once when this opened: the greeting and the reply to their task both use it. */
     private var today: com.piyush.mode.feature.memory.data.DayContext? = null
@@ -244,6 +257,11 @@ public class ListenPresenter(
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = "")
         job = scope.launch {
             inSession {
+                val stopped = if (forQuestion) null else runCatching { lastStopped(chat) }.getOrNull()
+                if (stopped != null) {
+                    carryOn(stopped)
+                    return@inSession
+                }
                 val greeting = greet()
                 own.value = own.value.copy(greeting = greeting)
                 say(false, greeting)
@@ -316,6 +334,20 @@ public class ListenPresenter(
             own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, next.line, offer = offer))
         }
         converse(next?.line.orEmpty(), followUp = true)
+    }
+
+    /**
+     * Opens the session by offering to carry on [stopped], in its own chat, so the session continues where it was.
+     * Yes runs the task again there; no asks what else (as for any offer).
+     */
+    private suspend fun carryOn(stopped: StoppedTask) {
+        if (chat == null) chat = stopped.conversationId
+        val line = carryOnLine(stopped.name)
+        val offer = TalkOffer(stopped.task, CARRY_ON_YES, CARRY_ON_NO)
+        pendingOffer = offer
+        com.piyush.mode.core.common.AppLog.log("talk", "offered to carry on a stopped task in ${stopped.conversationId}")
+        own.value = own.value.copy(greeting = line, turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, line, offer = offer))
+        converse(line, followUp = false)
     }
 
     /** Their tap on one of Mode's offered answers: as if they said it. */
@@ -614,6 +646,13 @@ public class ListenPresenter(
         private val QUESTION_PHASES = setOf(TalkPhase.Asking, TalkPhase.Answering, TalkPhase.Answered)
 
         /** "Hey Alex, good evening. What do you want me to do?" (by the hour; late at night just "Hey Alex."). */
+        const val CARRY_ON_YES: String = "Yes, carry on"
+        const val CARRY_ON_NO: String = "No, something else"
+
+        /** "Last time, “LinkedIn onboarding and paneer” stopped before it was done. Want me to carry on?" */
+        fun carryOnLine(name: String): String =
+            "Last time, \u201c${name.trim().trimEnd('.')}\u201d stopped before it was done. Want me to carry on?"
+
         fun greetingLine(name: String?, hour: Int): String {
             val who = name?.trim()?.split(' ')?.firstOrNull()?.takeIf { it.isNotEmpty() }
             val part = when (hour) {

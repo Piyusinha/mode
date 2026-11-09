@@ -15,33 +15,57 @@ public class CpuPacer(
     private val cpuTimeMs: () -> Long?,
     private val now: () -> Long,
     private val limitPercent: Int = 60,
+    private val hardPercent: Int = 75,
     private val windowMs: Long = 60_000,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
     private val samples = ArrayDeque<Pair<Long, Long>>()
 
-    /** Waits, if needed, so CPU over the last minute is under [limitPercent]. Returns how long it waited. */
-    public suspend fun pace(): Long {
+    private var lastResortAt: Long? = null
+
+    /**
+     * Waits, if needed, so CPU over the last minute is under [limitPercent]. Returns how long it waited.
+     *
+     * [lastResort] (the user's idea, used only when pausing isn't enough): when CPU is still at [hardPercent] or
+     * more after the pauses, Mode comes to the front for a moment, where iOS's background limit doesn't apply,
+     * and the task carries on (the agent reopens the app it was in). At most once a minute.
+     */
+    public suspend fun pace(lastResort: (suspend () -> Unit)? = null): Long {
         var waited = 0L
         repeat(MAX_ROUNDS) {
-            val t = now()
-            val cpu = cpuTimeMs() ?: return waited
-            samples.addLast(t to cpu)
-            // Keep one sample at or before the window's start, so the average always covers the last minute.
-            while (samples.size > 2 && samples[1].first <= t - windowMs) samples.removeFirst()
-            val (t0, cpu0) = samples.first()
-            val span = t - t0
-            if (span < MIN_SPAN_MS) return waited
-            val used = cpu - cpu0
-            val percent = used * 100.0 / span
+            val percent = percent() ?: return waited
             if (percent < limitPercent) return waited
+            val (span, used) = lastSpan
             // Idle long enough that used / (span + pause) falls to [TARGET_SHARE] of the limit.
             val pause = (used / (limitPercent / 100.0 * TARGET_SHARE) - span).toLong().coerceIn(MIN_PAUSE_MS, MAX_PAUSE_MS)
             AppLog.log("cpu", "busy: ${percent.toInt()}% CPU over the last ${span / 1000} s; pausing ${pause} ms before the next step")
             sleep(pause)
             waited += pause
         }
+        val still = percent() ?: return waited
+        val t = now()
+        if (lastResort != null && still >= hardPercent && lastResortAt.let { it == null || t - it >= windowMs }) {
+            lastResortAt = t
+            AppLog.log("cpu", "still ${still.toInt()}% CPU after pausing; bringing Mode to the front for a moment (last resort)")
+            runCatching { lastResort() }
+        }
         return waited
+    }
+
+    private var lastSpan: Pair<Long, Long> = 0L to 0L
+
+    /** CPU over the last minute, in percent; null when unknown or measured over too short a time. */
+    private fun percent(): Double? {
+        val t = now()
+        val cpu = cpuTimeMs() ?: return null
+        samples.addLast(t to cpu)
+        // Keep one sample at or before the window's start, so the average always covers the last minute.
+        while (samples.size > 2 && samples[1].first <= t - windowMs) samples.removeFirst()
+        val (t0, cpu0) = samples.first()
+        val span = t - t0
+        if (span < MIN_SPAN_MS) return null
+        lastSpan = span to (cpu - cpu0)
+        return (cpu - cpu0) * 100.0 / span
     }
 
     private companion object {

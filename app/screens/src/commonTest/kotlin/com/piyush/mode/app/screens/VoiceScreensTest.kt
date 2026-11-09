@@ -324,4 +324,45 @@ class VoiceScreensTest {
         listOf("Skip it", "no thanks", "leave it for now").forEach { assertTrue(ListenPresenter.isDecline(it), it) }
         assertFalse(ListenPresenter.isYes("Yes, and also text Priya"))
     }
+
+    @Test
+    fun aSessionOffersToCarryOnTheLastStoppedTaskInItsChat() = runTest {
+        val f = Fixture(backgroundScope)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val chat = f.conversations.create("LinkedIn onboarding and paneer")
+            val stopped = com.piyush.mode.app.screens.settings.StoppedTask("Order high-protein paneer on Blinkit", chat.id, "LinkedIn onboarding and paneer")
+            var askedFor: String? = "unset"
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", lastStopped = { id -> askedFor = id; stopped })
+            talk.begin()
+            val offered = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertEquals(null, askedFor, "from Siri there is no chat yet: the latest one is looked at")
+            assertEquals("Last time, \u201cLinkedIn onboarding and paneer\u201d stopped before it was done. Want me to carry on?", offered.greeting)
+            assertEquals("Yes, carry on", offered.turns.last().offer?.yes)
+            talk.pick("Yes, carry on")
+            val sent = talk.state.awaitState { it.sent }
+            assertEquals("Order high-protein paneer on Blinkit", sent.task)
+            assertEquals(chat.id, f.tasks.latest(1).first().conversationId, "it runs in the same chat: the session carries on")
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun withNothingStoppedTheSessionGreetsAsUsual() = runTest {
+        val f = Fixture(backgroundScope)
+        f.settings.update { it.copy(userName = "Alex") }
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", lastStopped = { null })
+            talk.begin()
+            assertTrue(talk.state.awaitState { it.greeting.isNotEmpty() }.greeting.startsWith("Hey Alex"))
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
 }
