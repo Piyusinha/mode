@@ -4,6 +4,29 @@ What changed in each release of Mode, the phone app (iPhone now, Android next). 
 tagged `Mode-Mobile-Build-<version>`, and `tools/release-app.sh` won't make one without its section here.
 Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.md](desktop/CHANGELOG.md).
 
+## 0.1.9 · 9 Nov 2026
+
+- Speechify is a new voice for Mode, first in Settings → Voice and in Choose a voice: natural voices
+  in 48 languages, Hindi included, on a free plan of about 4 hours of speech a month with no card.
+  Paste a key from platform.speechify.ai; Mode checks it with Speechify, then keeps it in the
+  iPhone's Keychain. It speaks in the language and at the speed you set, and in a conversation it
+  streams: Mode starts talking as the first sound arrives instead of waiting for the whole line.
+- Yes to the greeting's offer does what was offered. When Mode opens with "Want me to set an
+  alarm?", "sure, please do this" now runs that task (the offer shows Yes and Not now to tap, too).
+  Before, the words themselves became the task and Mode had to ask what you meant. More ways of
+  saying yes are understood: "do this", "go for it", "sounds good".
+- A new voice session starts fresh. Mode only offers to carry on a stopped task when the session
+  is opened from that chat's mic; from Siri or a new chat it no longer opens with "Last time…",
+  and its greeting no longer brings up the last task of the day.
+- Fixed: Mode's voice could stop in the middle of a line and its own words show up as yours. The
+  microphone heard Mode, took that for you speaking and then going quiet, and closed, which
+  switched the sound off. While Mode speaks, the microphone now never decides you have finished.
+- Talking over Mode takes a little more: half a second of speech with three new words among the
+  last five heard. Words close to Mode's own ("harbor" for "Harper") count as its voice heard back.
+- Chat names come from what Mode did as well as what you asked, so a chat that began with "sure,
+  please do this" is no longer called "Unspecified Request".
+- ElevenLabs is no longer tagged "Most human", and setup no longer suggests it under Apple's voice.
+
 ## 0.1.8 · 9 Nov 2026
 
 - The voice session minimises instead of closing: ⌄ at the top left slides the voice screen down
