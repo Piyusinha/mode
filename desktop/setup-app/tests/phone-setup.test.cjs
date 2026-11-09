@@ -370,3 +370,32 @@ test('the phone page looks for a newer Mode by itself when it opens', async () =
   assert.ok(f.calls.includes('check_update'));
   assert.equal(f.run('S.update.available'), true);
 });
+
+// ---- paid account on LocalDevVPN: switch to Mode's own VPN ---------------------------------------------------
+test('a paid install on LocalDevVPN offers Mode’s own VPN, which turns it on and installs the paid build', async () => {
+  const f = fixture({
+    active_account: { email: 'test@example.com', teams: [{ id: 'team', kind: 'paid', name: 'Team' }] },
+    mode_vpn_turn_on: { appOn: true, tunnelOn: true },
+    install_mode: args => ({ version: '0.1.6', expires: '2027-11-09T00:00:00Z', ownVpn: args.ownVpn }),
+    phone_control: [],
+  });
+  device(f);
+  f.run("S.record.ownVpn = false; render();");
+  assert.match(f.app.innerHTML, /data-act="useOwnVpn"/);
+  let installArgs = null;
+  f.run("const real = TAURI.core.invoke; TAURI.core.invoke = async (c, a) => { if (c === 'install_mode') globalThis.__args = a; return real(c, a); };");
+  await f.click('useOwnVpn');
+  await new Promise(setImmediate); await new Promise(setImmediate);
+  installArgs = f.run('globalThis.__args');
+  assert.ok(f.calls.includes('mode_vpn_turn_on'), 'turns on Network Extensions first');
+  assert.equal(installArgs.ownVpn, true, 'installs the paid build');
+  assert.equal(installArgs.update, false);
+  assert.equal(f.run('S.switchToOwnVpn'), false, 'used once');
+});
+
+test('Mode’s own VPN is not offered on free accounts or when it is already on', () => {
+  const f = fixture(); device(f);
+  assert.doesNotMatch(f.app.innerHTML, /data-act="useOwnVpn"/); // paid, own VPN already
+  f.run("S.record.paid = false; S.record.ownVpn = false; render();");
+  assert.doesNotMatch(f.app.innerHTML, /data-act="useOwnVpn"/);
+});

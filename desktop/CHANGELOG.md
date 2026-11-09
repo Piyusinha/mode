@@ -6,6 +6,13 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
+## 0.1.6 · 9 Nov 2026
+
+- Paid accounts set up with LocalDevVPN can switch to Mode's own VPN from the phone page (Phone
+  control › Use Mode's own VPN): Mode Setup turns it on in your developer account and installs
+  the paid build over the current one, keeping everything in Mode. No LocalDevVPN app needed
+  after that.
+
 ## 0.1.5 · 7 Nov 2026
 
 - The phone page looks for a newer Mode by itself when it opens, so "Update to …" shows without

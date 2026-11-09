@@ -443,7 +443,12 @@ const screens = {
         ${tc('down', '', 'Mode', esc(r.mode?.version ?? '—'), esc(updateNote), updateButton)}
         ${tc('renew', soon ? 'orange' : 'green', 'Signed until', esc(fmtDate(r.mode?.expires)), r.paid ? 'Paid account · renews once a year.' : r.sidestore ? 'SideStore renews it every week on your iPhone.' : 'Renewed by this computer. Free accounts last 7 days.',
           btn('Renew signing', 'renewNow', 'small', connected ? '' : 'disabled') + (!r.paid && !r.sidestore ? btn('Install SideStore', 'addSidestore', 'small', connected ? '' : 'disabled') : ''))}
-        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN', S.reconnecting ? 'Keep your iPhone unlocked and connected. Stop any running task in Mode.' : 'Repair the pairing file if Mode can’t reach its tools.', btn(S.reconnecting ? 'Reconnecting…' : 'Reconnect', 'reconnect', 'small', connected && !S.reconnecting ? '' : 'disabled'))}`}
+        ${tc('shield', 'green', 'Phone control', r.ownVpn ? 'Mode’s own VPN' : 'LocalDevVPN',
+          S.reconnecting ? 'Keep your iPhone unlocked and connected. Stop any running task in Mode.'
+            : r.paid && !r.ownVpn ? 'Your paid account can use Mode’s own VPN instead: no LocalDevVPN app, and it turns on by itself.'
+            : 'Repair the pairing file if Mode can’t reach its tools.',
+          btn(S.reconnecting ? 'Reconnecting…' : 'Reconnect', 'reconnect', 'small', connected && !S.reconnecting ? '' : 'disabled')
+          + (r.paid && !r.ownVpn ? btn('Use Mode’s own VPN', 'useOwnVpn', 'small', connected && !S.reconnecting ? '' : 'disabled') : ''))}`}
       </div>
       ${S.reconnecting ? `<div role="status">${callout('Reconnecting phone control… Keep your iPhone unlocked and connected.', '', 'renew')}</div>` : ''}
       ${S.reconnectResult ? `<div role="status">${callout(esc(S.reconnectResult), '', 'check')}</div>` : ''}
@@ -622,7 +627,7 @@ async function signIn() {
     const before = S.prefs.phones?.[S.phone?.udid];
     S.team = S.teams.find(t => t.id === before?.teamId) ?? S.teams[0] ?? null;
     if (!S.team) { S.signInError = 'This Apple account has no team that can sign apps.'; go('signIn'); return; }
-    if (S.after === 'renew') { S.after = null; S.ownVpn = before?.ownVpn ?? false; S.vpnDecided = S.team.kind === 'paid' && !S.ownVpn; S.renew = S.renewAddSidestore || before?.sidestore ? 'sidestore' : 'computer'; S.renewAddSidestore = false; runInstall(); return; }
+    if (S.after === 'renew') { S.after = null; S.ownVpn = before?.ownVpn ?? false; S.vpnDecided = S.team.kind === 'paid' && !S.ownVpn && !S.switchToOwnVpn; S.renew = S.renewAddSidestore || before?.sidestore ? 'sidestore' : 'computer'; S.renewAddSidestore = false; runInstall(); return; }
     if (S.teams.length > 1) go('team'); else afterTeam();
   } catch (e) {
     if (attempt !== S.authAttempt) return;
@@ -690,7 +695,7 @@ async function reconnectPhone() {
 }
 
 async function beginDeviceAction(operation) {
-  if (!S.phone || !S.phones.some(p => p.usb && p.udid === S.phone.udid)) return;
+  if (!S.phone || !S.phones.some(p => p.usb && p.udid === S.phone.udid)) { S.switchToOwnVpn = false; return; }
   S.operation = operation;
   S.after = 'renew'; S.team = null; S.failure = null;
   const active = await call('active_account').catch(() => null);
@@ -701,6 +706,7 @@ async function beginDeviceAction(operation) {
       S.teams = active.teams; S.team = team; S.after = null;
       S.ownVpn = before.ownVpn;
       S.vpnDecided = team.kind === 'paid' && !S.ownVpn;
+      if (S.switchToOwnVpn && team.kind === 'paid') S.vpnDecided = false; // turn it on, then install the paid build
       S.renew = S.renewAddSidestore || before.sidestore ? 'sidestore' : 'computer';
       S.renewAddSidestore = false;
       await runInstall(); return;
@@ -712,7 +718,7 @@ async function beginDeviceAction(operation) {
 async function cancelSignIn() {
   ++S.authAttempt;
   S.signingIn = false; S.signInError = null; S.codeReq = null;
-  S.after = null; S.renewAddSidestore = false;
+  S.after = null; S.renewAddSidestore = false; S.switchToOwnVpn = false;
   await call('cancel_sign_in').catch(() => {});
   go(S.record ? 'device' : 'welcome');
 }
@@ -738,6 +744,7 @@ listen('progress', p => {
 
 async function runInstall() {
   const paid = S.team.kind === 'paid';
+  S.switchToOwnVpn = false;
   if (!S.stages.length || S.screen !== 'unplugged') S.stages = stagesFor();
   S.failure = null;
   go('install');
@@ -844,6 +851,7 @@ document.addEventListener('click', async e => {
     case 'reinstall': await beginDeviceAction('install'); break;
     case 'addSidestore': S.renewAddSidestore = true; await beginDeviceAction('renew'); break;
     case 'reconnect': await reconnectPhone(); break;
+    case 'useOwnVpn': S.switchToOwnVpn = true; await beginDeviceAction('install'); break;
     case 'signOut': await call('sign_out', { email: S.prefs.email ?? S.email }); S.prefs.email = null; S.hasSaved = false; render(); break;
     case 'copyReport': { const r = await call('diagnostics'); navigator.clipboard?.writeText(r).catch(() => {}); S.copied = true; render(); setTimeout(() => { S.copied = false; render(); }, 2000); break; }
   }
