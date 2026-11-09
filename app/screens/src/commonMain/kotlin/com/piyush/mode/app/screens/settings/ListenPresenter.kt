@@ -497,19 +497,6 @@ public class ListenPresenter(
         taskId?.let(queue::cancel)
     }
 
-    /**
-     * End, at any moment: listening and speaking stop, a task sent from this conversation is cancelled, and the
-     * conversation closes. The way out that never waits (unlike "that's all" or the quiet timeout), so nobody
-     * reaches for iOS's own Stop Session, which unpairs Mode.
-     */
-    public fun endNow() {
-        job?.cancel()
-        job = null
-        voices.stop()
-        taskId?.let(queue::cancel)
-        end("Ended")
-    }
-
     /** Closes the screen: anything still being said or heard stops; a task already sent carries on. */
     public fun dismiss() {
         endSession()

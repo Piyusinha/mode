@@ -84,8 +84,6 @@ final class TalkModel {
     func thatsAll() { presenter.thatsAll() }
     func later() { presenter.later() }
     func stop() { presenter.stop() }
-    /// End: everything stops now (listening, speaking, the task from here) and the conversation closes.
-    func endNow() { presenter.endNow() }
     func dismiss() { presenter.dismiss() }
 
     isolated deinit {
@@ -188,8 +186,6 @@ struct TalkScreen: View {
     let onLater: () -> Void
     let onStop: () -> Void
     let onClose: () -> Void
-    /// End, always on screen (top left, and in the dock when nothing else is there): stops everything at once.
-    var onEnd: () -> Void = {}
     /// The voice notice's Update in Settings (closes talking mode first).
     var onVoiceSettings: () -> Void = {}
     /// Listening hears nothing: a small warning at the top.
@@ -247,7 +243,7 @@ struct TalkScreen: View {
 
     private var header: some View {
         HStack {
-            ModeIconButton(.close, label: L10n.Talk.end, action: onEnd)
+            ModeIconButton(.close, label: L10n.Talk.close, action: onClose)
             Spacer()
             if !hearingFailed { status }
             Spacer()
@@ -584,9 +580,7 @@ struct TalkScreen: View {
                         .frame(width: ModeSize.talkStopWidth)
                 }
             case .answered:
-                // Mode is saying how it went: End is still right there.
-                ModeVoiceButton(L10n.Talk.end, style: .raised, height: ModeSize.primaryButton, action: onEnd)
-                    .frame(width: ModeSize.talkStopWidth)
+                EmptyView()
             default:
                 if hearingFailed {
                     VStack(spacing: ModeSpacing.s) {
@@ -628,7 +622,6 @@ struct TalkRoute: View {
             state: model.state, level: model.level, speaking: model.speaking, typingAnswer: model.typingAnswer, typed: $model.typed,
             onAllowMic: model.allowMic, onDone: model.done, onType: model.typeInstead, onSend: model.send,
             onAnswer: model.answer, onLater: { model.later(); close() }, onStop: { model.stop(); close() }, onClose: close,
-            onEnd: { model.endNow(); close() },
             onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; close(); onVoiceSettings(hearing) },
             cantHear: model.cantHear,
             onTryAgain: model.tryAgain,

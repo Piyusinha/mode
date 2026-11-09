@@ -324,15 +324,4 @@ class VoiceScreensTest {
         listOf("Skip it", "no thanks", "leave it for now").forEach { assertTrue(ListenPresenter.isDecline(it), it) }
         assertFalse(ListenPresenter.isYes("Yes, and also text Priya"))
     }
-
-    @Test
-    fun endStopsTheTaskAndClosesTheConversationAtOnce() = runTest {
-        val f = Fixture(backgroundScope)
-        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
-        talk.submitTyped("Turn on dark mode")
-        talk.state.awaitState { it.sent }
-        talk.endNow()
-        assertTrue(talk.state.value.finished, "the conversation closes at once")
-        f.runner.state.awaitState { !it.running }
-    }
 }
