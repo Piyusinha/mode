@@ -1,6 +1,7 @@
 package com.piyush.mode.app.screens
 
 import com.piyush.mode.app.screens.settings.ListenPresenter
+import com.piyush.mode.app.screens.settings.TalkTaskCard
 import com.piyush.mode.app.screens.settings.VoicePickerPresenter
 import com.piyush.mode.feature.settings.domain.VoiceKind
 import com.piyush.mode.feature.settings.voice.DeviceVoice
@@ -435,9 +436,11 @@ class VoiceScreensTest {
         talk.submitTyped("Turn on dark mode")
         talk.state.awaitState { it.sent }
         talk.stop()
-        val after = talk.state.awaitState { !it.sent }
+        // Not working any more: the card says stopped and Mode listens again (the task winds down behind).
+        val after = talk.state.awaitState { s -> !s.sent && s.turns.mapNotNull { it.card }.none { it.state == TalkTaskCard.State.Working } }
         assertFalse(after.finished, "stopping the task keeps the session open")
         f.runner.state.awaitState { !it.running }
+        talk.state.awaitState { !it.stopping }
     }
 
     @Test

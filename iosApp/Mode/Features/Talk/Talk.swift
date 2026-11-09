@@ -13,6 +13,8 @@ final class TalkModel {
         var phase: TalkPhase = .greeting
         /// The session is open but not listening (paused from the bar, or after a quiet spell).
         var micPaused = false
+        /// Stop was tapped: the task winds down behind while the session listens again.
+        var stopping = false
         /// The chat this session belongs to, once it has one: the top-left button goes back to it.
         var chat: String?
         var greeting = ""
@@ -94,6 +96,12 @@ final class TalkModel {
 
     /// What the session bar shows: what the session is doing now, in a line and a half.
     var bar: (kind: ModeSessionBar.Kind, title: String, subtitle: String) {
+        let base = barNow
+        // Stop was tapped: the bar already listens, and says the task is still letting go.
+        return state.stopping && base.kind != .needsYou ? (base.kind, base.title, L10n.Talk.barStopping) : base
+    }
+
+    private var barNow: (kind: ModeSessionBar.Kind, title: String, subtitle: String) {
         if state.micPaused { return (.paused, L10n.Talk.barPaused, L10n.Talk.barPausedDetail) }
         switch state.phase {
         case .asking, .answering:
@@ -199,7 +207,7 @@ final class TalkModel {
         // The newest word is still forming: it shows lighter until the next one comes.
         let words = s.partial.split(separator: " ").map(String.init)
         return State(
-            phase: s.phase, micPaused: s.micPaused, chat: s.chat, greeting: s.greeting,
+            phase: s.phase, micPaused: s.micPaused, stopping: s.stopping, chat: s.chat, greeting: s.greeting,
             turns: s.turns.map(turn), hasDone: !s.doneSoFar.isEmpty,
             settled: words.dropLast().joined(separator: " "), forming: words.last ?? "",
             task: s.task, reply: s.reply, working: s.working, question: s.question, options: s.options,

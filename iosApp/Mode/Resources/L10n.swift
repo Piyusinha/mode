@@ -815,6 +815,7 @@ enum L10n {
         static let barNeedsYouDetail = String(localized: "talk.bar.needsYouDetail", defaultValue: "Say it, or tap to answer")
         static let barPaused = String(localized: "talk.bar.paused", defaultValue: "Session open · mic paused")
         static let barPausedDetail = String(localized: "talk.bar.pausedDetail", defaultValue: "Tap the mic to talk again")
+        static let barStopping = String(localized: "talk.bar.stopping", defaultValue: "Stopping the last task…")
         static let barWaiting = String(localized: "talk.bar.waiting", defaultValue: "Waiting for you")
         static let barWaitingDetail = String(localized: "talk.bar.waitingDetail", defaultValue: "Tap to type, or the mic to talk")
         static let workingOnIt = LocalizedStringResource("talk.workingOnIt", defaultValue: "Working on it")

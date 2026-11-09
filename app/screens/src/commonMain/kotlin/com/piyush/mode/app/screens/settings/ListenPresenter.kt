@@ -131,6 +131,8 @@ public data class ListenUiState(
     val micDenied: Boolean = false,
     /** The session is open but not listening: paused from the session bar, or after a quiet spell. */
     val micPaused: Boolean = false,
+    /** Stop was tapped: the task is still winding down behind; the session already listens again. */
+    val stopping: Boolean = false,
     /** The task was handed to the queue; [finished] once it ended (or, started by voice, once the conversation ended). */
     val sent: Boolean = false,
     val finished: Boolean = false,
@@ -604,9 +606,27 @@ public class ListenPresenter(
             }
             return
         }
-        // A task is running: only the task stops. The session sees it end (afterTask), says so and listens again.
-        com.piyush.mode.core.common.AppLog.log("talk", "stop: the task stops, the session stays open")
-        taskId?.let(queue::cancel)
+        // A task is running: Mode stops talking and listens again at once; the task winds down behind (it can take
+        // a few seconds to let go of the phone), and its card fills in when it has.
+        val id = taskId ?: return
+        com.piyush.mode.core.common.AppLog.log("talk", "stop: listening again now; the task stops behind")
+        job?.cancel()
+        job = null
+        queue.cancel(id)
+        pendingOffer = null
+        own.value = own.value.copy(stopping = true, micPaused = false, turns = own.value.turns.map { t ->
+            val card = t.card
+            if (card != null && card.taskId == id && card.state == TalkTaskCard.State.Working) t.copy(card = card.copy(state = TalkTaskCard.State.Stopped)) else t
+        })
+        scope.launch {
+            val finished = kotlinx.coroutines.withTimeoutOrNull(STOP_WAIT_MS) { runner.state.first { !it.running && it.taskId == id } }
+            own.value = own.value.copy(stopping = false, turns = own.value.turns.map { t ->
+                val card = t.card
+                if (finished != null && card != null && card.taskId == id) t.copy(card = ended(live(card, finished), finished.lastResult?.outcome, finished.status)) else t
+            })
+            com.piyush.mode.core.common.AppLog.log("talk", if (finished != null) "the stopped task let go" else "the stopped task is still winding down after ${STOP_WAIT_MS / 1000} s")
+        }
+        job = scope.launch { inSession { nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE)) } }
     }
 
     /** Session bar › mic: stop listening; the session stays open, a running task carries on. */
@@ -738,6 +758,8 @@ public class ListenPresenter(
         const val PAUSED_END_MS: Long = 15 * 60_000L
         /** What Mode says after a task in a session is stopped. */
         const val STOPPED_LINE: String = "Okay, I stopped it. What next?"
+        /** How long the session waits to fill in a stopped task's card. */
+        const val STOP_WAIT_MS: Long = 30_000L
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
         fun isWrapUp(text: String): Boolean {
