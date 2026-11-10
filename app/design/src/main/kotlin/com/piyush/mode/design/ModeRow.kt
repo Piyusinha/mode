@@ -142,7 +142,7 @@ public fun ModeLeading(leading: ModeRowLeading) {
             ModeIconImage(leading.icon, ModeIconSize.regular, leading.foreground)
         }
         is ModeRowLeading.LogoTile -> Box(hidden.size(ModeSize.tile).background(leading.background, tile), Alignment.Center) {
-            ModeLogoImage(leading.logo, ModeSize.icon + ModeSpacing.xs, leading.foreground)
+            ModeLogoImage(leading.logo, if (leading.logo.wide) ModeSize.tileLogoWide else ModeSize.icon + ModeSpacing.xs, leading.foreground)
         }
     }
 }

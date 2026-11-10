@@ -125,7 +125,7 @@ private fun tip(tip: SetupTip, w: Words): ModeTip = when (tip) {
     SetupTip.Voice -> ModeTip(w.get(R.string.tips_voice_title), w.get(R.string.tips_voice_message), w.get(R.string.tips_voice_action), MoMood.Listening, ModeIcon.Speaker, ModeTipTone.Coral)
     SetupTip.Listening -> ModeTip(w.get(R.string.tips_listening_title), w.get(R.string.tips_listening_message), w.get(R.string.tips_listening_action), MoMood.Idle, ModeIcon.Microphone, ModeTipTone.Blue)
     SetupTip.Access -> ModeTip(w.get(R.string.tips_access_title), w.get(R.string.tips_access_message), w.get(R.string.tips_access_action), MoMood.Done, ModeIcon.Shield, ModeTipTone.Green)
-    SetupTip.StartWithoutOpening -> ModeTip(w.get(R.string.tips_start_title), w.get(R.string.tips_start_message), w.get(R.string.tips_start_action), MoMood.Working, ModeIcon.Power, ModeTipTone.Purple)
+    SetupTip.StartWithoutOpening -> ModeTip(w.get(R.string.tips_start_title), w.get(R.string.tips_start_message), w.get(R.string.tips_start_action), MoMood.Working, ModeIcon.Ask, ModeTipTone.Purple)
     SetupTip.Name -> ModeTip(w.get(R.string.tips_name_title), w.get(R.string.tips_name_message), w.get(R.string.tips_name_action), MoMood.YourTurn, ModeIcon.Profile, ModeTipTone.Orange)
 }
 

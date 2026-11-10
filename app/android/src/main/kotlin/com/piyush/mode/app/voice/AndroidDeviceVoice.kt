@@ -5,14 +5,17 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -47,7 +50,12 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private var ttsReady = false
     private val tts: TextToSpeech = TextToSpeech(app) { status -> ttsReady = status == TextToSpeech.SUCCESS }
     private val speaking = mutableMapOf<String, (Boolean) -> Unit>()
+    /** The lines whose sound has begun: a line stopped part-way was still said (only one that never sounded failed). */
+    private val sounding = mutableSetOf<String>()
     private var player: MediaPlayer? = null
+    /** The clip playing now waits on this: stopping it must answer, or its caller waits forever. Main thread only. */
+    private var clipDone: ((Boolean) -> Unit)? = null
+    private val stream = StreamOut()
     private var recognizer: SpeechRecognizer? = null
     private var recording: Job? = null
     @Volatile private var stopRecording = false
@@ -56,10 +64,14 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
 
     init {
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String) { VoiceLevel.speaking.value = true }
+            override fun onStart(utteranceId: String) {
+                synchronized(speaking) { if (utteranceId in speaking) sounding += utteranceId }
+                VoiceLevel.speaking.value = true
+            }
             override fun onDone(utteranceId: String) = finishSpeaking(utteranceId, true)
             @Deprecated("Android still calls it") override fun onError(utteranceId: String) = finishSpeaking(utteranceId, false)
-            override fun onStop(utteranceId: String, interrupted: Boolean) = finishSpeaking(utteranceId, false)
+            // Stopped part-way (the user talked over it, or Stop): said, as far as it got.
+            override fun onStop(utteranceId: String, interrupted: Boolean) = finishSpeaking(utteranceId, synchronized(speaking) { utteranceId in sounding })
         })
     }
 
@@ -86,6 +98,10 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
             listen = ::listen,
             hush = ::hush,
         )
+        // Speechify streams: each chunk plays as it arrives.
+        DeviceVoice.streamBegin = stream::begin
+        DeviceVoice.streamChunk = stream::chunk
+        DeviceVoice.streamEnd = stream::end
     }
 
     private fun micAllowed() = app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -109,22 +125,30 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) finishSpeaking(id, false)
     }
 
-    /** Stops speaking: every line still being said ends now (not every engine reports a stopped line). */
+    /**
+     * Stops speaking, whoever speaks (the phone's voice, a clip, a stream): every line still being said ends now
+     * (not every engine reports a stopped line), and each caller hears back, so nothing waits on a line that's over.
+     */
     private fun hush() {
         tts.stop()
         finishAllSpeaking()
+        stream.stop()
+        main.post { endClip(true) }
     }
 
+    /** Every line still being said is over: one whose sound had begun counts as said, one that never sounded doesn't. */
     private fun finishAllSpeaking() {
-        val pending = synchronized(speaking) { speaking.values.toList().also { speaking.clear() } }
+        val pending = synchronized(speaking) {
+            speaking.map { (id, done) -> done to (id in sounding) }.also { speaking.clear(); sounding.clear() }
+        }
         if (pending.isEmpty()) return
         VoiceLevel.speaking.value = false
-        main.post { pending.forEach { it(false) } }
+        main.post { pending.forEach { (done, said) -> done(said) } }
     }
 
     private fun finishSpeaking(id: String, ok: Boolean) {
         VoiceLevel.speaking.value = false
-        val done = synchronized(speaking) { speaking.remove(id) } ?: return
+        val done = synchronized(speaking) { sounding.remove(id); speaking.remove(id) } ?: return
         main.post { done(ok) }
     }
 
@@ -155,17 +179,132 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private fun play(bytes: ByteArray, done: (Boolean) -> Unit) {
         val file = File(app.cacheDir, CLIP).apply { writeBytes(bytes) }
         main.post {
+            // A clip still playing is over now: its caller must not wait forever.
+            endClip(true)
             runCatching {
+                val p = MediaPlayer()
+                player = p
+                p.setDataSource(file.absolutePath)
+                p.setOnCompletionListener { if (player === p) endClip(true) }
+                p.setOnErrorListener { _, _, _ -> if (player === p) endClip(false); true }
+                p.prepare()
+                p.start()
+                clipDone = done
+                VoiceLevel.speaking.value = true
+            }.onFailure {
                 player?.release()
-                player = MediaPlayer().apply {
-                    setDataSource(file.absolutePath)
-                    setOnCompletionListener { VoiceLevel.speaking.value = false; done(true); it.release(); player = null }
-                    setOnErrorListener { mp, _, _ -> VoiceLevel.speaking.value = false; done(false); mp.release(); player = null; true }
-                    prepare()
-                    start()
-                    VoiceLevel.speaking.value = true
+                player = null
+                done(false)
+            }
+        }
+    }
+
+    /** The clip is over (played, failed or stopped): the player goes and its caller hears back. Main thread only. */
+    private fun endClip(ok: Boolean) {
+        val done = clipDone
+        clipDone = null
+        player?.release()
+        player = null
+        if (done != null) {
+            VoiceLevel.speaking.value = false
+            done(ok)
+        }
+    }
+
+    /**
+     * A line that arrives as raw 16-bit mono PCM while it is being made (Speechify): each chunk plays as it comes.
+     * Chunks are written on a thread of their own (a full buffer makes the write wait), and the line is over once
+     * everything written has been heard, or it is stopped.
+     */
+    private inner class StreamOut {
+        private val lock = Any()
+        private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "mode-voice-stream").apply { isDaemon = true } }
+        private var track: AudioTrack? = null
+        private var done: ((Boolean) -> Unit)? = null
+        /** Goes up with every line: work queued for an older line does nothing. */
+        private var line = 0
+        private var rate = 0
+        private var frames = 0L
+        private var started = false
+
+        /** Starts a line; false when the phone can't play this format. [done] says, once, whether sound started. */
+        fun begin(sampleRate: Int, done: (Boolean) -> Unit): Boolean {
+            stop()
+            val min = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            if (min <= 0) return false
+            val made = runCatching {
+                AudioTrack.Builder()
+                    .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    .setAudioFormat(AudioFormat.Builder().setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .setBufferSizeInBytes(maxOf(min, sampleRate * 2 / STREAM_BUFFER_PER_SECOND))
+                    .build()
+            }.getOrNull()?.takeIf { it.state == AudioTrack.STATE_INITIALIZED }
+            if (made == null) {
+                AppLog.log("voice", "the phone can't play a $sampleRate Hz stream")
+                return false
+            }
+            synchronized(lock) {
+                line++
+                track = made
+                this.done = done
+                rate = sampleRate
+                frames = 0
+                started = false
+            }
+            runCatching { made.play() }
+            return true
+        }
+
+        fun chunk(bytes: ByteArray) {
+            val (t, current) = synchronized(lock) { (track ?: return) to line }
+            worker.execute {
+                var offset = 0
+                while (offset < bytes.size && current(current)) {
+                    val n = runCatching { t.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_NON_BLOCKING) }.getOrDefault(-1)
+                    if (n < 0) return@execute
+                    if (n == 0) { Thread.sleep(STREAM_POLL_MS); continue }
+                    offset += n
+                    synchronized(lock) {
+                        if (line != current) return@execute
+                        frames += n / 2
+                        if (!started) { started = true; VoiceLevel.speaking.value = true }
+                    }
                 }
-            }.onFailure { done(false) }
+            }
+        }
+
+        /** No more audio: the line ends once what was written has been heard. */
+        fun end() {
+            val (t, current) = synchronized(lock) { (track ?: return) to line }
+            worker.execute {
+                val (total, hz) = synchronized(lock) { if (line != current) return@execute; frames to rate }
+                val giveUp = SystemClock.elapsedRealtime() + total * MS / hz.coerceAtLeast(1) + STREAM_TAIL_MS
+                while (current(current) && (t.playbackHeadPosition.toLong() and HEAD_MASK) < total && SystemClock.elapsedRealtime() < giveUp) {
+                    Thread.sleep(STREAM_POLL_MS)
+                }
+                finish(current)
+            }
+        }
+
+        /** Stops the line at once (the user talked over Mode, or it was cancelled). */
+        fun stop() = finish(null)
+
+        private fun current(n: Int): Boolean = synchronized(lock) { line == n }
+
+        private fun finish(only: Int?) {
+            val (t, callback, said) = synchronized(lock) {
+                val callback = done ?: return
+                if (only != null && only != line) return
+                line++
+                done = null
+                Triple(track, callback, started).also { track = null }
+            }
+            VoiceLevel.speaking.value = false
+            // Quiet now; the track is let go on its own thread, after any write to it has seen the line is over.
+            runCatching { t?.pause() }
+            worker.execute { runCatching { t?.flush(); t?.release() } }
+            main.post { callback(said) }
         }
     }
 
@@ -336,8 +475,6 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         main.post {
             current?.cancel()
             current?.destroy()
-            player?.release()
-            player = null
         }
     }
 
@@ -354,6 +491,13 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         /** Listening this long with nothing heard: talking mode asks whether the microphone is on. */
         const val CANT_HEAR_MS = 6_000L
         const val CLIP = "voice-clip"
+        /** A streamed line: a quarter second of buffer, how often its thread looks again, and how long past its length it may take. */
+        const val STREAM_BUFFER_PER_SECOND = 4
+        const val STREAM_POLL_MS = 10L
+        const val STREAM_TAIL_MS = 1_500L
+        const val MS = 1000L
+        /** The playback head is an unsigned 32-bit count of frames. */
+        const val HEAD_MASK = 0xFFFFFFFFL
         const val ASKED_PREFS = "mode.permissions"
         const val DEFAULT_SUFFIX = "-language"
         const val QUIET = "quiet"

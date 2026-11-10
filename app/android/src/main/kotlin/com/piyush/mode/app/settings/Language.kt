@@ -106,11 +106,12 @@ fun VoicePickerRoute(graph: ModeGraph, provider: String, close: () -> Unit) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = ModeSpacing.screenEdge).padding(bottom = ModeSpacing.xxl), verticalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
             ModePageTitle(stringResource(R.string.voice_choose_voice))
             ModePillSegments(
-                listOf(VoiceService.Device, VoiceService.ElevenLabs, VoiceService.Fish).map { it.id to w.voiceProvider(it.id) },
+                listOf(VoiceService.Speechify, VoiceService.Device, VoiceService.ElevenLabs, VoiceService.Fish).map { it.id to w.voiceProvider(it.id) },
                 service.id, { presenter.provider(it) }, compact = true,
             )
             ModeInlineText(
                 stringResource(when (service) {
+                    VoiceService.Speechify -> R.string.voice_speechify_banner
                     VoiceService.ElevenLabs -> R.string.voice_eleven_banner
                     VoiceService.Fish -> R.string.voice_fish_banner
                     else -> R.string.voice_apple_banner

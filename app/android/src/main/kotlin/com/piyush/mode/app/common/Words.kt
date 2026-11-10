@@ -98,6 +98,7 @@ class Words(private val context: Context) {
     /** A voice or listening service's name, by its stored id ("apple" is the phone's own). */
     fun voiceProvider(id: String): String = when (id) {
         "apple" -> get(R.string.voice_apple)
+        "speechify" -> get(R.string.voice_speechify)
         "fish" -> get(R.string.voice_fish)
         "elevenlabs" -> get(R.string.voice_eleven)
         "soniox" -> get(R.string.voice_soniox)

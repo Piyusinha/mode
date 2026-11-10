@@ -65,6 +65,7 @@ import com.piyush.mode.design.MoMood
 /** A voice or listening service: its name, logo, plan line, where to get a key. */
 enum class VoiceService(val id: String, val logo: ModeLogo, val site: String?, val keyPage: String?, val hearing: Boolean) {
     Device("apple", ModeLogo.Android, null, null, false),
+    Speechify("speechify", ModeLogo.Speechify, "speechify.ai", "https://platform.speechify.ai/api-keys", false),
     Fish("fish", ModeLogo.FishAudio, "fish.audio", "https://fish.audio/app/api-keys/", false),
     ElevenLabs("elevenlabs", ModeLogo.ElevenLabs, "elevenlabs.io", "https://elevenlabs.io/app/settings/api-keys", false),
     Soniox("soniox", ModeLogo.Soniox, "soniox.com", "https://console.soniox.com", true),
@@ -72,6 +73,7 @@ enum class VoiceService(val id: String, val logo: ModeLogo, val site: String?, v
 
     fun plan(hearing: Boolean, w: Words): String = w.get(when (this) {
         Device -> if (hearing) R.string.voice_apple_hearing else R.string.voice_apple_speech
+        Speechify -> R.string.voice_speechify_free
         Fish -> R.string.voice_fish_free
         ElevenLabs -> R.string.voice_eleven_free
         Soniox -> R.string.voice_soniox_free
@@ -80,7 +82,7 @@ enum class VoiceService(val id: String, val logo: ModeLogo, val site: String?, v
 
     fun blurb(w: Words): String = w.get(when (this) {
         Device -> R.string.voice_blurb_apple
-        Fish, ElevenLabs -> R.string.voice_blurb_speech
+        Speechify, Fish, ElevenLabs -> R.string.voice_blurb_speech
         Soniox -> R.string.voice_blurb_soniox
         Deepgram -> R.string.voice_blurb_deepgram
     })
@@ -275,7 +277,9 @@ private fun KeySheet(service: VoiceService, masked: String?, s: VoiceUiState, w:
 }
 
 private fun rows(s: VoiceUiState, hearing: Boolean, w: Words): List<VoiceRowView> {
-    val order = if (hearing) listOf(VoiceService.Device, VoiceService.Deepgram, VoiceService.Soniox) else listOf(VoiceService.Device, VoiceService.ElevenLabs, VoiceService.Fish)
+    // A fixed order (Speechify first for who speaks); which one is in use is the radio, not the position.
+    val order = if (hearing) listOf(VoiceService.Device, VoiceService.Deepgram, VoiceService.Soniox)
+    else listOf(VoiceService.Speechify, VoiceService.Device, VoiceService.ElevenLabs, VoiceService.Fish)
     return s.rows.mapNotNull { r -> VoiceService.of(r.id)?.let { row(it, r, hearing, w) } }.sortedBy { order.indexOf(it.service) }
 }
 

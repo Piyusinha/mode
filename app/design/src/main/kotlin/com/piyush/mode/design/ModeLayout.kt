@@ -72,6 +72,10 @@ public object ModeRadius {
     public val firstRunCard: Dp = 24.dp
     /** A tinted note on a setup guide. */
     public val note: Dp = 18.dp
+    /** Mo's note on a page (a newer Mode is out). */
+    public val setupNote: Dp = 22.dp
+    /** The session bar: an open voice session, minimised. */
+    public val sessionBar: Dp = 22.dp
 }
 
 /** Icon sizes, so an icon never borrows a text style's size. */
@@ -114,6 +118,8 @@ public object ModeSize {
     /** The coloured square tiles (model letters, permission icons). */
     public val tile: Dp = 40.dp
     public val tileRadius: Dp = 12.dp
+    /** A wordmark-shaped logo in a tile (Fish Audio, Speechify) takes most of its width. */
+    public val tileLogoWide: Dp = 32.dp
     public val radio: Dp = 24.dp
     public val stepDot: Dp = 10.dp
     public val stepDotCurrent: Dp = 24.dp
@@ -134,6 +140,15 @@ public object ModeSize {
     public val moLarge: Dp = 80.dp
     public val moHero: Dp = 56.dp
     public val moRow: Dp = 32.dp
+    /** Mo at the start of its note. */
+    public val setupMoNote: Dp = 28.dp
+    /** The session bar: Mo, its round buttons and their glyph, the listening bars. */
+    public val sessionBarMo: Dp = 36.dp
+    public val sessionBarAction: Dp = 44.dp
+    public val sessionBarActionIcon: Dp = 18.dp
+    public val sessionBarWaveWidth: Dp = 3.dp
+    public val sessionBarWaveHeight: Dp = 20.dp
+    public val sessionBarWaveGap: Dp = 3.dp
     /** The badge on Mo's corner in a row, and its ring. */
     public val moRowBadge: Dp = 19.dp
     public val moRowBadgeRing: Dp = 2.dp
@@ -385,5 +400,7 @@ public object ModeOpacity {
     /** Tip cards: the close chip and the dots not showing. */
     public const val tipChip: Float = 0.08f
     public const val tipDotOff: Float = 0.2f
+    /** The session bar's second line on blue ("Say it, or tap to answer"). */
+    public const val sessionBarAskDetail: Float = 0.78f
     public val orbRings: List<Float> = listOf(0.08f, 0.14f, 0.22f)
 }

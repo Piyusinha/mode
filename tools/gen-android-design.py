@@ -61,6 +61,7 @@ ANDROID_ICONS = {
 }
 # iPhone cases newer than this mapping, with their Material equivalent.
 ICONS.setdefault("backup", ("cloud_upload", False))
+ICONS.setdefault("chevronDown", ("keyboard_arrow_down", False))
 
 
 def snake(name):

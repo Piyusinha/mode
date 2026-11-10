@@ -14,6 +14,7 @@ public enum class ModeIcon(@DrawableRes public val res: Int) {
     PrivateOff(R.drawable.ic_mode_private_off),
     Back(R.drawable.ic_mode_back),
     Chevron(R.drawable.ic_mode_chevron),
+    ChevronDown(R.drawable.ic_mode_chevron_down),
     Close(R.drawable.ic_mode_close),
     Stop(R.drawable.ic_mode_stop),
     Settings(R.drawable.ic_mode_settings),

@@ -742,6 +742,22 @@
     <string name="tab_settings">Settings</string>
     <string name="tab_tasks">Tasks</string>
     <string name="talk_allow_mic">Allow microphone</string>
+    <string name="talk_bar_answer">Answer</string>
+    <string name="talk_bar_listening">Listening…</string>
+    <string name="talk_bar_needs_you">Mode needs you</string>
+    <string name="talk_bar_needs_you_detail">Say it, or tap to answer</string>
+    <string name="talk_bar_open">Tap to open</string>
+    <string name="talk_bar_open_label">Open the voice session</string>
+    <string name="talk_bar_pause">Pause listening</string>
+    <string name="talk_bar_paused">Session open · mic paused</string>
+    <string name="talk_bar_paused_detail">Tap the mic to talk again</string>
+    <string name="talk_bar_resume">Resume listening</string>
+    <string name="talk_bar_speaking_detail">Mode is talking · tap to see it all</string>
+    <string name="talk_bar_stop">Stop</string>
+    <string name="talk_bar_stopping">Stopping the last task…</string>
+    <string name="talk_bar_waiting">Waiting for you</string>
+    <string name="talk_bar_waiting_detail">Tap to type, or the mic to talk</string>
+    <string name="talk_bar_working_detail">Mode is working · mic off meanwhile</string>
     <string name="talk_cancel">Cancel</string>
     <string name="talk_cant_hear">Can\'t hear you. Is your mic on? If this keeps happening, restart Mode.</string>
     <string name="talk_card_done">DONE · %1$s</string>
@@ -753,6 +769,7 @@
     <string name="talk_close">Close</string>
     <string name="talk_couldnt_hear_you">Mode couldn’t hear you</string>
     <string name="talk_done">Done</string>
+    <string name="talk_end">End</string>
     <string name="talk_got_it">Got it</string>
     <string name="talk_hearing_live">Hearing you live</string>
     <string name="talk_if_needed">If Mode needs you, it comes back here and asks out loud. You answer by voice and it carries on.</string>
@@ -766,6 +783,7 @@
     <string name="talk_mic_off_note">Mic off while I work in your apps. I’ll listen again when I’m done.</string>
     <string name="talk_mic_opens_after">The mic opens as soon as Mode stops talking.</string>
     <string name="talk_mic_title">Let Mode hear you</string>
+    <string name="talk_minimise">Minimise</string>
     <string name="talk_mode_label">MODE</string>
     <string name="talk_mode_speaking">MODE · SPEAKING</string>
     <string name="talk_needs_you">Mode needs you</string>
@@ -773,6 +791,7 @@
     <string name="talk_open_settings">Open Settings</string>
     <string name="talk_parts_of">%1$s of %2$s</string>
     <string name="talk_result">Result</string>
+    <string name="talk_resume_mic">Talk</string>
     <string name="talk_say_answer">Say your answer.</string>
     <string name="talk_say_it">Say what you want done</string>
     <string name="talk_say_or_tap">Say your answer, or tap one.</string>
@@ -840,7 +859,7 @@
     <string name="tips_name_message">Mo greets you by name and remembers the people and orders you use most.</string>
     <string name="tips_name_title">Tell Mo your name</string>
     <string name="tips_start_action">Set it up</string>
-    <string name="tips_start_message">Say “Hold power, Start Mode”, or unlock your phone by voice and let Mo begin.</string>
+    <string name="tips_start_message">Say “Hey Google, open Ask Mode” from anywhere, and Mo starts listening.</string>
     <string name="tips_start_title">Start Mo without opening it</string>
     <string name="tips_undo">Undo</string>
     <string name="tips_voice_action">Change the voice</string>
@@ -892,6 +911,10 @@
     <string name="unlock_voice_where_to_tap">Where to tap in step 5</string>
     <string name="unlock_voice_works">It works · unlocked in %1$s s</string>
     <string name="unlock_voice_works_detail">Mo will start tasks the moment you say it.</string>
+    <string name="updates_available">Mode %1$s is available.</string>
+    <string name="updates_how_to">Download it from Mode’s release page and install it over this one. Your chats and settings stay.</string>
+    <string name="updates_version">Mode %1$s</string>
+    <string name="updates_whats_new">What’s new in %1$s</string>
     <string name="voice_add_key">Add key</string>
     <string name="voice_all">All</string>
     <string name="voice_allow_mic">Allow mic</string>
@@ -956,7 +979,6 @@
     <string name="voice_hearing">Hearing</string>
     <string name="voice_hearing_in_use">Hearing in use</string>
     <string name="voice_hearing_purpose">Turns what you say into a task</string>
-    <string name="voice_human_voice_suggestion">Sounds more human with ElevenLabs</string>
     <string name="voice_in_use">In use</string>
     <string name="voice_in_use_couldnt_hear">In use · couldn’t hear</string>
     <string name="voice_in_use_couldnt_speak">In use · couldn’t speak</string>
@@ -988,7 +1010,6 @@
     <string name="voice_male">Male</string>
     <string name="voice_mic_off">The microphone is off for Mode in phone Settings.</string>
     <string name="voice_modes_voice">Mode\'s voice</string>
-    <string name="voice_most_human">Most human</string>
     <string name="voice_move_up">Move up</string>
     <string name="voice_needs_key">Add your %1$s key to see its voices. The free plan is enough.</string>
     <string name="voice_new_key_field">New %1$s API key</string>
@@ -1054,6 +1075,9 @@
     <string name="voice_speech">Speech</string>
     <string name="voice_speech_in_use">Speech in use</string>
     <string name="voice_speech_purpose">Lifelike voices for Mode’s replies</string>
+    <string name="voice_speechify">Speechify</string>
+    <string name="voice_speechify_banner">**Natural voices in 48 languages,** including Hindi. **Free plan:** about 4 hours of Mode talking a month, no card needed.</string>
+    <string name="voice_speechify_free">Free plan: about 4 hours of speech a month</string>
     <string name="voice_speed">Speed</string>
     <string name="voice_step_create_key">Open its API keys page and create a key.</string>
     <string name="voice_step_paste">Copy it and paste it here.</string>

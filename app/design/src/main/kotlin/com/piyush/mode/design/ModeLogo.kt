@@ -5,7 +5,7 @@ import androidx.annotation.DrawableRes
 /**
  * The logos of AI providers, model makers and voice services, as vectors tinted at runtime.
  * From LobeHub's AI icons (MIT: AI makers, ElevenLabs, Fish Audio), Simple Icons (CC0: Apple,
- * Deepgram) and soniox.com (Soniox); the marks belong to their owners and only name the service
+ * Deepgram), soniox.com (Soniox) and speechify.ai (Speechify); the marks belong to their owners and only name the service
  * the user connects or the model or voice they pick. Generated from the iPhone's Logos.xcassets.
  */
 public enum class ModeLogo(@DrawableRes public val res: Int) {
@@ -22,12 +22,16 @@ public enum class ModeLogo(@DrawableRes public val res: Int) {
     Zhipu(R.drawable.logo_zhipu),
     Apple(R.drawable.logo_apple),
     ElevenLabs(R.drawable.logo_elevenlabs),
+    Speechify(R.drawable.logo_speechify),
     FishAudio(R.drawable.logo_fishaudio),
     Soniox(R.drawable.logo_soniox),
     Deepgram(R.drawable.logo_deepgram),
     /** The phone's own voice and listening on Android (Simple Icons, CC0). */
     Android(R.drawable.logo_android),
     ;
+
+    /** Wider than tall (a waveform, a wordmark): drawn across most of its tile, or it reads as a speck. */
+    public val wide: Boolean get() = this == FishAudio || this == Speechify
 
     public companion object {
         /** The maker's logo for a model id ("anthropic/claude-haiku-5.5", "gpt-6.1-terra"), if known. */
