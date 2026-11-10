@@ -47,7 +47,7 @@ import com.piyush.mode.app.screens.settings.ListenUiState
 import com.piyush.mode.app.screens.settings.TalkPhase
 import com.piyush.mode.app.screens.settings.TalkTaskCard
 import com.piyush.mode.app.screens.settings.TalkTurn
-import com.piyush.mode.app.shell.rememberPresenter
+import com.piyush.mode.app.shell.TalkSession
 import com.piyush.mode.app.voice.VoiceLevel
 import com.piyush.mode.design.Mode
 import com.piyush.mode.design.ModeIcon
@@ -58,6 +58,9 @@ import com.piyush.mode.design.ModeLiveLabel
 import com.piyush.mode.design.ModeLogo
 import com.piyush.mode.design.ModeLogoImage
 import com.piyush.mode.design.ModeRadius
+import com.piyush.mode.design.ModeSessionBar
+import com.piyush.mode.design.ModeSessionKind
+import com.piyush.mode.design.ModeSessionWords
 import com.piyush.mode.design.ModeSize
 import com.piyush.mode.design.ModeSpacing
 import com.piyush.mode.design.ModeChipFlow
@@ -121,6 +124,10 @@ data class TalkState(
     val noticeHearing: Boolean,
     /** The option the words heard so far point to, while answering. */
     val heardOption: String?,
+    /** A voice session (not a lone question): its screen minimises into the session bar, and End is always there. */
+    val session: Boolean = false,
+    /** The session is open but not listening (paused from the bar, or after a quiet spell). */
+    val micPaused: Boolean = false,
 )
 
 /** What the user did in talking mode. */
@@ -136,29 +143,45 @@ sealed interface TalkEvent {
     data object Later : TalkEvent
     data object Stop : TalkEvent
     data object Close : TalkEvent
+    /** The screen shrinks into the session bar; the session carries on. */
+    data object Minimise : TalkEvent
+    /** The session is over: listening, speaking and its task stop. */
+    data object End : TalkEvent
+    /** The mic again, after it was paused. */
+    data object Resume : TalkEvent
     data object TryAgain : TalkEvent
     data object VoiceSettings : TalkEvent
     data class OpenChat(val conversationId: String) : TalkEvent
     data class WhatWentWrong(val taskId: String) : TalkEvent
 }
 
+/** The presenter of an open talk (a session, or a spoken question), made once and kept until the talk ends. */
+@Composable
+fun rememberTalkPresenter(graph: ModeGraph, presenters: com.piyush.mode.app.shell.PresenterStore, session: TalkSession): ListenPresenter =
+    remember(session.id) {
+        presenters.get(session.owner, TalkSession.PRESENTER) {
+            if (session.request.forQuestion) graph.screens.talkQuestion() else graph.screens.listen(session.request.conversationId, session.request.entry)
+        }
+    }
+
 /**
- * Talking mode, from "Start Mode" to done (boards "Talking mode"); also a spoken question in a running task, when
- * Mode comes forward to ask it. Closes itself when the user closes it or the spoken task finishes.
+ * An open voice session on screen (board: Voice session flow), from "Start Mode" on; also a spoken question in a
+ * running task, when Mode comes forward to ask it with no session open. The shell owns the session: ⌄ (or Back)
+ * shrinks this screen into the session bar and the session carries on; End (or the bar's ×) ends it. A lone
+ * question closes instead.
  */
 @Composable
 fun TalkRoute(
-    graph: ModeGraph,
-    request: TalkRequest,
+    presenter: ListenPresenter,
+    session: TalkSession,
     openSettings: () -> Unit,
     onVoiceSettings: (hearing: Boolean) -> Unit,
     onOpenChat: (String) -> Unit,
     onWhatWentWrong: (String) -> Unit,
+    onMinimise: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val presenter: ListenPresenter = rememberPresenter("talk") {
-        if (request.forQuestion) graph.screens.talkQuestion() else graph.screens.listen(request.conversationId, request.entry)
-    }
+    val forQuestion = session.request.forQuestion
     val ui by presenter.state.collectAsStateWithLifecycle()
     val level by VoiceLevel.level.collectAsStateWithLifecycle()
     val speaking by VoiceLevel.speaking.collectAsStateWithLifecycle()
@@ -167,15 +190,18 @@ fun TalkRoute(
     var typed by rememberSaveable { mutableStateOf("") }
     var typingAnswer by rememberSaveable { mutableStateOf(false) }
     var noticeSeen by rememberSaveable { mutableStateOf(false) }
-    val state = remember(ui) { map(ui, words) }
+    val state = remember(ui) { map(ui, words).copy(session = !forQuestion) }
 
-    fun close() {
-        presenter.dismiss()
-        onClose()
+    /** Out of the way: a session shrinks to its bar and carries on; a lone question's screen closes. */
+    fun leave() = if (forQuestion) onClose() else onMinimise()
+    // Once per session: the screen coming back from the session bar doesn't start it over.
+    LaunchedEffect(session.id) {
+        if (!forQuestion && !session.begun) {
+            session.begun = true
+            presenter.begin()
+        }
     }
-    LaunchedEffect(Unit) { if (!request.forQuestion) presenter.begin() }
-    LaunchedEffect(ui.finished) { if (ui.finished) close() }
-    BackHandler { close() }
+    BackHandler { leave() }
 
     TalkScreen(state, level, speaking, cantHear, typingAnswer, noticeSeen, typed, { typed = it }) { event ->
         when (event) {
@@ -205,33 +231,97 @@ fun TalkRoute(
             TalkEvent.ThatsAll -> presenter.thatsAll()
             TalkEvent.Later -> {
                 presenter.later()
-                close()
+                leave()
             }
+            // In a session Stop only stops the task: Mode says so and listens again. A lone question's screen closes.
             TalkEvent.Stop -> {
                 presenter.stop()
-                close()
+                if (forQuestion) onClose()
             }
-            TalkEvent.Close -> close()
+            TalkEvent.Close -> if (forQuestion) onClose() else presenter.endNow()
+            TalkEvent.Minimise -> leave()
+            TalkEvent.End -> if (forQuestion) onClose() else presenter.endNow()
+            TalkEvent.Resume -> presenter.resumeListening()
             TalkEvent.TryAgain -> {
                 noticeSeen = false
                 presenter.begin()
             }
             TalkEvent.VoiceSettings -> {
                 val hearing = state.noticeHearing
-                close()
+                leave()
                 onVoiceSettings(hearing)
             }
             is TalkEvent.OpenChat -> {
-                close()
+                leave()
                 onOpenChat(event.conversationId)
             }
             is TalkEvent.WhatWentWrong -> {
-                close()
+                leave()
                 onWhatWentWrong(event.taskId)
             }
         }
     }
 }
+
+/** What the session bar shows: what the session is doing now, in a line and a half. */
+data class TalkBarState(val kind: ModeSessionKind, val title: String, val subtitle: String)
+
+/**
+ * An open voice session, minimised: its bar. A tap opens the voice screen again ([onOpen]); the mic pauses or
+ * resumes listening (the session stays open); × ends the session; Stop stops its task.
+ */
+@Composable
+fun TalkSessionBar(presenter: ListenPresenter, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val ui by presenter.state.collectAsStateWithLifecycle()
+    val words = rememberWords()
+    val bar = remember(ui) { bar(ui, words) }
+    ModeSessionBar(
+        bar.kind, bar.title, bar.subtitle,
+        ModeSessionWords(
+            open = stringResource(R.string.talk_bar_open_label), pause = stringResource(R.string.talk_bar_pause),
+            resume = stringResource(R.string.talk_bar_resume), end = stringResource(R.string.talk_end),
+            stop = stringResource(R.string.talk_bar_stop), answer = stringResource(R.string.talk_bar_answer),
+        ),
+        onOpen = onOpen,
+        onMic = {
+            when {
+                ui.micPaused -> presenter.resumeListening()
+                ui.phase == TalkPhase.Greeting || ui.phase == TalkPhase.Listening || ui.phase == TalkPhase.Answered -> presenter.pauseListening()
+                // Nothing could listen, or they chose to type: the mic tries again, keeping what was said so far
+                // (before anything was said, the session simply starts).
+                ui.phase == TalkPhase.Typing -> if (ui.turns.isEmpty()) presenter.begin() else presenter.listenAgain()
+                // The microphone isn't allowed yet: the voice screen asks for it.
+                ui.phase == TalkPhase.NeedsMic -> onOpen()
+                else -> Unit
+            }
+        },
+        onEnd = presenter::endNow, onStop = presenter::stop, modifier = modifier,
+    )
+}
+
+private fun bar(s: ListenUiState, w: Words): TalkBarState {
+    val now = when {
+        s.micPaused -> TalkBarState(ModeSessionKind.Paused, w.get(R.string.talk_bar_paused), w.get(R.string.talk_bar_paused_detail))
+        s.phase == TalkPhase.Asking || s.phase == TalkPhase.Answering ->
+            TalkBarState(ModeSessionKind.NeedsYou, s.question.ifEmpty { w.get(R.string.talk_bar_needs_you) }, w.get(R.string.talk_bar_needs_you_detail))
+        s.phase == TalkPhase.Starting -> TalkBarState(ModeSessionKind.Working, s.working.ifEmpty { s.task }, w.get(R.string.talk_bar_working_detail))
+        s.phase == TalkPhase.Greeting || s.phase == TalkPhase.Answered -> {
+            val line = if (s.phase == TalkPhase.Answered) s.answerReply else s.greeting
+            if (line.isEmpty()) TalkBarState(ModeSessionKind.Listening, w.get(R.string.talk_bar_listening), w.get(R.string.talk_bar_open))
+            else TalkBarState(ModeSessionKind.Speaking, line, w.get(R.string.talk_bar_speaking_detail))
+        }
+        s.phase == TalkPhase.Listening -> TalkBarState(ModeSessionKind.Listening, w.get(R.string.talk_bar_listening), s.partial.trim().ifEmpty { w.get(R.string.talk_bar_open) })
+        else -> TalkBarState(ModeSessionKind.Paused, w.get(R.string.talk_bar_waiting), w.get(R.string.talk_bar_waiting_detail))
+    }
+    // Stop was tapped: the bar already listens, and says the task is still letting go.
+    return if (s.stopping && now.kind != ModeSessionKind.NeedsYou) now.copy(subtitle = w.get(R.string.talk_bar_stopping)) else now
+}
+
+/**
+ * The session bar a screen with its own bottom bar (a chat) shows above it, set by the shell while a voice session
+ * is open and minimised. Null: no bar.
+ */
+val LocalSessionBar = androidx.compose.runtime.staticCompositionLocalOf<(@Composable () -> Unit)?> { null }
 
 private fun map(s: ListenUiState, w: Words): TalkState {
     // The newest word is still forming: it shows lighter until the next one comes.
@@ -241,7 +331,7 @@ private fun map(s: ListenUiState, w: Words): TalkState {
         phase = s.phase, greeting = s.greeting, turns = s.turns, hasDone = s.doneSoFar.isNotEmpty(),
         settled = heard.dropLast(1).joinToString(" "), forming = heard.lastOrNull().orEmpty(),
         task = s.task, reply = s.reply, working = s.working, question = s.question, options = s.options,
-        answer = s.answer, answerReply = s.answerReply, micDenied = s.micDenied,
+        answer = s.answer, answerReply = s.answerReply, micDenied = s.micDenied, micPaused = s.micPaused,
         notice = s.voiceNotice?.let { w.get(if (it.hearing) R.string.voice_couldnt_hear_with else R.string.voice_couldnt_speak_with, provider.orEmpty()) },
         noticeMessage = s.voiceNotice?.let { w.voiceTrouble(it.trouble, it.hearing) },
         noticeHearing = s.voiceNotice?.hearing ?: false,
@@ -263,7 +353,7 @@ fun TalkScreen(
 ) {
     val c = Mode.colors
     val phase = state.phase
-    val listening = (phase == TalkPhase.Listening || phase == TalkPhase.Answering) && !typingAnswer
+    val listening = (phase == TalkPhase.Listening || phase == TalkPhase.Answering) && !typingAnswer && !state.micPaused
     // Hearing failed and nothing started: "Mode couldn't hear you", until the user types instead.
     val hearingFailed = phase == TalkPhase.Typing && state.notice != null && state.noticeHearing && !noticeSeen
     // They've asked for something: the screen is the conversation, with what's happening now at the bottom.
@@ -307,9 +397,13 @@ fun TalkScreen(
 private fun Header(state: TalkState, listening: Boolean, hearingFailed: Boolean, inConversation: Boolean, onEvent: (TalkEvent) -> Unit) {
     val c = Mode.colors
     Row(Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.screenEdge).padding(top = ModeSpacing.s), verticalAlignment = Alignment.CenterVertically) {
-        ModeIconButton(ModeIcon.Close, stringResource(R.string.talk_close), { onEvent(TalkEvent.Close) })
+        // A session minimises into the session bar (it carries on); a lone question closes.
+        if (state.session) ModeIconButton(ModeIcon.ChevronDown, stringResource(R.string.talk_minimise), { onEvent(TalkEvent.Minimise) })
+        else ModeIconButton(ModeIcon.Close, stringResource(R.string.talk_close), { onEvent(TalkEvent.Close) })
         Box(Modifier.weight(1f), Alignment.Center) {
-            if (!hearingFailed) {
+            if (state.micPaused) {
+                ModeTalkStatus(stringResource(R.string.talk_bar_paused), null)
+            } else if (!hearingFailed) {
                 when (state.phase) {
                     TalkPhase.NeedsMic -> ModeTalkStatus(stringResource(R.string.talk_start_mode), null)
                     TalkPhase.Greeting -> ModeTalkStatus(stringResource(R.string.talk_speaking), c.brand)
@@ -321,7 +415,7 @@ private fun Header(state: TalkState, listening: Boolean, hearingFailed: Boolean,
                 }
             }
         }
-        if (listening || state.phase == TalkPhase.Greeting || state.phase == TalkPhase.Asking) {
+        if (!state.micPaused && (listening || state.phase == TalkPhase.Greeting || state.phase == TalkPhase.Asking)) {
             ModeIconButton(ModeIcon.Keyboard, stringResource(R.string.talk_type), { onEvent(TalkEvent.Type) })
         } else {
             Spacer(Modifier.size(ModeSize.touch))
@@ -362,7 +456,7 @@ private fun ColumnScope.Conversation(state: TalkState, level: Float, speaking: B
         }
         Box(Modifier.padding(top = ModeSpacing.xs).fillMaxWidth(), Alignment.Center) {
             when (state.phase) {
-                TalkPhase.Greeting, TalkPhase.Listening -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
+                TalkPhase.Greeting, TalkPhase.Listening -> if (!state.micPaused) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ModeSpacing.m)) {
                     if (state.phase == TalkPhase.Listening && (state.settled.isNotEmpty() || state.forming.isNotEmpty())) {
                         ModeTalkLiveWords(state.settled, state.forming, ModeTextStyle.LiveWords, Mode.colors.brand)
                     }
@@ -461,7 +555,11 @@ private fun Page(
                 }
             }
         }
-        TalkPhase.Greeting, TalkPhase.Listening -> {
+        TalkPhase.Greeting, TalkPhase.Listening -> if (state.micPaused) {
+            // Open, not listening: Mo rests until the mic comes back on.
+            ModeTalkMo(MoMood.Sleep, ModeSize.talkMoListening, Modifier.height(ModeSize.talkHalo))
+            ModeText(stringResource(R.string.talk_bar_paused_detail), ModeTextStyle.Subheadline, color = c.textSecondary, align = TextAlign.Center)
+        } else {
             if (state.greeting.isNotEmpty()) {
                 // Mode said this out loud as it opened; it stays as a quiet caption.
                 Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs)) {
@@ -534,7 +632,14 @@ private fun Page(
 private fun Dock(state: TalkState, inConversation: Boolean, typingAnswer: Boolean, hearingFailed: Boolean, typed: String, onEvent: (TalkEvent) -> Unit) {
     val canSend = typed.isNotBlank()
     Box(Modifier.fillMaxWidth().padding(horizontal = ModeSpacing.screenEdge), Alignment.Center) {
-        when (state.phase) {
+        // The session is open, not listening: the mic comes back on here, or End.
+        if (state.micPaused && state.phase != TalkPhase.Typing) {
+            Row(horizontalArrangement = Arrangement.spacedBy(ModeSize.talkDockGap), verticalAlignment = Alignment.Top) {
+                ModeTalkSideButton(ModeIcon.Keyboard, stringResource(R.string.talk_type), { onEvent(TalkEvent.Type) })
+                ModeTalkMicButton(false, stringResource(R.string.talk_resume_mic), { onEvent(TalkEvent.Resume) })
+                ModeTalkSideButton(ModeIcon.Close, stringResource(R.string.talk_end), { onEvent(TalkEvent.End) })
+            }
+        } else when (state.phase) {
             TalkPhase.NeedsMic -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ModeSpacing.s + ModeSpacing.xxs)) {
                 if (state.micDenied) {
                     ModeVoiceButton(stringResource(R.string.talk_open_settings), ModeVoiceButtonStyle.Ink, { onEvent(TalkEvent.OpenSettings) }, height = ModeSize.primaryButton)
@@ -550,6 +655,7 @@ private fun Dock(state: TalkState, inConversation: Boolean, typingAnswer: Boolea
                 ModeTalkSideButton(ModeIcon.Keyboard, stringResource(R.string.talk_type), { onEvent(TalkEvent.Type) })
                 ModeTalkMicButton(state.phase == TalkPhase.Listening, stringResource(R.string.talk_done), { onEvent(TalkEvent.Done) })
                 if (state.hasDone) ModeTalkSideButton(ModeIcon.Checkmark, stringResource(R.string.talk_thats_all), { onEvent(TalkEvent.ThatsAll) })
+                else if (state.session) ModeTalkSideButton(ModeIcon.Close, stringResource(R.string.talk_end), { onEvent(TalkEvent.End) })
                 else ModeTalkSideButton(ModeIcon.Close, stringResource(R.string.talk_cancel), { onEvent(TalkEvent.Close) })
             }
             TalkPhase.Asking, TalkPhase.Answering -> if (typingAnswer) {
@@ -566,7 +672,9 @@ private fun Dock(state: TalkState, inConversation: Boolean, typingAnswer: Boolea
                 if (inConversation) ModeTalkMicOff(stringResource(R.string.talk_mic_off_note))
                 ModeVoiceButton(stringResource(R.string.talk_stop), ModeVoiceButtonStyle.Danger, { onEvent(TalkEvent.Stop) }, Modifier.width(ModeSize.talkStopWidth), height = ModeSize.primaryButton)
             }
-            TalkPhase.Answered -> Unit
+            TalkPhase.Answered -> if (state.session) {
+                ModeVoiceButton(stringResource(R.string.talk_end), ModeVoiceButtonStyle.Raised, { onEvent(TalkEvent.End) }, Modifier.width(ModeSize.talkStopWidth), height = ModeSize.primaryButton)
+            }
             TalkPhase.Typing -> if (hearingFailed) {
                 Column(verticalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
                     ModeVoiceButton(stringResource(R.string.talk_try_again), ModeVoiceButtonStyle.Ink, { onEvent(TalkEvent.TryAgain) })

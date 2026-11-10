@@ -28,8 +28,46 @@ class Navigator(private val presenters: PresenterStore) {
     /** A link that arrived before the main tabs were showing (the first job's chat, a notification). */
     var pending: Route? by mutableStateOf(null)
 
-    /** Talking mode, over everything while it's open (a mic, the assistant, a spoken question). */
-    var talk: com.piyush.mode.app.talk.TalkRequest? by mutableStateOf(null)
+    /**
+     * The open voice session (a mic, the assistant), or a spoken question that came forward with none open. A
+     * session lives here, not on its screen, so the screen can shrink into the session bar and come back.
+     */
+    var talk: TalkSession? by mutableStateOf(null)
+        private set
+
+    /** The voice screen is up (else an open session shows as the session bar). */
+    var talkOpen: Boolean by mutableStateOf(false)
+    private var talks = 0
+
+    /**
+     * Opens talking mode. A session that's already open comes back up when it's this chat's (or no chat was
+     * named, or it has none yet); otherwise it ends and a new one takes its place.
+     */
+    fun talk(request: com.piyush.mode.app.talk.TalkRequest) {
+        val current = talk
+        if (current != null && !current.request.forQuestion) {
+            // A question in the open session's task: its screen comes up to ask it.
+            if (request.forQuestion) { talkOpen = true; return }
+            val chat = presenter(current)?.state?.value?.chat
+            if (request.conversationId == null || chat == null || chat == request.conversationId) { talkOpen = true; return }
+            presenter(current)?.endNow()
+        }
+        endTalk()
+        talk = TalkSession(talks++, request)
+        talkOpen = true
+    }
+
+    /** The session is over (End, ×, "that's all"), or the question's screen closed: the screen and the bar go. */
+    fun endTalk() {
+        val current = talk ?: return
+        talk = null
+        talkOpen = false
+        presenter(current)?.dismiss()
+        presenters.release(current.owner)
+    }
+
+    private fun presenter(session: TalkSession): com.piyush.mode.app.screens.settings.ListenPresenter? =
+        presenters.find(session.owner, TalkSession.PRESENTER)
 
     fun stack(tab: AppTab): List<Entry> = stacks.getValue(tab)
 
@@ -59,6 +97,7 @@ class Navigator(private val presenters: PresenterStore) {
 
     /** Back to Home's first page with every stack empty (after Reset Mode). */
     fun reset() {
+        endTalk()
         AppTab.entries.forEach { stacks.getValue(it).clear() }
         tab = AppTab.Home
         pending = null
@@ -72,6 +111,18 @@ class Navigator(private val presenters: PresenterStore) {
     }
 }
 
+/** One opening of talking mode: what opened it, and the owner of its presenter (each opening has its own). */
+class TalkSession(val id: Int, val request: com.piyush.mode.app.talk.TalkRequest) {
+    val owner: String = "talk$id"
+
+    /** Mode greeted once: the screen coming back from the session bar doesn't start the session over. */
+    var begun: Boolean = false
+
+    companion object {
+        const val PRESENTER = "talk"
+    }
+}
+
 /**
  * The presenters the pages made, by owner (a page's [Entry.id], or a fixed owner like the first run),
  * kept across rotation and closed when their page goes.
@@ -82,6 +133,10 @@ class PresenterStore {
     @Suppress("UNCHECKED_CAST")
     fun <P : Presenter<*>> get(owner: String, key: String, create: () -> P): P =
         held.getOrPut(owner) { mutableMapOf() }.getOrPut(key, create) as P
+
+    /** The presenter [owner] already made under [key], if it has. */
+    @Suppress("UNCHECKED_CAST")
+    fun <P : Presenter<*>> find(owner: String, key: String): P? = held[owner]?.get(key) as? P
 
     fun release(owner: String) {
         held.remove(owner)?.values?.forEach { it.close() }

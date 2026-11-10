@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         val graph = ModeApplication.graph(this)
         val pages = SystemPages(this)
         val signIn = ChatGptSignIn(this, lifecycleScope, pages)
+        com.piyush.mode.app.overlay.OverlayController.endAppSession = { shell.navigator.endTalk() }
         // A link not yet followed (also when Android brings back a screen it had closed, with a new link).
         follow(intent)
         setContent {
@@ -70,6 +71,11 @@ class MainActivity : ComponentActivity() {
             .build()
     }
 
+    override fun onDestroy() {
+        com.piyush.mode.app.overlay.OverlayController.endAppSession = null
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         follow(intent)
@@ -82,7 +88,7 @@ class MainActivity : ComponentActivity() {
         // Opened as "Ask Mode" (by the user's assistant, or its icon): straight into talking mode.
         if (intent.component?.className == com.piyush.mode.app.graph.ASK_MODE) {
             AppLog.log("link", "ask mode")
-            shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest()
+            shell.navigator.talk(com.piyush.mode.app.talk.TalkRequest())
             return
         }
         val data = intent.dataString ?: return
@@ -108,11 +114,11 @@ class MainActivity : ComponentActivity() {
         }
         if (link is DeepLink.Open) shell.navigator.select(AppTab.Home)
         when (link) {
-            DeepLink.Listen -> shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest()
-            is DeepLink.Talk -> shell.navigator.talk = com.piyush.mode.app.talk.TalkRequest(
+            DeepLink.Listen -> shell.navigator.talk(com.piyush.mode.app.talk.TalkRequest())
+            is DeepLink.Talk -> shell.navigator.talk(com.piyush.mode.app.talk.TalkRequest(
                 link.conversationId,
                 if (link.conversationId == null) com.piyush.mode.app.talk.TalkRequest.ENTRY_ASK else com.piyush.mode.app.talk.TalkRequest.ENTRY_CHAT,
-            )
+            ))
             else -> Unit
         }
     }

@@ -170,6 +170,8 @@ fun ConversationScreen(
             verticalArrangement = Arrangement.spacedBy(ModeSpacing.s),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // An open voice session, minimised: above the message bar.
+            com.piyush.mode.app.talk.LocalSessionBar.current?.invoke()
             if (state.running) ModeWorkingTag(stringResource(R.string.conversation_mode_is_working))
             ModeMessageBar(
                 draft, onDraft, state.isPrivate, canSend,

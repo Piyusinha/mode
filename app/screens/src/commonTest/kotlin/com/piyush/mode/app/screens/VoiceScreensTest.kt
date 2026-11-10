@@ -518,6 +518,23 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun listeningAgainKeepsTheConversation() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+        // They chose to type, then want the mic back: the turns so far stay (begin would start over).
+        talk.typeInstead()
+        val typing = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Typing }
+        talk.listenAgain()
+        val again = talk.state.awaitState { it.phase != com.piyush.mode.app.screens.settings.TalkPhase.Typing }
+        assertEquals(typing.turns, again.turns, "the conversation is still there")
+        assertEquals(typing.doneSoFar, again.doneSoFar)
+        assertFalse(again.finished)
+    }
+
+    @Test
     fun endFinishesTheSessionAtOnce() = runTest {
         val f = Fixture(backgroundScope, model = NeverAnswers)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)

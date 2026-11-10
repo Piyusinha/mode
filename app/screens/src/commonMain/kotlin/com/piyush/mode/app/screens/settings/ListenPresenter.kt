@@ -724,6 +724,20 @@ public class ListenPresenter(
         job = scope.launch { inSession { converse("", followUp = false) } }
     }
 
+    /**
+     * The mic again in a conversation already under way, after hearing failed or they chose to type: Mode listens for
+     * the next thing and everything said so far stays ([begin] would greet again and start the conversation over).
+     */
+    public fun listenAgain() {
+        if (own.value.sent) return
+        forgotten?.cancel()
+        job?.cancel()
+        voices.stop()
+        own.value = own.value.copy(micPaused = false, partial = "")
+        com.piyush.mode.core.common.AppLog.log("talk", "listening again")
+        job = scope.launch { inSession { converse("", followUp = false) } }
+    }
+
     private fun pausedByQuiet() {
         com.piyush.mode.core.common.AppLog.log("talk", "quiet: mic paused, the session stays open")
         own.value = own.value.copy(micPaused = true, partial = "")

@@ -75,6 +75,8 @@ object OverlayController {
         val service = ServiceRegistry.service.value ?: return false
         this.app = app
         val graph = ModeApplication.graph(app)
+        // One voice session at a time: a session left open in Mode's app ends when the overlay starts its own.
+        if (host == null) endAppSession?.invoke()
         if (host == null) open(service, graph)
         AppLog.log("overlay", "summoned from $entry")
         closing?.cancel()
@@ -157,6 +159,10 @@ object OverlayController {
                     autoSlim(v)
                     when {
                         finished -> closeSoon("the conversation ended")
+                        // Quiet after a task: in Mode's own app the session waits with its mic paused; over someone
+                        // else's app the overlay goes, and the next "Ask Mode" starts fresh.
+                        v !is OverlayView.Working && talk.state.value.micPaused && a !is ActivityUiState.Working && a !is ActivityUiState.Waiting ->
+                            closeSoon("quiet after the task")
                         !begun && sawWork && a !is ActivityUiState.Working && a !is ActivityUiState.Waiting -> closeSoon("the task ended")
                     }
                 }
@@ -260,6 +266,9 @@ object OverlayController {
             OverlayEvent.AllowMic -> openEntry?.invoke() ?: talk?.allowMic()
         }
     }
+
+    /** Ends the voice session open in Mode's own app, if any (two sessions would both listen). Set by the app. */
+    var endAppSession: (() -> Unit)? = null
 
     /** Opens the small entry screen (it asks for the microphone, which an overlay can't). Set by the app. */
     var openEntry: (() -> Unit)? = null

@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import com.piyush.mode.app.R
 import com.piyush.mode.app.graph.ModeGraph
@@ -58,12 +59,29 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     var showingProviders by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val overlays = Overlays(
         openLive = { nav.push(Route.LiveRun) }, openAsk = { asking = true }, openProviders = { showingProviders = true }, reset = onReset,
-        openTalk = { nav.talk = it },
+        openTalk = nav::talk,
     )
-    // A spoken question comes forward in talking mode (unless talking mode is already open and asks it itself).
+    // A spoken question comes forward in talking mode: the open session's screen comes up to ask it, or, with no
+    // session open, a screen of its own.
     val spokenQuestion = run.state.question?.takeIf { it.spoken }?.id
     LaunchedEffect(spokenQuestion) {
-        if (spokenQuestion != null && nav.talk == null) nav.talk = com.piyush.mode.app.talk.TalkRequest(forQuestion = true)
+        if (spokenQuestion != null) nav.talk(com.piyush.mode.app.talk.TalkRequest(forQuestion = true))
+    }
+    // The open voice session (or a lone spoken question), kept here while its screen is down.
+    val session = nav.talk
+    val talk = session?.let { com.piyush.mode.app.talk.rememberTalkPresenter(graph, shell.presenters, it) }
+    if (talk != null) {
+        // Over (End, ×, "that's all", paused too long, a question answered): the screen and the bar go.
+        val finished by androidx.compose.runtime.produceState(false, talk) { talk.state.collect { value = it.finished } }
+        LaunchedEffect(finished) { if (finished) nav.endTalk() }
+        // Leaving Mode while it waits for words: the mic pauses (Android gives the microphone only to the app in
+        // front) and the session stays open. Not while its task works: that is Mode in another app, and it listens
+        // again when it comes back.
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+            val s = talk.state.value
+            val waiting = s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Greeting || s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Listening
+            if (session?.request?.forQuestion == false && !s.sent && waiting) talk.pauseListening()
+        }
     }
 
     LaunchedEffect(nav.pending) {
@@ -74,12 +92,24 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     BackHandler(enabled = nav.stack(nav.tab).isNotEmpty()) { nav.pop() }
 
     val stack = nav.stack(nav.tab)
+    // The session bar, while a session is open and its screen is down. A chat shows it above its own message bar;
+    // every other page makes room for it at the bottom (above the tabs on a tab's first page).
+    val sessionBar: (@Composable () -> Unit)? = talk?.takeIf { session?.request?.forQuestion == false && !nav.talkOpen }?.let { presenter ->
+        { com.piyush.mode.app.talk.TalkSessionBar(presenter, onOpen = { nav.talkOpen = true }) }
+    }
+    val inChat = stack.lastOrNull()?.route is Route.Conversation
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var barHeight by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(ModeSpacing.none) }
+    val shellBar = sessionBar?.takeIf { !inChat }
+    if (shellBar == null) barHeight = ModeSpacing.none
     Column(Modifier.fillMaxSize()) {
         // What stopped working since setup, over every tab; the page below makes room for it.
         WarningBannerHost(graph, pages, navigate = { nav.push(it) })
         Box(Modifier.fillMaxSize()) {
+        androidx.compose.runtime.CompositionLocalProvider(com.piyush.mode.app.talk.LocalSessionBar provides sessionBar?.takeIf { inChat }) {
         AnimatedContent(
             targetState = nav.tab to stack.lastOrNull(),
+            modifier = Modifier.padding(bottom = barHeight),
             transitionSpec = { fadeIn(tween(ModeMotion.quickMs)) togetherWith fadeOut(tween(ModeMotion.quickMs)) },
             label = "page",
         ) { (tab, entry) ->
@@ -89,13 +119,14 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
                 PresenterOwner(shell.presenters, entry.id) { Page(entry.route, graph, run, nav, pages, overlays) }
             }
         }
+        }
         if (asking) {
             com.piyush.mode.app.ask.AskRoute(graph, onSent = { conversation ->
                 asking = false
                 nav.open(AppTab.Home, Route.Conversation(conversation))
             }, onSpeak = {
                 asking = false
-                nav.talk = com.piyush.mode.app.talk.TalkRequest(entry = com.piyush.mode.app.talk.TalkRequest.ENTRY_ASK)
+                nav.talk(com.piyush.mode.app.talk.TalkRequest(entry = com.piyush.mode.app.talk.TalkRequest.ENTRY_ASK))
             }) { asking = false }
         }
         if (showingProviders) com.piyush.mode.app.settings.ProvidersRoute(graph, pages, signIn, { showingProviders = false })
@@ -103,27 +134,30 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
         run.state.question?.takeIf { !it.spoken }?.let { question ->
             com.piyush.mode.app.run.QuestionSheet(question, run::answer, run::stopFromQuestion)
         }
-        if (stack.isEmpty()) {
+        if (stack.isEmpty() || shellBar != null) {
             Box(Modifier.align(Alignment.BottomCenter), contentAlignment = Alignment.BottomCenter) {
-                ModeEdgeFade(top = false)
-                MainBar(nav, run, overlays)
+                if (stack.isEmpty()) ModeEdgeFade(top = false)
+                Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ModeSpacing.s)) {
+                    if (shellBar != null) {
+                        Box(
+                            Modifier.padding(horizontal = ModeSpacing.m).padding(bottom = if (stack.isEmpty()) ModeSpacing.none else ModeSpacing.s)
+                                .onSizeChanged { barHeight = with(density) { it.height.toDp() } + ModeSpacing.s },
+                        ) { shellBar() }
+                    }
+                    if (stack.isEmpty()) MainBar(nav, run, overlays)
+                }
             }
         }
-        nav.talk?.let { request ->
-            val close = {
-                nav.talk = null
-                shell.presenters.release(TALK)
-            }
-            PresenterOwner(shell.presenters, TALK) {
-                com.piyush.mode.app.talk.TalkRoute(
-                    graph, request,
-                    openSettings = pages::appInfo,
-                    onVoiceSettings = { hearing -> nav.push(if (hearing) Route.Listening else Route.Voice) },
-                    onOpenChat = { nav.open(AppTab.Home, Route.Conversation(it)) },
-                    onWhatWentWrong = { nav.push(Route.TaskDebug(it)) },
-                    onClose = close,
-                )
-            }
+        if (session != null && talk != null && (nav.talkOpen || session.request.forQuestion)) {
+            com.piyush.mode.app.talk.TalkRoute(
+                talk, session,
+                openSettings = pages::appInfo,
+                onVoiceSettings = { hearing -> nav.push(if (hearing) Route.Listening else Route.Voice) },
+                onOpenChat = { nav.open(AppTab.Home, Route.Conversation(it)) },
+                onWhatWentWrong = { nav.push(Route.TaskDebug(it)) },
+                onMinimise = { nav.talkOpen = false },
+                onClose = nav::endTalk,
+            )
         }
         }
     }
@@ -210,6 +244,3 @@ private fun NotYet(nav: Navigator) {
         }
     }
 }
-
-/** Talking mode's presenters, released when it closes. */
-private const val TALK = "talk"

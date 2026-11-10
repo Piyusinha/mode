@@ -348,7 +348,8 @@ public fun ModeTalkNext(text: String, modifier: Modifier = Modifier, yes: String
                 Modifier.background(if (offers) c.infoSoft else c.card, shape).padding(horizontal = ModeSpacing.m + ModeSpacing.xxs, vertical = ModeSpacing.m - ModeSpacing.xxs),
             )
             if (yes != null && no != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
+                // Side by side when they fit; a long answer goes under the other instead of breaking its words.
+                ModeChipFlow {
                     ModeTalkOption(yes, chosen = true, onClick = onYes)
                     ModeTalkOption(no, chosen = false, onClick = onNo)
                 }
