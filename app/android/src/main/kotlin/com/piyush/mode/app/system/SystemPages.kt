@@ -83,7 +83,7 @@ class SystemPages(private val activity: Activity) {
     fun wifi() = open("wi-fi", Intent(Settings.ACTION_WIFI_SETTINGS), Intent(Settings.ACTION_WIRELESS_SETTINGS))
 
     /** This phone's maker (the debug override first, so one phone can show another maker's pages). */
-    private fun brand(): PhoneQuirks.Brand? = com.piyush.mode.app.graph.brandOf(com.piyush.mode.core.storage.SharedPrefsStore(activity))
+    private fun brand(): PhoneQuirks.Brand? = com.piyush.mode.app.graph.brandOf(activity)
 
     /** A maker's own page: a component, or an action its app answers; with Mode's name for the pages that take it. */
     private fun page(p: QuirkPage): Intent {

@@ -98,7 +98,7 @@ fun androidModeGraph(
             phoneChecks = link?.let {
                 AccessibilityPhoneChecks(
                     app, it, background,
-                    brand = { brandOf(prefs) },
+                    brand = { brandOf(app) },
                     confirmed = { prefs.getString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEVICE_STEPS)?.split(',')?.filter(String::isNotBlank)?.toSet().orEmpty() },
                     speechAvailable = { android.speech.SpeechRecognizer.isRecognitionAvailable(app) },
                 )
@@ -111,10 +111,31 @@ fun androidModeGraph(
     )
 }
 
-/** This phone's maker (a debug override first, so one phone can show another maker's setup rows). */
-public fun brandOf(prefs: SharedPrefsStore): com.piyush.mode.core.platform.PhoneQuirks.Brand? =
-    prefs.getString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEBUG_BRAND)?.takeIf { it.isNotBlank() }?.let { com.piyush.mode.core.platform.PhoneQuirks.of(it) }
-        ?: com.piyush.mode.core.platform.PhoneQuirks.of(android.os.Build.MANUFACTURER, android.os.Build.BRAND)
+/**
+ * This phone's maker, as far as its own software goes (a debug override first, so one phone can show another maker's
+ * setup rows). The name alone isn't enough: a OnePlus running a stock-style Android (Paranoid Android, LineageOS) has
+ * none of OxygenOS's lists, so asking for its Autostart switch leaves the user looking for a page that isn't there.
+ * Each step stays only when one of its pages is on this phone; with none of the maker's apps, it's a plain Android.
+ */
+public fun brandOf(context: android.content.Context): com.piyush.mode.core.platform.PhoneQuirks.Brand? {
+    val prefs = SharedPrefsStore(context)
+    prefs.getString(com.piyush.mode.feature.settings.domain.SettingsKeys.DEBUG_BRAND)?.takeIf { it.isNotBlank() }
+        ?.let { return com.piyush.mode.core.platform.PhoneQuirks.of(it) }
+    val brand = com.piyush.mode.core.platform.PhoneQuirks.of(android.os.Build.MANUFACTURER, android.os.Build.BRAND) ?: return null
+    val pm = context.packageManager
+    fun present(pages: List<com.piyush.mode.core.platform.QuirkPage>) = pages.any { p ->
+        runCatching { pm.getPackageInfo(p.packageName, 0); true }.getOrDefault(false)
+    }
+    if (!present(brand.battery + brand.autostart + brand.sleeping + brand.popups)) return null
+    return brand.copy(manualSteps = brand.manualSteps.filter { step ->
+        when (step) {
+            com.piyush.mode.core.platform.ManualStep.Sleeping -> present(brand.sleeping)
+            com.piyush.mode.core.platform.ManualStep.Autostart -> present(brand.autostart)
+            com.piyush.mode.core.platform.ManualStep.Popups -> present(brand.popups)
+            com.piyush.mode.core.platform.ManualStep.Shortcut -> true
+        }
+    })
+}
 
 private const val PLAY_BUILD = "This version of Mode can't use your phone's apps. Install Mode from heymode.app to let it."
 

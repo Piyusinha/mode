@@ -31,7 +31,6 @@ import com.piyush.mode.app.screens.home.WarningsPresenter
 import com.piyush.mode.app.shell.Route
 import com.piyush.mode.app.shell.rememberPresenter
 import com.piyush.mode.app.system.SystemPages
-import com.piyush.mode.core.storage.SharedPrefsStore
 import com.piyush.mode.design.ModeIcon
 import com.piyush.mode.design.ModeSpacing
 import com.piyush.mode.design.ModeWarningBanner
@@ -44,7 +43,7 @@ import com.piyush.mode.design.ModeWarningTone
 @Composable
 fun WarningBannerHost(graph: ModeGraph, pages: SystemPages, showing: Route?, navigate: (Route) -> Unit) {
     val context = LocalContext.current
-    val presenter: WarningsPresenter = rememberPresenter("warnings") { graph.screens.warnings(brand = { brandOf(SharedPrefsStore(context))?.name }) }
+    val presenter: WarningsPresenter = rememberPresenter("warnings") { graph.screens.warnings(brand = { brandOf(context)?.name }) }
     val state by presenter.state.collectAsStateWithLifecycle()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { presenter.refresh() }
