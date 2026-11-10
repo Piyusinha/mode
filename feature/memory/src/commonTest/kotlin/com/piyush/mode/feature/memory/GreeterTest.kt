@@ -25,7 +25,9 @@ class GreeterTest {
     private class Model(val line: String, val waitMs: Long = 0) : LlmClient {
         var asked: String = ""
         var model: String = ""
+        var calls = 0
         override suspend fun chat(model: String, messages: List<ChatMessage>, tools: kotlinx.serialization.json.JsonArray): ChatResult {
+            calls++
             asked = messages.last().text
             this.model = model
             delay(waitMs)
@@ -94,5 +96,26 @@ class GreeterTest {
         assertEquals("Set an alarm for 11:30 tonight for Softovac", opening?.offer?.task)
         assertEquals("Yes, set it", opening?.offer?.yes)
         assertEquals("Not now", opening?.offer?.no)
+    }
+
+    @Test
+    fun aPreparedOpeningGreetsAtOnceAndIsUsedUp() = runTest {
+        val model = Model("Dinner with Priya's at 7. Want me to text her you're on your way?")
+        var clock = 1_000L
+        val greeter = Greeter(model, memory, fast).also { it.now = { clock } }
+        greeter.prepare("Alex", 18, evening)
+        assertEquals(1, model.calls)
+        assertEquals(model.line, greeter.opening("Alex", 18, evening)?.line)
+        assertEquals(1, model.calls, "the prepared one is used, the AI isn't asked")
+        greeter.opening("Alex", 18, evening)
+        assertEquals(2, model.calls, "used up: the next one is written now")
+
+        greeter.prepare("Alex", 18, evening)
+        greeter.opening("Alex", 19, evening)
+        assertEquals(4, model.calls, "another hour: not the prepared one")
+        greeter.prepare("Alex", 18, evening)
+        clock += Greeter.PREPARED_FOR_MS + 1
+        greeter.opening("Alex", 18, evening)
+        assertEquals(6, model.calls, "too old: written afresh")
     }
 }

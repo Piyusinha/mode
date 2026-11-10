@@ -291,19 +291,97 @@ public class ListenPresenter(
                     continueChat(soFar)
                     return@inSession
                 }
-                val greeting = greet()
-                // The greeting may offer something ("Want me to set an alarm?"): yes then runs that task, not the word "yes".
-                val offer = greeting.offer?.let { TalkOffer(it.task, it.yes, it.no) }
-                pendingOffer = offer
-                own.value = own.value.copy(greeting = greeting.line)
-                if (offer != null) {
-                    own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, greeting.line, offer = offer))
-                } else {
-                    say(false, greeting.line)
-                }
-                converse(greeting.line, followUp = false)
+                openWithGreeting()
             }
         }
+    }
+
+    /**
+     * Mode's first words come at once and the mic opens with them: its own hello ("Hey Alex, good evening."),
+     * while the AI writes what comes next (an offer from their day, or how it asks what they need). The AI's
+     * line follows when it arrives; a word from the user at any point takes over, so a slow AI never keeps
+     * anyone waiting. The AI's part may offer something: yes then runs that task, not the word "yes".
+     */
+    private suspend fun openWithGreeting() {
+        val s = settings.settings.value
+        val hello = salutation(s.userName, hour())
+        val written = scope.async { greet() }
+        val turnId = nextTurnId++
+        own.value = own.value.copy(greeting = hello, turns = own.value.turns + TalkTurn(turnId, false, TalkTurn.Kind.Said, hello))
+        var listening: kotlinx.coroutines.Deferred<Heard>? = null
+        try {
+            if (own.value.micPaused) {
+                runCatching { voices.speak(hello) }
+                val rest = written.await()
+                rest?.let { sayRest(turnId, hello, it) }
+                return
+            }
+            // 1. Hello, with the mic open: they can talk over it.
+            val over = voices.speakOrHear(hello) { words -> own.value = own.value.copy(phase = TalkPhase.Listening, partial = words) }
+            if (over is Heard.Words) { heard(over.text); return }
+            // 2. Listening while the AI finishes; whichever comes first wins.
+            own.value = own.value.copy(phase = TalkPhase.Listening)
+            mark(com.piyush.mode.core.telemetry.Event.ListenStarted)
+            var rest: com.piyush.mode.feature.memory.data.NextLine? = null
+            while (true) {
+                var words = ""
+                val listenedAt = clock.now()
+                val listen = scope.async { voices.hear { w -> words = w; own.value = own.value.copy(partial = w) } }
+                listening = listen
+                val first = kotlinx.coroutines.selects.select<Any?> {
+                    written.onAwait { Arrived(it) }
+                    listen.onAwait { it }
+                }
+                if (first is Arrived) {
+                    // Mid-sentence already: let them finish; otherwise the mic reopens with the AI's line.
+                    if (words.isNotBlank()) {
+                        val theirs = listen.await()
+                        if (theirs is Heard.Words) { heard(theirs.text); return }
+                    } else {
+                        listen.cancel()
+                    }
+                    rest = first.line
+                    break
+                }
+                when (val theirs = first as Heard) {
+                    is Heard.Words -> { heard(theirs.text); return }
+                    Heard.Nothing -> {
+                        // No mic to listen with: the AI's line is said when it comes, and the usual ending follows.
+                        rest = written.await()
+                        break
+                    }
+                    Heard.Silence -> breatheAfter(listenedAt)
+                }
+            }
+            listening = null
+            // 3. The rest of the greeting, then Mode listens on.
+            val line = rest ?: com.piyush.mode.feature.memory.data.NextLine(QUESTION_LINE)
+            sayRest(turnId, hello, line)
+            converse(line.line, followUp = false)
+        } finally {
+            if (!written.isCompleted) written.cancel()
+            listening?.cancel()
+        }
+    }
+
+    private class Arrived(val line: com.piyush.mode.feature.memory.data.NextLine?)
+
+    /**
+     * A listen that came back at once (no microphone to wait on, as in tests) must not spin until the quiet runs
+     * out: everything else, the screen's state included, would stand still. A short wait lets it all run.
+     */
+    private suspend fun breatheAfter(listenedAt: Long) {
+        if (clock.now() - listenedAt < QUICK_LISTEN_MS) delay(LISTEN_GAP_MS)
+    }
+
+    /** The AI's part of the greeting joins Mode's hello on screen, with its offer when it has one. */
+    private fun sayRest(turnId: Int, hello: String, rest: com.piyush.mode.feature.memory.data.NextLine) {
+        val offer = rest.offer?.let { TalkOffer(it.task, it.yes, it.no) }
+        pendingOffer = offer
+        val full = "$hello ${rest.line}"
+        own.value = own.value.copy(greeting = full, turns = own.value.turns.map { t ->
+            if (t.id == turnId) TalkTurn(turnId, false, if (offer != null) TalkTurn.Kind.Next else TalkTurn.Kind.Said, full, offer = offer) else t
+        })
     }
 
     /**
@@ -324,6 +402,7 @@ public class ListenPresenter(
         val since = clock.now()
         var tries = 0
         while (true) {
+            val listenedAt = clock.now()
             when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
                 is Heard.Words -> { heard(heard.text); return }
                 Heard.Nothing -> {
@@ -343,9 +422,7 @@ public class ListenPresenter(
                         own.value = own.value.copy(phase = TalkPhase.Typing)
                         return
                     }
-                    // A listen that comes back at once (nothing to wait on) must not hold the thread until the quiet
-                    // runs out: everything else on it, the screen's state included, stood still for 20 s.
-                    kotlinx.coroutines.yield()
+                    breatheAfter(listenedAt)
                 }
             }
         }
@@ -467,7 +544,9 @@ public class ListenPresenter(
             nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE))
             return
         }
-        if (done != null && done.stay) { end("LeftInApp"); return }
+        // The task left them in the app (a cart to look at, a video playing): a lone question is over, but a
+        // session carries on from behind, where they are, until they end it.
+        if (done != null && done.stay && !keepsGoing) { end("LeftInApp"); return }
         lastTask = task
         lastDone = done?.success == true
         lastSaid = said
@@ -527,7 +606,11 @@ public class ListenPresenter(
      * Mode's first words: the AI's, with what's coming up in their day ([GREET_WAIT_MS] at most), else Mode's own
      * short greeting. Logs which, and how long it took, so a fixed line is never a mystery.
      */
-    private suspend fun greet(): com.piyush.mode.feature.memory.data.NextLine {
+    /**
+     * The AI's part of the greeting (null: Mode asks what they need in its own words). Once it has been used,
+     * the next one for this moment is written behind, so the next session greets at once.
+     */
+    private suspend fun greet(): com.piyush.mode.feature.memory.data.NextLine? {
         val s = settings.settings.value
         val started = clock.now()
         val context = runCatching { kotlinx.coroutines.withTimeoutOrNull(DAY_WAIT_MS) { day() } }.getOrNull()
@@ -541,7 +624,8 @@ public class ListenPresenter(
         }
         val ms = clock.now() - started
         com.piyush.mode.core.common.AppLog.log("talk", if (written != null) "greeting by ${greeter?.lastModel} in $ms ms: \"${written.line}\"${written.offer?.let { " offers: ${it.task}" }.orEmpty()}" else "greeting: Mode's own line (${whyNot(ms, GREET_WAIT_MS)}, ${greeter?.lastModel})")
-        return written ?: com.piyush.mode.feature.memory.data.NextLine(greetingLine(s.userName, hour()))
+        if (context != null && greeter != null) scope.launch { runCatching { greeter.prepare(s.userName, hour(), context, language = speakLanguage()) } }
+        return written
     }
 
     private fun speakLanguage(): String? {
@@ -756,7 +840,10 @@ public class ListenPresenter(
         const val ACK_WAIT_MS = 20_000L
 
         /** How long Mode's first words may wait for the AI (Mo shows itself listening meanwhile). */
-        const val GREET_WAIT_MS = 12_000L
+        const val GREET_WAIT_MS = 6_000L
+        /** A listen shorter than this never waited on a microphone. */
+        private const val QUICK_LISTEN_MS = 500L
+        private const val LISTEN_GAP_MS = 250L
 
         /** Reading their day (calendar, repeats) for the greeting: never longer than this. */
         const val DAY_WAIT_MS = 600L
@@ -827,7 +914,10 @@ public class ListenPresenter(
         fun carryOnLine(name: String): String =
             "Last time, \u201c${name.trim().trimEnd('.')}\u201d stopped before it was done. Want me to carry on?"
 
-        fun greetingLine(name: String?, hour: Int): String {
+        fun greetingLine(name: String?, hour: Int): String = "${salutation(name, hour)} $QUESTION_LINE"
+
+        /** Mode's own hello, said at once ("Hey Alex, good evening."): the AI's line follows it. */
+        fun salutation(name: String?, hour: Int): String {
             val who = name?.trim()?.split(' ')?.firstOrNull()?.takeIf { it.isNotEmpty() }
             val part = when (hour) {
                 in 5..11 -> "good morning"
@@ -835,9 +925,11 @@ public class ListenPresenter(
                 in 17..21 -> "good evening"
                 else -> null
             }
-            val hey = listOfNotNull("Hey" + (who?.let { " $it" } ?: ""), part).joinToString(", ")
-            return "$hey. What do you want me to do?"
+            return listOfNotNull("Hey" + (who?.let { " $it" } ?: ""), part).joinToString(", ") + "."
         }
+
+        /** What follows the hello when the AI has nothing in time. */
+        const val QUESTION_LINE = "What do you want me to do?"
 
         /** A question, not a task: Mode looks it up. */
         private val QUESTION = Regex("""^(what|when|where|who|which|why|how|is|are|do|does|did|am i|have i|can you tell|tell me)\b""", RegexOption.IGNORE_CASE)

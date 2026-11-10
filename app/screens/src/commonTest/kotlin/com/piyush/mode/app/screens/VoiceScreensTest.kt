@@ -183,9 +183,10 @@ class VoiceScreensTest {
     fun startedByVoiceModeGreetsInTheAIsWordsWithWhatsComingUp() = runTest {
         val f = Fixture(backgroundScope)
         var asked = ""
-        val greeting = "Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?"
+        val greeting = "Dinner with Priya's at 7. Want me to text her you're on your way?"
         val model = com.piyush.mode.llm.LlmClient { _, messages, _ ->
             asked = messages.last().text
+            kotlinx.coroutines.delay(1_500) // the AI takes its time; Mode's own hello doesn't wait for it
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
                     put("line", kotlinx.serialization.json.JsonPrimitive(greeting))
@@ -199,11 +200,32 @@ class VoiceScreensTest {
             val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
                 entry = "siri", greeter = greeter, day = { day })
             talk.begin()
-            assertEquals(greeting, talk.state.awaitState { it.greeting.isNotEmpty() }.greeting)
+            val hello = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertTrue(hello.greeting.startsWith("Hey") && hello.greeting.endsWith("."), "Mode's own hello comes first: ${hello.greeting}")
+            assertFalse("Dinner" in hello.greeting)
+            val full = talk.state.awaitState { it.greeting.endsWith(greeting) }
+            assertEquals("${hello.greeting} $greeting", full.greeting)
+            assertEquals(1, full.turns.count { !it.mine }, "the AI's part joins the hello on screen, not a second line")
             assertTrue("Dinner with Priya" in asked)
         } finally {
             DeviceVoice.hearingState = before
         }
+    }
+
+    @Test
+    fun aTaskGivenWhileTheAIStillWritesTheGreetingStartsAtOnce() = runTest {
+        val f = Fixture(backgroundScope, model = NeverAnswers)
+        val slow = com.piyush.mode.llm.LlmClient { _, _, _ -> kotlinx.coroutines.awaitCancellation() }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(slow, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", greeter = greeter, day = { com.piyush.mode.feature.memory.data.DayContext("Monday 10 November, 21:00") })
+        talk.begin()
+        val hello = talk.state.awaitState { it.greeting.isNotEmpty() }.greeting
+        talk.submitTyped("Turn on dark mode")
+        val sent = talk.state.awaitState { it.sent }
+        assertEquals("Turn on dark mode", sent.task)
+        assertEquals(hello, sent.greeting, "the greeting stays as Mode's hello; the AI's late line is dropped")
+        assertTrue(sent.turns.none { ListenPresenter.QUESTION_LINE in it.text }, "no question after the task started")
     }
 
     @Test
@@ -373,7 +395,7 @@ class VoiceScreensTest {
             talk.begin()
             val offered = talk.state.awaitState { it.turns.any { t -> t.offer != null } }
             assertEquals("Yes, set it", offered.turns.last().offer?.yes)
-            assertEquals(1, offered.turns.count { it.text.startsWith("Your Softovac") }, "the greeting shows once")
+            assertEquals(1, offered.turns.count { "Your Softovac" in it.text }, "the greeting shows once")
             assertTrue(ListenPresenter.isYes("Sure, please do this."))
             talk.pick("Sure, please do this.")
             val sent = talk.state.awaitState { it.sent }
@@ -495,6 +517,20 @@ class VoiceScreensTest {
         assertFalse(after.finished, "stopping the task keeps the session open")
         f.runner.state.awaitState { !it.running }
         talk.state.awaitState { !it.stopping }
+    }
+
+    @Test
+    fun aTaskThatLeavesThemInTheAppDoesNotEndTheSession() = runTest {
+        // Mode left the cart open in Zomato ("stay"); the session goes on from there (seen on the phone, 10 Nov: it ended).
+        val f = Fixture(backgroundScope, model = com.piyush.mode.testing.ScriptedModel(
+            com.piyush.mode.testing.call("done", "evidence" to "cart open", "summary" to "Your coffee is in the cart.", "success" to true, "stay_here" to true),
+        ))
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
+        talk.submitTyped("Order my usual coffee")
+        val next = talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+        assertFalse(next.finished, "the session carries on while they look at the cart")
+        assertEquals("Anything else?", talk.state.awaitState { it.greeting == "Anything else?" }.greeting)
     }
 
     @Test
