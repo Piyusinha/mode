@@ -158,10 +158,10 @@ struct HealthScreen: View {
 }
 
 struct HealthRoute: View {
-    @State private var model: HealthModel
+    @LazyState private var model: HealthModel
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: HealthModel(screens: app.screens, navigate: navigate))
+        _model = LazyState(wrappedValue: HealthModel(screens: app.screens, navigate: navigate))
     }
 
     var body: some View {

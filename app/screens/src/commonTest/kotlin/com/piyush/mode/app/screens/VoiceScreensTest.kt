@@ -1,6 +1,7 @@
 package com.piyush.mode.app.screens
 
 import com.piyush.mode.app.screens.settings.ListenPresenter
+import com.piyush.mode.app.screens.settings.TalkTaskCard
 import com.piyush.mode.app.screens.settings.VoicePickerPresenter
 import com.piyush.mode.feature.settings.domain.VoiceKind
 import com.piyush.mode.feature.settings.voice.DeviceVoice
@@ -90,7 +91,7 @@ class VoiceScreensTest {
 
     @Test
     fun aTaskSpokenFromAChatsMicGoesIntoThatChat() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val chat = f.conversations.create("Dark Mode")
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             conversationId = chat.id)
@@ -121,7 +122,7 @@ class VoiceScreensTest {
 
     @Test
     fun aTalkingSessionIsOneTraceFromHowItOpenedToHowItEnded() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val traces = Recorded()
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             telemetry = traces, entry = "chat_mic")
@@ -159,7 +160,7 @@ class VoiceScreensTest {
 
     @Test
     fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
-        val f = Fixture(backgroundScope)
+        val f = Fixture(backgroundScope, model = NeverAnswers)
         val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
             kotlinx.coroutines.delay(2_000)
             com.piyush.mode.llm.ChatResult(
@@ -174,8 +175,8 @@ class VoiceScreensTest {
         talk.submitTyped("Turn on dark mode")
         val sent = talk.state.awaitState { it.sent }
         assertEquals("", sent.reply)   // the task went before the line was written
-        val spoken = talk.state.awaitState { it.reply.isNotEmpty() }
-        assertEquals("On it, Alex. Dark Mode, coming right up.", spoken.reply)
+        // The session carries on after the task, so the reply is checked where it stays: in the conversation.
+        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == "On it, Alex. Dark Mode, coming right up." } }
     }
 
     @Test
@@ -324,13 +325,13 @@ class VoiceScreensTest {
     }
 
     @Test
-    fun openedFromTheAppTheScreenStillClosesAfterTheTask() = runTest {
+    fun aSessionFromAChatCarriesOnAfterItsTask() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
-            entry = "chat_mic", greeter = nextLines("Anything else?"))
+            entry = "chat_mic", greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
         talk.submitTyped("Turn on dark mode")
-        val done = talk.state.awaitState { it.finished }
-        assertTrue(done.doneSoFar.isEmpty())
+        val next = talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+        assertFalse(next.finished, "the session stays open until it is ended")
     }
 
     @Test
@@ -378,5 +379,185 @@ class VoiceScreensTest {
         listOf("Yes", "yeah sure", "Yes please", "go ahead Mo").forEach { assertTrue(ListenPresenter.isYes(it), it) }
         listOf("Skip it", "no thanks", "leave it for now").forEach { assertTrue(ListenPresenter.isDecline(it), it) }
         assertFalse(ListenPresenter.isYes("Yes, and also text Priya"))
+    }
+
+    @Test
+    fun aSessionOffersToCarryOnTheLastStoppedTaskInItsChat() = runTest {
+        val f = Fixture(backgroundScope, model = NeverAnswers)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val chat = f.conversations.create("LinkedIn onboarding and paneer")
+            val stopped = com.piyush.mode.app.screens.settings.StoppedTask("Order high-protein paneer on Blinkit", chat.id, "LinkedIn onboarding and paneer")
+            var askedFor: String? = "unset"
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                conversationId = chat.id, entry = "chat_mic", lastStopped = { id -> askedFor = id; stopped })
+            talk.begin()
+            val offered = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertEquals(chat.id, askedFor, "opened from the chat's mic: that chat is looked at")
+            assertEquals("Last time, \u201cLinkedIn onboarding and paneer\u201d stopped before it was done. Want me to carry on?", offered.greeting)
+            assertEquals("Yes, carry on", offered.turns.last().offer?.yes)
+            talk.pick("Yes, carry on")
+            val sent = talk.state.awaitState { it.sent }
+            assertEquals("Order high-protein paneer on Blinkit", sent.task)
+            assertEquals(chat.id, f.tasks.latest(1).first().conversationId, "it runs in the same chat: the session carries on")
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun yesToTheGreetingsOfferRunsTheOfferedTask() = runTest {
+        val f = Fixture(backgroundScope, model = NeverAnswers)
+        val model = com.piyush.mode.llm.LlmClient { _, _, _ ->
+            com.piyush.mode.llm.ChatResult(
+                com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
+                    put("line", kotlinx.serialization.json.JsonPrimitive("Your Softovac reminder is at 11:30 tonight. Want me to set an alarm?"))
+                    put("offer_task", kotlinx.serialization.json.JsonPrimitive("Set an alarm for 11:30 tonight for Softovac"))
+                    put("yes_label", kotlinx.serialization.json.JsonPrimitive("Yes, set it"))
+                    put("no_label", kotlinx.serialization.json.JsonPrimitive("Not now"))
+                }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
+        }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
+        val day = com.piyush.mode.feature.memory.data.DayContext("Monday 9 November, 22:10", repeats = listOf("Softovac at 23:30"))
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", greeter = greeter, day = { day })
+            talk.begin()
+            val offered = talk.state.awaitState { it.turns.any { t -> t.offer != null } }
+            assertEquals("Yes, set it", offered.turns.last().offer?.yes)
+            assertEquals(1, offered.turns.count { it.text.startsWith("Your Softovac") }, "the greeting shows once")
+            assertTrue(ListenPresenter.isYes("Sure, please do this."))
+            talk.pick("Sure, please do this.")
+            val sent = talk.state.awaitState { it.sent }
+            assertEquals("Set an alarm for 11:30 tonight for Softovac", sent.task, "the offered task runs, not the words \"sure, please do this\"")
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun aNewSessionNeverBringsUpAnEarlierStoppedTask() = runTest {
+        val f = Fixture(backgroundScope)
+        f.settings.update { it.copy(userName = "Alex") }
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val chat = f.conversations.create("LinkedIn onboarding and paneer")
+            val stopped = com.piyush.mode.app.screens.settings.StoppedTask("Order high-protein paneer on Blinkit", chat.id, "LinkedIn onboarding and paneer")
+            var asked = false
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", lastStopped = { asked = true; stopped })
+            talk.begin()
+            val greeted = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertFalse(asked, "a new chat does not look back")
+            assertTrue(greeted.greeting.startsWith("Hey Alex"), greeted.greeting)
+            assertTrue(greeted.turns.none { it.offer != null })
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun withNothingStoppedTheSessionGreetsAsUsual() = runTest {
+        val f = Fixture(backgroundScope)
+        f.settings.update { it.copy(userName = "Alex") }
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                entry = "siri", lastStopped = { null })
+            talk.begin()
+            assertTrue(talk.state.awaitState { it.greeting.isNotEmpty() }.greeting.startsWith("Hey Alex"))
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun aSessionFromAChatShowsItAndCarriesOnFromIt() = runTest {
+        val f = Fixture(backgroundScope)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val soFar = com.piyush.mode.app.screens.settings.ChatSoFar(
+                title = "LinkedIn onboarding and paneer",
+                lines = listOf(true to "Check my LinkedIn onboarding email", false to "It says to fill in your new-hire details."),
+                lastTask = "Check my LinkedIn onboarding email", lastDone = true, lastSaid = "It says to fill in your new-hire details.",
+            )
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                conversationId = "chat-9", entry = "chat_mic", chatSoFar = { soFar })
+            talk.begin()
+            val s = talk.state.awaitState { it.greeting.isNotEmpty() }
+            assertEquals("Back to \u201cLinkedIn onboarding and paneer\u201d. What next?", s.greeting)
+            assertEquals(listOf("Check my LinkedIn onboarding email", "It says to fill in your new-hire details."), s.turns.take(2).map { it.text })
+            assertTrue(s.turns.first().mine)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun theMicPausesAndResumesWithoutEndingTheSession() = runTest {
+        val f = Fixture(backgroundScope)
+        val before = DeviceVoice.hearingState
+        DeviceVoice.hearingState = { "ready" }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner, entry = "siri", pausedEndMs = Long.MAX_VALUE)
+            talk.begin()
+            talk.state.awaitState { it.greeting.isNotEmpty() }
+            talk.pauseListening()
+            assertFalse(talk.state.awaitState { it.micPaused }.finished, "pausing keeps the session open")
+            talk.resumeListening()
+            assertFalse(talk.state.awaitState { !it.micPaused }.finished)
+        } finally {
+            DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun endFinishesTheSessionAtOnce() = runTest {
+        val f = Fixture(backgroundScope, model = NeverAnswers)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.sent }
+        talk.endNow()
+        talk.state.awaitState { it.finished }
+        f.runner.state.awaitState { !it.running }
+    }
+
+    @Test
+    fun aForgottenPausedSessionEndsByItself() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner)
+        talk.pauseListening()
+        talk.state.awaitState { it.micPaused }
+        talk.state.awaitState { it.finished }
+    }
+
+    @Test
+    fun stoppingATaskKeepsTheSessionOpen() = runTest {
+        val f = Fixture(backgroundScope, model = NeverAnswers)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            pausedEndMs = Long.MAX_VALUE)
+        talk.submitTyped("Turn on dark mode")
+        talk.state.awaitState { it.sent }
+        talk.stop()
+        // Not working any more: the card says stopped and Mode listens again (the task winds down behind).
+        val after = talk.state.awaitState { s -> !s.sent && s.turns.mapNotNull { it.card }.none { it.state == TalkTaskCard.State.Working } }
+        assertFalse(after.finished, "stopping the task keeps the session open")
+        f.runner.state.awaitState { !it.running }
+        talk.state.awaitState { !it.stopping }
+    }
+
+    @Test
+    fun stopWithNothingRunningPausesTheMic() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            pausedEndMs = Long.MAX_VALUE)
+        talk.stop()
+        assertFalse(talk.state.awaitState { it.micPaused }.finished)
     }
 }

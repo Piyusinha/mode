@@ -12,7 +12,7 @@ class BargeInTest {
     @Test
     fun theUsersOwnWordsInterruptAfterAMomentOfSpeech() {
         assertTrue(BargeIn.shouldInterrupt("actually use the IndiGo app instead", line, 600))
-        assertFalse(BargeIn.shouldInterrupt("actually use the IndiGo app instead", line, 100), "not before 250 ms of speech")
+        assertFalse(BargeIn.shouldInterrupt("actually use the IndiGo app instead", line, 300), "not before 500 ms of speech")
     }
 
     @Test
@@ -22,6 +22,27 @@ class BargeInTest {
         assertEquals(emptyList(), BargeIn.newWords("check your flight", line))
         assertEquals(listOf("rahul", "whatsapp"), BargeIn.newWords("and tell Rahul on WhatsApp", line))
         assertFalse(BargeIn.shouldInterrupt("tell Rahul", line, 900), "one new word is not enough")
+        assertFalse(BargeIn.shouldInterrupt("and tell Rahul on WhatsApp", line, 900), "two new words are not enough")
+    }
+
+    @Test
+    fun modesVoiceMisheardIsStillModes() {
+        // Echo cancellation leaves a little of Mode; Apple mishears it: near-misses and pieces of Mode's words.
+        assertFalse(BargeIn.shouldInterrupt("okay I'll checking you indigo flights on flight radar and tell you the gates", line, 3_000))
+        assertEquals(emptyList(), BargeIn.newWords("flight radar indigo flights checking", line))
+        val harper = "Hi, I'm Harper. Tell me what to do."
+        assertFalse(BargeIn.shouldInterrupt("hi I'm harbor tell me what to do", harper, 2_000))
+    }
+
+    @Test
+    fun aFewMisheardWordsScatteredInTheEchoDoNotInterrupt() {
+        // Three odd words, but spread through Mode's own line: not someone talking over it.
+        assertFalse(BargeIn.shouldInterrupt("okay banana I'll check your IndiGo pickle flight on Flightradar and tell zebra you the gate", line, 3_000))
+    }
+
+    @Test
+    fun threeNewWordsInARowInterrupt() {
+        assertTrue(BargeIn.shouldInterrupt("I'll check your IndiGo flight no wait book Uber instead", line, 1_500))
     }
 
     @Test

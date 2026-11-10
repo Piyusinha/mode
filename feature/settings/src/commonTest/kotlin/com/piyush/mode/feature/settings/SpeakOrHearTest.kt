@@ -49,7 +49,7 @@ class SpeakOrHearTest {
             launch {
                 while (phone.partial == null) delay(10)
                 phone.partial!!("use")
-                delay(300)
+                delay(600) // past BargeIn.MIN_SPEECH_MS
                 phone.partial!!("use the IndiGo app instead")
                 while (phone.hushed == 0) delay(10)
                 delay(50)

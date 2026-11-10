@@ -207,10 +207,10 @@ struct PlanModelsScreen: View {
 }
 
 struct PlanModelsRoute: View {
-    @State private var model: PlanModelsViewModel
+    @LazyState private var model: PlanModelsViewModel
 
     init(app: AppModel, brain: Bool) {
-        _model = State(initialValue: PlanModelsViewModel(screens: app.screens, startOnBrain: brain))
+        _model = LazyState(wrappedValue: PlanModelsViewModel(screens: app.screens, startOnBrain: brain))
     }
 
     var body: some View {

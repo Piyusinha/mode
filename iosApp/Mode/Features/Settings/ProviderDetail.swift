@@ -260,11 +260,11 @@ private extension Array where Element == String {
 }
 
 struct ProviderDetailRoute: View {
-    @State private var model: ProviderDetailViewModel
+    @LazyState private var model: ProviderDetailViewModel
     @Environment(\.openURL) private var openURL
 
     init(app: AppModel, id: String, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: ProviderDetailViewModel(screens: app.screens, id: id, navigate: navigate))
+        _model = LazyState(wrappedValue: ProviderDetailViewModel(screens: app.screens, id: id, navigate: navigate))
     }
 
     var body: some View {

@@ -5,6 +5,7 @@ import { App } from './App';
 const Privacy = lazy(() => import('./pages/Privacy').then((m) => ({ default: m.Privacy })));
 const License = lazy(() => import('./pages/License').then((m) => ({ default: m.License })));
 const Releases = lazy(() => import('./pages/Releases').then((m) => ({ default: m.Releases })));
+import { startAnalytics } from './lib/analytics';
 import './styles.css';
 
 /** One small site: the landing page, plus Privacy, Licence and Releases (served by the same index.html). */
@@ -15,6 +16,8 @@ function Route() {
   if (path === '/releases') return <Releases />;
   return <App />;
 }
+
+startAnalytics();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

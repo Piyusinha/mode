@@ -1,0 +1,10 @@
+{
+  "name": "heymode-stats",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes wrangler@4 dev",
+    "deploy": "npx --yes wrangler@4 deploy",
+    "set-password": "node scripts/set-password.mjs"
+  }
+}

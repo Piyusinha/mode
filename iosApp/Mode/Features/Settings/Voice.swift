@@ -9,7 +9,7 @@ import UIKit
 
 /// A speech or hearing service, as the screens name and draw it.
 enum VoiceService: String, CaseIterable, Identifiable {
-    case apple, fish, elevenlabs, soniox, deepgram
+    case apple, speechify, fish, elevenlabs, soniox, deepgram
     var id: String { rawValue }
 
     init?(id: String?) { guard let id, let s = VoiceService(rawValue: id) else { return nil }; self = s }
@@ -17,6 +17,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .apple: String(localized: L10n.Voice.apple)
+        case .speechify: String(localized: L10n.Voice.speechify)
         case .fish: String(localized: L10n.Voice.fish)
         case .elevenlabs: String(localized: L10n.Voice.eleven)
         case .soniox: String(localized: L10n.Voice.soniox)
@@ -27,6 +28,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     var logo: ModeLogo {
         switch self {
         case .apple: .apple
+        case .speechify: .speechify
         case .fish: .fishAudio
         case .elevenlabs: .elevenLabs
         case .soniox: .soniox
@@ -46,6 +48,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     func plan(hearing: Bool) -> String {
         switch self {
         case .apple: String(localized: hearing ? L10n.Voice.appleHearing : L10n.Voice.appleSpeech)
+        case .speechify: String(localized: L10n.Voice.speechifyFree)
         case .fish: String(localized: L10n.Voice.fishFree)
         case .elevenlabs: String(localized: L10n.Voice.elevenFree)
         case .soniox: String(localized: L10n.Voice.sonioxFree)
@@ -57,7 +60,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     var blurb: LocalizedStringResource {
         switch self {
         case .apple: L10n.Voice.blurbApple
-        case .fish, .elevenlabs: L10n.Voice.blurbSpeech
+        case .speechify, .fish, .elevenlabs: L10n.Voice.blurbSpeech
         case .soniox: L10n.Voice.blurbSoniox
         case .deepgram: L10n.Voice.blurbDeepgram
         }
@@ -66,6 +69,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     var keyPage: URL? {
         switch self {
         case .apple: nil
+        case .speechify: ModeLinks.speechifyKeys
         case .fish: ModeLinks.fishAudioKeys
         case .elevenlabs: ModeLinks.elevenLabsKeys
         case .soniox: ModeLinks.sonioxKeys
@@ -77,6 +81,7 @@ enum VoiceService: String, CaseIterable, Identifiable {
     var site: (name: String, url: URL)? {
         let name: String? = switch self {
         case .apple: nil
+        case .speechify: "speechify.ai"
         case .fish: "fish.audio"
         case .elevenlabs: "elevenlabs.io"
         case .soniox: "soniox.com"
@@ -87,9 +92,6 @@ enum VoiceService: String, CaseIterable, Identifiable {
     }
 
     var hearing: Bool { self == .soniox || self == .deepgram }
-
-    /// Mode's recommendation for this provider, if it is one: the most human voice.
-    var recommendation: String? { self == .elevenlabs ? String(localized: L10n.Voice.mostHuman) : nil }
 }
 
 // MARK: - The provider lists (Mode's voice, Listening)
@@ -178,8 +180,8 @@ final class VoiceListModel {
 
     private static func map(_ s: VoiceUiState, hearing: Bool) -> State {
         let speaker = VoiceService(id: s.speaker)
-        // Shown in a fixed order (Apple, then the others); which one is in use is the radio, not the position.
-        let order: [VoiceService] = hearing ? [.apple, .deepgram, .soniox] : [.apple, .elevenlabs, .fish]
+        // Shown in a fixed order (Speechify first for who speaks); which one is in use is the radio, not the position.
+        let order: [VoiceService] = hearing ? [.apple, .deepgram, .soniox] : [.speechify, .apple, .elevenlabs, .fish]
         return State(
             rows: s.rows.sorted { a, b in
                 (VoiceService(id: a.id).flatMap(order.firstIndex) ?? order.count) < (VoiceService(id: b.id).flatMap(order.firstIndex) ?? order.count)
@@ -312,11 +314,10 @@ struct VoiceProviderPicker: View {
         row.problem != nil ? ModeColor.danger : row.connected ? ModeColor.success : ModeColor.ring
     }
 
-    /// "In use" (green for who speaks, grey for who listens, as on the boards) and Mode's recommendation.
+    /// "In use" (green for who speaks, grey for who listens, as on the boards).
     private func tags(_ row: VoiceListModel.Row) -> [ModeVoiceTag] {
         var tags: [ModeVoiceTag] = []
         if row.chosen { tags.append(ModeVoiceTag(String(localized: L10n.Voice.inUse), tone: hearing ? .neutral : .green)) }
-        if let recommendation = row.service.recommendation { tags.append(ModeVoiceTag(recommendation, tone: .neutral)) }
         return tags
     }
 
@@ -547,10 +548,10 @@ struct VoiceProviderPage: View {
 
 /// Mode's voice or Listening, with the key sheet and a provider's page.
 struct VoiceRoute: View {
-    @State private var model: VoiceListModel
+    @LazyState private var model: VoiceListModel
 
     init(app: AppModel, hearing: Bool, navigate: @escaping (Route) -> Void) {
-        _model = State(initialValue: VoiceListModel(screens: app.screens, hearing: hearing, navigate: navigate))
+        _model = LazyState(wrappedValue: VoiceListModel(screens: app.screens, hearing: hearing, navigate: navigate))
     }
 
     var body: some View {
@@ -805,7 +806,7 @@ struct VoicePickerScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.m) {
                 VoicePageHeader(title: L10n.Voice.chooseVoice, subtitle: nil).padding(.bottom, -ModeSpacing.l + ModeSpacing.s)
-                ModeVoiceSwitch([(VoiceService.apple, L10n.Voice.apple), (.elevenlabs, L10n.Voice.eleven), (.fish, L10n.Voice.fish)],
+                ModeVoiceSwitch([(VoiceService.speechify, L10n.Voice.speechify), (.apple, L10n.Voice.apple), (.elevenlabs, L10n.Voice.eleven), (.fish, L10n.Voice.fish)],
                                 selection: Binding(get: { state.service }, set: { onEvent(.service($0)) }))
                 Text(banner).modeText(.footnote, color: ModeColor.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -841,6 +842,7 @@ struct VoicePickerScreen: View {
 
     private var banner: LocalizedStringResource {
         switch state.service {
+        case .speechify: L10n.Voice.speechifyBanner
         case .elevenlabs: L10n.Voice.elevenBanner
         case .fish: L10n.Voice.fishBanner
         default: L10n.Voice.appleBanner
@@ -895,11 +897,11 @@ struct VoicePickerScreen: View {
 }
 
 struct VoicePickerRoute: View {
-    @State private var model: VoicePickerModel
+    @LazyState private var model: VoicePickerModel
     @Environment(\.dismiss) private var dismiss
 
     init(app: AppModel, provider: String) {
-        _model = State(initialValue: VoicePickerModel(screens: app.screens, provider: provider))
+        _model = LazyState(wrappedValue: VoicePickerModel(screens: app.screens, provider: provider))
     }
 
     var body: some View {

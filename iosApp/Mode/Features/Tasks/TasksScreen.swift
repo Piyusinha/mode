@@ -90,12 +90,12 @@ struct TasksScreen: View {
 struct TasksRoute: View {
     let app: AppModel
     let run: RunStatusViewModel
-    @State private var model: TasksViewModel
+    @LazyState private var model: TasksViewModel
 
     init(app: AppModel, run: RunStatusViewModel, navigate: @escaping (Route) -> Void) {
         self.app = app
         self.run = run
-        _model = State(initialValue: TasksViewModel(screens: app.screens, navigate: navigate))
+        _model = LazyState(wrappedValue: TasksViewModel(screens: app.screens, navigate: navigate))
     }
 
     var body: some View {

@@ -217,6 +217,9 @@ class ModeGraph(platform: PlatformServices) {
         background = platform.background,
         device = platform.device,
         backupService = backup,
+        modeUpdates = com.piyush.mode.feature.settings.data.ModeUpdates(
+            platform.http, platform.prefs, platform.appInfo.version,
+        ),
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
         profile = platform.profile,
     )

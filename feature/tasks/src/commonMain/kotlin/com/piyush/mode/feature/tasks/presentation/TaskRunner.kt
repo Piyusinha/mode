@@ -109,6 +109,10 @@ public class TaskRunner(
     /** An overlay over the user's app shows Mode (Android): asking and answering happen there, Mode's app stays back. */
     private val presence: com.piyush.mode.core.platform.ModePresence = com.piyush.mode.core.platform.ModePresence.None,
 ) {
+    /** Keeps a task under iOS's background CPU limit (see [CpuPacer]). */
+    private val pacerEpoch = kotlin.time.TimeSource.Monotonic.markNow()
+    private val cpuPacer = CpuPacer(appInfo::cpuTimeMs, now = { pacerEpoch.elapsedNow().inWholeMilliseconds })
+
     /** Messages for the running task, taken by the agent at its next step. */
     private val steers = MutableStateFlow<List<String>>(emptyList())
     /** What to do with words said over Mode's spoken answer: a follow-up task in that chat (set by the graph). */
@@ -341,6 +345,12 @@ public class TaskRunner(
                 telemetry = telemetry,
                 memory = prepared?.agentMemory,
                 pause = gate,
+                pace = {
+                    cpuPacer.pace(lastResort = {
+                        phone.send(Op.LaunchApp(appInfo.bundleId))
+                        delay(FRONT_FOR_CPU_MS)
+                    })
+                },
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
                 device = device,
@@ -362,16 +372,18 @@ public class TaskRunner(
             // Time, steps and cost stay in the run log; what the user sees is the answer.
             mutableState.update { it.copy(lastResult = finished, status = PlainText.fromMarkdown(reply, oneLine = true)) }
             // Spoken while the microphone is off. The stream stays up.
-            if (spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done) {
+            val saidAloud = spoken && settings.settings.value.speakResult && finished.outcome is AgentOutcome.Done
+            if (saidAloud) {
                 // The agent's spoken version (a sentence or two); the chat reply flattened if it gave none.
                 val said = (finished.outcome as? AgentOutcome.Done)?.spoken ?: PlainText.fromMarkdown(reply, oneLine = true)
                 // Spoken with the microphone off: the screen stream is still up, and a microphone opened beside it
                 // records only silence (seen on the phone, 5 Nov: 153 buffers, peak level 0.00).
                 runCatching { voices?.speak(said) }
             }
-            // The notification reads like the chat reply, as plain text (it can't draw Markdown).
-            notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
-            state.value.conversationId?.let(::retitle)
+            // The notification reads like the chat reply, as plain text (it can't draw Markdown). Not when the answer
+            // was just said out loud in a spoken session: one notification per task stacked up over a session.
+            if (!saidAloud) notifier.postResult("Mode", PlainText.fromMarkdown(reply), state.value.conversationId)
+            state.value.conversationId?.let { retitle(it, latest = reply) }
             // Come back so the user sees how it went, unless the task was to leave them where it ended
             // (a video playing, an app they asked to open): then Mode finishes in the background.
             if ((finished.outcome as? AgentOutcome.Done)?.stay == true) {
@@ -501,13 +513,18 @@ public class TaskRunner(
      * Says a short update now and then while the task runs: when the plan moves on, paced by
      * [Narrator.Pacing], never over a spoken question, never the same thing twice.
      */
-    /** The chat's name, written again from all it asked, in the background (the old name stays if this fails). */
-    private fun retitle(conversationId: String) {
+    /**
+     * The chat's name, written again from all it asked and what Mode did ([latest]: the reply just given), in the
+     * background (the old name stays if this fails).
+     */
+    private fun retitle(conversationId: String, latest: String) {
         val titler = titler ?: return
         scope.launch {
-            val asked = runCatching { conversations.turnsNow(conversationId) }.getOrDefault(emptyList())
-                .filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User }.map { it.text }
-            val title = titler.title(asked) ?: return@launch
+            val turns = runCatching { conversations.turnsNow(conversationId) }.getOrDefault(emptyList())
+            val asked = turns.filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User }.map { it.text }
+            val done = (turns.filter { it.role == com.piyush.mode.feature.conversations.domain.TurnRole.Mode }.map { it.text } + latest)
+                .map { PlainText.fromMarkdown(it, oneLine = true) }.distinct()
+            val title = titler.title(asked, done) ?: return@launch
             if (title == conversations.get(conversationId)?.title) return@launch
             runCatching { conversations.rename(conversationId, title) }
             AppLog.log("chat", "renamed $conversationId: \"$title\" (from ${asked.size} request(s))")
@@ -741,3 +758,6 @@ private const val RESUME_LOOKBACK = 50L
 private const val RESUME_NOTES = 8
 private const val RESUME_STEPS = 5
 private const val RESUME_OUTCOME_CHARS = 120
+
+/** The last resort for CPU: how long Mode stays in front before the task carries on. */
+private const val FRONT_FOR_CPU_MS: Long = 2_000L

@@ -22,7 +22,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.piyush.mode</string>
+			<string>app.heymode.mode</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>mode</string>
@@ -63,7 +63,7 @@
 			<key>UTTypeDescription</key>
 			<string>Mode backup</string>
 			<key>UTTypeIdentifier</key>
-			<string>com.piyush.mode.backup</string>
+			<string>app.heymode.mode.backup</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>

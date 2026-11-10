@@ -217,10 +217,10 @@ final class BackupModel {
 }
 
 struct BackupRoute: View {
-    @State private var model: BackupModel
+    @LazyState private var model: BackupModel
 
     init(app: AppModel) {
-        _model = State(initialValue: BackupModel(screens: app.screens))
+        _model = LazyState(wrappedValue: BackupModel(screens: app.screens))
     }
 
     var body: some View {

@@ -30,7 +30,8 @@ public sealed interface ConnectState {
     /** Signed in; proving the plan works. */
     public data object Checking : ConnectState
 
-    public data object Connected : ConnectState
+    /** [provider]: the AI that is connected and in use ([com.piyush.mode.llm.ModelProvider] id), for its card. */
+    public data class Connected(val provider: String) : ConnectState
 
     /** [notEligible]: the plan can't be used here (Free): use OpenRouter instead. */
     public data class Failed(val message: String, val notEligible: Boolean) : ConnectState
@@ -87,8 +88,9 @@ public class FirstRunPresenter(
                         ChatGptPhase.Waiting -> ConnectState.Waiting
                         ChatGptPhase.Checking -> ConnectState.Checking
                         is ChatGptPhase.Failed -> ConnectState.Failed(p.message, p.notEligible)
-                        is ChatGptPhase.Connected -> ConnectState.Connected
-                        ChatGptPhase.Idle -> if (connected) ConnectState.Connected else ConnectState.Choose
+                        is ChatGptPhase.Connected -> ConnectState.Connected(com.piyush.mode.llm.ModelProvider.ChatGpt.id)
+                        // Connected another way (Claude, OpenRouter): show that one, not ChatGPT.
+                        ChatGptPhase.Idle -> if (connected) ConnectState.Connected(inUse(s.provider)) else ConnectState.Choose
                     },
                     connected = connected,
                     starting = isStarting,
@@ -97,6 +99,10 @@ public class FirstRunPresenter(
             }.collect { mutableState.value = it }
         }
     }
+
+    /** The provider in use when it's connected, else the first connected one. */
+    private fun inUse(selected: com.piyush.mode.llm.ModelProvider): String =
+        (selected.takeIf(settings::hasAccess) ?: com.piyush.mode.llm.ModelProvider.entries.firstOrNull(settings::hasAccess) ?: selected).id
 
     public fun getStarted() { step.value = FirstRunStep.Connect }
 

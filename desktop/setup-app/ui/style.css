@@ -188,3 +188,5 @@ ol.numbered.ink b { font-size: 14px; line-height: 19px; } ol.numbered.ink span s
 .keys { row-gap: 4px; } .keys .key { width: 24px; height: 24px; }
 .ios-list > div { padding: 6px 9px; }
 ol.numbered.ink li { padding: 5px 0; }
+
+a.inline { color: var(--tint); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

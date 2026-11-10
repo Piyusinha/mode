@@ -6,6 +6,35 @@ won't make one without its section here. Mode itself has its own: [CHANGELOG.md]
 
 ## Unreleased
 
+## 0.1.6 · 9 Nov 2026
+
+- Paid accounts always get Mode's own VPN: installing, updating or renewing turns it on and uses
+  it, instead of keeping LocalDevVPN from an earlier setup. LocalDevVPN is used only if turning it
+  on fails and you choose it. A phone set up with LocalDevVPN can also switch straight away from
+  the phone page (Phone control › Use Mode's own VPN).
+- Cancel while installing: the installing screen has a Cancel button. It stops the install (and
+  its download) and goes back to the phone page, or to the Apple account step during a first
+  setup.
+- Back after a failed install goes to the phone page for an update or renewal, and "Finish on
+  your iPhone" has Finish later.
+
+## 0.1.5 · 7 Nov 2026
+
+- The phone page looks for a newer Mode by itself when it opens, so "Update to …" shows without
+  pressing Check for updates.
+
+## 0.1.4 · 7 Nov 2026
+
+- A saved Apple password that no longer works (changed since) is removed from this computer the
+  first time Apple turns it down, and the sign-in asks for the new one, instead of trying the
+  old one again each time.
+- Stops an iPhone on iOS 26 or earlier with "Mode needs iOS 27", instead of installing a Mode
+  that can't see or tap the screen, and guides you through updating: Software Update, finding
+  "Upgrade to iOS 27", and what to do if it isn't offered or there isn't enough space. Check
+  again goes on after the update.
+- The steps on your iPhone include trusting your Apple account (Settings › General › VPN &
+  Device Management), for when iOS says "Untrusted Developer".
+
 ## 0.1.3 · 7 Nov 2026
 
 - Tells you when a newer Mode Setup is out: a banner on the first page and the phone page, with

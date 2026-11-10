@@ -22,14 +22,19 @@ public class ChatTitler(
     private val llm: LlmClient,
     private val model: () -> Pair<String, ModelProvider>?,
 ) {
-    /** A short title for a chat whose requests were [asked] (oldest first); null if the model can't. */
-    public suspend fun title(asked: List<String>, budgetMs: Long = BUDGET_MS): String? {
+    /**
+     * A short title for a chat whose requests were [asked] (oldest first); null if the model can't. [done] is what
+     * Mode did or answered (oldest first): a request that names nothing ("Sure, please do this") is named from it.
+     */
+    public suspend fun title(asked: List<String>, done: List<String> = emptyList(), budgetMs: Long = BUDGET_MS): String? {
         val requests = asked.map { it.trim() }.filter { it.isNotEmpty() }.takeLast(MAX_REQUESTS)
         if (requests.isEmpty()) return null
         val (id, provider) = model() ?: return null
         return try {
             withTimeoutOrNull(budgetMs) {
-                val user = "WHAT THEY ASKED, OLDEST FIRST:\n" + requests.joinToString("\n") { "- ${it.take(REQUEST_CHARS)}" }
+                val results = done.map { it.trim() }.filter { it.isNotEmpty() }.takeLast(MAX_REQUESTS)
+                val user = "WHAT THEY ASKED, OLDEST FIRST:\n" + requests.joinToString("\n") { "- ${it.take(REQUEST_CHARS)}" } +
+                    if (results.isEmpty()) "" else "\nWHAT MODE DID OR ANSWERED, OLDEST FIRST:\n" + results.joinToString("\n") { "- ${it.take(REQUEST_CHARS)}" }
                 val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", SYSTEM), ChatMessage("user", user)), TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 clean((args?.get("title") as? JsonPrimitive)?.contentOrNull ?: reply.text)
@@ -62,7 +67,9 @@ public class ChatTitler(
             Name a chat between the user and Mode, their iPhone assistant, from what they asked in it. 2 to 6 words,
             like a phone's chat list: what it's about, covering the main things when there are several ("Sam,
             DoorDash meeting and coffee", "Dark Mode and Wi-Fi", "Tomorrow's flight to Delhi"). No verbs like "Can you",
-            no quotes, no full stop, no emoji. Same language as the requests. Call name_chat.
+            no quotes, no full stop, no emoji. Same language as the requests. When a request doesn't say what it is
+            about ("Sure, please do this", "Yes"), name the chat from what Mode did or answered. Never a placeholder
+            such as "Unspecified request", "Unknown" or "New chat". Call name_chat.
         """.trimIndent()
 
         private val TOOLS = buildJsonArray {

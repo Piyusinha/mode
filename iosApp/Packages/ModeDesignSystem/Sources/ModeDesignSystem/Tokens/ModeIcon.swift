@@ -11,6 +11,8 @@ public enum ModeIcon: String, CaseIterable, Sendable {
     case privateOff = "eye.slash"
     case back = "chevron.left"
     case chevron = "chevron.right"
+    /// Minimise: the voice session shrinks into the session bar.
+    case chevronDown = "chevron.down"
     case close = "xmark"
     case stop = "stop.fill"
     case settings = "gearshape"

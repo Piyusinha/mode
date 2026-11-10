@@ -46,6 +46,8 @@ else cat <<'NOTES'
    - Linux: `Mode-Setup-linux.AppImage` (or the .deb)
 2. Open it. It checks your computer first: Windows needs Apple's iTunes from apple.com, Linux
    needs usbmuxd, and it tells you if either is missing. Xcode is not needed.
+   On Windows, if it says "Windows protected your PC", click **More info**, then **Run anyway**:
+   the installer isn't signed with a paid Windows certificate.
 3. Connect your iPhone with a cable and follow the steps. Mode Setup installs the newest Mode.
 
 See the [changelog](https://github.com/Piyusinha/mode/blob/main/desktop/CHANGELOG.md).

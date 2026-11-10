@@ -133,6 +133,10 @@ Apple account · a ChatGPT or Claude plan, or an OpenRouter key. No Xcode needed
 ([.deb](https://heymode.app/download/linux-deb); it needs `usbmuxd`).
 Mode Setup checks your computer before it starts and tells you if anything is missing.
 
+> **Windows says “Windows protected your PC”?** Mode Setup isn’t signed with a paid Windows
+> certificate yet, so SmartScreen doesn’t know it. Click **More info**, then **Run anyway**.
+> It’s the same open-source app as on this page, built by GitHub from this repository.
+
 <br>
 
 ## Why isn’t Mode on the App Store?
@@ -157,6 +161,24 @@ stay in this version.
 ## Setting up your iPhone
 
 Mode Setup shows each of these on screen when it’s needed. Here they are in one place.
+
+### Update to iOS 27
+
+Mode sees and taps your screen with Apple’s remote control, which starts in iOS 27, so Mode
+Setup stops an iPhone on iOS 26 or earlier. Updating is free and keeps your apps and data.
+
+1. Plug your iPhone into power and connect to Wi-Fi. It takes 20 to 40 minutes and needs about
+   7 GB free.
+2. Open **Settings → General → Software Update**.
+3. Choose **iOS 27**. If the top update is iOS 26, look further down for **Upgrade to iOS 27**
+   and tap that.
+4. Tap **Update Now** and enter your passcode. Your iPhone restarts and finishes on its own.
+5. Plug it into Mode Setup again and press **Check again**.
+
+> **No iOS 27 in Software Update?** Check your iPhone is on
+> [Apple’s list of iPhones that get iOS 27](https://www.apple.com/ios/). Not enough space?
+> Update with your computer instead: on a Mac, select your iPhone in Finder and click
+> **Check for Update**; on Windows, use Apple Devices or iTunes.
 
 ### Turn on Developer Mode
 

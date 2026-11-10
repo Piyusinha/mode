@@ -6,10 +6,13 @@
 //   /download/v/<tag>/<file>                                    a file from a specific release (the Releases page)
 //   /api/stars                                                  the GitHub star count (for the star button)
 //   /api/releases                                               the releases and their notes (the Releases page)
+//   /api/e                                                      website analytics events (worker/analytics.js)
 //
 // The file comes from the newest GitHub release but is sent from heymode.app as a download, so the
 // browser stays on the page and never shows GitHub. Cloudflare caches each file near the visitor.
 // Until a release is published, the link shows a short "almost here" page instead of GitHub's 404.
+
+import { collect, write } from './analytics.js';
 
 const REPO = 'Piyusinha/mode';
 const CACHE_VERSION = 2;
@@ -35,8 +38,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/stars') return stars(url.searchParams.has('fresh'));
     if (url.pathname === '/api/releases') return releases();
+    if (url.pathname === '/api/e') return collect(request, env);
     const v = url.pathname.match(/^\/download\/v\/([\w.-]+)\/([\w.-]+)$/);
-    if (v) return send(request, `https://github.com/${REPO}/releases/download/${v[1]}/${v[2]}`, v[2], 'Mode', v[1]);
+    if (v) return counted(env, request, url, 'version', v[1], v[2],
+      await send(request, `https://github.com/${REPO}/releases/download/${v[1]}/${v[2]}`, v[2], 'Mode', v[1]));
     const m = url.pathname.match(/^\/download\/?([a-z-]*)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -49,9 +54,22 @@ export default {
     const tag = await latestTag();
     const from = tag ? `https://github.com/${REPO}/releases/download/${tag}/${entry.file}`
                      : `https://github.com/${REPO}/releases/latest/download/${entry.file}`;
-    return send(request, from, entry.file, entry.label, tag);
+    return counted(env, request, url, m[1] ? key : `auto-${key}`, tag, entry.file, await send(request, from, entry.file, entry.label, tag));
   },
 };
+
+/** Counts a download as it goes out: which file, which version, and whether it was ready (or "almost here").
+    The site adds the visitor's random ID (?vid=) to its download links; links from elsewhere have none. */
+function counted(env, request, url, target, tag, file, response) {
+  if (request.method === 'GET') {
+    const ready = !(response.headers.get('content-type') || '').startsWith('text/html');
+    write(env, request, { v: url.searchParams.get('vid') || '', r: hostOf(request.headers.get('referer')) },
+      { e: 'download_sent', p: url.pathname, a: url.searchParams.get('where') || '', t: target,
+        d: (tag || '').replace(/^Mode-Desktop-App-|^v/, ''), x: file, val: ready ? 1 : 0 });
+  }
+  return response;
+}
+const hostOf = (u) => { try { return u ? new URL(u).hostname : ''; } catch { return ''; } };
 
 /** The newest published Mode Setup release's tag (e.g. "Mode-Desktop-App-0.1.3"), checked at most once a minute; null if
     GitHub can't say. Mode and Mode Setup are released separately ("Mode-Mobile-Build-…" and "Mode-Desktop-App-…"); the first releases
@@ -106,16 +124,17 @@ async function send(request, from, file, label, tag) {
 
 /** Published releases with their notes and files, for the Releases page. Cached at Cloudflare for 10 minutes. */
 async function releases() {
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, {
+  // Checked at most once a minute, so a release you publish or delete shows up (or goes) within a minute.
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30&page=1`, {
     headers: { 'User-Agent': 'heymode.app', Accept: 'application/vnd.github+json' },
-    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 600, '300-599': 0 } },
+    cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 60, '300-599': 0 } },
   });
   const list = res.ok ? await res.json() : [];
   const out = list.filter((r) => !r.draft).map((r) => ({
     tag: r.tag_name, name: r.name || r.tag_name, date: r.published_at, prerelease: r.prerelease, notes: r.body || '',
     files: r.assets.map((a) => ({ name: a.name, size: a.size })),
   }));
-  return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300' } });
+  return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
 /** The repo's star count, for the GitHub button. Cached at Cloudflare for a minute; `?fresh` skips that

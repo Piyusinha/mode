@@ -7,14 +7,14 @@ const SCREENS = `${import.meta.env.BASE_URL}screens/`;
 
 export function Tour() {
   // Draw once, then hand the stage to the engine. Nothing here re-renders, so the engine owns the classes it sets.
-  useEffect(() => startTour(CHAPTERS.map((c) => c.screens.length)), []);
+  useEffect(() => startTour(CHAPTERS.map((c) => c.screens.length), CHAPTERS.map((c) => c.name)), []);
 
   return (
-    <div id="story">
+    <div id="story" data-section="tour">
       <div className="stage tour" id="stage">
         <ol className="tix" aria-label="What Mode does">
           {CHAPTERS.map((c, i) => (
-            <li key={c.name}><button type="button" data-go={i}><span>{String(i + 1).padStart(2, '0')}</span>{c.name}</button></li>
+            <li key={c.name}><button type="button" data-go={i} data-ev="tour_jump" data-where="list" data-target={String(i)}><span>{String(i + 1).padStart(2, '0')}</span>{c.name}</button></li>
           ))}
         </ol>
 
@@ -61,7 +61,7 @@ export function Tour() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 10l6 6 6-6" /></svg>
         </div>
         <nav className="rail" id="rail" aria-label="Chapters">
-          {CHAPTERS.map((c, i) => <button type="button" key={c.name} data-go={i} aria-label={c.name} title={c.name}><b><i /></b></button>)}
+          {CHAPTERS.map((c, i) => <button type="button" key={c.name} data-go={i} data-ev="tour_jump" data-where="rail" data-target={String(i)} aria-label={c.name} title={c.name}><b><i /></b></button>)}
         </nav>
       </div>
     </div>

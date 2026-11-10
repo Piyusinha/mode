@@ -9,7 +9,7 @@ const MORE = [
 
 export function More() {
   return (
-    <section className="sec wrap" id="more" aria-labelledby="more-h">
+    <section className="sec wrap" id="more" data-section="more" aria-labelledby="more-h">
       <p className="kick rv">And the small things</p>
       <Words id="more-h">Built to be <em>lived with.</em></Words>
       <ul className="minis">

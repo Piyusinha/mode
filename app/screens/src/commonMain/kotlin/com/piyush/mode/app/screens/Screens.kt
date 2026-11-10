@@ -76,6 +76,8 @@ public class Screens(
     private val backupService: com.piyush.mode.feature.backup.data.BackupService? = null,
     /** Words about the phone ("this iPhone", where its Settings are). */
     private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
+    /** Is a newer Mode out (Settings)? */
+    private val modeUpdates: com.piyush.mode.feature.settings.data.ModeUpdates? = null,
 ) {
     /** The models on the plan in use (ChatGPT, Claude): phone control, brain, effort, measuring. */
     /** How much Mode does on its own (Settings → Access). */
@@ -83,7 +85,7 @@ public class Screens(
     public fun voice(hearing: Boolean): com.piyush.mode.app.screens.settings.VoicePresenter =
         com.piyush.mode.app.screens.settings.VoicePresenter(scope, settings, voices!!, hearing)
 
-    /** Choose a voice, starting on [provider] (Apple, ElevenLabs, Fish Audio). */
+    /** Choose a voice, starting on [provider] (Speechify, Apple, ElevenLabs, Fish Audio). */
     public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
         com.piyush.mode.app.screens.settings.VoicePickerPresenter(
             scope, settings, voices!!,
@@ -114,8 +116,38 @@ public class Screens(
     public fun listen(conversationId: String?, entry: String): com.piyush.mode.app.screens.settings.ListenPresenter =
         com.piyush.mode.app.screens.settings.ListenPresenter(
             scope, voices!!, queue, settings, runner, clock, conversationId = conversationId, telemetry = telemetry, entry = entry,
-            acknowledger = acknowledger, greeter = greeter, day = ::dayContext,
+            acknowledger = acknowledger, greeter = greeter, day = ::dayContext, lastStopped = ::lastStopped, chatSoFar = ::chatSoFar,
         )
+
+    /** A chat's title, last [CHAT_SO_FAR_LINES] messages (one line each) and last task, for a session continuing it. */
+    private fun chatSoFar(conversationId: String): com.piyush.mode.app.screens.settings.ChatSoFar? {
+        val turns = conversations.turnsNow(conversationId)
+        if (turns.isEmpty()) return null
+        val oneLine = { text: String -> com.piyush.mode.core.common.PlainText.fromMarkdown(text, oneLine = true).take(CHAT_LINE_CHARS) }
+        val last = tasks.latest(CARRY_ON_LOOKBACK).firstOrNull { it.conversationId == conversationId }
+        return com.piyush.mode.app.screens.settings.ChatSoFar(
+            title = conversations.get(conversationId)?.title,
+            lines = turns.takeLast(CHAT_SO_FAR_LINES).map { (it.role == com.piyush.mode.feature.conversations.domain.TurnRole.User) to oneLine(it.text) },
+            lastTask = last?.text,
+            lastDone = last?.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Done,
+            lastSaid = last?.summary?.let(oneLine),
+        )
+    }
+
+    /**
+     * The last task of this chat when it stopped before it was done in the last [CARRY_ON_WITHIN_MS]: stopped by
+     * the user, or cut off (Mode closed while it ran, marked failed on relaunch).
+     */
+    private fun lastStopped(conversationId: String): com.piyush.mode.app.screens.settings.StoppedTask? {
+        val last = tasks.latest(CARRY_ON_LOOKBACK).firstOrNull { it.conversationId == conversationId } ?: return null
+        val stopped = last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Stopped ||
+            last.status == com.piyush.mode.feature.tasks.domain.TaskStatus.Failed
+        val ended = last.endedAt ?: last.startedAt ?: last.createdAt
+        if (!stopped || clock.now() - ended > CARRY_ON_WITHIN_MS) return null
+        val title = last.conversationId?.let { conversations.get(it)?.title }?.trim()?.takeIf { it.isNotEmpty() }
+        val name = title ?: last.text.trim().split(Regex("\\s+")).take(CARRY_ON_WORDS).joinToString(" ")
+        return com.piyush.mode.app.screens.settings.StoppedTask(last.text, last.conversationId, name)
+    }
 
     /** Mode's first words when started by voice, written by the fast model with what's coming up in their day. */
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? by lazy {
@@ -146,10 +178,8 @@ public class Screens(
                 "${s.text} at ${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
             }
             .take(DAY_ITEMS)
-        val last = tasks.latest(1).firstOrNull()
-            ?.takeIf { t -> clock.relativeDay(t.endedAt ?: t.createdAt) == com.piyush.mode.app.screens.common.RelativeDay.Today }
-            ?.let { t -> "${t.text} · ${t.status.name.lowercase()}" }
-        return com.piyush.mode.feature.memory.data.DayContext(label, events, repeats, last)
+        // No earlier task: a new session starts fresh. Only a session from a chat's mic carries that chat on (chatSoFar).
+        return com.piyush.mode.feature.memory.data.DayContext(label, events, repeats)
     }
 
     /** What Mode says when handed a spoken task, written by the fast model (phone control's). */
@@ -264,6 +294,10 @@ public class Screens(
         chatGptModels = { chatGpt.knownModels.value }, voices = voices,
     )
 
+    /** This Mode's version and a newer Mode, when one is out (Settings). */
+    public fun appUpdate(): com.piyush.mode.app.screens.settings.AppUpdatePresenter =
+        com.piyush.mode.app.screens.settings.AppUpdatePresenter(scope, modeUpdates)
+
     /** The AI providers: connected ones, the one in use, and connecting more (setup and Settings). */
     public fun providers(): com.piyush.mode.app.screens.settings.ProvidersPresenter =
         com.piyush.mode.app.screens.settings.ProvidersPresenter(scope, settings, chatGpt, auth, claude, claudeLlm)
@@ -290,3 +324,12 @@ private const val DAY_ITEMS = 5
 
 /** Repeats due within this long count as "coming up" for the greeting. */
 private const val REPEATS_AHEAD_MS = 3 * 60 * 60 * 1000L
+
+/** How far back a stopped task is offered again when a session starts. */
+private const val CARRY_ON_WITHIN_MS: Long = 12L * 60 * 60 * 1000
+private const val CARRY_ON_LOOKBACK: Long = 50
+/** With no chat title, the request's first words name it. */
+private const val CARRY_ON_WORDS: Int = 8
+/** How much of a chat a spoken session shows when it continues it. */
+private const val CHAT_SO_FAR_LINES: Int = 4
+private const val CHAT_LINE_CHARS: Int = 160

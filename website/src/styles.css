@@ -430,14 +430,33 @@ em{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.0
 .md th,.md td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 .md th{color:var(--ink)}
 .md pre.licence{white-space:pre-wrap;font-size:13px;line-height:1.55;background:var(--card);border-radius:20px;padding:22px;margin-top:28px;max-height:70vh;overflow:auto}
-.rel{background:var(--card);border-radius:28px;padding:26px;margin-top:16px}
-.rel header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
-.rel h2{font-size:30px}
-.rel header span{font-size:14px;color:var(--ink-2);display:flex;gap:8px;align-items:center}
-.rel .latest,.rel .pre{font-size:12px;font-weight:800;padding:3px 9px;border-radius:9px;background:#E4F4EA;color:#1D7A45}
-.rel .pre{background:#FFF1E0;color:#A34E00}
-.rel .files{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 6px}
-.rel .files small{margin-left:8px;font-weight:600;opacity:.6;font-size:12px}
-.rel .md{margin-top:14px;font-size:16px}
-.rel .md h2{font-size:21px;margin:22px 0 8px}
+.doc .lead{margin:0 0 28px}
+/* the newest release: a card with its downloads and what's new */
+.rel-now{background:var(--card);border-radius:28px;padding:28px}
+.rel-now header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+.rel-now h2{font-size:clamp(28px,4vw,38px)}
+.rel-now header span{font-size:14px;color:var(--ink-2);display:flex;gap:10px;align-items:center}
+.rel-now .latest{font-size:12px;font-weight:800;padding:3px 10px;border-radius:9px;background:#E4F4EA;color:#1D7A45}
+.rel-now .files{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0 0}
+.rel-now .files .btn.soft{background:var(--card-2)}
+.rel-now .files small{margin-left:8px;font-weight:600;opacity:.6;font-size:12px}
+.rel-now .also{margin:12px 0 0;font-size:14px;color:var(--ink-2)}
+.rel-now .also a{color:var(--ink);text-underline-offset:3px}
+.rel-now h3{font-size:18px;margin:28px 0 8px;letter-spacing:-.01em}
+.rel-now .md{font-size:16px}
+/* earlier versions: one quiet row each, what's new on demand */
+.rel-old{margin-top:36px}
+.rel-old h3{font-size:18px;margin:0 0 10px}
+.rel-old details{border-top:1px solid var(--line)}
+.rel-old details:last-child{border-bottom:1px solid var(--line)}
+.rel-old summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding:16px 4px}
+.rel-old summary::-webkit-details-marker{display:none}
+.rel-old summary b{font-family:var(--display);font-size:20px;letter-spacing:-.02em;min-width:56px}
+.rel-old .when{font-size:14px;color:var(--ink-2)}
+.rel-old .links{margin-left:auto;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px}
+.rel-old .links a{color:var(--ink-2);text-underline-offset:3px}
+.rel-old .links a:hover{color:var(--ink)}
+.rel-old summary::after{content:"+";font-size:20px;color:var(--ink-2);width:16px;text-align:center}
+.rel-old details[open] summary::after{content:"–"}
+.rel-old .md{font-size:15px;padding:0 4px 14px}
 .rel .files .btn.soft{background:var(--card-2)}

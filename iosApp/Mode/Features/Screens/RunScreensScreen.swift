@@ -99,10 +99,10 @@ struct RunScreensScreen: View {
 }
 
 struct RunScreensRoute: View {
-    @State private var model: RunScreensViewModel
+    @LazyState private var model: RunScreensViewModel
 
     init(app: AppModel, taskId: String) {
-        _model = State(initialValue: RunScreensViewModel(screens: app.screens, taskId: taskId))
+        _model = LazyState(wrappedValue: RunScreensViewModel(screens: app.screens, taskId: taskId))
     }
 
     var body: some View {

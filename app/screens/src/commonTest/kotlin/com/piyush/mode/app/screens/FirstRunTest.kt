@@ -34,7 +34,9 @@ class FirstRunTest {
         assertEquals(FirstRunStep.Connect, p.state.value.step, "no AI yet: Continue does nothing")
         f.settings.apiKey = "sk-or-test"
         f.settings.update { it }
-        p.state.awaitState { it.connected }
+        val connected = p.state.awaitState { it.connected }
+        // Connected with OpenRouter: the card shows OpenRouter, not ChatGPT.
+        assertEquals(ConnectState.Connected("openrouter"), connected.connect)
         p.next()
         assertEquals(FirstRunStep.FirstTask, p.state.awaitState { it.step == FirstRunStep.FirstTask }.step)
         assertTrue(p.state.value.firstJobs.size == 3)

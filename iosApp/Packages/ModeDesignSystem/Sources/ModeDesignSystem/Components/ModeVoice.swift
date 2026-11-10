@@ -122,7 +122,7 @@ public struct ModeVoiceTileView: View {
         Group {
             switch tile {
             case let .logo(logo):
-                let wide = logo == .fishAudio
+                let wide = logo == .fishAudio || logo == .speechify
                 logo.image.resizable().scaledToFit()
                     .frame(width: side * (wide ? 0.8 : 0.5), height: side * (wide ? 0.8 : 0.5))
                     .foregroundStyle(ModeColor.onAccent)

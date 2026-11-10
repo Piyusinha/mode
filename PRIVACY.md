@@ -43,6 +43,24 @@ and card numbers.
 - The pairing file it makes for your iPhone stays on the iPhone and on that
   computer.
 
+## The website (heymode.app)
+
+The website counts how it's used, so we can tell what helps people get started.
+This is about the website only: the Mode app and Mode Setup send nothing.
+
+- What it counts: pages viewed, buttons clicked, how much of the film and the
+  tour is watched, which sections are seen, and downloads (which installer and
+  version).
+- With each visit: a random ID saved in your browser (so a reload or a return
+  visit counts as the same visitor), your country, the kind of device, system
+  and browser, your language, your screen width, and the site that linked you.
+- Not collected: your name, email, IP address or exact location. No cookies,
+  no advertising, nothing shared with or sold to anyone.
+- Where it's kept: in the website's own Cloudflare account, for up to three
+  months.
+- Turning it off: switch on "Do Not Track" or "Global Privacy Control" in your
+  browser and nothing is counted. Clearing the site's data removes the saved ID.
+
 ## Questions
 
 Open an issue at https://github.com/Piyusinha/mode/issues.

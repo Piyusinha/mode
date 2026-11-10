@@ -4,6 +4,7 @@ package com.piyush.mode.feature.settings.domain
 public enum class VoiceKind(public val id: String, public val needsKey: Boolean) {
     /** The phone's own voice and hearing (Apple on iOS, Android's on Android). The id stays "apple": settings and backups keep working. */
     Device("apple", false),
+    Speechify("speechify", true),
     Fish("fish", true),
     ElevenLabs("elevenlabs", true),
     Soniox("soniox", true),
@@ -11,25 +12,25 @@ public enum class VoiceKind(public val id: String, public val needsKey: Boolean)
     ;
 
     public companion object {
-        public val SPEECH: List<VoiceKind> = listOf(Device, Fish, ElevenLabs)
+        public val SPEECH: List<VoiceKind> = listOf(Device, Speechify, Fish, ElevenLabs)
         public val HEARING: List<VoiceKind> = listOf(Device, Soniox, Deepgram)
         public fun fromId(id: String): VoiceKind? = entries.firstOrNull { it.id == id }
         public fun speechDefault(): List<String> = SPEECH.map { it.id }
         public fun hearingDefault(): List<String> = HEARING.map { it.id }
 
-        /** Mode's recommendations: the most human voice, and the most accurate listening. */
-        public val MOST_HUMAN: VoiceKind = ElevenLabs
+        /** Mode's recommendation for listening: the most accurate. */
         public val MOST_ACCURATE: VoiceKind = Deepgram
 
         /** The voice Mode suggests on a provider, by its name there (null: none in particular). */
         public fun ourPick(kind: VoiceKind): String? = when (kind) {
             ElevenLabs -> "Rachel"
+            Speechify -> "Harper"
             else -> null
         }
     }
 }
 
-/** A voice picked from a provider's list: its id there (Apple's identifier, ElevenLabs' voice_id, Fish Audio's model id) and its name. */
+/** A voice picked from a provider's list: its id there (Apple's identifier, ElevenLabs' voice_id, Speechify's voice id, Fish Audio's model id) and its name. */
 @kotlinx.serialization.Serializable
 public data class VoiceChoice(val id: String, val name: String)
 

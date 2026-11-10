@@ -143,10 +143,10 @@ struct AccessScreen: View {
 }
 
 struct AccessRoute: View {
-    @State private var model: AccessViewModel
+    @LazyState private var model: AccessViewModel
 
     init(app: AppModel) {
-        _model = State(initialValue: AccessViewModel(screens: app.screens))
+        _model = LazyState(wrappedValue: AccessViewModel(screens: app.screens))
     }
 
     var body: some View {

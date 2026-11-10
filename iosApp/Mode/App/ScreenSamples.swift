@@ -20,6 +20,7 @@ struct ScreenSample: Identifiable {
         switch id.replacingOccurrences(of: "-bottom", with: "") {
         case "welcome": WelcomeScreen(onEvent: { _ in })
         case "connect": ConnectAIScreen(state: .init(step: .connect, connect: .choose, connected: false, jobs: []), onEvent: { _ in })
+        case "connect-claude": ConnectAIScreen(state: .init(step: .connect, connect: .connected("claude_oauth"), connected: true, jobs: []), onEvent: { _ in })
         case "connect-failed": ConnectAIScreen(state: .init(step: .connect, connect: .notEligible, connected: false, jobs: []), onEvent: { _ in })
         case "firsttask": FirstTaskScreen(jobs: ["Turn on Do Not Disturb", "Turn off Wi-Fi", "Set an alarm for 7 am"], starting: false, onEvent: { _ in })
         case "firsttask-starting": FirstTaskScreen(jobs: ["Turn on Do Not Disturb", "Turn off Wi-Fi", "Set an alarm for 7 am"], starting: true, onEvent: { _ in })
@@ -94,6 +95,13 @@ struct ScreenSample: Identifiable {
                              savingFix: false, fixReply: nil, onFixSeen: {})
         }
         case "settings": pushed { settings.defaultScrollAnchor(bottom ? .bottom : .top) }
+        case "settings-update": pushed {
+            SettingsScreen(state: Self.settingsState,
+                           update: .init(current: "0.1.3", newer: "0.1.4", notesUrl: URL(string: "https://github.com/Piyusinha/mode/releases")),
+                           providers: Self.providers, name: .constant("Alex"), costStep: 0.01, costRange: 0.01...1,
+                           dailyCapStep: 0.1, dailyCapRange: 0...10, onEvent: { _ in })
+                .defaultScrollAnchor(bottom ? .bottom : .top)
+        }
         case "settings-voice", "settings-voice-failed": pushed {
             SettingsScreen(state: Self.settingsVoice(failed: id.hasPrefix("settings-voice-failed")), providers: Self.providers, name: .constant("Alex"),
                            costStep: 0.01, costRange: 0.01...1, dailyCapStep: 0.1, dailyCapRange: 0...10, onEvent: { _ in })
@@ -148,7 +156,7 @@ struct ScreenSample: Identifiable {
         var state = settingsState
         state.speaker = "elevenlabs"; state.voiceName = "Rachel"; state.voiceValue = "ElevenLabs · Rachel"
         state.speakerLogo = VoiceService.elevenlabs.logo
-        state.speakerTag = failed ? nil : VoiceService.elevenlabs.recommendation
+        state.speakerTag = nil
         state.listener = "deepgram"; state.listenerLabel = VoiceService.deepgram.title; state.listenerLogo = VoiceService.deepgram.logo
         state.speakProblem = failed ? VoiceTroubleText.short("PlanLimit", hearing: false) : nil
         state.voiceNote = failed ? L10n.Voice.sectionNoteFailed : L10n.Voice.sectionNote

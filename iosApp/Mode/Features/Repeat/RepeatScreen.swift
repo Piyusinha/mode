@@ -49,12 +49,12 @@ struct RepeatRoute: View {
 }
 
 private struct RepeatContent: View {
-    @State private var model: RepeatViewModel
+    @LazyState private var model: RepeatViewModel
     private let dismiss: () -> Void
 
     init(app: AppModel, text: String, dismiss: @escaping () -> Void) {
         self.dismiss = dismiss
-        _model = State(initialValue: RepeatViewModel(screens: app.screens, text: text, dismiss: dismiss))
+        _model = LazyState(wrappedValue: RepeatViewModel(screens: app.screens, text: text, dismiss: dismiss))
     }
 
     var body: some View {

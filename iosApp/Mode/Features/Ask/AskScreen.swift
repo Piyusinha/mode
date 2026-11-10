@@ -41,10 +41,10 @@ struct AskScreen: View {
 
 /// Connects Ask to its ViewModel.
 struct AskRoute: View {
-    @State private var model: AskViewModel
+    @LazyState private var model: AskViewModel
 
     init(app: AppModel, onSent: @escaping (String) -> Void) {
-        _model = State(initialValue: AskViewModel(screens: app.screens, onSent: onSent))
+        _model = LazyState(wrappedValue: AskViewModel(screens: app.screens, onSent: onSent))
     }
 
     var body: some View {

@@ -303,6 +303,7 @@ public class HealthPresenter(
 
     private fun name(kind: VoiceKind): String = when (kind) {
         VoiceKind.Device -> "Apple"
+        VoiceKind.Speechify -> "Speechify"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Fish -> "Fish Audio"
         VoiceKind.Deepgram -> "Deepgram"

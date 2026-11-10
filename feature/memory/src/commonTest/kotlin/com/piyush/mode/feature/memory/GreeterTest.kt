@@ -45,7 +45,7 @@ class GreeterTest {
     @Test
     fun theFirstWordsAreTheAIsWithWhatsComingUpInTheirDay() = runTest {
         val model = Model("Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?")
-        val line = Greeter(model, memory, fast).line("Alex Sinha", hour = 18, day = evening)
+        val line = Greeter(model, memory, fast).opening("Alex Sinha", hour = 18, day = evening)?.line
 
         assertEquals("Evening, Alex. Dinner with Priya's at 7. Want me to text her you're on your way?", line)
         assertEquals("fast-model@low", model.model, "the quick model, at its lowest effort")
@@ -59,16 +59,16 @@ class GreeterTest {
     @Test
     fun withNothingComingUpItJustAsksWhatTheyNeed() = runTest {
         val model = Model("Hey Alex, what can I do for you?")
-        Greeter(model, memory, fast).line("Alex", hour = 10, day = DayContext(now = "Friday 7 November, 10:00"))
+        Greeter(model, memory, fast).opening("Alex", hour = 10, day = DayContext(now = "Friday 7 November, 10:00"))
         assertTrue("NOTHING IS COMING UP" in model.asked)
         assertFalse("CALENDAR" in model.asked)
     }
 
     @Test
     fun aSlowOrUnusableAnswerFallsBackToModesOwnGreeting() = runTest {
-        assertNull(Greeter(Model("Too late.", waitMs = Greeter.BUDGET_MS + 500), memory, fast).line("Alex", 18, evening))
-        assertNull(Greeter(Model("x"), memory, model = { null }).line("Alex", 18, evening), "no AI connected")
-        assertNull(Greeter(Model((1..40).joinToString(" ") { "word" }), memory, fast).line("Alex", 18, evening), "too long to say")
+        assertNull(Greeter(Model("Too late.", waitMs = Greeter.BUDGET_MS + 500), memory, fast).opening("Alex", 18, evening))
+        assertNull(Greeter(Model("x"), memory, model = { null }).opening("Alex", 18, evening), "no AI connected")
+        assertNull(Greeter(Model((1..40).joinToString(" ") { "word" }), memory, fast).opening("Alex", 18, evening), "too long to say")
     }
 
     @Test
@@ -78,5 +78,21 @@ class GreeterTest {
         assertTrue("THEIR CALENDAR FROM NOW" in model.asked && "Dinner with Priya" in model.asked)
         Acknowledger(model, memory, fast).line("Book a cab", "Alex", hour = 18, private = true, day = evening.events)
         assertFalse("Dinner with Priya" in model.asked, "a private task reads nothing personal")
+    }
+
+    @Test
+    fun anOfferInTheFirstWordsComesWithItsTask() = runTest {
+        val model = object : LlmClient {
+            override suspend fun chat(model: String, messages: List<ChatMessage>, tools: kotlinx.serialization.json.JsonArray): ChatResult =
+                ChatResult(ToolCall("say", buildJsonObject {
+                    put("line", JsonPrimitive("Your Softovac reminder is at 11:30 tonight. Want me to set an alarm?"))
+                    put("offer_task", JsonPrimitive("Set an alarm for 11:30 tonight for Softovac"))
+                    put("yes_label", JsonPrimitive("Yes, set it"))
+                }), "", Usage(200, 20, 0.0))
+        }
+        val opening = Greeter(model, memory, fast).opening("Alex", hour = 22, day = evening)
+        assertEquals("Set an alarm for 11:30 tonight for Softovac", opening?.offer?.task)
+        assertEquals("Yes, set it", opening?.offer?.yes)
+        assertEquals("Not now", opening?.offer?.no)
     }
 }

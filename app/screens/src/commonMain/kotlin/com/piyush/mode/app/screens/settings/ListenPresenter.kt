@@ -86,8 +86,29 @@ public data class TalkResultRow(val title: String, val detail: String, val done:
 /** Mode offers to run [task]: [yes] ("Yes, look there") runs it, [no] ("Skip it") doesn't. */
 public data class TalkOffer(val task: String, val yes: String, val no: String)
 
+/** The chat a spoken session continues: its title, its last messages, and its last task and how it went. */
+public data class ChatSoFar(
+    val title: String?,
+    /** The last few messages, oldest first: true for what the user said. */
+    val lines: List<Pair<Boolean, String>>,
+    val lastTask: String?,
+    val lastDone: Boolean,
+    /** What Mode answered last, as one line. */
+    val lastSaid: String?,
+)
+
+/** The last task of a session that stopped before it was done (stopped, or cut off when Mode closed). */
+public data class StoppedTask(
+    val task: String,
+    val conversationId: String?,
+    /** What to call it out loud: the chat's title when it has one ("LinkedIn onboarding and paneer"). */
+    val name: String,
+)
+
 public data class ListenUiState(
     val phase: TalkPhase = TalkPhase.Greeting,
+    /** The chat this session belongs to, once it has one: Back goes there. */
+    val chat: String? = null,
     /** What Mode said first ("Hey Alex, good evening. What do you want me to do?"). */
     val greeting: String = "",
     /** The words heard so far (live), while listening or answering. */
@@ -108,6 +129,10 @@ public data class ListenUiState(
     val voiceName: String? = null,
     /** The microphone is off for Mode in iPhone Settings. */
     val micDenied: Boolean = false,
+    /** The session is open but not listening: paused from the session bar, or after a quiet spell. */
+    val micPaused: Boolean = false,
+    /** Stop was tapped: the task is still winding down behind; the session already listens again. */
+    val stopping: Boolean = false,
     /** The task was handed to the queue; [finished] once it ended (or, started by voice, once the conversation ended). */
     val sent: Boolean = false,
     val finished: Boolean = false,
@@ -149,6 +174,15 @@ public class ListenPresenter(
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? = null,
     /** What's coming up in their day (calendar, repeats due, the last task), read when talking mode opens. */
     private val day: suspend () -> com.piyush.mode.feature.memory.data.DayContext? = { null },
+    /**
+     * The chat's last task when it stopped before it was done, asked only for a session opened from that chat's
+     * mic (a new chat never looks back). Mode then opens by asking to carry on; yes runs it again in that chat.
+     */
+    private val lastStopped: suspend (conversationId: String) -> StoppedTask? = { null },
+    /** The chat so far, when the session continues one (started from its mic): shown and used for what Mode says. */
+    private val chatSoFar: suspend (conversationId: String) -> ChatSoFar? = { null },
+    /** How long a paused session with nothing running stays open. */
+    private val pausedEndMs: Long = PAUSED_END_MS,
 ) : Presenter<ListenUiState>(parent, ListenUiState()) {
     /** Their day, read once when this opened: the greeting and the reply to their task both use it. */
     private var today: com.piyush.mode.feature.memory.data.DayContext? = null
@@ -181,10 +215,10 @@ public class ListenPresenter(
     private var taskId: String? = null
 
     /**
-     * Started by voice ("Hey Siri, start Mode" on the iPhone, holding power on Android) or Ask's mic: one task
-     * after another until they say "that's all", go quiet, or close it.
+     * One task after another until it is ended (End, ×, "that's all"), however it started: by voice ("Hey Siri,
+     * start Mode" on the iPhone, the assistant or the overlay on Android), Ask's mic or a chat's. A lone question doesn't.
      */
-    private val keepsGoing = entry in SESSION_ENTRIES
+    private val keepsGoing = !forQuestion
 
     /** Where the tasks go: the chat it opened in, else the first task's own chat, so a conversation stays together. */
     private var chat: String? = conversationId
@@ -227,7 +261,7 @@ public class ListenPresenter(
         if (job?.isActive == true || own.value.sent) return
         val speaker = voices.speaker()
         val listener = voices.listener()
-        val base = ListenUiState(listener = listener?.id, speaker = speaker?.first?.id, voiceName = speaker?.second?.name)
+        val base = ListenUiState(listener = listener?.id, speaker = speaker?.first?.id, voiceName = speaker?.second?.name, chat = chat)
         session()
         if (listener == null) {
             val apple = DeviceVoice.hearingState()
@@ -250,10 +284,29 @@ public class ListenPresenter(
         own.value = base.copy(phase = TalkPhase.Greeting, greeting = "")
         job = scope.launch {
             inSession {
+                // Only a session opened from a chat's mic looks back: a new chat starts fresh, never "last time…".
+                val stopped = chat?.takeIf { !forQuestion }?.let { runCatching { lastStopped(it) }.getOrNull() }
+                val soFar = chat?.takeIf { !forQuestion }?.let { runCatching { chatSoFar(it) }.getOrNull() }
+                soFar?.let(::showSoFar)
+                if (stopped != null) {
+                    carryOn(stopped)
+                    return@inSession
+                }
+                if (soFar != null) {
+                    continueChat(soFar)
+                    return@inSession
+                }
                 val greeting = greet()
-                own.value = own.value.copy(greeting = greeting)
-                say(false, greeting)
-                converse(greeting, followUp = false)
+                // The greeting may offer something ("Want me to set an alarm?"): yes then runs that task, not the word "yes".
+                val offer = greeting.offer?.let { TalkOffer(it.task, it.yes, it.no) }
+                pendingOffer = offer
+                own.value = own.value.copy(greeting = greeting.line)
+                if (offer != null) {
+                    own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, greeting.line, offer = offer))
+                } else {
+                    say(false, greeting.line)
+                }
+                converse(greeting.line, followUp = false)
             }
         }
     }
@@ -263,6 +316,11 @@ public class ListenPresenter(
      * task ([followUp]), [FOLLOW_UP_QUIET_MS] of quiet, or "that's all", ends the conversation.
      */
     private suspend fun converse(line: String, followUp: Boolean) {
+        // Mic paused: Mode still says its line, then waits for the mic to come back on.
+        if (own.value.micPaused) {
+            if (line.isNotBlank()) runCatching { voices.speak(line) }
+            return
+        }
         // Talking over the line: what they say is the task.
         val over = if (line.isBlank()) null else voices.speakOrHear(line) { words -> own.value = own.value.copy(phase = TalkPhase.Listening, partial = words) }
         if (over is Heard.Words) { heard(over.text); return }
@@ -278,18 +336,25 @@ public class ListenPresenter(
                     // The listener failed (the notice says why). In a conversation it tries once more first, so a
                     // hiccup doesn't end hands-free talking.
                     if (keepsGoing && ++failures <= LISTEN_RETRIES) { delay(LISTEN_RETRY_MS); continue }
-                    outcome = "HearingFailed"; own.value = own.value.copy(phase = TalkPhase.Typing); return
+                    // After a task, the session's outcome stays the task's; hearing failing is the outcome only before one.
+                    if (own.value.doneSoFar.isEmpty() && !own.value.sent && taskId == null) outcome = "HearingFailed"
+                    own.value = own.value.copy(phase = TalkPhase.Typing)
+                    return
                 }
                 Heard.Silence -> {
                     tries++
                     val quietLongEnough = if (followUp) clock.now() - since >= FOLLOW_UP_QUIET_MS else tries >= MAX_SILENT_LISTENS
                     if (quietLongEnough) {
-                        if (followUp) { end("QuietAfter"); return }
+                        // Quiet after a task: the session stays open with the mic paused (ending is the user's).
+                        if (followUp) { pausedByQuiet(); return }
                         outcome = "NothingHeard"
                         mark(com.piyush.mode.core.telemetry.Event.NothingHeard)
                         own.value = own.value.copy(phase = TalkPhase.Typing)
                         return
                     }
+                    // A listen that comes back at once (nothing to wait on) must not hold the thread until the quiet
+                    // runs out: everything else on it, the screen's state included, stood still for 20 s.
+                    kotlinx.coroutines.yield()
                 }
             }
         }
@@ -334,6 +399,45 @@ public class ListenPresenter(
         converse(next?.line.orEmpty(), followUp = true)
     }
 
+    /**
+     * Opens the session by offering to carry on [stopped], in its own chat, so the session continues where it was.
+     * Yes runs the task again there; no asks what else (as for any offer).
+     */
+    private suspend fun carryOn(stopped: StoppedTask) {
+        if (chat == null) chat = stopped.conversationId
+        own.value = own.value.copy(chat = chat)
+        val line = carryOnLine(stopped.name)
+        val offer = TalkOffer(stopped.task, CARRY_ON_YES, CARRY_ON_NO)
+        pendingOffer = offer
+        com.piyush.mode.core.common.AppLog.log("talk", "offered to carry on a stopped task in ${stopped.conversationId}")
+        own.value = own.value.copy(greeting = line, turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Next, line, offer = offer))
+        converse(line, followUp = false)
+    }
+
+    /** The chat's last messages on screen, above this session's, and its last task for what Mode says next. */
+    private fun showSoFar(soFar: ChatSoFar) {
+        lastTask = soFar.lastTask.orEmpty()
+        lastDone = soFar.lastDone
+        lastSaid = soFar.lastSaid
+        val earlier = soFar.lines.map { (mine, text) -> TalkTurn(nextTurnId++, mine, TalkTurn.Kind.Said, text) }
+        own.value = own.value.copy(turns = earlier + own.value.turns)
+    }
+
+    /**
+     * Opening a session in a chat: Mode picks up from its last task (the AI's line, with an offer when it has
+     * one), else "Back to “title”. What next?". Then it listens, as after any task.
+     */
+    private suspend fun continueChat(soFar: ChatSoFar) {
+        val s = settings.settings.value
+        today = runCatching { kotlinx.coroutines.withTimeoutOrNull(DAY_WAIT_MS) { day() } }.getOrNull()
+        val next = soFar.lastTask?.let { task ->
+            greeter?.next(s.userName, hour(), today ?: com.piyush.mode.feature.memory.data.DayContext(""), task, soFar.lastDone, soFar.lastSaid,
+                budgetMs = GREET_WAIT_MS, language = speakLanguage())
+        }
+        com.piyush.mode.core.common.AppLog.log("talk", "continuing chat ${chat}: ${if (next != null) "AI line" else "Mode's own line"}")
+        nextLine(next ?: com.piyush.mode.feature.memory.data.NextLine(backToChatLine(soFar.title)))
+    }
+
     /** Their tap on one of Mode's offered answers: as if they said it. */
     public fun pick(answer: String) {
         job?.cancel()
@@ -371,7 +475,13 @@ public class ListenPresenter(
             val card = t.card
             if (card != null && card.taskId == id) t.copy(card = ended(live(card, finishedState), result, finishedState.status)) else t
         })
-        if (result is com.piyush.mode.agent.AgentOutcome.Stopped) { end("Stopped"); return }
+        if (result is com.piyush.mode.agent.AgentOutcome.Stopped) {
+            if (forQuestion) { end("Stopped"); return }
+            // Stopped in a session: it stays open; Mode says so and listens for what's next.
+            com.piyush.mode.core.common.AppLog.log("talk", "task stopped: the session carries on")
+            nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE))
+            return
+        }
         if (done != null && done.stay) { end("LeftInApp"); return }
         failureLine(task, result, finishedState.status)?.let { line ->
             lastTask = task
@@ -464,21 +574,21 @@ public class ListenPresenter(
      * Mode's first words: the AI's, with what's coming up in their day ([GREET_WAIT_MS] at most), else Mode's own
      * short greeting. Logs which, and how long it took, so a fixed line is never a mystery.
      */
-    private suspend fun greet(): String {
+    private suspend fun greet(): com.piyush.mode.feature.memory.data.NextLine {
         val s = settings.settings.value
         val started = clock.now()
         val context = runCatching { kotlinx.coroutines.withTimeoutOrNull(DAY_WAIT_MS) { day() } }.getOrNull()
         today = context
         val written = context?.let { c ->
             telemetry.trace(com.piyush.mode.core.telemetry.Operation.VoiceAcknowledge) { span ->
-                greeter?.line(s.userName, hour(), c, budgetMs = GREET_WAIT_MS, language = speakLanguage()).also {
+                greeter?.opening(s.userName, hour(), c, budgetMs = GREET_WAIT_MS, language = speakLanguage()).also {
                     span.fields(mapOf(com.piyush.mode.core.telemetry.Field.Outcome to if (it == null) "GreetingFallback" else "GreetingAI"))
                 }
             }
         }
         val ms = clock.now() - started
-        com.piyush.mode.core.common.AppLog.log("talk", if (written != null) "greeting by ${greeter?.lastModel} in $ms ms: \"$written\"" else "greeting: Mode's own line (${whyNot(ms, GREET_WAIT_MS)}, ${greeter?.lastModel})")
-        return written ?: greetingLine(s.userName, hour())
+        com.piyush.mode.core.common.AppLog.log("talk", if (written != null) "greeting by ${greeter?.lastModel} in $ms ms: \"${written.line}\"${written.offer?.let { " offers: ${it.task}" }.orEmpty()}" else "greeting: Mode's own line (${whyNot(ms, GREET_WAIT_MS)}, ${greeter?.lastModel})")
+        return written ?: com.piyush.mode.feature.memory.data.NextLine(greetingLine(s.userName, hour()))
     }
 
     private fun speakLanguage(): String? {
@@ -543,11 +653,93 @@ public class ListenPresenter(
 
     /** Stops listening and speaking, and the task if it was sent from here. */
     public fun stop() {
-        if (!own.value.sent) outcome = "Stopped"
+        voices.stop()
+        val running = own.value.sent && taskId != null
+        if (forQuestion || !running) {
+            if (!own.value.sent) outcome = "Stopped"
+            job?.cancel()
+            job = null
+            taskId?.let(queue::cancel)
+            // In a session nothing was running: the mic pauses; the session stays open.
+            if (!forQuestion) {
+                own.value = own.value.copy(micPaused = true, partial = "")
+                endWhenForgotten()
+            }
+            return
+        }
+        // A task is running: Mode stops talking and listens again at once; the task winds down behind (it can take
+        // a few seconds to let go of the phone), and its card fills in when it has.
+        val id = taskId ?: return
+        com.piyush.mode.core.common.AppLog.log("talk", "stop: listening again now; the task stops behind")
+        job?.cancel()
+        job = null
+        queue.cancel(id)
+        pendingOffer = null
+        own.value = own.value.copy(stopping = true, micPaused = false, turns = own.value.turns.map { t ->
+            val card = t.card
+            if (card != null && card.taskId == id && card.state == TalkTaskCard.State.Working) t.copy(card = card.copy(state = TalkTaskCard.State.Stopped)) else t
+        })
+        scope.launch {
+            val finished = kotlinx.coroutines.withTimeoutOrNull(STOP_WAIT_MS) { runner.state.first { !it.running && it.taskId == id } }
+            own.value = own.value.copy(stopping = false, turns = own.value.turns.map { t ->
+                val card = t.card
+                if (finished != null && card != null && card.taskId == id) t.copy(card = ended(live(card, finished), finished.lastResult?.outcome, finished.status)) else t
+            })
+            com.piyush.mode.core.common.AppLog.log("talk", if (finished != null) "the stopped task let go" else "the stopped task is still winding down after ${STOP_WAIT_MS / 1000} s")
+        }
+        job = scope.launch { inSession { nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE)) } }
+    }
+
+    /** Session bar › mic: stop listening; the session stays open, a running task carries on. */
+    public fun pauseListening() {
+        if (own.value.micPaused) return
+        if (!own.value.sent) { job?.cancel(); job = null }
+        voices.stop()
+        own.value = own.value.copy(micPaused = true, partial = "")
+        com.piyush.mode.core.common.AppLog.log("talk", "mic paused")
+        endWhenForgotten()
+    }
+
+    /** A session left paused with nothing running ends by itself after a while (no mic, no Live Activity left on). */
+    private var forgotten: Job? = null
+    private fun endWhenForgotten() {
+        forgotten?.cancel()
+        forgotten = scope.launch {
+            delay(pausedEndMs)
+            if (own.value.micPaused && !runner.state.value.running) {
+                com.piyush.mode.core.common.AppLog.log("talk", "paused too long: the session ends")
+                end("PausedTooLong")
+            }
+        }
+    }
+
+    /** Session bar › mic again: listening comes back (not while a task is working: it listens after). */
+    public fun resumeListening() {
+        if (!own.value.micPaused) return
+        forgotten?.cancel()
+        own.value = own.value.copy(micPaused = false)
+        com.piyush.mode.core.common.AppLog.log("talk", "mic on again")
+        if (own.value.sent) return
+        job?.cancel()
+        job = scope.launch { inSession { converse("", followUp = false) } }
+    }
+
+    private fun pausedByQuiet() {
+        com.piyush.mode.core.common.AppLog.log("talk", "quiet: mic paused, the session stays open")
+        own.value = own.value.copy(micPaused = true, partial = "")
+        endWhenForgotten()
+    }
+
+    /**
+     * End, from the session bar's × or the voice screen: listening and speaking stop, a task sent from this session
+     * is cancelled, and the session is over.
+     */
+    public fun endNow() {
         job?.cancel()
         job = null
         voices.stop()
-        taskId?.let(queue::cancel)
+        taskId?.let { id -> if (own.value.sent) queue.cancel(id) }
+        end("Ended")
     }
 
     /** Closes the screen: anything still being said or heard stops; a task already sent carries on. */
@@ -576,6 +768,7 @@ public class ListenPresenter(
         val submitted = queue.submit(task, source, chat, false)
         taskId = submitted?.id
         if (chat == null) chat = submitted?.conversationId
+        own.value = own.value.copy(chat = chat)
         submitted?.let {
             val card = TalkTaskCard(it.id, it.conversationId, task.trim(), TalkTaskCard.State.Working, clock.now())
             own.value = own.value.copy(turns = own.value.turns + TalkTurn(nextTurnId++, false, TalkTurn.Kind.Task, task.trim(), card = card))
@@ -606,9 +799,7 @@ public class ListenPresenter(
     private fun hour(): Int = Instant.fromEpochMilliseconds(clock.now()).toLocalDateTime(clock.zone()).hour
 
     internal companion object {
-        /** How talking mode opened when it should carry on after a task: Siri, Android's assistant, Ask's mic. */
         const val OVERLAY = OVERLAY_ENTRY
-        val SESSION_ENTRIES = setOf("siri", "assistant", "ask_mic", OVERLAY)
         const val ANYTHING_ELSE = "Anything else?"
         const val PART_DONE = "I did part of it. Anything else?"
         const val DIDNT_WORK = "That didn't work"
@@ -637,6 +828,12 @@ public class ListenPresenter(
 
         /** After a task, this long with nothing said ends the conversation. */
         const val FOLLOW_UP_QUIET_MS = 20_000L
+        /** A paused session with nothing running ends after this long. */
+        const val PAUSED_END_MS: Long = 15 * 60_000L
+        /** What Mode says after a task in a session is stopped. */
+        const val STOPPED_LINE: String = "Okay, I stopped it. What next?"
+        /** How long the session waits to fill in a stopped task's card. */
+        const val STOP_WAIT_MS: Long = 30_000L
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
         fun isWrapUp(text: String): Boolean {
@@ -667,7 +864,7 @@ public class ListenPresenter(
             return rest.isBlank()
         }
 
-        private val YESES = listOf("yes", "yeah", "yep", "yup", "sure", "go ahead", "do it", "do that", "please do", "haan", "ha", "ji", "of course", "why not")
+        private val YESES = listOf("yes", "yeah", "yep", "yup", "sure", "go ahead", "go for it", "do it", "do that", "do this", "please do", "please do this", "please do that", "sounds good", "haan", "ha", "ji", "of course", "why not")
         private val DECLINES = listOf("no", "nope", "skip", "skip it", "no thanks", "no thank you", "leave it", "not now", "don't", "dont", "nahi", "rehne do", "never mind", "nevermind")
 
         private val FILLERS = listOf("mo", "mode", "ok", "okay", "please", "for now", "yeah", "yes", "sure")
@@ -682,6 +879,17 @@ public class ListenPresenter(
         private val QUESTION_PHASES = setOf(TalkPhase.Asking, TalkPhase.Answering, TalkPhase.Answered)
 
         /** "Hey Alex, good evening. What do you want me to do?" (by the hour; late at night just "Hey Alex."). */
+        /** "Back to “LinkedIn onboarding and paneer”. What next?" */
+        fun backToChatLine(title: String?): String =
+            title?.trim()?.takeIf { it.isNotEmpty() }?.let { "Back to \u201c${it.trimEnd('.')}\u201d. What next?" } ?: "Back to this chat. What next?"
+
+        const val CARRY_ON_YES: String = "Yes, carry on"
+        const val CARRY_ON_NO: String = "No, something else"
+
+        /** "Last time, “LinkedIn onboarding and paneer” stopped before it was done. Want me to carry on?" */
+        fun carryOnLine(name: String): String =
+            "Last time, \u201c${name.trim().trimEnd('.')}\u201d stopped before it was done. Want me to carry on?"
+
         fun greetingLine(name: String?, hour: Int): String {
             val who = name?.trim()?.split(' ')?.firstOrNull()?.takeIf { it.isNotEmpty() }
             val part = when (hour) {

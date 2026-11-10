@@ -194,7 +194,7 @@ struct ConnectChatGPTScreen: View {
 }
 
 struct ConnectChatGPTRoute: View {
-    @State private var model: ConnectChatGPTViewModel
+    @LazyState private var model: ConnectChatGPTViewModel
     @Environment(\.webAuthenticationSession) private var webAuthentication
     @Environment(\.dismiss) private var dismiss
     /// Set by setup around its sheets: this page's step, and the way to OpenRouter.
@@ -202,7 +202,7 @@ struct ConnectChatGPTRoute: View {
     @Environment(\.setupUseOpenRouter) private var useOpenRouter
 
     init(app: AppModel) {
-        _model = State(initialValue: ConnectChatGPTViewModel(screens: app.screens))
+        _model = LazyState(wrappedValue: ConnectChatGPTViewModel(screens: app.screens))
     }
 
     var body: some View {

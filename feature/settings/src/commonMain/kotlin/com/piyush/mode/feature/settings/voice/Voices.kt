@@ -17,6 +17,9 @@ import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.preparePost
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.utils.io.readAvailable
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.client.statement.bodyAsText
@@ -172,7 +175,9 @@ public class Voices(
                     if (!interrupted && BargeIn.shouldInterrupt(words, line, speechMs)) {
                         interrupted = true
                         device.hush()
-                        telemetry.event(Event.BargeIn, span.context, mapOf(Field.Words to BargeIn.newWords(words, line).size.toString()))
+                        val fresh = BargeIn.newWords(words, line).size
+                        AppLog.log("voice", "talked over after $speechMs ms: $fresh new word(s), Mode stops mid-line")
+                        telemetry.event(Event.BargeIn, span.context, mapOf(Field.Words to fresh.toString()))
                     }
                 }
             }
@@ -315,7 +320,7 @@ public class Voices(
 
     /**
      * Asks [kind]'s provider whether [key] works, before it is saved: a cheap read that needs a valid key
-     * (ElevenLabs' voices, Fish Audio's credit, Deepgram's projects, Soniox's models).
+     * (ElevenLabs' voices, Speechify's voices, Fish Audio's credit, Deepgram's projects, Soniox's models).
      */
     public suspend fun checkKey(kind: VoiceKind, key: String): KeyCheck {
         val k = key.trim()
@@ -324,6 +329,7 @@ public class Voices(
             val response = when (kind) {
                 VoiceKind.ElevenLabs -> http.get("https://api.elevenlabs.io/v2/voices?page_size=1") { header("xi-api-key", k) }
                 VoiceKind.Fish -> http.get("https://api.fish.audio/wallet/self/api-credit") { header("Authorization", "Bearer $k") }
+                VoiceKind.Speechify -> http.get("$SPEECHIFY/v1/voices?limit=1") { header("Authorization", "Bearer $k") }
                 VoiceKind.Deepgram -> http.get("https://api.deepgram.com/v1/projects") { header("Authorization", "Token $k") }
                 VoiceKind.Soniox -> http.get("https://api.soniox.com/v1/models") { header("Authorization", "Bearer $k") }
                 VoiceKind.Device -> return KeyCheck.Valid
@@ -345,6 +351,7 @@ public class Voices(
         return when (kind) {
             VoiceKind.Device -> if (device.speakLine(line, voiceId, speed)) Said.Started else Said.Failed(VoiceTrouble.NotReady)
             VoiceKind.Fish -> cloudSpeak(FISH_TTS, settings.voiceKey(kind)!!, fish = true, line, voiceId, speed)
+            VoiceKind.Speechify -> speechifySpeak(settings.voiceKey(kind)!!, line, voiceId, speed)
             VoiceKind.ElevenLabs -> cloudSpeak(elevenUrl(voiceId), settings.voiceKey(kind)!!, fish = false, line, voiceId, speed)
             else -> Said.Failed(VoiceTrouble.NotReady)
         }
@@ -356,12 +363,16 @@ public class Voices(
     /** The provider chosen for hearing. */
     public fun listener(): VoiceKind? = chosen(hearing = true)
 
-    /** The voices [kind] offers: Apple's on this iPhone; ElevenLabs' library and Fish Audio's public voices with a key. */
+    /** The voices [kind] offers: Apple's on this iPhone; ElevenLabs' library, Speechify's catalogue and Fish Audio's public voices with a key. */
     public suspend fun options(kind: VoiceKind): VoiceList {
         if (kind == VoiceKind.Device) return VoiceList(device.voices())
         val key = settings.voiceKey(kind) ?: return VoiceList(emptyList(), VoiceListError.NoKey)
         return try {
-            VoiceList(if (kind == VoiceKind.ElevenLabs) elevenVoices(key) else fishVoices(key))
+            VoiceList(when (kind) {
+                VoiceKind.ElevenLabs -> elevenVoices(key)
+                VoiceKind.Speechify -> speechifyVoices(key)
+                else -> fishVoices(key)
+            })
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -425,6 +436,86 @@ public class Voices(
                 group = languages.firstOrNull()?.let(::languageName),
                 preview = sample, tag = if (i < 3) POPULAR else null,
             )
+        }
+    }
+
+    /**
+     * Speechify's shared catalogue, its staff picks first (each language's top pick tagged); the list comes in pages
+     * of at most 200, so a few pages are read.
+     */
+    private suspend fun speechifyVoices(key: String): List<VoiceOption> {
+        val all = mutableListOf<JsonObject>()
+        var cursor: String? = null
+        repeat(SPEECHIFY_PAGES) {
+            val response = http.get("$SPEECHIFY/v1/voices?type=shared&limit=200" + (cursor?.let { "&cursor=$it" } ?: "")) {
+                header("Authorization", "Bearer $key")
+            }
+            if (!response.status.isSuccess()) error("HTTP ${response.status.value}")
+            val page = json(response.bodyAsText()) ?: return@repeat
+            (page["voices"] as? JsonArray)?.mapNotNullTo(all) { it as? JsonObject }
+            cursor = page["next_cursor"]?.jsonPrimitive?.contentOrNull
+            if (page["has_more"]?.jsonPrimitive?.contentOrNull != "true" || cursor == null) return all.toVoiceOptions()
+        }
+        return all.toVoiceOptions()
+    }
+
+    private fun List<JsonObject>.toVoiceOptions(): List<VoiceOption> = mapNotNull { o ->
+        val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        val locale = o["locale"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val gender = o["gender"]?.jsonPrimitive?.contentOrNull?.takeIf { it == "male" || it == "female" }?.replaceFirstChar(Char::uppercase)
+        val rank = o["staff_pick_rank"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+        val language = locale.takeIf { it.isNotEmpty() }?.let(::languageName)
+        rank to VoiceOption(
+            id = id, name = o["display_name"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { null } ?: id,
+            traits = listOfNotNull(gender, language).joinToString(" · "),
+            group = language,
+            preview = o["preview_audio"]?.jsonPrimitive?.contentOrNull,
+            tag = if (rank == 1) POPULAR else null,
+        )
+    }.sortedBy { (rank, _) -> rank ?: Int.MAX_VALUE }.map { it.second }
+
+    /**
+     * [line] said by Speechify's Simba 3.5 (48 languages, Hindi included), in the user's language when they set one,
+     * streamed: raw PCM plays as it arrives, so Mode starts talking before the whole line is made.
+     */
+    private suspend fun speechifySpeak(key: String, text: String, voiceId: String?, speed: Double): Said {
+        val language = com.piyush.mode.feature.settings.domain.SpeechLanguage.fromId(settings.settings.value.language)
+            .takeUnless { it == com.piyush.mode.feature.settings.domain.SpeechLanguage.Auto }
+        val body = speechifyBody(text, voiceId ?: speechifyDefaultVoice(language?.code), speed, language?.id)
+        var refused: VoiceTrouble? = null
+        var received = 0L
+        val started = http.preparePost("$SPEECHIFY/v1/audio/stream") {
+            header("Authorization", "Bearer $key")
+            header(HttpHeaders.Accept, "audio/pcm")
+            setBody(TextContent(body, ContentType.Application.Json))
+        }.execute { response ->
+            if (!response.status.isSuccess()) {
+                AppLog.log("voice", "speech ${response.status.value}")
+                refused = troubleFor(response.status.value) ?: VoiceTrouble.Unreachable
+                return@execute false
+            }
+            val channel = response.bodyAsChannel()
+            device.playStream(SPEECHIFY_RATE) { send ->
+                val buffer = ByteArray(STREAM_CHUNK)
+                // 16-bit samples: an odd byte waits for its other half in the next read.
+                var odd: Byte? = null
+                while (true) {
+                    val n = channel.readAvailable(buffer, 0, buffer.size)
+                    if (n < 0) break
+                    if (n == 0) continue
+                    received += n
+                    val joined = odd?.let { byteArrayOf(it) + buffer.copyOf(n) } ?: buffer.copyOf(n)
+                    val even = joined.size - joined.size % 2
+                    odd = if (even < joined.size) joined[even] else null
+                    if (even > 0) send(joined.copyOf(even))
+                }
+            }
+        }
+        return when {
+            started -> Said.Started
+            refused != null -> Said.Failed(refused!!)
+            received == 0L -> Said.Failed(VoiceTrouble.Unreachable)
+            else -> Said.Failed(VoiceTrouble.NotReady)
         }
     }
 
@@ -546,6 +637,28 @@ public class Voices(
             fileReader = read
         }
         private const val FISH_TTS = "https://api.fish.audio/v1/tts"
+        private const val SPEECHIFY = "https://api.speechify.ai"
+        private const val SPEECHIFY_MODEL = "simba-3.5"
+        private const val SPEECHIFY_PAGES = 3
+        /** Speechify's raw stream: 16-bit mono PCM at 24 kHz. */
+        private const val SPEECHIFY_RATE = 24_000
+        private const val STREAM_CHUNK = 4_800
+
+        /** Speechify's top pick for the user's language until they pick a voice: Mihika for Hindi, else Harper. */
+        internal fun speechifyDefaultVoice(languageCode: String?): String = if (languageCode == "hi") "mihika" else "harper_32"
+
+        /** One line for Speechify's stream: raw 24 kHz PCM, the speed as SSML prosody (it has no speed field). */
+        internal fun speechifyBody(text: String, voiceId: String, speed: Double, language: String?): String = buildJsonObject {
+            val rate = kotlin.math.round(speed * 100).toInt()
+            put("input", if (rate == 100) text else "<speak><prosody rate=\"$rate%\">${xmlEscaped(text)}</prosody></speak>")
+            put("voice_id", voiceId)
+            put("model", SPEECHIFY_MODEL)
+            put("output_format", "pcm_24000")
+            language?.let { put("language", it) }
+        }.toString()
+
+        private fun xmlEscaped(text: String): String =
+            text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&apos;")
         private val MAX_PREVIEW = 30.seconds
         /** ElevenLabs' default voice until the user picks one. */
         private const val ELEVEN_DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"

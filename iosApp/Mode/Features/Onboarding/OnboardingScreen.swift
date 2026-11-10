@@ -359,21 +359,6 @@ private struct VoiceStep: View {
                                        playLabel: L10n.Voice.play(voice.name),
                                        onSelect: { onEvent(.chooseVoice(voice.id)) }, onPlay: { onEvent(.playVoice(voice.id)) })
                 }
-                if state.speaker == .apple {
-                    Button { onEvent(.openVoiceSheet(.elevenLabs)) } label: {
-                        HStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
-                            ModeLeadingView(VoiceService.elevenlabs.tile)
-                                .scaleEffect(ModeSize.iconLarge / ModeSize.tile)
-                                .frame(width: ModeSize.iconLarge, height: ModeSize.iconLarge)
-                            Text(L10n.Voice.humanVoiceSuggestion).modeText(.subheadlineEmphasis)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            ModeChevron()
-                        }
-                        .frame(minHeight: ModeSize.touch + ModeSpacing.xs)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
 
             Text(L10n.Voice.whoListens).modeText(.section).accessibilityAddTraits(.isHeader)
@@ -421,8 +406,8 @@ private struct VoiceStep: View {
                 .frame(width: ModeSize.voiceProviderLogo, height: ModeSize.voiceProviderLogo)
             VStack(alignment: .leading, spacing: ModeSpacing.xxs) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: ModeSpacing.s) { providerName(service).fixedSize(); recommendation(service) }
-                    VStack(alignment: .leading, spacing: ModeSpacing.xxs) { providerName(service); recommendation(service) }
+                    providerName(service).fixedSize()
+                    providerName(service)
                 }
                 HStack(spacing: ModeSpacing.s - ModeSpacing.xxs) {
                     Circle().fill((hearing ? state.listenerConnected : state.speakerConnected) ? ModeColor.success : ModeColor.separator)
@@ -450,9 +435,6 @@ private struct VoiceStep: View {
     }
 
     private func providerName(_ service: VoiceService) -> some View { Text(service.title).modeText(.calloutEmphasis) }
-    @ViewBuilder private func recommendation(_ service: VoiceService) -> some View {
-        if let tag = service.recommendation { ModeTag(tag, background: ModeColor.cardRaised, foreground: ModeColor.textPrimary).fixedSize() }
-    }
 }
 
 private struct TestStep: View {

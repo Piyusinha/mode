@@ -11,6 +11,12 @@ import UIKit
 final class TalkModel {
     struct State: Equatable {
         var phase: TalkPhase = .greeting
+        /// The session is open but not listening (paused from the bar, or after a quiet spell).
+        var micPaused = false
+        /// Stop was tapped: the task winds down behind while the session listens again.
+        var stopping = false
+        /// The chat this session belongs to, once it has one: the top-left button goes back to it.
+        var chat: String?
         var greeting = ""
         /// The conversation so far: what they asked, what Mode said, and each task's card.
         var turns: [Turn] = []
@@ -64,7 +70,54 @@ final class TalkModel {
         }
     }
 
-    func begin() { if !forQuestion { presenter.begin() } }
+    /// Once per session: the voice screen opens again from the session bar without starting over.
+    private var begun = false
+    func begin() {
+        guard !forQuestion, !begun else { return }
+        begun = true
+        presenter.begin()
+    }
+    /// The session bar's mic: pause or resume listening; the session stays open. True when the voice screen has to
+    /// come up instead (the microphone isn't allowed yet).
+    @discardableResult
+    func toggleMic() -> Bool {
+        if state.micPaused { presenter.resumeListening(); return false }
+        switch state.phase {
+        case .greeting, .listening, .answered: presenter.pauseListening()
+        case .typing: tryAgain()
+        case .needsMic: return true
+        default: break
+        }
+        return false
+    }
+    func resumeListening() { presenter.resumeListening() }
+    /// End, from the bar's × or the voice screen: everything stops and the session is over.
+    func endNow() { presenter.endNow() }
+
+    /// What the session bar shows: what the session is doing now, in a line and a half.
+    var bar: (kind: ModeSessionBar.Kind, title: String, subtitle: String) {
+        let base = barNow
+        // Stop was tapped: the bar already listens, and says the task is still letting go.
+        return state.stopping && base.kind != .needsYou ? (base.kind, base.title, L10n.Talk.barStopping) : base
+    }
+
+    private var barNow: (kind: ModeSessionBar.Kind, title: String, subtitle: String) {
+        if state.micPaused { return (.paused, L10n.Talk.barPaused, L10n.Talk.barPausedDetail) }
+        switch state.phase {
+        case .asking, .answering:
+            return (.needsYou, state.question.isEmpty ? L10n.Talk.barNeedsYou : state.question, L10n.Talk.barNeedsYouDetail)
+        case .starting:
+            return (.working, state.working.isEmpty ? state.task : state.working, L10n.Talk.barWorkingDetail)
+        case .greeting, .answered:
+            let line = state.phase == .answered ? state.answerReply : state.greeting
+            return line.isEmpty ? (.listening, L10n.Talk.barListening, L10n.Talk.barOpen) : (.speaking, line, L10n.Talk.barSpeakingDetail)
+        case .listening:
+            let heard = (state.settled + " " + state.forming).trimmingCharacters(in: .whitespaces)
+            return (.listening, L10n.Talk.barListening, heard.isEmpty ? L10n.Talk.barOpen : heard)
+        default:
+            return (.paused, L10n.Talk.barWaiting, L10n.Talk.barWaitingDetail)
+        }
+    }
     /// "Mode couldn't hear you" → Try again: listen again from the start.
     func tryAgain() { noticeSeen = false; presenter.begin() }
     func allowMic() { presenter.allowMic() }
@@ -154,7 +207,7 @@ final class TalkModel {
         // The newest word is still forming: it shows lighter until the next one comes.
         let words = s.partial.split(separator: " ").map(String.init)
         return State(
-            phase: s.phase, greeting: s.greeting,
+            phase: s.phase, micPaused: s.micPaused, stopping: s.stopping, chat: s.chat, greeting: s.greeting,
             turns: s.turns.map(turn), hasDone: !s.doneSoFar.isEmpty,
             settled: words.dropLast().joined(separator: " "), forming: words.last ?? "",
             task: s.task, reply: s.reply, working: s.working, question: s.question, options: s.options,
@@ -186,6 +239,12 @@ struct TalkScreen: View {
     let onLater: () -> Void
     let onStop: () -> Void
     let onClose: () -> Void
+    /// ⌄ at the top left: the screen shrinks into the session bar and the session carries on (nil: Close).
+    var onMinimise: (() -> Void)?
+    /// End: the session is over (everything stops).
+    var onEnd: (() -> Void)?
+    /// The mic again after it was paused.
+    var onResume: () -> Void = {}
     /// The voice notice's Update in Settings (closes talking mode first).
     var onVoiceSettings: () -> Void = {}
     /// Listening hears nothing: a small warning at the top.
@@ -243,7 +302,12 @@ struct TalkScreen: View {
 
     private var header: some View {
         HStack {
-            ModeIconButton(.close, label: L10n.Talk.close, action: onClose)
+            // A session minimises into the session bar (it carries on); a lone question closes.
+            if let onMinimise {
+                ModeIconButton(.chevronDown, label: L10n.Talk.minimise, action: onMinimise)
+            } else {
+                ModeIconButton(.close, label: L10n.Talk.close, action: onClose)
+            }
             Spacer()
             if !hearingFailed { status }
             Spacer()
@@ -534,6 +598,14 @@ struct TalkScreen: View {
 
     @ViewBuilder private var dock: some View {
         Group {
+            if state.micPaused {
+                // The session is open, not listening: the mic comes back on here, or End.
+                HStack(spacing: ModeSize.talkDockGap) {
+                    ModeTalkSideButton(.keyboard, label: L10n.Talk.type, action: onType)
+                    ModeTalkMicButton(listening: false, label: L10n.Talk.resumeMic, action: onResume)
+                    ModeTalkSideButton(.close, label: L10n.Talk.end, action: onEnd ?? onClose)
+                }
+            } else {
             switch state.phase {
             case .needsMic:
                 VStack(spacing: ModeSpacing.s + ModeSpacing.xxs) {
@@ -558,7 +630,7 @@ struct TalkScreen: View {
                     if state.hasDone {
                         ModeTalkSideButton(.checkmark, label: L10n.Talk.thatsAll, action: onThatsAll)
                     } else {
-                        ModeTalkSideButton(.close, label: L10n.Talk.cancel, action: onClose)
+                        ModeTalkSideButton(.close, label: onEnd == nil ? L10n.Talk.cancel : L10n.Talk.end, action: onEnd ?? onClose)
                     }
                 }
             case .asking, .answering:
@@ -580,7 +652,10 @@ struct TalkScreen: View {
                         .frame(width: ModeSize.talkStopWidth)
                 }
             case .answered:
-                EmptyView()
+                if let onEnd {
+                    ModeVoiceButton(L10n.Talk.end, style: .raised, height: ModeSize.primaryButton, action: onEnd)
+                        .frame(width: ModeSize.talkStopWidth)
+                }
             default:
                 if hearingFailed {
                     VStack(spacing: ModeSpacing.s) {
@@ -592,15 +667,44 @@ struct TalkScreen: View {
                         .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            }
         }
         .padding(.horizontal, ModeSpacing.screenEdge)
     }
 }
 
-/// Opens talking mode and closes it: when the user closes it, when a spoken task finishes, or (for a question)
-/// when MainTabs stops showing it.
+/// An open voice session on screen (board: Voice session flow). MainTabs owns the session: ⌄ shrinks this screen into
+/// the session bar and the session carries on; End (or the bar's ×) ends it.
+struct TalkSessionRoute: View {
+    @Bindable var model: TalkModel
+    let onMinimise: () -> Void
+    let onEnded: () -> Void
+    var onVoiceSettings: (Bool) -> Void = { _ in }
+    var onOpenChat: (String) -> Void = { _ in }
+    var onWhatWentWrong: (String) -> Void = { _ in }
+
+    var body: some View {
+        TalkScreen(
+            state: model.state, level: model.level, speaking: model.speaking, typingAnswer: model.typingAnswer, typed: $model.typed,
+            onAllowMic: model.allowMic, onDone: model.done, onType: model.typeInstead, onSend: model.send,
+            onAnswer: model.answer, onLater: { model.later(); onMinimise() }, onStop: model.stop, onClose: model.endNow,
+            onMinimise: onMinimise, onEnd: model.endNow, onResume: model.resumeListening,
+            onVoiceSettings: { let hearing = model.state.voiceNoticeHearing; onMinimise(); onVoiceSettings(hearing) },
+            cantHear: model.cantHear,
+            onTryAgain: model.tryAgain,
+            onPick: model.pick,
+            onThatsAll: model.thatsAll,
+            onOpenChat: { id in onMinimise(); onOpenChat(id) },
+            onWhatWentWrong: { taskId in onMinimise(); onWhatWentWrong(taskId) }
+        )
+        .task { model.begin() }
+        .onChange(of: model.state.finished, initial: true) { _, finished in if finished { onEnded() } }
+    }
+}
+
+/// A question in a spoken task (Mode came forward to ask it out loud) when no session is open: closes when answered.
 struct TalkRoute: View {
-    @State private var model: TalkModel
+    @LazyState private var model: TalkModel
     private let onClose: () -> Void
     private let onVoiceSettings: (Bool) -> Void
     private let onOpenChat: (String) -> Void
@@ -610,7 +714,7 @@ struct TalkRoute: View {
     init(app: AppModel, forQuestion: Bool, conversationId: String? = nil, entry: String = "siri",
          onClose: @escaping () -> Void, onVoiceSettings: @escaping (Bool) -> Void = { _ in },
          onOpenChat: @escaping (String) -> Void = { _ in }, onWhatWentWrong: @escaping (String) -> Void = { _ in }) {
-        _model = State(initialValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId, entry: entry))
+        _model = LazyState(wrappedValue: TalkModel(screens: app.screens, forQuestion: forQuestion, conversationId: conversationId, entry: entry))
         self.onClose = onClose
         self.onVoiceSettings = onVoiceSettings
         self.onOpenChat = onOpenChat

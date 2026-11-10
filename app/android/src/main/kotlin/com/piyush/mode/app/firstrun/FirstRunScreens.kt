@@ -126,7 +126,14 @@ private fun ChatGptCard(connect: ConnectState, onEvent: (FirstRunEvent) -> Unit)
             stringResource(if (connect == ConnectState.Waiting) R.string.first_run_waiting else R.string.first_run_checking),
             stringResource(R.string.first_run_waiting_detail),
         ) { ModeButton(stringResource(R.string.first_run_cancel), { onEvent(FirstRunEvent.CancelSignIn) }, role = ModeButtonRole.Other) }
-        ConnectState.Connected -> ModeProviderCard(ModeLogo.OpenAI, name, stringResource(R.string.first_run_connected))
+        // The AI that is connected and in use: ChatGPT, or one from More options (Claude, OpenRouter).
+        is ConnectState.Connected -> {
+            val kind = com.piyush.mode.app.settings.ProviderWords.kind(connect.provider)
+            ModeProviderCard(
+                com.piyush.mode.app.settings.ProviderWords.logo(kind), com.piyush.mode.app.settings.ProviderWords.title(kind, com.piyush.mode.app.common.rememberWords()),
+                stringResource(R.string.first_run_connected),
+            )
+        }
         is ConnectState.Failed -> if (connect.notEligible) {
             ModeProviderCard(
                 ModeLogo.OpenAI, stringResource(R.string.first_run_not_eligible), stringResource(R.string.first_run_not_eligible_detail), warning = true,

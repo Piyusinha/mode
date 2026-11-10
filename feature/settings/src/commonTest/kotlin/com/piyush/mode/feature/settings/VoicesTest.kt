@@ -16,6 +16,8 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -140,7 +142,147 @@ class VoicesTest {
         assertEquals(listOf("r", "a", "g"), eleven.map { it.id })
         assertEquals(Voices.OUR_PICK, eleven.first().tag)
         assertEquals(list, Voices.withOurPick(VoiceKind.Device, list))
-        assertEquals(VoiceKind.ElevenLabs, VoiceKind.MOST_HUMAN)
         assertEquals(VoiceKind.Deepgram, VoiceKind.MOST_ACCURATE)
+    }
+
+    @Test
+    fun speechifySpeaksTheChosenVoiceInTheUsersLanguageAndSpeed() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.Speechify, "sk-speechify-12345678")
+        settings.update {
+            it.copy(
+                speechOrder = listOf("speechify", "apple"), speechSpeed = com.piyush.mode.feature.settings.domain.SpeechSpeed.Faster,
+                language = "hi-IN",
+            )
+        }
+        var url = ""
+        var body = ""
+        var auth = ""
+        var accept = ""
+        val stream = StreamPhone().also { it.install() }
+        val http = HttpClient(MockEngine { request ->
+            url = request.url.toString(); auth = request.headers["Authorization"].orEmpty(); accept = request.headers["Accept"].orEmpty()
+            body = (request.body as io.ktor.http.content.TextContent).text
+            respond(byteArrayOf(1, 2, 3, 4, 5, 6))
+        })
+        val voices = Voices(settings, http)
+        voices.speak("On it & done.")
+        stream.uninstall()
+        assertEquals("https://api.speechify.ai/v1/audio/stream", url)
+        assertEquals("Bearer sk-speechify-12345678", auth)
+        assertEquals("audio/pcm", accept)
+        assertEquals(24_000, stream.rate)
+        val json = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject
+        assertEquals("mihika", json["voice_id"]?.jsonPrimitive?.content, "no voice picked: Speechify's top Hindi voice")
+        assertEquals("simba-3.5", json["model"]?.jsonPrimitive?.content)
+        assertEquals("hi-IN", json["language"]?.jsonPrimitive?.content)
+        assertEquals("<speak><prosody rate=\"115%\">On it &amp; done.</prosody></speak>", json["input"]?.jsonPrimitive?.content)
+        assertEquals("pcm_24000", json["output_format"]?.jsonPrimitive?.content)
+        assertEquals(listOf<Byte>(1, 2, 3, 4, 5, 6), stream.played.toList())
+        assertEquals(1, stream.ended)
+        assertEquals(null, voices.problem.value)
+    }
+
+    @Test
+    fun speechifyAtNormalSpeedSendsPlainTextAndARefusalSaysWhy() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.Speechify, "sk-speechify-12345678")
+        settings.update {
+            it.copy(speechOrder = listOf("speechify", "apple"),
+                voices = mapOf("speechify" to com.piyush.mode.feature.settings.domain.VoiceChoice("harper_32", "Harper")))
+        }
+        var body = ""
+        val stream = StreamPhone().also { it.install() }
+        val http = HttpClient(MockEngine { request ->
+            body = (request.body as io.ktor.http.content.TextContent).text
+            respond("""{"error":{"code":"payment_required"}}""", status = HttpStatusCode.PaymentRequired)
+        })
+        val voices = Voices(settings, http)
+        voices.speak("Done.")
+        stream.uninstall()
+        assertEquals(0, stream.begun, "nothing plays when Speechify refuses")
+        val json = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject
+        assertEquals("Done.", json["input"]?.jsonPrimitive?.content)
+        assertEquals("harper_32", json["voice_id"]?.jsonPrimitive?.content)
+        assertEquals(null, json["language"])
+        assertEquals(VoiceProblem(VoiceKind.Speechify, hearing = false, VoiceTrouble.PlanLimit), voices.problem.value)
+    }
+
+    @Test
+    fun speechifyVoicesListStaffPicksFirstWithHarperAsModesPick() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.Speechify, "sk-speechify-12345678")
+        var asked = ""
+        val http = HttpClient(MockEngine { request ->
+            asked = request.url.toString()
+            respond("""{"has_more":false,"next_cursor":null,"voices":[
+                {"id":"oliver","display_name":"Oliver","gender":"male","locale":"en-US","type":"shared","models":[]},
+                {"id":"mihika","display_name":"Mihika","gender":"female","locale":"hi-IN","type":"shared","models":[],"staff_pick_rank":1,"preview_audio":"https://x/m.mp3"},
+                {"id":"harper_32","display_name":"Harper","gender":"female","locale":"en-US","type":"shared","models":[],"staff_pick_rank":1},
+                {"id":"wyatt_32","display_name":"Wyatt","gender":"male","locale":"en-US","type":"shared","models":[],"staff_pick_rank":2}
+            ]}""")
+        })
+        val voices = Voices(settings, http)
+        kotlin.test.assertTrue(asked.isEmpty())
+        val list = voices.options(VoiceKind.Speechify).options
+        kotlin.test.assertTrue("type=shared" in asked, asked)
+        assertEquals(listOf("mihika", "harper_32", "wyatt_32", "oliver"), list.map { it.id })
+        assertEquals(VoiceOption("mihika", "Mihika", "Female · Hindi", "Hindi", "https://x/m.mp3", Voices.POPULAR), list.first())
+        val ranked = Voices.withOurPick(VoiceKind.Speechify, list)
+        assertEquals("harper_32", ranked.first().id)
+        assertEquals(Voices.OUR_PICK, ranked.first().tag)
+    }
+
+    @Test
+    fun aSpeechifyKeyIsCheckedAgainstItsVoices() = runTest {
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        var asked = ""
+        val http = HttpClient(MockEngine { request ->
+            asked = request.url.toString()
+            if (request.headers["Authorization"] == "Bearer good-key-1234") respond("{}") else respond("no", status = HttpStatusCode.Unauthorized)
+        })
+        val voices = Voices(settings, http)
+        assertEquals(KeyCheck.Valid, voices.checkKey(VoiceKind.Speechify, "good-key-1234"))
+        assertEquals("https://api.speechify.ai/v1/voices?limit=1", asked)
+        assertEquals(KeyCheck.Rejected(VoiceTrouble.KeyRejected), voices.checkKey(VoiceKind.Speechify, "bad-key-1234"))
+    }
+
+    @Test
+    fun speechifyIsOfferedButAppleStaysTheDefaultVoice() {
+        kotlin.test.assertTrue(VoiceKind.Speechify in VoiceKind.SPEECH)
+        assertEquals(VoiceKind.Device.id, VoiceKind.speechDefault().first())
+        // A saved order from before Speechify existed gains it without changing who speaks.
+        val old = com.piyush.mode.feature.settings.domain.ModeSettings(speechOrder = listOf("elevenlabs", "apple", "fish")).validated()
+        assertEquals(listOf("elevenlabs", "apple", "fish", "speechify"), old.speechOrder)
+    }
+
+    @Test
+    fun speechifyStreamsOnlyWholeSamplesWhateverTheChunks() = runTest {
+        // A 16-bit sample split across two network reads is joined before it plays.
+        val settings = SettingsRepository(InMemorySecretStore(), InMemoryKeyValueStore())
+        settings.setVoiceKey(VoiceKind.Speechify, "sk-speechify-12345678")
+        settings.update { it.copy(speechOrder = listOf("speechify", "apple")) }
+        val stream = StreamPhone().also { it.install() }
+        val http = HttpClient(MockEngine { respond(io.ktor.utils.io.ByteReadChannel(byteArrayOf(1, 2, 3, 4, 5, 6, 7))) })
+        Voices(settings, http).speak("Hello there.")
+        stream.uninstall()
+        assertEquals(listOf<Byte>(1, 2, 3, 4, 5, 6), stream.played.toList(), "a lone last byte is not half a sample played")
+        kotlin.test.assertTrue(stream.chunks.all { it % 2 == 0 }, stream.chunks.toString())
+    }
+
+    /** The phone's streaming player, faked: records what it was given and reports sound once the stream ends. */
+    private class StreamPhone {
+        var rate = 0
+        var begun = 0
+        var ended = 0
+        var played = byteArrayOf()
+        val chunks = mutableListOf<Int>()
+        private var done: ((Boolean) -> Unit)? = null
+        fun install() {
+            DeviceVoice.streamBegin = { r, d -> rate = r; begun++; done = d; true }
+            DeviceVoice.streamChunk = { b -> played += b; chunks += b.size }
+            DeviceVoice.streamEnd = { ended++; done?.invoke(played.isNotEmpty()) }
+        }
+        fun uninstall() { DeviceVoice.streamBegin = null; DeviceVoice.streamChunk = {}; DeviceVoice.streamEnd = {} }
     }
 }

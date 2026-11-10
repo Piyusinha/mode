@@ -4,6 +4,12 @@ package com.piyush.mode.core.platform
 public interface AppInfo {
     /** This app's bundle id, to bring Mode back to the front after driving another app. */
     public val bundleId: String
+
+    /** This Mode's version ("0.1.3"), to tell whether a newer one is out. */
+    public val version: String get() = ""
+
+    /** CPU time this process has used so far (user and system, every thread), in milliseconds; null where unknown. */
+    public fun cpuTimeMs(): Long? = null
 }
 
 /** The app moving between foreground, background and ending. */

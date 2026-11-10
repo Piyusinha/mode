@@ -5,6 +5,7 @@ import SwiftUI
 /// Settings, as on its board: You, AI (the provider in use and its models), Limits, Memory. Draws state, sends events.
 struct SettingsScreen: View {
     let state: SettingsViewModel.State
+    var update = SettingsViewModel.Update()
     let providers: ProvidersViewModel.State
     @Binding var name: String
     let costStep: Double
@@ -18,6 +19,14 @@ struct SettingsScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: ModeSpacing.s) {
                 ModePageTitle(L10n.Common.settings)
+                if let newer = update.newer {
+                    ModeSetupNote(.mo, lead: L10n.Updates.available(newer), text: L10n.Updates.howTo)
+                    if update.notesUrl != nil {
+                        ModeCard {
+                            ModeRow(L10n.Updates.whatsNew(newer), action: { onEvent(.openWhatsNew) }) { ModeChevron() }
+                        }
+                    }
+                }
                 ModeSectionHeader(L10n.Settings.you)
                 ModeCard {
                     ModeRow(String(localized: L10n.Settings.name)) {
@@ -79,7 +88,9 @@ struct SettingsScreen: View {
 
                 ModeCard {
                     ModeRow(String(localized: L10n.Health.row), leading: .icon(.wrench), action: { onEvent(.openHealth) }) { ModeChevron() }
-                    ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }
+                    if state.showsDeveloper {
+                        ModeRow(String(localized: L10n.Developer.title), action: { onEvent(.openDeveloper) }) { ModeChevron() }
+                    }
                 }
                 .padding(.top, ModeSpacing.xl)
 
@@ -95,6 +106,9 @@ struct SettingsScreen: View {
                 }
                 .disabled(resetting)
                 .padding(.top, ModeSpacing.m)
+                if !update.current.isEmpty {
+                    ModeFootnote(verbatim: L10n.Updates.version(update.current), centered: true)
+                }
             }
             .padding(.horizontal, ModeSpacing.screenEdge)
             .padding(.bottom, ModeSpacing.xxl)
@@ -194,17 +208,17 @@ struct ModelPickerScreen: View {
 
 struct SettingsRoute: View {
     let app: AppModel
-    @State private var model: SettingsViewModel
-    @State private var providers: ProvidersViewModel
+    @LazyState private var model: SettingsViewModel
+    @LazyState private var providers: ProvidersViewModel
 
     init(app: AppModel, navigate: @escaping (Route) -> Void) {
         self.app = app
-        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate, reset: { [app] in await app.resetEverything() }))
-        _providers = State(initialValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
+        _model = LazyState(wrappedValue: SettingsViewModel(screens: app.screens, navigate: navigate, reset: { [app] in await app.resetEverything() }))
+        _providers = LazyState(wrappedValue: ProvidersViewModel(screens: app.screens, picksUnconnected: false))
     }
 
     var body: some View {
-        SettingsScreen(state: model.state, providers: providers.state, name: $model.name, costStep: model.costStep,
+        SettingsScreen(state: model.state, update: model.update, providers: providers.state, name: $model.name, costStep: model.costStep,
                        costRange: model.costRange, dailyCapStep: model.dailyCapStep, dailyCapRange: model.dailyCapRange,
                        resetting: model.resetting, onEvent: model.send)
             .alert(Text(L10n.Settings.resetConfirm), isPresented: $model.confirmingReset) {
@@ -233,12 +247,12 @@ struct SettingsRoute: View {
 }
 
 struct ModelPickerRoute: View {
-    @State private var model: SettingsViewModel
+    @LazyState private var model: SettingsViewModel
     let stuck: Bool
 
     init(app: AppModel, stuck: Bool, navigate: @escaping (Route) -> Void) {
         self.stuck = stuck
-        _model = State(initialValue: SettingsViewModel(screens: app.screens, navigate: navigate))
+        _model = LazyState(wrappedValue: SettingsViewModel(screens: app.screens, navigate: navigate))
     }
 
     var body: some View {

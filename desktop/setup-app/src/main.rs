@@ -16,7 +16,7 @@ use mode_setup_core::{
     apps,
     device::{self, Phone, Readiness},
     install::{Installed, Signer, Stage, VpnStatus},
-    pairing, release,
+    pairing, release, SetupError,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -33,6 +33,30 @@ struct App {
     auth_epoch: Arc<std::sync::atomic::AtomicU64>,
     signing_in: Mutex<()>,
     pairing: Mutex<()>,
+    /// Cancel on the installing screen: the install (and its download) in progress stops.
+    cancel: Arc<tokio::sync::Notify>,
+}
+
+/// What a cancelled install answers; the window matches on it and goes back.
+const CANCELLED: &str = "Cancelled.";
+
+/// Runs [work] until it finishes or Cancel is pressed; cancelling drops it at its next step, which releases
+/// what it holds (the signer, the connection to the phone).
+async fn cancellable<T>(state: &App, work: impl std::future::Future<Output = Res<T>>) -> Res<T> {
+    let cancel = state.cancel.clone();
+    let cancelled = cancel.notified();
+    tokio::pin!(cancelled);
+    cancelled.as_mut().enable();
+    tokio::select! {
+        r = work => r,
+        _ = cancelled => Err(CANCELLED.into()),
+    }
+}
+
+/// Cancel, on the installing screen.
+#[tauri::command]
+fn cancel_install(state: State<'_, App>) {
+    state.cancel.notify_waiters();
 }
 
 type Res<T> = Result<T, String>;
@@ -106,13 +130,18 @@ async fn helpers() -> Vec<HelperStatus> {
     out
 }
 
+/// Shown when the password kept in the keychain no longer works (the window matches on "saved password").
+const SAVED_PASSWORD_REJECTED: &str = "Your saved password didn’t work, so it was removed from this computer. Enter your Apple password.";
+
 /// Signs in; Apple's code is asked with the "code-needed" event. Answers the teams, paid first.
 #[tauri::command]
 async fn sign_in(app: AppHandle, state: State<'_, App>, email: String, password: Option<String>, remember: bool, helper: String) -> Res<Vec<Team>> {
     use std::sync::atomic::Ordering;
     let _login = state.signing_in.try_lock().map_err(|_| "Sign-in is already in progress.")?;
     let epoch = state.auth_epoch.fetch_add(1, Ordering::SeqCst) + 1;
-    let password = match password.filter(|p| !p.is_empty()) {
+    let typed = password.filter(|p| !p.is_empty());
+    let from_keychain = typed.is_none();
+    let password = match typed {
         Some(p) => p,
         None => account::remembered_password(&email).ok_or("Enter your password.")?,
     };
@@ -126,7 +155,16 @@ async fn sign_in(app: AppHandle, state: State<'_, App>, email: String, password:
         if !cancelled { let _ = handle.emit("code-needed", req); }
         async move { if cancelled { CodeAnswer::Cancel } else { rx.await.unwrap_or(CodeAnswer::Cancel) } }
     };
-    let mut session = account::sign_in(&email, &password, &helper, ask).await.map_err(err)?;
+    let mut session = match account::sign_in(&email, &password, &helper, ask).await {
+        Ok(s) => s,
+        // A remembered password Apple turns down (changed since) is forgotten, so it isn't tried again.
+        Err(SetupError::WrongPassword) if from_keychain => {
+            account::forget_password(&email);
+            save_prefs(&app, |p| p.remembered_password = false);
+            return Err(SAVED_PASSWORD_REJECTED.into());
+        }
+        Err(e) => return Err(err(e)),
+    };
     if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }
     let teams = account::teams(&mut session).await.map_err(err)?;
     if state.auth_epoch.load(Ordering::SeqCst) != epoch { return Err("Sign-in cancelled.".into()); }
@@ -295,9 +333,11 @@ async fn check_update(own_vpn: bool) -> Res<release::Release> {
 #[tauri::command]
 async fn install_mode(app: AppHandle, state: State<'_, App>, udid: String, phone_name: String, team_id: String, own_vpn: bool, update: Option<bool>) -> Res<Installed> {
     let t = team(&state, &team_id)?;
-    let ipa = mode_ipa(&app, own_vpn, update.unwrap_or(false)).await?;
-    let mut s = state.signer.lock().await;
-    let installed = s.as_mut().ok_or("Sign in again.")?.install(&udid, &phone_name, &t, &ipa, progress(&app, "mode")).await.map_err(err)?;
+    let installed = cancellable(&state, async {
+        let ipa = mode_ipa(&app, own_vpn, update.unwrap_or(false)).await?;
+        let mut s = state.signer.lock().await;
+        s.as_mut().ok_or("Sign in again.")?.install(&udid, &phone_name, &t, &ipa, progress(&app, "mode")).await.map_err(err)
+    }).await?;
     let record = Record { phone: phone_name, team_id: t.id.clone(), team_name: t.name.clone(), paid: t.kind == TeamKind::Paid, own_vpn,
                           mode: installed.clone(), sidestore: None };
     save_prefs(&app, |p| {
@@ -312,13 +352,15 @@ async fn install_sidestore(app: AppHandle, state: State<'_, App>, udid: String, 
     let t = team(&state, &team_id)?;
     let dest = std::env::temp_dir().join("ModeSetup").join("SideStore.ipa");
     let handle = app.clone();
-    release::download(release::SIDESTORE_IPA, &dest, None, move |f| {
-        let _ = handle.emit("progress", ProgressEvent { what: "sidestore".into(), stage: "download".into(), fraction: f });
-    })
-    .await
-    .map_err(err)?;
-    let mut s = state.signer.lock().await;
-    let installed = s.as_mut().ok_or("Sign in again.")?.install(&udid, &phone_name, &t, &dest, progress(&app, "sidestore")).await.map_err(err)?;
+    let installed = cancellable(&state, async {
+        release::download(release::SIDESTORE_IPA, &dest, None, move |f| {
+            let _ = handle.emit("progress", ProgressEvent { what: "sidestore".into(), stage: "download".into(), fraction: f });
+        })
+        .await
+        .map_err(err)?;
+        let mut s = state.signer.lock().await;
+        s.as_mut().ok_or("Sign in again.")?.install(&udid, &phone_name, &t, &dest, progress(&app, "sidestore")).await.map_err(err)
+    }).await?;
     let ss = installed.clone();
     save_prefs(&app, |p| {
         if let Some(r) = p.phones.get_mut(&udid) {
@@ -452,7 +494,7 @@ fn main() {
     tauri::Builder::default()
         .manage(App::default())
         .invoke_handler(tauri::generate_handler![
-            check_computer, check_setup_update, setup_version, phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
+            check_computer, check_setup_update, cancel_install, setup_version, phones, trust, show_developer_mode, apps_on_phone, helpers, sign_in, submit_code, active_account, cancel_sign_in, sign_out, check_update,
             mode_vpn_turn_on, mode_vpn_status, install_mode, install_sidestore, phone_control, prefs, set_helper, open_url, diagnostics,
             local_dev_vpn_qr, debug_start
         ])
