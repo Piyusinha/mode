@@ -263,7 +263,15 @@ object OverlayController {
                 )
                 close("opened the chat")
             }
-            OverlayEvent.AllowMic -> openEntry?.invoke() ?: talk?.allowMic()
+            // Android asks for the microphone from an app screen, not over another app: the conversation moves to
+            // Mode's own voice screen, which asks and carries on. One session, not the overlay's and the app's.
+            OverlayEvent.AllowMic -> openEntry?.invoke() ?: run {
+                close("the microphone is asked for in Mode")
+                app?.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("${DeepLink.SCHEME}://listen"), app, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+            }
         }
     }
 

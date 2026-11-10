@@ -62,8 +62,10 @@ class ModeApplication : Application() {
         followTheRunningTask()
         // The phone's accessibility shortcut, pointed at Mode: Mode over the app in front, without any assistant.
         // In Mode's own app it's the voice screen instead (an overlay over Mode itself would be the same thing twice).
+        // One voice session at a time: with the overlay already up, the shortcut brings it back to full size.
         com.piyush.mode.android.ServiceRegistry.onShortcut = {
-            val inMode = com.piyush.mode.android.ServiceRegistry.service.value?.appInFront(0) == packageName
+            val overlay = com.piyush.mode.app.overlay.OverlayController.showing
+            val inMode = !overlay && com.piyush.mode.android.ServiceRegistry.service.value?.appInFront(0) == packageName
             if (inMode || !com.piyush.mode.app.overlay.OverlayController.summon(this, entry = "shortcut")) {
                 startActivity(
                     Intent(Intent.ACTION_VIEW, android.net.Uri.parse("${com.piyush.mode.app.shell.DeepLink.SCHEME}://listen"), this, MainActivity::class.java)

@@ -65,10 +65,19 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     // session open, a screen of its own.
     val spokenQuestion = run.state.question?.takeIf { it.spoken }?.id
     LaunchedEffect(spokenQuestion) {
-        if (spokenQuestion != null) nav.talk(com.piyush.mode.app.talk.TalkRequest(forQuestion = true))
+        // The overlay over another app asks it itself: Mode's own screen stays out of it.
+        if (spokenQuestion != null && !com.piyush.mode.app.overlay.OverlayController.showing) {
+            nav.talk(com.piyush.mode.app.talk.TalkRequest(forQuestion = true))
+        }
     }
     // The open voice session (or a lone spoken question), kept here while its screen is down.
     val session = nav.talk
+    // One voice session at a time: a session starting in Mode's app ends the overlay's.
+    LaunchedEffect(session?.id) {
+        if (session != null && !session.request.forQuestion && com.piyush.mode.app.overlay.OverlayController.showing) {
+            com.piyush.mode.app.overlay.OverlayController.close("a voice session started in Mode")
+        }
+    }
     val talk = session?.let { com.piyush.mode.app.talk.rememberTalkPresenter(graph, shell.presenters, it) }
     if (talk != null) {
         // Over (End, ×, "that's all", paused too long, a question answered): the screen and the bar go.
