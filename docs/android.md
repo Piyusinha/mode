@@ -123,6 +123,14 @@ Known gap: the Play build has no phone control, so its setup will need its own p
   shows a second app entry, "Ask Mode" (an activity alias of the main screen), which opens straight into a voice
   session, so "Hey Google, open Ask Mode" (or Gemini, Bixby) starts the same conversation as "Hey Siri, start
   Mode": one task after another until "that's all". The widget's mic and Ask's mic do the same.
+  Gemini only finds apps by their main name ("I couldn't find an app called Ask mode", seen 10 Nov), so with Start
+  by voice on, Mode opened by the assistant (`Activity.referrer`: the Google app, Gemini, Bixby) also starts
+  listening: "Hey Google, open Mode". A tap on Mode's icon (the launcher opens it) opens Mode as usual. Start by
+  voice can be turned off in Permissions, and the "Ask Mode" icon goes with it.
+- **The accessibility shortcut** (`ServiceRegistry.onShortcut`): the floating button, a two-finger swipe up or both
+  volume keys, pointed at Mode in Settings › Accessibility › Mode shortcut, opens the overlay over the app in front
+  (Mode's voice screen when Mode is in front). No assistant needed. Setup's "Shortcut to Mode" row reads it back from
+  `accessibility_button_targets` / `accessibility_shortcut_target_service`.
   Mode also has an assistant service (`assistant/ModeAssistant.kt`) for anyone who picks it in Default apps ›
   Digital assistant themselves; Mode's screens don't offer it. It opens Mode normally (an assistant activity was
   hidden with the session on Android 16). An assistant must bring a speech recognizer, so `ModeRecognitionService`

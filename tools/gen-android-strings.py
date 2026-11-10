@@ -54,7 +54,7 @@ OVERRIDES = {
     "setup.permissions.siri": "The assistant",
     "start.mo.faceID": "Fingerprint",
     # Android has no "Hey Mode": the user's own assistant opens Ask Mode by name (Mode never asks to replace it).
-    "tips.start.message": "Say “Hey Google, open Ask Mode” from anywhere, and Mo starts listening.",
+    "tips.start.message": "Say “Hey Google, open Mode” from anywhere, and Mo starts listening.",
     "updates.howTo": "Download it from Mode’s release page and install it over this one. Your chats and settings stay.",
     "voice.appleBanner": "**Free and private.** These voices run on your phone, even offline. Get more in Settings › Accessibility › Text-to-speech output.",
 }

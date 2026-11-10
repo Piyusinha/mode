@@ -173,6 +173,9 @@ private fun declaresAskMode(app: Application): Boolean =
 private fun askModeOn(app: Application): Boolean =
     app.packageManager.getComponentEnabledSetting(askMode(app)) == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 
+/** Start by voice is on: the user chose to let their assistant start Mode listening. */
+fun startByVoiceOn(app: Application): Boolean = askModeOn(app)
+
 /** Shows or hides the "Ask Mode" entry (the launcher and the user's assistant find it by its name). */
 fun setAskMode(app: Application, on: Boolean) {
     app.packageManager.setComponentEnabledSetting(

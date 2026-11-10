@@ -859,7 +859,7 @@
     <string name="tips_name_message">Mo greets you by name and remembers the people and orders you use most.</string>
     <string name="tips_name_title">Tell Mo your name</string>
     <string name="tips_start_action">Set it up</string>
-    <string name="tips_start_message">Say “Hey Google, open Ask Mode” from anywhere, and Mo starts listening.</string>
+    <string name="tips_start_message">Say “Hey Google, open Mode” from anywhere, and Mo starts listening.</string>
     <string name="tips_start_title">Start Mo without opening it</string>
     <string name="tips_undo">Undo</string>
     <string name="tips_voice_action">Change the voice</string>
