@@ -83,13 +83,21 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
         // Over (End, ×, "that's all", paused too long, a question answered): the screen and the bar go.
         val finished by androidx.compose.runtime.produceState(false, talk) { talk.state.collect { value = it.finished } }
         LaunchedEffect(finished) { if (finished) nav.endTalk() }
-        // Leaving Mode while it waits for words: the mic pauses (Android gives the microphone only to the app in
-        // front) and the session stays open. Not while its task works: that is Mode in another app, and it listens
-        // again when it comes back.
+        // Leaving Mode with the session open (Home, Back, another app, or Mode's own task opening one): the overlay
+        // takes over this very session as Mo at the edge, and a tap on Mo opens it. Without phone control there's no
+        // overlay: the mic pauses (Android gives it only to the app in front) and the session waits in Mode.
+        val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application
         androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+            if (session?.request?.forQuestion != false) return@LifecycleEventEffect
+            nav.talkOpen = false
+            if (com.piyush.mode.app.overlay.OverlayController.adopt(application, talk)) return@LifecycleEventEffect
             val s = talk.state.value
             val waiting = s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Greeting || s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Listening
-            if (session?.request?.forQuestion == false && !s.sent && waiting) talk.pauseListening()
+            if (!s.sent && waiting) talk.pauseListening()
+        }
+        // Back in Mode: the session comes back from the overlay to its bar here.
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) {
+            com.piyush.mode.app.overlay.OverlayController.giveBack(talk)
         }
     }
 

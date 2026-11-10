@@ -67,6 +67,41 @@ object OverlayController {
 
     val showing: Boolean get() = host != null
 
+    /** The session the overlay shows belongs to Mode's app (handed over when the user left Mode), not to the overlay. */
+    private var adopted: ListenPresenter? = null
+
+    /** The overlay is showing the app's own session (it goes back to Mode's session bar when Mode comes back). */
+    fun holds(presenter: ListenPresenter): Boolean = adopted === presenter && host != null
+
+    /**
+     * The user left Mode with its voice session open: the overlay takes over that very session (the same chat, what
+     * was said, any task running), as Mo at the edge. If it was only waiting for words, the mic pauses until they tap
+     * Mo. False when it can't (phone control is off).
+     */
+    fun adopt(app: Application, presenter: ListenPresenter): Boolean {
+        if (host != null) return adopted === presenter
+        val service = ServiceRegistry.service.value ?: return false
+        this.app = app
+        val graph = ModeApplication.graph(app)
+        presenter.outsideMode = true
+        val s = presenter.state.value
+        val waiting = s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Greeting || s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Listening
+        if (!s.sent && waiting) presenter.pauseListening()
+        adopted = presenter
+        begun = true
+        open(service, graph, presenter)
+        local.update { it.copy(minimized = true) }
+        AppLog.log("overlay", "took over the session from Mode's app")
+        return true
+    }
+
+    /** Mode is back in front: its session goes back to the session bar there (nothing ends). */
+    fun giveBack(presenter: ListenPresenter) {
+        if (adopted !== presenter) return
+        presenter.outsideMode = false
+        close("Mode is back: the session goes back to its bar")
+    }
+
     /**
      * Shows Mode over the user's app: greets and listens, or shows the task already running, or starts [task].
      * False when it can't (phone control is off): the caller opens Mode's app instead.
@@ -108,8 +143,12 @@ object OverlayController {
         watch?.cancel()
         slimming?.cancel()
         closing?.cancel()
-        session?.dismiss()
-        listOfNotNull(session, activity, live, home).forEach { it.close() }
+        // The app's own session isn't the overlay's to close: Mode's app ends or keeps it.
+        val own = session?.takeIf { it !== adopted }
+        own?.dismiss()
+        listOfNotNull(own, activity, live, home).forEach { it.close() }
+        adopted?.outsideMode = false
+        adopted = null
         session = null; activity = null; live = null; home = null
         host?.close()
         host = null
@@ -136,10 +175,10 @@ object OverlayController {
         AppLog.log("overlay", "closed: $why")
     }
 
-    private fun open(service: android.accessibilityservice.AccessibilityService, graph: com.piyush.mode.app.graph.ModeGraph) {
+    private fun open(service: android.accessibilityservice.AccessibilityService, graph: com.piyush.mode.app.graph.ModeGraph, existing: ListenPresenter? = null) {
         val h = OverlayHost(service)
         host = h
-        val talk = graph.screens.listen(null, OVERLAY_ENTRY).also { session = it }
+        val talk = (existing ?: graph.screens.listen(null, OVERLAY_ENTRY)).also { session = it }
         val act = graph.screens.liveActivity().also { activity = it }
         val run = graph.screens.liveRun().also { live = it }
         val suggestions = graph.screens.home().also { home = it }
@@ -256,7 +295,8 @@ object OverlayController {
     internal fun onEvent(event: OverlayEvent) {
         val talk = session
         when (event) {
-            OverlayEvent.Close -> close("closed by the user")
+            // ×: the session ends (the app's own one too, when the overlay took it over).
+            OverlayEvent.Close -> { adopted?.endNow(); close("closed by the user") }
             // ⌄: Mo goes to the edge; nothing stops (only × ends it).
             OverlayEvent.Slim -> { slimming?.cancel(); local.update { it.copy(minimized = true, typing = false) } }
             // Back from Mo at the edge: the same conversation, and the mic on.

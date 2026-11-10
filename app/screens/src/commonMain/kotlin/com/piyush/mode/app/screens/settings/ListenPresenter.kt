@@ -490,7 +490,7 @@ public class ListenPresenter(
         if (done != null && done.stay) {
             // Mode's own screen goes, so the user sees the app the task left them in. The overlay is already over that
             // app: it only steps aside, and the conversation goes on.
-            if (entry != OVERLAY) { end("LeftInApp"); return }
+            if (!outsideMode) { end("LeftInApp"); return }
             own.value = own.value.copy(leftInApp = own.value.leftInApp + 1)
             com.piyush.mode.core.common.AppLog.log("talk", "task left them in its app: the overlay steps aside, the session goes on")
         }
@@ -653,8 +653,14 @@ public class ListenPresenter(
         job = scope.launch { inSession { heard(task, if (typedSpeaks) TaskSource.Voice else TaskSource.App) } }
     }
 
+    /**
+     * The session is on screen over another app (Android's overlay), not in Mode's own: a task that leaves the user in
+     * its app doesn't end it, and what's typed is answered out loud. Set when Mode's app hands its session over.
+     */
+    public var outsideMode: Boolean = entry == OVERLAY
+
     /** The overlay talks the whole way: what's typed there is answered and asked about out loud too. */
-    private val typedSpeaks = entry == OVERLAY
+    private val typedSpeaks get() = outsideMode
 
     /** A tapped option answers Mode's spoken question. */
     public fun answer(option: String) { runner.answer(option) }

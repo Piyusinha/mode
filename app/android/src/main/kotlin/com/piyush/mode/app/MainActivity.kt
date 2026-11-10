@@ -40,9 +40,13 @@ class MainActivity : ComponentActivity() {
             }
         }
         // While a task runs on the hidden screen, leaving Mode shrinks it to a small window.
+        // Not with a voice session open and phone control on: then the overlay takes the session over (Mo at the edge).
         lifecycleScope.launch {
-            (application as ModeApplication).backgroundTask.collect { running ->
-                runCatching { setPictureInPictureParams(pipParams(running)) }
+            val session = androidx.compose.runtime.snapshotFlow { shell.navigator.talk }
+            kotlinx.coroutines.flow.combine((application as ModeApplication).backgroundTask, session, com.piyush.mode.android.ServiceRegistry.service) { running, talk, service ->
+                running to (running && (talk == null || talk.request.forQuestion || service == null))
+            }.collect { (running, small) ->
+                runCatching { setPictureInPictureParams(pipParams(small)) }
                 // The task ended: the small window goes (its answer comes as a notification, and in the chat).
                 if (!running && isInPictureInPictureMode) moveTaskToBack(true)
             }
