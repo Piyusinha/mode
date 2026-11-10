@@ -72,7 +72,10 @@ data class AiInUse(val title: String, val kind: ProviderWords.Kind, val summary:
 
 data class SettingsState(
     val modelName: String = "",
+    /** How hard it thinks ("Medium"), under the model's name. */
+    val modelEffort: String? = null,
     val stuckName: String = "",
+    val stuckEffort: String? = null,
     val showsCost: Boolean = true,
     val maxCost: Double = 0.05,
     val maxCostLabel: String = "",
@@ -150,8 +153,8 @@ fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: B
             ModeSectionHeader(stringResource(R.string.settings_ai))
             ModeCard(rows = listOf(
                 { AiInUseRow(ai, onEvent) },
-                { ModeValueRow(stringResource(R.string.settings_main_model), state.modelName, onClick = { onEvent(SettingsEvent.OpenPicker(false)) }) },
-                { ModeValueRow(stringResource(R.string.settings_when_stuck_short), state.stuckName, onClick = { onEvent(SettingsEvent.OpenPicker(true)) }) },
+                { ModeValueRow(stringResource(R.string.settings_main_model), state.modelName, onClick = { onEvent(SettingsEvent.OpenPicker(false)) }, detail = state.modelEffort) },
+                { ModeValueRow(stringResource(R.string.settings_when_stuck_short), state.stuckName, onClick = { onEvent(SettingsEvent.OpenPicker(true)) }, detail = state.stuckEffort) },
             ))
             ModeSectionHeader(stringResource(R.string.access_section))
             ModeCard(rows = listOf(
@@ -283,7 +286,6 @@ fun SettingsRoute(graph: ModeGraph, navigate: (Route) -> Unit, close: () -> Unit
 }
 
 private fun map(s: SettingsUiState, w: Words): SettingsState {
-    fun named(name: String?, effort: String?) = listOfNotNull(name, effort?.let(w::effort)).joinToString(" · ")
     val cap = s.dailyCapUsd
     val speaker = s.speaker
     val voiceValue = when {
@@ -292,8 +294,10 @@ private fun map(s: SettingsUiState, w: Words): SettingsState {
         else -> "${w.voiceProvider(speaker)} · ${s.voiceName ?: w.get(R.string.voice_default_voice)}"
     }
     return SettingsState(
-        modelName = named(s.model?.name, s.modelEffort),
-        stuckName = s.stuckModel?.let { named(it.name, s.stuckEffort) } ?: w.get(R.string.settings_off),
+        modelName = s.model?.name.orEmpty(),
+        modelEffort = s.modelEffort?.let(w::effort),
+        stuckName = s.stuckModel?.name ?: w.get(R.string.settings_off),
+        stuckEffort = s.stuckModel?.let { s.stuckEffort?.let(w::effort) },
         showsCost = s.showsCost,
         maxCost = s.maxCostPerTaskUsd,
         maxCostLabel = w.money(s.maxCostPerTaskUsd),

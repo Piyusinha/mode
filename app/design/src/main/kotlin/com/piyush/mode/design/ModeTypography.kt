@@ -110,12 +110,26 @@ public fun ModeText(
     color: Color = Mode.colors.textPrimary,
     align: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
+    /** One line that shrinks to fit (down to [ModeTextFit.min] of its size) before it ends in "…": a row's value. */
+    fit: Boolean = false,
 ) {
+    val textStyle = style.style(color).let { if (align != null) it.copy(textAlign = align) else it }
     BasicText(
         text = text,
         modifier = modifier,
-        style = style.style(color).let { if (align != null) it.copy(textAlign = align) else it },
-        maxLines = maxLines,
+        style = textStyle,
+        maxLines = if (fit) 1 else maxLines,
         overflow = TextOverflow.Ellipsis,
+        autoSize = if (fit) {
+            androidx.compose.foundation.text.TextAutoSize.StepBased(
+                minFontSize = textStyle.fontSize * ModeTextFit.min, maxFontSize = textStyle.fontSize, stepSize = ModeTextFit.step,
+            )
+        } else null,
     )
+}
+
+/** How far a fitted line may shrink, and in what steps. */
+public object ModeTextFit {
+    public const val min: Float = 0.75f
+    public val step: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit(0.5f, androidx.compose.ui.unit.TextUnitType.Sp)
 }

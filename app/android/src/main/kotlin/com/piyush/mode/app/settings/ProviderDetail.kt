@@ -101,8 +101,8 @@ fun ProviderDetailRoute(graph: ModeGraph, id: String, pages: SystemPages, naviga
             if (kind != ProviderWords.Kind.OpenRouter) {
                 ModeSectionHeader(stringResource(R.string.account_models))
                 ModeCard(lifted = true, rows = listOf(
-                    { ModeValueRow(stringResource(R.string.plan_phone_control), model(s.phoneModel, s.phoneEffort, w), onClick = { navigate(Route.PlanModels(false)) }) },
-                    { ModeValueRow(stringResource(R.string.plan_brain), model(s.brainModel, s.brainEffort, w), onClick = { navigate(Route.PlanModels(true)) }) },
+                    { ModeValueRow(stringResource(R.string.plan_phone_control), s.phoneModel.orEmpty(), detail = s.phoneEffort?.let(w::effort), onClick = { navigate(Route.PlanModels(false)) }) },
+                    { ModeValueRow(stringResource(R.string.plan_brain), s.brainModel.orEmpty(), detail = s.brainEffort?.let(w::effort), onClick = { navigate(Route.PlanModels(true)) }) },
                 ))
             }
             if (s.connected) {
@@ -180,7 +180,6 @@ private fun Usage(kind: ProviderWords.Kind, s: ProviderDetailUiState, w: Words) 
 
 private fun steps(n: Int, w: Words) = if (n == 1) w.get(R.string.account_steps_one) else w.get(R.string.account_steps, n)
 
-private fun model(name: String?, effort: String?, w: Words) = listOfNotNull(name, effort?.let(w::effort)).joinToString(" · ")
 
 /** "Monday 18:00": when a limit resets or the usage was read. */
 private fun when_(ms: Long, w: Words): String =

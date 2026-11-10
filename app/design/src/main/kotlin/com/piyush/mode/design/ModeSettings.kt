@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -68,8 +69,10 @@ public fun ModeStatusLine(text: String, dot: Color, modifier: Modifier = Modifie
 public fun ModeLogoValueRow(title: String, value: String, logo: ModeLogo, onClick: () -> Unit, modifier: Modifier = Modifier, tag: String? = null, problem: String? = null) {
     val c = Mode.colors
     val (press, alpha) = rememberPress()
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
+    val titleMax = maxWidth * TITLE_SHARE
     Row(
-        modifier.fillMaxWidth()
+        Modifier.fillMaxWidth()
             .defaultMinSize(minHeight = if (problem != null) ModeSize.logoRowProblem else if (tag != null) ModeSize.logoRowTagged else ModeSize.logoRow)
             .alpha(alpha).clickable(press, indication = null, role = Role.Button, onClick = onClick).padding(vertical = ModeSpacing.s),
         horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
@@ -78,9 +81,11 @@ public fun ModeLogoValueRow(title: String, value: String, logo: ModeLogo, onClic
         Box(Modifier.clearAndSetSemantics {}.size(ModeSize.badge).background(c.textPrimary, RoundedCornerShape(ModeSize.smallTileRadius)), Alignment.Center) {
             ModeLogoImage(logo, ModeSize.iconSmall + ModeSpacing.xxs, c.page)
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xs)) {
+        // With a problem the title column takes the row (the reason runs under it); otherwise it keeps its words on one
+        // line when it can (up to half) and the value takes the rest.
+        Column(if (problem != null) Modifier.weight(1f) else Modifier.widthIn(max = titleMax), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ModeText(title, ModeTextStyle.Callout, Modifier.weight(1f))
+                ModeText(title, ModeTextStyle.Callout, if (problem != null) Modifier.weight(1f) else Modifier)
                 if (problem != null) ModeText(value, ModeTextStyle.Subheadline, color = c.textSecondary, maxLines = 1)
             }
             if (problem != null) {
@@ -92,31 +97,46 @@ public fun ModeLogoValueRow(title: String, value: String, logo: ModeLogo, onClic
                 ModeText(tag, ModeTextStyle.CaptionEmphasis, Modifier.background(c.cardRaised, Capsule).padding(horizontal = ModeSpacing.s, vertical = ModeSpacing.xxs))
             }
         }
-        // Title and value share the width (large text sizes): the value shortens, the title never breaks mid-word.
-        if (problem == null) ModeText(value, ModeTextStyle.Subheadline, Modifier.weight(1f, fill = false), color = c.textSecondary, maxLines = 1, align = TextAlign.End)
+        if (problem == null) ModeText(value, ModeTextStyle.Subheadline, Modifier.weight(1f), color = c.textSecondary, align = TextAlign.End, fit = true)
         ModeChevron()
+    }
     }
 }
 
 /** A name and its value on the right (with a dot when it has a state); a chevron when it opens something. */
 @Composable
-public fun ModeValueRow(title: String, value: String, modifier: Modifier = Modifier, dot: Color? = null, onClick: (() -> Unit)? = null) {
+public fun ModeValueRow(
+    title: String, value: String, modifier: Modifier = Modifier, dot: Color? = null, onClick: (() -> Unit)? = null,
+    /** A smaller line under the value ("Medium" under "GPT-6.1 Terra"), so a long value stays readable. */
+    detail: String? = null,
+) {
     val c = Mode.colors
     val (press, alpha) = rememberPress()
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth()) {
+    // The title keeps its words on one line when it can (up to half the row); the value takes the rest, on the right,
+    // on one line: it shrinks a little, then ends in "…". Rows line up whatever the text size.
+    val titleMax = maxWidth * TITLE_SHARE
     Row(
-        modifier.fillMaxWidth().defaultMinSize(minHeight = if (onClick == null) ModeSize.valueRow else ModeSize.rowMin)
+        Modifier.fillMaxWidth().defaultMinSize(minHeight = if (onClick == null) ModeSize.valueRow else ModeSize.rowMin)
             .then(if (onClick != null) Modifier.alpha(alpha).clickable(press, indication = null, role = Role.Button, onClick = onClick) else Modifier)
             .padding(vertical = ModeSpacing.s),
         horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Title and value share the width (large text sizes): neither is squeezed to a sliver.
-        ModeText(title, ModeTextStyle.Callout, Modifier.weight(1f, fill = false))
+        ModeText(title, ModeTextStyle.Callout, Modifier.widthIn(max = titleMax))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
             if (dot != null) Box(Modifier.size(ModeSize.statusDot).background(dot, CircleShape))
-            ModeText(value, ModeTextStyle.Callout, color = c.textSecondary, align = TextAlign.End, maxLines = 2)
+            if (detail == null) {
+                ModeText(value, ModeTextStyle.Callout, color = c.textSecondary, align = TextAlign.End, fit = true)
+            } else {
+                Column(horizontalAlignment = Alignment.End) {
+                    ModeText(value, ModeTextStyle.Callout, color = c.textSecondary, align = TextAlign.End, fit = true)
+                    ModeText(detail, ModeTextStyle.Footnote, color = c.textSecondary, align = TextAlign.End, fit = true)
+                }
+            }
         }
         if (onClick != null) ModeChevron()
+    }
     }
 }
 
@@ -432,3 +452,6 @@ public fun ModeExampleCard(lines: List<Pair<String, String>>, modifier: Modifier
         }
     }
 }
+
+/** A value row's title keeps to this share of the row, so the value always has room. */
+private const val TITLE_SHARE = 0.5f
