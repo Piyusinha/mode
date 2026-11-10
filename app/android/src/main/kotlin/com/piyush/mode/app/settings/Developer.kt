@@ -12,6 +12,12 @@ import com.piyush.mode.app.R
 import com.piyush.mode.app.graph.ModeGraph
 import com.piyush.mode.design.ModePageBar
 
+/** Whether Settings shows Developer: in debug builds only. The release APK people install hides it. */
+object DeveloperFeature {
+    fun enabled(context: android.content.Context): Boolean =
+        context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+}
+
 /** Settings › Developer: the shared developer screens (Agent, Compare, Logs, Settings, Hands), as on the iPhone. */
 @Composable
 fun DeveloperRoute(graph: ModeGraph, close: () -> Unit) {

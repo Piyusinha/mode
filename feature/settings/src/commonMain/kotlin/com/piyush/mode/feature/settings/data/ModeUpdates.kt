@@ -37,6 +37,8 @@ public class ModeUpdates(
     public val current: String,
     private val now: () -> Long = ::nowMs,
     private val repo: String = "Piyusinha/mode",
+    /** The file a release must carry to be an update here: Mode.ipa on the iPhone, Mode.apk on Android. */
+    private val file: String = IPA,
 ) {
     private val newest = MutableStateFlow(cached())
 
@@ -48,13 +50,15 @@ public class ModeUpdates(
     public suspend fun check(force: Boolean = false) {
         val last = prefs.getString(CHECKED_AT)?.toLongOrNull()
         if (!force && last != null && now() - last < DAY_MS) return
-        val found = runCatching {
+        val releases = runCatching {
             val res = http.get("https://api.github.com/repos/$repo/releases?per_page=50") {
                 header("Accept", "application/vnd.github+json")
             }
-            if (res.status.isSuccess()) newestOf(res.bodyAsText()) else null
+            if (res.status.isSuccess()) res.bodyAsText() else null
         }.getOrNull() ?: return
+        // GitHub answered: that was today's check, also when no release carries this platform's file yet.
         prefs.putString(CHECKED_AT, now().toString())
+        val found = runCatching { newestOf(releases, file) }.getOrNull() ?: return
         prefs.putString(NEWEST, "${found.version}\n${found.notesUrl}")
         newest.value = found
         availableState.value = found.takeIf { isNewer(it.version, current) }
@@ -68,15 +72,17 @@ public class ModeUpdates(
         private const val DAY_MS = 24L * 60 * 60 * 1000
         private val TAG = Regex("""^(?:Mode-Mobile-Build-|v)(\d+(?:\.\d+)*)$""")
 
-        /** The newest published Mode release with Mode.ipa in GitHub's release list, by version. */
-        public fun newestOf(json: String): ModeUpdate? {
+        public const val IPA: String = "Mode.ipa"
+
+        /** The newest published Mode release carrying [file] in GitHub's release list, by version. */
+        public fun newestOf(json: String, file: String = IPA): ModeUpdate? {
             val list = Json.parseToJsonElement(json) as? JsonArray ?: return null
             return list.mapNotNull { e ->
                 val r = e.jsonObject
                 if (r["draft"]?.jsonPrimitive?.booleanOrNull == true || r["prerelease"]?.jsonPrimitive?.booleanOrNull == true) return@mapNotNull null
                 val version = TAG.find(r["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty())?.groupValues?.get(1) ?: return@mapNotNull null
-                val hasIpa = r["assets"]?.jsonArray.orEmpty().any { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == "Mode.ipa" }
-                if (!hasIpa) return@mapNotNull null
+                val hasFile = r["assets"]?.jsonArray.orEmpty().any { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == file }
+                if (!hasFile) return@mapNotNull null
                 ModeUpdate(version, r["html_url"]?.jsonPrimitive?.contentOrNull ?: "https://github.com/Piyusinha/mode/releases")
             }.reduceOrNull { a, b -> if (isNewer(b.version, a.version)) b else a }
         }

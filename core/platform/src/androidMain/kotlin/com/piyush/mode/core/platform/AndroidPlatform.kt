@@ -7,6 +7,10 @@ import androidx.lifecycle.ProcessLifecycleOwner
 
 public class AndroidAppInfo(context: Context) : AppInfo {
     override val bundleId: String = context.applicationContext.packageName
+    override val version: String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull().orEmpty()
+    override val releaseFile: String = "Mode.apk"
 }
 
 /**

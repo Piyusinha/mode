@@ -49,6 +49,7 @@ import com.piyush.mode.design.ModeFootnote
 import com.piyush.mode.design.ModeIcon
 import com.piyush.mode.design.ModeLeading
 import com.piyush.mode.design.ModeLogo
+import com.piyush.mode.design.ModeMoNote
 import com.piyush.mode.design.ModeLogoValueRow
 import com.piyush.mode.design.ModePageBar
 import com.piyush.mode.design.ModePageTitle
@@ -86,7 +87,12 @@ data class SettingsState(
     val listenProblem: String? = null,
     val talkBack: Boolean = true,
     val voiceNote: String = "",
+    /** Developer: debug builds only, hidden in the release APK. */
+    val showsDeveloper: Boolean = false,
 )
+
+/** This Mode's version line ("Mode 0.1.9"), and a newer Mode when one is out: its note and the row to its release page. */
+data class UpdateState(val version: String? = null, val available: String? = null, val whatsNew: String? = null)
 
 sealed interface SettingsEvent {
     data object Back : SettingsEvent
@@ -100,11 +106,12 @@ sealed interface SettingsEvent {
     data class MaxCost(val usd: Double) : SettingsEvent
     data class DailyCap(val usd: Double) : SettingsEvent
     data object AskReset : SettingsEvent
+    data object OpenWhatsNew : SettingsEvent
 }
 
 /** Settings, as on its board: You, Voice, AI, How Mode acts, Limits, Health, Reset. */
 @Composable
-fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: Boolean, onEvent: (SettingsEvent) -> Unit) {
+fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: Boolean, update: UpdateState = UpdateState(), onEvent: (SettingsEvent) -> Unit) {
     val c = Mode.colors
     Column(Modifier.fillMaxSize()) {
         ModePageBar(stringResource(R.string.common_back), { onEvent(SettingsEvent.Back) })
@@ -113,6 +120,10 @@ fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: B
             verticalArrangement = Arrangement.spacedBy(ModeSpacing.s),
         ) {
             ModePageTitle(stringResource(R.string.common_settings))
+            update.available?.let { available ->
+                ModeMoNote(available, stringResource(R.string.updates_how_to))
+                update.whatsNew?.let { row -> ModeCard(rows = listOf({ ModeRow(row, onClick = { onEvent(SettingsEvent.OpenWhatsNew) }) })) }
+            }
             ModeSectionHeader(stringResource(R.string.settings_you))
             ModeCard(rows = listOf(
                 {
@@ -175,15 +186,16 @@ fun SettingsScreen(state: SettingsState, ai: AiInUse, name: String, resetting: B
             } else {
                 ModeCard(rows = listOf({ ModeText(ai.planNote, ModeTextStyle.Footnote, Modifier.padding(vertical = ModeSpacing.m), color = c.textSecondary) }))
             }
-            ModeCard(Modifier.padding(top = ModeSpacing.xl), rows = listOf(
+            ModeCard(Modifier.padding(top = ModeSpacing.xl), rows = listOfNotNull<@Composable () -> Unit>(
                 { ModeRow(stringResource(R.string.health_row), leading = ModeRowLeading.Icon(ModeIcon.Wrench), onClick = { onEvent(SettingsEvent.Open(Route.Health)) }) },
                 { ModeRow(stringResource(R.string.backup_row), leading = ModeRowLeading.Icon(ModeIcon.Share), onClick = { onEvent(SettingsEvent.Open(Route.Backup)) }) },
-                { ModeRow(stringResource(R.string.developer_title), onClick = { onEvent(SettingsEvent.Open(Route.Developer)) }) },
+                if (state.showsDeveloper) { { ModeRow(stringResource(R.string.developer_title), onClick = { onEvent(SettingsEvent.Open(Route.Developer)) }) } } else null,
             ))
             ModeButton(
                 stringResource(if (resetting) R.string.settings_resetting else R.string.settings_reset_mode), { onEvent(SettingsEvent.AskReset) },
                 Modifier.fillMaxWidth().padding(top = ModeSpacing.m), role = ModeButtonRole.Destructive, enabled = !resetting,
             )
+            update.version?.let { ModeText(it, ModeTextStyle.Footnote, Modifier.fillMaxWidth().padding(top = ModeSpacing.s), color = c.textSecondary, align = TextAlign.Center) }
         }
     }
 }
@@ -215,7 +227,18 @@ fun SettingsRoute(graph: ModeGraph, navigate: (Route) -> Unit, close: () -> Unit
     val ui by presenter.state.collectAsStateWithLifecycle()
     val pui by providers.state.collectAsStateWithLifecycle()
     val words = rememberWords()
-    val state = remember(ui) { map(ui, words) }
+    val updates: com.piyush.mode.app.screens.settings.AppUpdatePresenter = rememberPresenter("appUpdate") { graph.screens.appUpdate() }
+    val uui by updates.state.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val debug = remember(context) { DeveloperFeature.enabled(context) }
+    val state = remember(ui, debug) { map(ui, words).copy(showsDeveloper = debug) }
+    val update = remember(uui) {
+        UpdateState(
+            version = uui.current.takeIf { it.isNotEmpty() }?.let { words.get(R.string.updates_version, it) },
+            available = uui.newer?.let { words.get(R.string.updates_available, it) },
+            whatsNew = uui.newer?.takeIf { uui.notesUrl != null }?.let { words.get(R.string.updates_whats_new, it) },
+        )
+    }
     val ai = remember(pui) { ProviderWords.inUse(pui, words) }
     var name by rememberSaveable(ui.name.isEmpty()) { mutableStateOf(ui.name) }
     var edited by rememberSaveable { mutableStateOf(false) }
@@ -226,7 +249,7 @@ fun SettingsRoute(graph: ModeGraph, navigate: (Route) -> Unit, close: () -> Unit
         edited = false
     }
     DisposableEffect(Unit) { onDispose { saveName() } }
-    SettingsScreen(state, ai, name, resetting) { event ->
+    SettingsScreen(state, ai, name, resetting, update) { event ->
         when (event) {
             SettingsEvent.Back -> close()
             is SettingsEvent.Name -> {
@@ -234,7 +257,10 @@ fun SettingsRoute(graph: ModeGraph, navigate: (Route) -> Unit, close: () -> Unit
                 edited = true
             }
             SettingsEvent.SaveName -> saveName()
-            is SettingsEvent.Open -> navigate(event.route)
+            is SettingsEvent.Open -> if (event.route != Route.Developer || state.showsDeveloper) navigate(event.route)
+            SettingsEvent.OpenWhatsNew -> uui.notesUrl?.let { url ->
+                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+            }
             is SettingsEvent.OpenPicker -> navigate(if (state.showsCost) Route.ModelPicker(event.stuck) else Route.PlanModels(event.stuck))
             SettingsEvent.OpenProvider -> navigate(Route.ProviderDetail(ui.provider))
             SettingsEvent.ShowProviders -> showProviders()
@@ -331,6 +357,7 @@ object ProviderWords {
     }
 
     fun voiceLogo(id: String?): ModeLogo = when (id) {
+        "speechify" -> ModeLogo.Speechify
         "fish" -> ModeLogo.FishAudio
         "elevenlabs" -> ModeLogo.ElevenLabs
         "soniox" -> ModeLogo.Soniox

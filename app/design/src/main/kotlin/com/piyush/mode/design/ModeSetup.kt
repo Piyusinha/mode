@@ -292,3 +292,21 @@ public fun ModeRequirementList(rows: List<ModeRequirement>, modifier: Modifier =
         },
     )
 }
+
+/** Mo's note on a page: [lead] in bold, then [text], on a raised card ("Mode 0.1.4 is available. Download it…"). */
+@Composable
+public fun ModeMoNote(lead: String, text: String, modifier: Modifier = Modifier) {
+    val c = Mode.colors
+    Row(
+        modifier.fillMaxWidth().background(c.cardRaised, RoundedCornerShape(ModeRadius.setupNote))
+            .padding(horizontal = ModeSpacing.l - ModeSpacing.xxs, vertical = ModeSpacing.m).semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
+        verticalAlignment = Alignment.Top,
+    ) {
+        ModeMo(MoMood.Idle, ModeSize.setupMoNote)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(ModeSpacing.xxs)) {
+            ModeText(lead, ModeTextStyle.FootnoteEmphasis)
+            ModeText(text, ModeTextStyle.Footnote)
+        }
+    }
+}

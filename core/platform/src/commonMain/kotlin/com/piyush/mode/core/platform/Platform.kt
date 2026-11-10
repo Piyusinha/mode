@@ -8,6 +8,9 @@ public interface AppInfo {
     /** This Mode's version ("0.1.3"), to tell whether a newer one is out. */
     public val version: String get() = ""
 
+    /** The file a Mode release carries for this platform ("Mode.ipa", "Mode.apk"): a release without it isn't an update here. */
+    public val releaseFile: String get() = "Mode.ipa"
+
     /** CPU time this process has used so far (user and system, every thread), in milliseconds; null where unknown. */
     public fun cpuTimeMs(): Long? = null
 }
