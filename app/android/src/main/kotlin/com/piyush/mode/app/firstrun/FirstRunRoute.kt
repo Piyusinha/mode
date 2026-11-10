@@ -100,9 +100,9 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
             is PhoneSetupEvent.Allow -> when {
                 // Android stops asking after two refusals: its settings page is the only way left.
                 event.row.kind == PhoneSetupKind.Notifications && event.row.status == PermissionStatus.Denied -> pages.notifications()
-                // Start by voice: the "Ask Mode" entry appears at once; nothing in Android's settings to visit.
+                // Start by voice: the "Ask Mode" entry appears (or goes) at once; nothing in Android's settings to visit.
                 event.row.kind == PhoneSetupKind.Assistant -> {
-                    com.piyush.mode.app.graph.setAskMode(context.applicationContext as android.app.Application, true)
+                    com.piyush.mode.app.graph.setAskMode(context.applicationContext as android.app.Application, event.row.status != PermissionStatus.Allowed)
                     presenter.refresh()
                 }
                 else -> presenter.allow(event.row.kind)
@@ -115,6 +115,8 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
                 PhoneSetupGuide.Sleeping -> pages.sleeping()
                 PhoneSetupGuide.Autostart -> pages.autostart()
                 PhoneSetupGuide.Popups -> pages.popups()
+                // Mode's page in Accessibility, where "Mode shortcut" is.
+                PhoneSetupGuide.Shortcut -> pages.accessibility()
             }
             is PhoneSetupEvent.Alternative -> when (event.guide) {
                 PhoneSetupGuide.RestrictedSettings -> presenter.unlocked()
@@ -122,6 +124,7 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
                 PhoneSetupGuide.Sleeping -> presenter.done(PhoneSetupKind.Sleeping)
                 PhoneSetupGuide.Autostart -> presenter.done(PhoneSetupKind.Autostart)
                 PhoneSetupGuide.Popups -> presenter.done(PhoneSetupKind.Popups)
+                PhoneSetupGuide.Shortcut -> presenter.done(PhoneSetupKind.Shortcut)
                 else -> presenter.closeGuide()
             }
             is PhoneSetupEvent.Later -> presenter.closeGuide()

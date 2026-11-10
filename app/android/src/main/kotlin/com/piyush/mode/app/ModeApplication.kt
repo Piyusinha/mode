@@ -60,6 +60,17 @@ class ModeApplication : Application() {
             stop = PendingIntent.getBroadcast(this, 0, Intent(this, StopReceiver::class.java), flags),
         )
         followTheRunningTask()
+        // The phone's accessibility shortcut, pointed at Mode: Mode over the app in front, without any assistant.
+        // In Mode's own app it's the voice screen instead (an overlay over Mode itself would be the same thing twice).
+        com.piyush.mode.android.ServiceRegistry.onShortcut = {
+            val inMode = com.piyush.mode.android.ServiceRegistry.service.value?.appInFront(0) == packageName
+            if (inMode || !com.piyush.mode.app.overlay.OverlayController.summon(this, entry = "shortcut")) {
+                startActivity(
+                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse("${com.piyush.mode.app.shell.DeepLink.SCHEME}://listen"), this, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+            }
+        }
         com.piyush.mode.app.graph.background?.let {
             com.piyush.mode.app.background.UserTakeover.watch(it, graph.screens.liveActivity(), graph.screens.liveRun(), packageName)
         }

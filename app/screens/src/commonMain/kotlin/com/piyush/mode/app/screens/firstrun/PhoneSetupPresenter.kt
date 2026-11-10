@@ -21,7 +21,7 @@ public enum class PhoneSetupKind {
     PhoneControl,
     /** Questions and progress in notifications. */
     Notifications,
-    /** Hold power to talk to Mode: optional. */
+    /** Start by voice: the "Ask Mode" entry the user's own assistant opens. Optional, and can be turned off. */
     Assistant,
     /** Asked the first time the user speaks. */
     Microphone,
@@ -33,6 +33,8 @@ public enum class PhoneSetupKind {
     Autostart,
     /** Xiaomi's "Display pop-up windows while running in the background": confirmed by the user. Optional. */
     Popups,
+    /** The accessibility shortcut (button, gesture, volume keys) opens Mode over any app. Optional. */
+    Shortcut,
 }
 
 /** A page that walks the user through one Android setting, then sends them there. */
@@ -51,6 +53,8 @@ public enum class PhoneSetupGuide {
     Autostart,
     /** Mode's permissions › Other permissions › pop-up windows in the background (board D05). */
     Popups,
+    /** Point the phone's accessibility shortcut at Mode. */
+    Shortcut,
 }
 
 public data class PhoneSetupRow(
@@ -150,6 +154,7 @@ public class PhoneSetupPresenter(
             PhoneSetupKind.Sleeping -> open(PhoneSetupGuide.Sleeping)
             PhoneSetupKind.Autostart -> open(PhoneSetupGuide.Autostart)
             PhoneSetupKind.Popups -> open(PhoneSetupGuide.Popups)
+            PhoneSetupKind.Shortcut -> open(PhoneSetupGuide.Shortcut)
         }
     }
 
@@ -177,6 +182,8 @@ public class PhoneSetupPresenter(
             PhoneSetupGuide.Battery -> allowed(PhoneSetupKind.Battery)
             // Manual guides close on "I've done this", never by themselves.
             PhoneSetupGuide.Sleeping, PhoneSetupGuide.Autostart, PhoneSetupGuide.Popups -> false
+            // The button or gesture set to Mode is read back; the volume keys only by "I've done this".
+            PhoneSetupGuide.Shortcut -> allowed(PhoneSetupKind.Shortcut)
         }
     }
 
@@ -185,6 +192,7 @@ public class PhoneSetupPresenter(
             PhoneCheckId.Sleeping to PhoneSetupKind.Sleeping,
             PhoneCheckId.Autostart to PhoneSetupKind.Autostart,
             PhoneCheckId.Popups to PhoneSetupKind.Popups,
+            PhoneCheckId.Shortcut to PhoneSetupKind.Shortcut,
         )
     }
 }

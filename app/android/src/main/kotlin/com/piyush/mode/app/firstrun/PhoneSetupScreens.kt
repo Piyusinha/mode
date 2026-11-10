@@ -116,15 +116,20 @@ private fun PhoneRow(row: PhoneSetupRow, onEvent: (PhoneSetupEvent) -> Unit) {
     val words = ROWS.getValue(row.kind)
     val allowed = row.status == PermissionStatus.Allowed
     val status = when {
+        // Start by voice can be turned off again (its "Ask Mode" icon goes with it).
+        allowed && row.kind == PhoneSetupKind.Assistant -> ModeStatusAction.Open(stringResource(R.string.phone_turn_off))
         allowed -> ModeStatusAction.Done(stringResource(words.done))
         row.later -> ModeStatusAction.Note(stringResource(R.string.phone_later))
+        // The shortcut is a nice-to-have on every phone, not a maker's trap: a soft button, no warning.
+        row.kind == PhoneSetupKind.Shortcut -> ModeStatusAction.Quiet(stringResource(words.action))
         row.manual -> ModeStatusAction.Open(stringResource(words.action))
         row.kind == PhoneSetupKind.PhoneControl -> ModeStatusAction.Prominent(stringResource(words.action))
         else -> ModeStatusAction.Quiet(stringResource(words.action))
     }
     ModePermissionRow(
         stringResource(words.title), stringResource(words.why), words.icon, status,
-        { onEvent(PhoneSetupEvent.Allow(row)) }, highlighted = row.kind == PhoneSetupKind.PhoneControl, caution = row.manual && !allowed,
+        { onEvent(PhoneSetupEvent.Allow(row)) }, highlighted = row.kind == PhoneSetupKind.PhoneControl,
+        caution = row.manual && !allowed && row.kind != PhoneSetupKind.Shortcut,
     )
 }
 
@@ -140,6 +145,7 @@ private val ROWS = mapOf(
     PhoneSetupKind.Sleeping to RowWords(R.string.phone_sleeping, R.string.phone_sleeping_why, ModeIcon.Moon, R.string.phone_open, R.string.phone_confirmed),
     PhoneSetupKind.Autostart to RowWords(R.string.phone_autostart, R.string.phone_autostart_why, ModeIcon.Rocket, R.string.phone_open, R.string.phone_confirmed),
     PhoneSetupKind.Popups to RowWords(R.string.phone_popups, R.string.phone_popups_why, ModeIcon.Popup, R.string.phone_open, R.string.phone_confirmed),
+    PhoneSetupKind.Shortcut to RowWords(R.string.phone_shortcut, R.string.phone_shortcut_why, ModeIcon.Tap, R.string.phone_set_up, R.string.phone_on),
 )
 
 /** One guide page: what to do in Android's Settings, step by step, and the button that goes there. */
@@ -221,5 +227,10 @@ private val GUIDES = mapOf(
         R.string.guide_popups_title, R.string.guide_popups_body, MoMood.YourTurn,
         listOf(R.string.guide_popups_1, R.string.guide_popups_2, R.string.guide_popups_3),
         R.string.guide_popups_note, ModeNoteKind.Info, R.string.guide_popups_open, alternative = R.string.guide_done, later = R.string.guide_later,
+    ),
+    PhoneSetupGuide.Shortcut to GuideWords(
+        R.string.guide_shortcut_title, R.string.guide_shortcut_body, MoMood.Listening,
+        listOf(R.string.guide_shortcut_1, R.string.guide_shortcut_2, R.string.guide_shortcut_3),
+        R.string.guide_shortcut_note, ModeNoteKind.Info, R.string.guide_shortcut_open, alternative = R.string.guide_done, later = R.string.guide_later,
     ),
 )

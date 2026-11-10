@@ -129,6 +129,23 @@ class PhoneSetupTest {
     }
 
     @Test
+    fun theShortcutRowClosesItsGuideOnceAndroidReadsItBack() = runTest {
+        val f = Fixture(this)
+        f.checks.quick = results(engine = true) + PhoneCheckResult(PhoneCheckId.Shortcut, CheckState.Unverifiable(confirmed = false))
+        val p = PhoneSetupPresenter(backgroundScope, f.checks, f.permissions, FakeLifecycle(), f.settings)
+        val s = p.state.awaitState { it.rows.isNotEmpty() }
+        val row = s.rows.first { it.kind == PhoneSetupKind.Shortcut }
+        assertTrue(row.optional && row.status == PermissionStatus.NotAsked)
+        assertTrue(s.ready, "the shortcut never holds up Continue")
+        p.allow(PhoneSetupKind.Shortcut)
+        assertEquals(PhoneSetupGuide.Shortcut, p.state.value.guide)
+        // Back from Accessibility with the button set to Mode: the guide closes by itself.
+        f.checks.quick = results(engine = true) + PhoneCheckResult(PhoneCheckId.Shortcut, CheckState.Unverifiable(confirmed = true))
+        p.refresh()
+        assertNull(p.state.awaitState { st -> st.rows.first { it.kind == PhoneSetupKind.Shortcut }.status == PermissionStatus.Allowed }.guide)
+    }
+
+    @Test
     fun aPlainPhoneHasNoManualRows() = runTest {
         val f = Fixture(this)
         f.checks.quick = results(engine = true)

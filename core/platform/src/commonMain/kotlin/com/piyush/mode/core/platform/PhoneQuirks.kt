@@ -14,7 +14,11 @@ public data class QuirkPage(
 )
 
 /** A setting Mode can't read back: the user does it and confirms it (rows on the setup hub, boards D01–D05). */
-public enum class ManualStep { Sleeping, Autostart, Popups }
+public enum class ManualStep {
+    Sleeping, Autostart, Popups,
+    /** Any phone: the accessibility shortcut pointed at Mode (the volume-key one can't be read back). */
+    Shortcut,
+}
 
 /**
  * What some phone makers add on top of Android, which can stop Mode halfway through a task or switch phone

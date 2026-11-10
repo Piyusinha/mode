@@ -42,6 +42,14 @@ class DeviceStatusTest {
     }
 
     @Test
+    fun theShortcutIsSetWhenAndroidSaysSoOrTheUserDoes() {
+        assertEquals(CheckState.Unverifiable(confirmed = true), DeviceStatus.shortcut(set = true, confirmed = emptySet()).state)
+        assertEquals(CheckState.Unverifiable(confirmed = true), DeviceStatus.shortcut(set = false, confirmed = setOf(ManualStep.Shortcut.name)).state)
+        assertEquals(CheckState.Unverifiable(confirmed = false), DeviceStatus.shortcut(set = false, confirmed = emptySet()).state)
+        assertEquals(PhoneCheckId.Shortcut, DeviceStatus.shortcut(set = false, confirmed = emptySet()).id)
+    }
+
+    @Test
     fun backgroundModeIsBlockedByTheMostPermanentReasonFirst() {
         assertEquals(BackgroundBlock.AndroidTooOld, DeviceStatus.backgroundBlock(sdkInt = 33, wifi = true, debuggingAllowed = true))
         assertEquals(BackgroundBlock.AndroidTooOld, DeviceStatus.backgroundBlock(sdkInt = 33, wifi = false, debuggingAllowed = false))

@@ -42,13 +42,23 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
     /** The bitmap behind the last screenshot's PNG, so shrinking it skips a decode. */
     @Volatile private var lastShot: Pair<ByteArray, Bitmap>? = null
 
+    /** The accessibility shortcut (button, gesture or volume keys) was used: Mode opens over the app in front. */
+    private val shortcut = object : android.accessibilityservice.AccessibilityButtonController.AccessibilityButtonCallback() {
+        override fun onClicked(controller: android.accessibilityservice.AccessibilityButtonController) {
+            AppLog.log("phone", "accessibility shortcut")
+            ServiceRegistry.onShortcut?.invoke()
+        }
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         AppLog.log("phone", "accessibility service on")
+        runCatching { accessibilityButtonController.registerAccessibilityButtonCallback(shortcut) }
         ServiceRegistry.connected(this)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        runCatching { accessibilityButtonController.unregisterAccessibilityButtonCallback(shortcut) }
         AppLog.log("phone", "accessibility service off")
         ServiceRegistry.disconnected(this)
         return super.onUnbind(intent)

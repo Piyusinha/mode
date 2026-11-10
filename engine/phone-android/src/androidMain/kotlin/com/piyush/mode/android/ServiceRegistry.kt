@@ -20,6 +20,16 @@ object ServiceRegistry {
     /** Called with the service each time it stops, so the app can tell the user. */
     @Volatile var onStopped: (() -> Unit)? = null
 
+    /**
+     * The phone's accessibility shortcut, pointed at Mode (the floating button, a two-finger swipe up, or both volume
+     * keys, as the user chose in Settings): the app opens Mode over whatever app is in front. Main thread.
+     */
+    @Volatile var onShortcut: (() -> Unit)? = null
+
+    /** The phone's accessibility button or gesture is set to Mode right now (the volume-key shortcut can't be read). */
+    val shortcutSet: Boolean
+        get() = runCatching { state.value?.accessibilityButtonController?.isAccessibilityButtonAvailable == true }.getOrDefault(false)
+
     internal fun connected(service: ModeAccessibilityService) {
         state.value = service
     }

@@ -72,7 +72,8 @@
             android:name=".AskMode"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="@mipmap/ic_ask_mode"
+            android:roundIcon="@mipmap/ic_ask_mode"
             android:label="@string/ask_mode_label"
             android:targetActivity=".MainActivity">
             <intent-filter>

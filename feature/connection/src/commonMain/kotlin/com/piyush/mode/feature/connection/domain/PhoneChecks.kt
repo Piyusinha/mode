@@ -23,6 +23,8 @@ public enum class PhoneCheckId {
     BackgroundLink,
     /** Android: the phone has a speech recognizer, so Mode can hear. */
     Speech,
+    /** Android: the accessibility shortcut opens Mode over any app (partly manual: volume keys can't be read). */
+    Shortcut,
 }
 
 public sealed interface CheckState {

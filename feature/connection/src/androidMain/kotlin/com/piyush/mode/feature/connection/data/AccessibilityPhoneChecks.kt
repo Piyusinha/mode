@@ -66,8 +66,19 @@ public class AccessibilityPhoneChecks(
                 if (power.isIgnoringBatteryOptimizations(app.packageName)) CheckState.Passed(null) else CheckState.Failed("restricted", null)),
             PhoneCheckResult(PhoneCheckId.Speech, if (speechAvailable()) CheckState.Passed(null) else CheckState.Failed("no speech recognizer", null)),
         ) + DeviceStatus.manual(brand(), confirmed()) + listOfNotNull(
+            // Only once phone control runs: the shortcut is the service's.
+            DeviceStatus.shortcut(ServiceRegistry.shortcutSet || shortcutTargetsMode(), confirmed()).takeIf { running },
             mode?.takeIf { it.enabled }?.let { PhoneCheckResult(PhoneCheckId.BackgroundLink, DeviceStatus.backgroundLink(it.wifiConnected(), it.linkDown)) },
         )
+    }
+
+    /**
+     * The phone's accessibility shortcut points at Mode: the button or gesture (one list of targets), or the volume
+     * keys. Read from Android's own settings; on a phone that won't let apps read them, the user confirms instead.
+     */
+    private fun shortcutTargetsMode(): Boolean = SHORTCUT_TARGETS.any { key ->
+        runCatching { android.provider.Settings.Secure.getString(app.contentResolver, key) }.getOrNull()
+            ?.split(':')?.any { it.startsWith(app.packageName + "/") } == true
     }
 
     override suspend fun run(update: (List<PhoneCheckResult>) -> Unit) {
@@ -162,6 +173,8 @@ public class AccessibilityPhoneChecks(
     }
 
     private companion object {
+        /** Where Android keeps what the accessibility shortcuts open: the button and gesture, then the volume keys. */
+        val SHORTCUT_TARGETS = listOf("accessibility_button_targets", "accessibility_shortcut_target_service")
         const val PROBE_SIDE = 400
         const val TAP_Y_DP = 120.0
     }

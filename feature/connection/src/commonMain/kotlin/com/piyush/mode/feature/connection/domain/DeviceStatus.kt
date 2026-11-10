@@ -43,12 +43,21 @@ public object DeviceStatus {
         ManualStep.Sleeping -> PhoneCheckId.Sleeping
         ManualStep.Autostart -> PhoneCheckId.Autostart
         ManualStep.Popups -> PhoneCheckId.Popups
+        ManualStep.Shortcut -> PhoneCheckId.Shortcut
     }
+
+    /**
+     * The accessibility shortcut: done when Android says the button or gesture is Mode's ([set]), or the user said
+     * they set it (the volume keys can't be read back).
+     */
+    public fun shortcut(set: Boolean, confirmed: Set<String>): PhoneCheckResult =
+        PhoneCheckResult(PhoneCheckId.Shortcut, CheckState.Unverifiable(confirmed = set || ManualStep.Shortcut.name in confirmed))
 
     public fun step(id: PhoneCheckId): ManualStep? = when (id) {
         PhoneCheckId.Sleeping -> ManualStep.Sleeping
         PhoneCheckId.Autostart -> ManualStep.Autostart
         PhoneCheckId.Popups -> ManualStep.Popups
+        PhoneCheckId.Shortcut -> ManualStep.Shortcut
         else -> null
     }
 
