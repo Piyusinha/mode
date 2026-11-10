@@ -20,7 +20,8 @@ import kotlin.time.TimeSource
  *     adb shell am broadcast -n app.heymode.mode/com.piyush.mode.app.DevProbe --es op tap --ef x 180 --ef y 400
  *
  * Ops: look, text, tap, back, home, recents, notifications, quick, launch (--es name …), type (--es s …),
- * enter, scroll (--es dir down|up), checks, hold (--el ms …). Results go to logcat under the tag ModeProbe.
+ * enter, scroll (--es dir down|up), checks, hold (--el ms …), stream and tone (--ef s seconds; a streamed line and a
+ * plain one, to compare). Results go to logcat under the tag ModeProbe.
  */
 class DevProbe : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -55,6 +56,44 @@ class DevProbe : BroadcastReceiver() {
                     "overlaystate" -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (intent.getBooleanExtra("close", false)) com.piyush.mode.app.overlay.OverlayController.close("probe")
                         com.piyush.mode.app.overlay.OverlayController.describe()
+                    }
+                    // A streamed line (as Speechify sends one): a tone as 24 kHz PCM in chunks. --ez hush true stops it part-way.
+                    "stream" -> {
+                        val rate = 24_000
+                        val seconds = intent.getFloatExtra("s", 1.5f)
+                        val pcm = ByteArray((rate * seconds).toInt() * 2).also { bytes ->
+                            for (i in 0 until bytes.size / 2) {
+                                val v = (kotlin.math.sin(2 * Math.PI * 440 * i / rate) * 6000).toInt()
+                                bytes[i * 2] = (v and 0xFF).toByte()
+                                bytes[i * 2 + 1] = (v shr 8 and 0xFF).toByte()
+                            }
+                        }
+                        if (intent.getBooleanExtra("hush", false)) scope.launch {
+                            kotlinx.coroutines.delay(500)
+                            com.piyush.mode.feature.settings.voice.DeviceVoice.hush()
+                        }
+                        val began = TimeSource.Monotonic.markNow()
+                        val said = com.piyush.mode.feature.settings.voice.DeviceVoice.playStream(rate) { send ->
+                            pcm.asList().chunked(4_800).forEach { send(it.toByteArray()); kotlinx.coroutines.delay(20) }
+                        }
+                        "stream said=$said after ${began.elapsedNow().inWholeMilliseconds} ms (${seconds} s of sound)"
+                    }
+                    // The same tone straight to the speaker in one blocking write: how long this phone takes to play it.
+                    "tone" -> {
+                        val rate = 24_000
+                        val seconds = intent.getFloatExtra("s", 1.5f)
+                        val pcm = ShortArray((rate * seconds).toInt()) { (kotlin.math.sin(2 * Math.PI * 440 * it / rate) * 6000).toInt().toShort() }
+                        val track = android.media.AudioTrack.Builder()
+                            .setAudioFormat(android.media.AudioFormat.Builder().setSampleRate(rate).setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO).setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT).build())
+                            .setTransferMode(android.media.AudioTrack.MODE_STREAM).build()
+                        val began = TimeSource.Monotonic.markNow()
+                        track.play()
+                        track.write(pcm, 0, pcm.size, android.media.AudioTrack.WRITE_BLOCKING)
+                        val wrote = began.elapsedNow().inWholeMilliseconds
+                        track.stop()
+                        while (track.playState == android.media.AudioTrack.PLAYSTATE_PLAYING && began.elapsedNow().inWholeMilliseconds < 20_000) kotlinx.coroutines.delay(10)
+                        track.release()
+                        "tone: written in $wrote ms, played in ${began.elapsedNow().inWholeMilliseconds} ms (${seconds} s of sound)"
                     }
                     // A question notification, as a task would post it (kind: YesNo, YesNoAlways, Choice, Text, YourTurn).
                     "ask" -> {

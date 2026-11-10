@@ -252,6 +252,9 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                 frames = 0
                 started = false
             }
+            // Sound from the first chunk on: by default a track waits for a full buffer, and a short line ("On it.")
+            // that never fills one was never heard.
+            runCatching { made.setStartThresholdInFrames((sampleRate / STREAM_START_PER_SECOND).coerceAtLeast(1)) }
             runCatching { made.play() }
             return true
         }
@@ -493,6 +496,8 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         const val CLIP = "voice-clip"
         /** A streamed line: a quarter second of buffer, how often its thread looks again, and how long past its length it may take. */
         const val STREAM_BUFFER_PER_SECOND = 4
+        /** It starts sounding once a fiftieth of a second has arrived. */
+        const val STREAM_START_PER_SECOND = 50
         const val STREAM_POLL_MS = 10L
         const val STREAM_TAIL_MS = 1_500L
         const val MS = 1000L
