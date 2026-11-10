@@ -252,6 +252,10 @@ public class HealthPresenter(
      */
     private suspend fun checkDevice() {
         val status = runCatching { phoneChecks.status() }.getOrDefault(emptyList()).associate { it.id to it.state }
+        // A phone without a maker's step (a stock Android phone) or without background mode has no such row: it would
+        // only spin forever.
+        val absent = MANUAL_ITEMS.filterKeys { it !in status }.values + listOfNotNull(HealthItem.BackgroundLink.takeIf { PhoneCheckId.BackgroundLink !in status })
+        if (absent.isNotEmpty()) mutableState.value = mutableState.value.copy(rows = mutableState.value.rows.filterNot { it.item in absent })
         MANUAL_ITEMS.forEach { (id, item) ->
             val state = status[id] as? CheckState.Unverifiable ?: return@forEach
             set(
@@ -297,12 +301,13 @@ public class HealthPresenter(
         set(if (speaking != null) {
             HealthRow(HealthItem.Speaking, HealthState.Warn, "${name(speaking.kind)}: ${trouble(speaking.trouble)}", HealthFix.Open, "voice")
         } else {
-            HealthRow(HealthItem.Speaking, HealthState.Ok, listOfNotNull(speaker?.first?.let(::name), speaker?.second?.name).joinToString(" · ").ifEmpty { "Apple" })
+            HealthRow(HealthItem.Speaking, HealthState.Ok, listOfNotNull(speaker?.first?.let(::name), speaker?.second?.name).joinToString(" · ").ifEmpty { name(VoiceKind.Device) })
         })
     }
 
     private fun name(kind: VoiceKind): String = when (kind) {
-        VoiceKind.Device -> "Apple"
+        // The phone's own voice and hearing: Apple's on the iPhone, Android's on Android.
+        VoiceKind.Device -> if (profile.osWord == "Android") "Android" else "Apple"
         VoiceKind.Speechify -> "Speechify"
         VoiceKind.ElevenLabs -> "ElevenLabs"
         VoiceKind.Fish -> "Fish Audio"

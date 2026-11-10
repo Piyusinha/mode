@@ -92,7 +92,8 @@ public fun ModeLogoValueRow(title: String, value: String, logo: ModeLogo, onClic
                 ModeText(tag, ModeTextStyle.CaptionEmphasis, Modifier.background(c.cardRaised, Capsule).padding(horizontal = ModeSpacing.s, vertical = ModeSpacing.xxs))
             }
         }
-        if (problem == null) ModeText(value, ModeTextStyle.Subheadline, color = c.textSecondary, maxLines = 1)
+        // Title and value share the width (large text sizes): the value shortens, the title never breaks mid-word.
+        if (problem == null) ModeText(value, ModeTextStyle.Subheadline, Modifier.weight(1f, fill = false), color = c.textSecondary, maxLines = 1, align = TextAlign.End)
         ModeChevron()
     }
 }
@@ -109,7 +110,8 @@ public fun ModeValueRow(title: String, value: String, modifier: Modifier = Modif
         horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ModeText(title, ModeTextStyle.Callout)
+        // Title and value share the width (large text sizes): neither is squeezed to a sliver.
+        ModeText(title, ModeTextStyle.Callout, Modifier.weight(1f, fill = false))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(ModeSpacing.xs + ModeSpacing.xxs, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
             if (dot != null) Box(Modifier.size(ModeSize.statusDot).background(dot, CircleShape))
             ModeText(value, ModeTextStyle.Callout, color = c.textSecondary, align = TextAlign.End, maxLines = 2)

@@ -89,6 +89,16 @@ class MainActivity : ComponentActivity() {
     private fun follow(intent: Intent) {
         if (intent.getBooleanExtra(FOLLOWED, false)) return
         intent.putExtra(FOLLOWED, true)
+        // Debug builds: open a page by name (DebugPages), to check every screen without tapping through.
+        intent.getStringExtra(DEBUG_PAGE)?.let { page ->
+            // DebugPages exists in debug builds only (src/debug); the release build has no such class.
+            if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) runCatching {
+                val pages = Class.forName("com.piyush.mode.app.DebugPages")
+                pages.getMethod("open", com.piyush.mode.app.shell.Navigator::class.java, String::class.java)
+                    .invoke(pages.getField("INSTANCE").get(null), shell.navigator, page)
+            }.onFailure { AppLog.log("link", "debug page $page: ${it.message}") }
+            return
+        }
         // Opened as "Ask Mode" (by the user's assistant, or its icon): straight into talking mode.
         if (intent.component?.className == com.piyush.mode.app.graph.ASK_MODE) {
             AppLog.log("link", "ask mode")
@@ -131,6 +141,9 @@ class MainActivity : ComponentActivity() {
         /** The small window's shape (board R02: 164 × 332). */
         const val PIP_WIDTH = 1
         const val PIP_HEIGHT = 2
+
+        /** The page to open, by name (debug builds). */
+        const val DEBUG_PAGE = "mode.page"
 
         /** Set on an intent once its link was followed, so a rotation doesn't follow it again. */
         const val FOLLOWED = "mode.followed"

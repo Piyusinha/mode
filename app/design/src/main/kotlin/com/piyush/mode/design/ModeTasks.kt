@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -38,26 +40,34 @@ public fun <T> ModePillSegments(
     compact: Boolean = false,
 ) {
     val c = Mode.colors
-    Row(
+    val gap = if (compact) ModeSpacing.xxs else ModeSize.segmentsInset
+    // Equal shares when the words fit; with long words or large text the segments keep their words whole and the row
+    // scrolls sideways, instead of cutting each one short ("Speech…", "ElevenL…").
+    androidx.compose.foundation.layout.BoxWithConstraints(
         modifier.fillMaxWidth().height(if (compact) ModeSize.segmentsCompactHeight else ModeSize.segmentsHeight)
             .background(c.cardRaised, Capsule).padding(ModeSize.segmentsInset),
-        horizontalArrangement = Arrangement.spacedBy(if (compact) ModeSpacing.xxs else ModeSize.segmentsInset),
+    ) {
+    val share = (maxWidth - gap * (options.size - 1)) / options.size.coerceAtLeast(1)
+    Row(
+        Modifier.fillMaxSize().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
         options.forEach { (option, title) ->
             val picked = option == selection
             val fill by animateColorAsState(if (picked) c.card else c.card.copy(alpha = 0f), label = "segment")
             Box(
-                Modifier.weight(1f).fillMaxHeight().then(if (picked) Modifier.modeShadow(Capsule) else Modifier).background(fill, Capsule)
+                Modifier.widthIn(min = share).fillMaxHeight().then(if (picked) Modifier.modeShadow(Capsule) else Modifier).background(fill, Capsule)
                     .clickable(role = Role.Tab, indication = null, interactionSource = null) { onSelect(option) }
                     .semantics { selected = picked },
                 Alignment.Center,
             ) {
                 ModeText(
                     title, if (picked) ModeTextStyle.SubheadlineEmphasis else ModeTextStyle.Subheadline,
-                    color = if (picked || compact) c.textPrimary else c.textSecondary, maxLines = 1,
+                    Modifier.padding(horizontal = ModeSpacing.m), color = if (picked || compact) c.textPrimary else c.textSecondary, maxLines = 1,
                 )
             }
         }
+    }
     }
 }
 
