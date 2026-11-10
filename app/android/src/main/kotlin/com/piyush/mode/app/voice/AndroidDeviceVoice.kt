@@ -59,6 +59,9 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     private var recognizer: SpeechRecognizer? = null
     private var recording: Job? = null
     @Volatile private var stopRecording = false
+    /** The recognizer's own beeps, kept quiet while Mode listens (Google's own voice search makes none either). */
+    private val earcons = Earcons(app, main)
+
     /** The on-device recognizer has the language's pack (false once it said it hasn't, until Mode restarts). */
     private var onDeviceReady = true
 
@@ -77,6 +80,8 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
 
     /** Hands the shared voice code everything it can do on this phone. */
     fun install() {
+        // A Mode that stopped mid-listen (killed, crashed) gives back the sounds it had quieted.
+        earcons.restoreLeftovers()
         Voices.installReader { path -> File(path).takeIf { it.exists() }?.readBytes() }
         DeviceVoice.deviceLanguages = { listOf(Locale.getDefault().toLanguageTag()) }
         DeviceVoice.deviceInstalled = { listOf(Locale.getDefault().toLanguageTag()) }
@@ -116,6 +121,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
 
     private fun speak(text: String, voiceId: String?, speed: Double, done: (Boolean) -> Unit) {
         if (!ttsReady) return done(false)
+        earcons.loudNow()
         tts.voices?.firstOrNull { it.name == voiceId }?.let { tts.voice = it }
         tts.setSpeechRate(speed.toFloat())
         val id = UUID.randomUUID().toString()
@@ -177,6 +183,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
     }
 
     private fun play(bytes: ByteArray, done: (Boolean) -> Unit) {
+        earcons.loudNow()
         val file = File(app.cacheDir, CLIP).apply { writeBytes(bytes) }
         main.post {
             // A clip still playing is over now: its caller must not wait forever.
@@ -230,6 +237,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         /** Starts a line; false when the phone can't play this format. [done] says, once, whether sound started. */
         fun begin(sampleRate: Int, done: (Boolean) -> Unit): Boolean {
             stop()
+            earcons.loudNow()
             val min = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
             if (min <= 0) return false
             val made = runCatching {
@@ -340,6 +348,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
             fun end(text: String?, reason: String) {
                 if (finished) return
                 finished = true
+                earcons.loudAgain()
                 main.removeCallbacks(quiet)
                 VoiceLevel.stopped()
                 done(null, text?.takeIf { it.isNotBlank() }, reason)
@@ -374,6 +383,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                         AppLog.log("voice", "no speech pack on the phone yet; listening with the regular recognizer")
                         onDeviceReady = false
                         finished = true
+                        earcons.loudAgain()
                         main.removeCallbacks(quiet)
                         r.destroy()
                         if (recognizer === r) recognizer = null
@@ -384,6 +394,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
                     end(null, if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) QUIET else FAILED)
                 }
             })
+            earcons.quiet()
             r.startListening(intentFor(silenceMs))
         }
     }
@@ -478,6 +489,7 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         main.post {
             current?.cancel()
             current?.destroy()
+            if (current != null) earcons.loudAgain()
         }
     }
 
@@ -511,6 +523,60 @@ class AndroidDeviceVoice(context: Context, private val words: VoiceWords) {
         const val DONE = "done"
         const val CANCELLED = "cancelled"
         const val FAILED = "failed"
+    }
+}
+
+/**
+ * Android's speech recognizer beeps when it starts and stops listening; Google's own voice search plays none. While
+ * Mode listens, the sounds those beeps use (media, system, notifications) are muted, and a moment after it stops (the
+ * closing beep plays then) they come back. Only what Mode muted is unmuted: a stream the user had muted stays so.
+ * What was muted is written down, so a Mode killed mid-listen gives it back the next time it starts.
+ */
+private class Earcons(context: Context, private val main: Handler) {
+    private val audio = context.getSystemService(android.media.AudioManager::class.java)
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private var muted: Set<Int> = emptySet()
+    private val restore = Runnable { unmute() }
+
+    /** Main thread. */
+    fun quiet() {
+        main.removeCallbacks(restore)
+        val now = STREAMS.filter { stream -> stream !in muted && runCatching { !audio.isStreamMute(stream) }.getOrDefault(false) }
+            .filter { stream -> runCatching { audio.adjustStreamVolume(stream, android.media.AudioManager.ADJUST_MUTE, 0); true }.getOrDefault(false) }
+        muted = muted + now
+        prefs.edit().putString(KEY, muted.joinToString(",")).apply()
+    }
+
+    /** Main thread: the closing beep plays as listening stops, so the sound comes back a moment after. */
+    fun loudAgain() {
+        main.removeCallbacks(restore)
+        main.postDelayed(restore, AFTER_MS)
+    }
+
+    /** Mode is about to speak: its own voice must be heard, now. Any thread. */
+    fun loudNow() {
+        main.post {
+            main.removeCallbacks(restore)
+            unmute()
+        }
+    }
+
+    fun restoreLeftovers() {
+        muted = prefs.getString(KEY, null)?.split(',')?.mapNotNull(String::toIntOrNull)?.toSet().orEmpty()
+        unmute()
+    }
+
+    private fun unmute() {
+        muted.forEach { stream -> runCatching { audio.adjustStreamVolume(stream, android.media.AudioManager.ADJUST_UNMUTE, 0) } }
+        muted = emptySet()
+        prefs.edit().remove(KEY).apply()
+    }
+
+    private companion object {
+        val STREAMS = listOf(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.STREAM_SYSTEM, android.media.AudioManager.STREAM_NOTIFICATION)
+        const val AFTER_MS = 700L
+        const val PREFS = "mode.voice"
+        const val KEY = "earcons.muted"
     }
 }
 
