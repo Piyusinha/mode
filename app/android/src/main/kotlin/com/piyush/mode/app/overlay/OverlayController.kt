@@ -84,6 +84,8 @@ object OverlayController {
         when {
             task != null -> { begun = true; session?.submitTyped(task) }
             !begun && !graph.tasks.state.value.running -> { begun = true; session?.begin() }
+            // Summoned again while it was open: the same conversation, listening.
+            else -> listen()
         }
         return true
     }
@@ -117,6 +119,7 @@ object OverlayController {
         OverlayGuard.passThrough = null
         begun = false
         sawWork = false
+        leftInApp = 0
         local.value = OverlayLocal()
         state.value = null
         // A question still open goes back to a notification: the overlay was the one asking it.
@@ -155,6 +158,10 @@ object OverlayController {
                 }.collect { (v, end) ->
                     val (finished, a) = end
                     state.value = v
+                    // The task left them in its app (search results, a video): Mo steps aside to the edge so they see
+                    // it; the conversation goes on.
+                    val left = talk.state.value.leftInApp
+                    if (left > leftInApp) { leftInApp = left; local.update { it.copy(minimized = true) } }
                     // Listening again: the next quiet spell may shrink it again.
                     if (!talk.state.value.micPaused && local.value.shrankWhenQuiet) local.update { it.copy(shrankWhenQuiet = false) }
                     layout(v)
@@ -252,15 +259,13 @@ object OverlayController {
             OverlayEvent.Close -> close("closed by the user")
             // ⌄: Mo goes to the edge; nothing stops (only × ends it).
             OverlayEvent.Slim -> { slimming?.cancel(); local.update { it.copy(minimized = true, typing = false) } }
-            OverlayEvent.Expand -> { slimming?.cancel(); local.update { it.copy(slim = false, minimized = false) } }
-            OverlayEvent.Listen -> talk?.let { t ->
-                val s = t.state.value
-                when {
-                    s.micPaused -> t.resumeListening()
-                    s.turns.isEmpty() -> t.begin()
-                    else -> t.listenAgain()
-                }
+            // Back from Mo at the edge: the same conversation, and the mic on.
+            OverlayEvent.Expand -> {
+                slimming?.cancel()
+                local.update { it.copy(slim = false, minimized = false) }
+                listen()
             }
+            OverlayEvent.Listen -> listen()
             is OverlayEvent.Say -> talk?.pick(event.text)
             is OverlayEvent.Send -> {
                 local.update { it.copy(typing = false) }
@@ -299,6 +304,20 @@ object OverlayController {
 
     /** Ends the voice session open in Mode's own app, if any (two sessions would both listen). Set by the app. */
     var endAppSession: (() -> Unit)? = null
+
+    /** The mic on again, in the same conversation, when it isn't listening (paused, or nothing was heard). */
+    private fun listen() {
+        val t = session ?: return
+        val s = t.state.value
+        when {
+            s.micPaused -> t.resumeListening()
+            s.phase == com.piyush.mode.app.screens.settings.TalkPhase.Typing && !local.value.typing ->
+                if (s.turns.isEmpty()) t.begin() else t.listenAgain()
+        }
+    }
+
+    /** How many tasks have left the user in their app so far (each one makes the overlay step aside once). */
+    private var leftInApp = 0
 
     /** Opens the small entry screen (it asks for the microphone, which an overlay can't). Set by the app. */
     var openEntry: (() -> Unit)? = null

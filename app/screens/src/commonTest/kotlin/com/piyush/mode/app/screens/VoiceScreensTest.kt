@@ -518,6 +518,23 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun aTaskThatLeavesThemInItsAppEndsModesScreenButNotTheOverlay() = runTest {
+        val stay = { com.piyush.mode.testing.ScriptedModel(com.piyush.mode.testing.call("done", "evidence" to "x", "summary" to "Here are the results.", "stay_here" to true)) }
+        val f = Fixture(backgroundScope, stay())
+        val screen = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", pausedEndMs = Long.MAX_VALUE)
+        screen.submitTyped("Search for Claude Fable 5.2")
+        assertTrue(screen.state.awaitState { it.finished }.finished, "Mode's own screen goes, so they see the results")
+
+        val g = Fixture(backgroundScope, stay())
+        val overlay = ListenPresenter(backgroundScope, Voices(g.settings, HttpClient(MockEngine { error("offline") })), g.queue, g.settings, g.runner,
+            entry = ListenPresenter.OVERLAY, pausedEndMs = Long.MAX_VALUE)
+        overlay.submitTyped("Search for Claude Fable 5.2")
+        val after = overlay.state.awaitState { it.leftInApp == 1 && it.greeting.isNotEmpty() }
+        assertFalse(after.finished, "the overlay steps aside; the conversation goes on")
+    }
+
+    @Test
     fun listeningAgainKeepsTheConversation() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,

@@ -142,6 +142,11 @@ public data class ListenUiState(
     val turns: List<TalkTurn> = emptyList(),
     /** The chosen voice or listener failed ("Mode couldn't hear with Deepgram"), with a way to Settings. */
     val voiceNotice: VoiceNotice? = null,
+    /**
+     * The last task left the user in the app it ended on (search results, a video): the overlay steps aside so they
+     * see it, and the conversation carries on. Counts up with each such task.
+     */
+    val leftInApp: Int = 0,
 )
 
 /** The chosen voice ([hearing] false) or listener [provider] failed, and why ([trouble]: a VoiceTrouble name). */
@@ -482,7 +487,13 @@ public class ListenPresenter(
             nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE))
             return
         }
-        if (done != null && done.stay) { end("LeftInApp"); return }
+        if (done != null && done.stay) {
+            // Mode's own screen goes, so the user sees the app the task left them in. The overlay is already over that
+            // app: it only steps aside, and the conversation goes on.
+            if (entry != OVERLAY) { end("LeftInApp"); return }
+            own.value = own.value.copy(leftInApp = own.value.leftInApp + 1)
+            com.piyush.mode.core.common.AppLog.log("talk", "task left them in its app: the overlay steps aside, the session goes on")
+        }
         failureLine(task, result, finishedState.status)?.let { line ->
             lastTask = task
             lastDone = false
