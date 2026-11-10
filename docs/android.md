@@ -118,7 +118,7 @@ Known gap: the Play build has no phone control, so its setup will need its own p
   - Stop in a session only stops the task: Mode says so and listens again.
   - A session from a chat's mic continues that chat (its last messages, an offer to carry on a task that stopped). Asking for a session while one is open brings that one back, unless it belongs to another chat: then it ends and the new one starts.
   - Android only: leaving Mode while it waits for words pauses the mic (Android gives the microphone to the app in front); not while its task works, since that is Mode in another app, and it listens again when it comes back. The bar's mic after typing or a failed listen listens again and keeps the conversation (`ListenPresenter.listenAgain`).
-  - Over someone else's app the agent overlay has no bar: when it goes quiet after a task it closes, and the next "Ask Mode" starts fresh. Summoning it ends a session left open in Mode's app (one session at a time).
+  - Over someone else's app the agent overlay's ⌄ shrinks it to Mo at the screen's edge (a bubble says what Mode is doing; a tap brings it back); only × ends it. Going quiet after a task shrinks it the same way. When nothing is heard it waits with a mic to tap ("Tap the mic to talk, or type"); the keyboard opens only when asked for. Summoning it ends a session left open in Mode's app (one session at a time).
 - **Start by voice** ("Ask Mode"): Mode doesn't replace the phone's assistant. Setup's "Start by voice" switch
   shows a second app entry, "Ask Mode" (an activity alias of the main screen), which opens straight into a voice
   session, so "Hey Google, open Ask Mode" (or Gemini, Bixby) starts the same conversation as "Hey Siri, start

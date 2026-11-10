@@ -151,6 +151,11 @@
     <string name="overlay_mic_body">Allow the microphone once, and you can talk to Mode from any app.</string>
     <string name="overlay_mic_allow">Allow microphone</string>
     <string name="overlay_time">%1$d:%2$02d</string>
+    <string name="overlay_slim_icon">Make it small: Mo stays at the edge</string>
+    <string name="overlay_paused">Mic paused</string>
+    <string name="overlay_hint_tap_mic">Tap the mic to talk, or type</string>
+    <string name="overlay_mic_on">Talk</string>
+    <string name="overlay_open">Open Mode. Tap to see it all.</string>
     <!-- Warnings at the top while Mode is open (boards W01–W06). -->
     <string name="warn_close">Hide this for a few days</string>
     <string name="warn_locked_title">Phone control is locked</string>

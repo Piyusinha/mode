@@ -80,7 +80,7 @@ object OverlayController {
         if (host == null) open(service, graph)
         AppLog.log("overlay", "summoned from $entry")
         closing?.cancel()
-        local.update { it.copy(slim = false, typing = false) }
+        local.update { it.copy(slim = false, typing = false, minimized = false) }
         when {
             task != null -> { begun = true; session?.submitTyped(task) }
             !begun && !graph.tasks.state.value.running -> { begun = true; session?.begin() }
@@ -155,14 +155,19 @@ object OverlayController {
                 }.collect { (v, end) ->
                     val (finished, a) = end
                     state.value = v
+                    // Listening again: the next quiet spell may shrink it again.
+                    if (!talk.state.value.micPaused && local.value.shrankWhenQuiet) local.update { it.copy(shrankWhenQuiet = false) }
                     layout(v)
                     autoSlim(v)
                     when {
                         finished -> closeSoon("the conversation ended")
-                        // Quiet after a task: in Mode's own app the session waits with its mic paused; over someone
-                        // else's app the overlay goes, and the next "Ask Mode" starts fresh.
-                        v !is OverlayView.Working && talk.state.value.micPaused && a !is ActivityUiState.Working && a !is ActivityUiState.Waiting ->
-                            closeSoon("quiet after the task")
+                        // Quiet after a task: the overlay shrinks to Mo at the edge (mic paused), out of the way but
+                        // still there. It goes only when the conversation ends.
+                        v !is OverlayView.Working && v !is OverlayView.Minimized && talk.state.value.micPaused &&
+                            talk.state.value.doneSoFar.isNotEmpty() && a !is ActivityUiState.Working && a !is ActivityUiState.Waiting &&
+                            !local.value.minimized && !local.value.shrankWhenQuiet -> {
+                            local.update { it.copy(minimized = true, shrankWhenQuiet = true) }
+                        }
                         !begun && sawWork && a !is ActivityUiState.Working && a !is ActivityUiState.Waiting -> closeSoon("the task ended")
                     }
                 }
@@ -198,7 +203,12 @@ object OverlayController {
     /** The sheet (or bar), or on the user's own screen the Mo button and the glow. */
     private fun layout(v: OverlayView) {
         val h = host ?: return
-        if (v is OverlayView.OnScreen) {
+        if (v is OverlayView.Minimized) {
+            h.hide(OverlayWindow.Sheet)
+            h.hide(OverlayWindow.Glow)
+            val y = ((app?.resources?.displayMetrics?.heightPixels ?: 0) * BUTTON_HEIGHT).toInt()
+            h.show(OverlayWindow.Button, WindowSpec(Gravity.END or Gravity.TOP, y = y)) { Themed { ButtonRoute() } }
+        } else if (v is OverlayView.OnScreen) {
             h.hide(OverlayWindow.Sheet)
             h.show(OverlayWindow.Glow, WindowSpec(Gravity.FILL, fullScreen = true, touchable = false)) { Themed { OverlayGlow() } }
             val y = ((app?.resources?.displayMetrics?.heightPixels ?: 0) * BUTTON_HEIGHT).toInt()
@@ -229,16 +239,28 @@ object OverlayController {
     @Composable
     private fun ButtonRoute() {
         val v by view.collectAsStateWithLifecycle()
-        val bubble = (v as? OverlayView.OnScreen)?.bubble ?: return
-        OverlayButton(bubble, ::onEvent)
+        when (val current = v) {
+            is OverlayView.OnScreen -> OverlayButton(current.bubble, ::onEvent)
+            is OverlayView.Minimized -> OverlayMinimized(current, ::onEvent)
+            else -> Unit
+        }
     }
 
     internal fun onEvent(event: OverlayEvent) {
         val talk = session
         when (event) {
             OverlayEvent.Close -> close("closed by the user")
-            OverlayEvent.Slim -> if (state.value is OverlayView.Working) local.update { it.copy(slim = true) } else close("put away")
-            OverlayEvent.Expand -> { slimming?.cancel(); local.update { it.copy(slim = false) } }
+            // ⌄: Mo goes to the edge; nothing stops (only × ends it).
+            OverlayEvent.Slim -> { slimming?.cancel(); local.update { it.copy(minimized = true, typing = false) } }
+            OverlayEvent.Expand -> { slimming?.cancel(); local.update { it.copy(slim = false, minimized = false) } }
+            OverlayEvent.Listen -> talk?.let { t ->
+                val s = t.state.value
+                when {
+                    s.micPaused -> t.resumeListening()
+                    s.turns.isEmpty() -> t.begin()
+                    else -> t.listenAgain()
+                }
+            }
             is OverlayEvent.Say -> talk?.pick(event.text)
             is OverlayEvent.Send -> {
                 local.update { it.copy(typing = false) }

@@ -19,6 +19,10 @@ object OverlayPresence : ModePresence {
 /** What only the overlay knows: shrunk to a bar, typing, the user took over, paused from the Mo button. */
 internal data class OverlayLocal(
     val slim: Boolean = false,
+    /** Shrunk to the Mo button at the screen's edge (⌄, or quiet after a task): the conversation carries on. */
+    val minimized: Boolean = false,
+    /** It already shrank by itself after going quiet (not again until the user brings it back and it goes quiet anew). */
+    val shrankWhenQuiet: Boolean = false,
     val typing: Boolean = false,
     val takenOver: Boolean = false,
     val paused: Boolean = false,
@@ -87,7 +91,16 @@ internal sealed interface OverlayView {
 
     /** O09: Mode is tapping the user's own screen: just the Mo button (with what it's doing) and the glow. */
     data class OnScreen(val bubble: String) : OverlayView
+
+    /** Not listening (nothing was heard, or the mic was paused): a mic to tap and a keyboard, no keyboard opened. */
+    data class Paused(val line: String, val chips: List<String>) : OverlayView
+
+    /** Shrunk to the Mo button at the edge, saying what Mode is doing ([text]: what it's working on or saying). */
+    data class Minimized(val kind: MinimizedKind, val text: String) : OverlayView
 }
+
+/** What the Mo button says while the overlay is shrunk. */
+internal enum class MinimizedKind { Listening, Speaking, Working, Paused }
 
 /**
  * What the overlay shows, from the voice session, the running task and the overlay's own state. The task wins over the
@@ -117,6 +130,7 @@ internal fun overlayView(
             if (onScreen && !local.paused && !activity.paused) {
                 return OverlayView.OnScreen(activity.now)
             }
+            if (local.minimized) return OverlayView.Minimized(MinimizedKind.Working, activity.now.ifBlank { activity.task })
             return OverlayView.Working(
                 task = activity.task,
                 steps = stream(live, activity),
@@ -131,9 +145,25 @@ internal fun overlayView(
         }
         else -> Unit
     }
+    if (local.minimized) {
+        val kind = when {
+            session.micPaused || session.phase == TalkPhase.Typing -> MinimizedKind.Paused
+            session.phase == TalkPhase.Starting -> MinimizedKind.Working
+            session.phase == TalkPhase.Greeting -> MinimizedKind.Speaking
+            else -> MinimizedKind.Listening
+        }
+        val text = when (kind) {
+            MinimizedKind.Working -> session.working.ifBlank { session.task }
+            MinimizedKind.Speaking -> session.turns.lastOrNull { !it.mine }?.text ?: session.greeting
+            else -> ""
+        }
+        return OverlayView.Minimized(kind, text)
+    }
+    // Nothing heard, or the mic paused: Mode waits with a mic to tap. The keyboard opens only when they ask for it.
+    if (session.micPaused && session.phase != TalkPhase.Starting) return OverlayView.Paused(session.greeting, chips)
     return when (session.phase) {
         TalkPhase.NeedsMic -> OverlayView.NeedsMic
-        TalkPhase.Typing -> OverlayView.Typing(null)
+        TalkPhase.Typing -> OverlayView.Paused(session.turns.lastOrNull { !it.mine }?.text ?: session.greeting, chips)
         TalkPhase.Starting -> OverlayView.Working(session.task, emptyList(), null, 0, 0, session.reply.ifBlank { session.working }, slim = false, onScreen = !onHiddenScreen, paused = false)
         else -> {
             // After a task: its card and Mode's line after it (the result and "Anything else?", or why it failed).

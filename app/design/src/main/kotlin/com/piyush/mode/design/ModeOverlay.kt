@@ -198,7 +198,12 @@ public fun ModeMiniScreen(screen: ImageBitmap?, label: String, modifier: Modifie
 
 /** Mode is listening, by itself: the mic, the voice as bars, a hint, and typing instead. Blue while answering. */
 @Composable
-public fun ModeListeningStrip(hint: String, level: Float, answering: Boolean, typeLabel: String, onType: () -> Unit, modifier: Modifier = Modifier) {
+public fun ModeListeningStrip(
+    hint: String, level: Float, answering: Boolean, typeLabel: String, onType: () -> Unit, modifier: Modifier = Modifier,
+    /** Not listening: the mic is a button that starts listening again, and the wave rests. */
+    micLabel: String? = null,
+    onMic: (() -> Unit)? = null,
+) {
     val c = Mode.colors
     val color = if (answering) c.info else c.tint
     val soft = if (answering) c.infoSoft else c.tintSoft
@@ -207,10 +212,14 @@ public fun ModeListeningStrip(hint: String, level: Float, answering: Boolean, ty
         horizontalArrangement = Arrangement.spacedBy(ModeSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(ModeSize.overlayStripMic).background(color, CircleShape), Alignment.Center) {
+        Box(
+            Modifier.size(ModeSize.overlayStripMic).background(color, CircleShape)
+                .then(if (onMic != null) Modifier.semantics { contentDescription = micLabel.orEmpty() }.clickable(role = Role.Button, onClick = onMic) else Modifier),
+            Alignment.Center,
+        ) {
             ModeIconImage(ModeIcon.Microphone, ModeIconSize.small, c.onInfo)
         }
-        ModeTalkWave(level, speaking = false, bars = STRIP_BARS, height = ModeSize.talkWaveQuestion, color = color, fades = false)
+        if (onMic == null) ModeTalkWave(level, speaking = false, bars = STRIP_BARS, height = ModeSize.talkWaveQuestion, color = color, fades = false)
         ModeText(hint, ModeTextStyle.Footnote, Modifier.weight(1f), color = c.textSecondary, maxLines = 2)
         ModeIconButton(ModeIcon.Keyboard, typeLabel, onType)
     }
@@ -273,7 +282,7 @@ public fun ModeOverlayBar(
 
 /** On the user's own screen while Mode taps it (O09): a small Mo button with a glowing ring, and the step beside it. */
 @Composable
-public fun ModeOverlayButton(bubble: String?, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+public fun ModeOverlayButton(bubble: String?, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, mood: MoMood = MoMood.Working) {
     val c = Mode.colors
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(ModeSpacing.s)) {
         if (!bubble.isNullOrBlank()) {
@@ -290,7 +299,7 @@ public fun ModeOverlayButton(bubble: String?, label: String, onClick: () -> Unit
                 .semantics { contentDescription = label }
                 .clickable(role = Role.Button, indication = null, interactionSource = null, onClick = onClick),
             Alignment.Center,
-        ) { ModeMo(MoMood.Working, ModeSize.overlayButtonMo) }
+        ) { ModeMo(mood, ModeSize.overlayButtonMo) }
     }
 }
 

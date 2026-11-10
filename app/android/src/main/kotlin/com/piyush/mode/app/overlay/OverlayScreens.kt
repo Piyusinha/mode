@@ -65,6 +65,8 @@ internal sealed interface OverlayEvent {
     data object Resume : OverlayEvent
     data class OpenChat(val conversationId: String) : OverlayEvent
     data object AllowMic : OverlayEvent
+    /** The mic again, after nothing was heard or it was paused. */
+    data object Listen : OverlayEvent
 }
 
 /** The sheet or the slim bar, whichever the state calls for. */
@@ -97,7 +99,7 @@ internal fun OverlaySheet(view: OverlayView, screen: ImageBitmap?, level: Float,
             )
             return
         }
-        is OverlayView.OnScreen -> return
+        is OverlayView.OnScreen, is OverlayView.Minimized -> return
         else -> Unit
     }
     ModeOverlaySheet {
@@ -125,10 +127,11 @@ private fun Header(view: OverlayView, speaking: Boolean, onEvent: (OverlayEvent)
         is OverlayView.Failed -> Quad(MoMood.Stuck, stringResource(R.string.overlay_failed), ModeOverlayTone.Problem, view.task)
         is OverlayView.Typing -> Quad(MoMood.Idle, stringResource(R.string.overlay_type), ModeOverlayTone.Working, stringResource(R.string.overlay_sub_ready))
         OverlayView.NeedsMic -> Quad(MoMood.YourTurn, stringResource(R.string.overlay_mic_title), ModeOverlayTone.Asking, "")
+        is OverlayView.Paused -> Quad(MoMood.Sleep, stringResource(R.string.overlay_paused), ModeOverlayTone.Working, stringResource(R.string.overlay_sub_ready))
         else -> Quad(MoMood.Idle, "", ModeOverlayTone.Working, "")
     }
     ModeOverlayHeader(
-        mood, status, tone, sub, stringResource(R.string.overlay_slim), stringResource(R.string.overlay_close),
+        mood, status, tone, sub, stringResource(R.string.overlay_slim_icon), stringResource(R.string.overlay_close),
         onSlim = { onEvent(OverlayEvent.Slim) }, onClose = { onEvent(OverlayEvent.Close) },
     )
 }
@@ -207,6 +210,10 @@ private fun Body(view: OverlayView, screen: ImageBitmap?, onEvent: (OverlayEvent
                 if (text.isNotBlank()) onEvent(OverlayEvent.Send(text, view.questionId))
             }, enabled = text.isNotBlank())
         }
+        is OverlayView.Paused -> {
+            if (view.line.isNotBlank()) ModeOverlayLine(view.line, quiet = true)
+            if (view.chips.isNotEmpty()) Chips(view.chips) { onEvent(OverlayEvent.Say(it)) }
+        }
         OverlayView.NeedsMic -> {
             ModeText(stringResource(R.string.overlay_mic_body), ModeTextStyle.Subheadline, color = c.textSecondary)
             ModeVoiceButton(stringResource(R.string.overlay_mic_allow), ModeVoiceButtonStyle.Info, { onEvent(OverlayEvent.AllowMic) }, icon = ModeIcon.Microphone)
@@ -225,6 +232,13 @@ private fun Strip(view: OverlayView, level: Float, speaking: Boolean, onEvent: (
         is OverlayView.Result -> Triple(view.listening || speaking, R.string.overlay_hint_next, false)
         is OverlayView.Failed -> Triple(view.listening || speaking, R.string.overlay_hint_failed, false)
         else -> Triple(false, 0, false)
+    }
+    if (view is OverlayView.Paused) {
+        ModeListeningStrip(
+            stringResource(R.string.overlay_hint_tap_mic), 0f, answering = false, stringResource(R.string.overlay_type), { onEvent(OverlayEvent.TypeInstead) },
+            micLabel = stringResource(R.string.overlay_mic_on), onMic = { onEvent(OverlayEvent.Listen) },
+        )
+        return
     }
     if (!listening) return
     ModeListeningStrip(
@@ -257,6 +271,20 @@ private fun ResultRow(row: TalkResultRow) {
 internal fun OverlayButton(bubble: String, onEvent: (OverlayEvent) -> Unit) {
     Box(Modifier.padding(ModeSpacing.m)) {
         ModeOverlayButton(bubble, stringResource(R.string.overlay_button), { onEvent(OverlayEvent.Pause) })
+    }
+}
+
+/** Shrunk: Mo at the edge, saying what it's doing; a tap brings the overlay back. */
+@Composable
+internal fun OverlayMinimized(view: OverlayView.Minimized, onEvent: (OverlayEvent) -> Unit) {
+    val (mood, bubble) = when (view.kind) {
+        MinimizedKind.Listening -> MoMood.Listening to stringResource(R.string.talk_bar_listening)
+        MinimizedKind.Speaking -> MoMood.Idle to view.text
+        MinimizedKind.Working -> MoMood.Working to view.text
+        MinimizedKind.Paused -> MoMood.Sleep to null
+    }
+    Box(Modifier.padding(ModeSpacing.m)) {
+        ModeOverlayButton(bubble, stringResource(R.string.overlay_open), { onEvent(OverlayEvent.Expand) }, mood = mood)
     }
 }
 
