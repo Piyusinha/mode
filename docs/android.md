@@ -112,8 +112,13 @@ Known gap: the Play build has no phone control, so its setup will need its own p
 - **Notifications** (`AndroidNotifier`): results open their chat; Mode's questions go on a high-importance channel with buttons from `QuestionActions` (shared, tested): Yes / No, Always, up to three choices (more choices end in a typed "something else"), a typed reply (RemoteInput), or "I've entered it". `AnswerReceiver` answers the task without opening Mode and withdraws the notification.
 - **The working notice** follows the task (`WorkNotice.progress`, fed from the shared `LiveActivityPresenter`): what Mode is doing, the plan as a progress bar, a running clock, or waiting for the phone to unlock; Stop ends the task.
 - **Repeats** remind with an exact alarm (`SCHEDULE_EXACT_ALARM`; inexact when the user hasn't allowed it). `ScheduleReceiver` shows the reminder; `BootReceiver` re-arms every repeat after a restart, an update, or a clock or time zone change (`Scheduler.rearmAll`).
-- **Voice** (`AndroidDeviceVoice` behind the shared `DeviceVoice`): text-to-speech with the phone's voices (named "English (India) · Voice 2", the user's accent first); listening live with the speech recognizer, on the device when its speech pack is there, otherwise the phone's regular recognizer while Android downloads the pack; a 16 kHz WAV with echo cancelling for a cloud listener (Deepgram, Soniox). `VoiceLevel` feeds talking mode's orb and bars and its "can't hear you".
-- **Talking mode** (`talk/Talk.kt`, the Talking mode boards) over the shared `ListenPresenter`: from Ask's mic, a chat's mic, `mode://talk`, `mode://listen`, the assistant, and a spoken question in a running task.
+- **Voice** (`AndroidDeviceVoice` behind the shared `DeviceVoice`): text-to-speech with the phone's voices (named "English (India) · Voice 2", the user's accent first); a provider's clip (ElevenLabs, Fish Audio) with the media player; Speechify's stream, played as it arrives (an `AudioTrack` fed on its own thread, sounding from the first chunk, over once what was sent has been heard). Stopping a line (Stop, closing, the next line) always answers whoever waits on it, and a line whose sound had begun counts as said, so stopping Mode mid-sentence is never shown as a voice that failed. Listening live with the speech recognizer, on the device when its speech pack is there, otherwise the phone's regular recognizer while Android downloads the pack; a 16 kHz WAV with echo cancelling for a cloud listener (Deepgram, Soniox). `VoiceLevel` feeds talking mode's orb and bars and its "can't hear you".
+- **Voice sessions** (`talk/Talk.kt`, the Talking mode and Voice session flow boards) over the shared `ListenPresenter`: from Ask's mic, a chat's mic, `mode://talk`, `mode://listen`, the assistant, and a spoken question in a running task. As on the iPhone, a session stays open after a task until it is ended (End, the bar's ×, "that's all", or 15 minutes paused with nothing running), and it is owned by the shell (`Navigator.talk`, one `TalkSession` with its presenter), not by its screen:
+  - ⌄ or Back shrinks the screen into the **session bar** (`ModeSessionBar`): above the tabs, at the bottom of any other page, or above a chat's message bar (`LocalSessionBar`). It says what the session is doing (listening, talking, working, needs you, paused); a tap opens the screen again, the mic pauses or resumes listening, × ends the session, Stop stops the task.
+  - Stop in a session only stops the task: Mode says so and listens again.
+  - A session from a chat's mic continues that chat (its last messages, an offer to carry on a task that stopped). Asking for a session while one is open brings that one back, unless it belongs to another chat: then it ends and the new one starts.
+  - Android only: leaving Mode while it waits for words pauses the mic (Android gives the microphone to the app in front); not while its task works, since that is Mode in another app, and it listens again when it comes back. The bar's mic after typing or a failed listen listens again and keeps the conversation (`ListenPresenter.listenAgain`).
+  - Over someone else's app the agent overlay has no bar: when it goes quiet after a task it closes, and the next "Ask Mode" starts fresh. Summoning it ends a session left open in Mode's app (one session at a time).
 - **Start by voice** ("Ask Mode"): Mode doesn't replace the phone's assistant. Setup's "Start by voice" switch
   shows a second app entry, "Ask Mode" (an activity alias of the main screen), which opens straight into a voice
   session, so "Hey Google, open Ask Mode" (or Gemini, Bixby) starts the same conversation as "Hey Siri, start
@@ -124,7 +129,7 @@ Known gap: the Play build has no phone control, so its setup will need its own p
   forwards to the phone's own one.
 - **The widget** (`widget/ModeWidget.kt`, board "Home screen widget"): the mic opens talking mode; two suggestions run at once through `mode://run/<task>` and open their chat. Redrawn after each task.
 
-To try these on an emulator (debug builds): `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT app.heymode.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
+To try these on an emulator (debug builds): `--es op stream --ef s 3` plays a tone the way Speechify's stream arrives (`tone` plays it plainly, to compare; the emulator's audio runs at about half speed), `--es op ask --es kind Choice --es options 'Home|Work|Gym'` posts a question, `--es op widget` asks the launcher to pin the widget, and `adb shell cmd role add-role-holder android.app.role.ASSISTANT app.heymode.mode` then `adb shell input keyevent KEYCODE_ASSIST` starts Mode as the assistant.
 
 ## Releases
 
@@ -138,6 +143,11 @@ To try these on an emulator (debug builds): `--es op ask --es kind Choice --es o
 - `.github/workflows/release-android.yml`, on the phone app's release tag `Mode-Mobile-Build-<version>` (made by
   `tools/release-app.sh`), builds and signs the APK from the repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
   and attaches it to the draft release. Without the secrets it builds unsigned and attaches nothing.
+- **A newer Mode** (`ModeUpdates`, shared): once a day Settings asks GitHub for Mode's releases. A release is an
+  update only where it carries that platform's file (`AppInfo.releaseFile`: `Mode.ipa`, `Mode.apk`), so Android is
+  never told about an iPhone-only release. Settings then says "Mode 0.2.0 is available" with a row to the release
+  page (the APK is downloaded and installed over this one), and shows this Mode's version at the bottom.
+  Settings › Developer shows only in debug builds.
 - Not shrunk (no R8) yet: the helper is started by class name from the APK, and the link and storage use
   reflection. The APK is about 55 MB; keep rules and per-ABI APKs would bring it down.
 - **The Play build** (`play` flavour, `app.heymode.mode.play`) has nothing that drives the phone: no accessibility
