@@ -310,6 +310,12 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
         }
     }
 
+    /**
+     * A task over the user's own app ended and left a System UI panel open (Quick Settings it read from, the shade):
+     * closed, as the user had it. Blocks briefly: call off the main thread.
+     */
+    fun closePanels() = closeSystemUi()
+
     /** Closes System UI's dialogs (Back) and the shade, so what opens next is seen. */
     private fun closeSystemUi() {
         repeat(SYSTEM_UI_TRIES) {

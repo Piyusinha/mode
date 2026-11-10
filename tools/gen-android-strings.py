@@ -55,6 +55,9 @@ OVERRIDES = {
     "start.mo.faceID": "Fingerprint",
     # Android has no "Hey Mode": the user's own assistant opens Ask Mode by name (Mode never asks to replace it).
     "tips.start.message": "Say “Hey Google, open Mode” from anywhere, and Mo starts listening.",
+    # The session bar is narrow on most Android phones: the paused lines are kept short enough not to be cut off.
+    "talk.bar.paused": "Mic paused",
+    "talk.bar.pausedDetail": "Tap the mic to talk",
     "updates.howTo": "Download it from Mode’s release page and install it over this one. Your chats and settings stay.",
     "voice.appleBanner": "**Free and private.** These voices run on your phone, even offline. Get more in Settings › Accessibility › Text-to-speech output.",
 }

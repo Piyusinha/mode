@@ -71,7 +71,12 @@ internal sealed interface OverlayEvent {
 
 /** The sheet or the slim bar, whichever the state calls for. */
 @Composable
-internal fun OverlaySheet(view: OverlayView, screen: ImageBitmap?, level: Float, speaking: Boolean, onEvent: (OverlayEvent) -> Unit) {
+internal fun OverlaySheet(
+    view: OverlayView, screen: ImageBitmap?, level: Float, speaking: Boolean,
+    /** Background mode is on: tasks run on a hidden screen. Otherwise Mo works on the user's own screen. */
+    hidden: Boolean,
+    onEvent: (OverlayEvent) -> Unit,
+) {
     when (view) {
         is OverlayView.Working -> if (view.slim) {
             ModeOverlayBar(
@@ -103,19 +108,21 @@ internal fun OverlaySheet(view: OverlayView, screen: ImageBitmap?, level: Float,
         else -> Unit
     }
     ModeOverlaySheet {
-        Header(view, speaking, onEvent)
+        Header(view, speaking, hidden, onEvent)
         Body(view, screen, onEvent)
         Strip(view, level, speaking, onEvent)
     }
 }
 
 @Composable
-private fun Header(view: OverlayView, speaking: Boolean, onEvent: (OverlayEvent) -> Unit) {
+private fun Header(view: OverlayView, speaking: Boolean, hidden: Boolean, onEvent: (OverlayEvent) -> Unit) {
+    // Only with background mode on does Mode work on a hidden screen; otherwise it uses the user's own.
+    val ready = stringResource(if (hidden) R.string.overlay_sub_ready else R.string.overlay_sub_screen)
     val (mood, status, tone, sub) = when (view) {
         is OverlayView.Greet -> Quad(
             if (view.listening) MoMood.Listening else MoMood.Idle,
             stringResource(if (speaking || !view.listening) R.string.overlay_speaking else R.string.overlay_listening),
-            ModeOverlayTone.Live, stringResource(R.string.overlay_sub_ready),
+            ModeOverlayTone.Live, ready,
         )
         is OverlayView.Heard -> Quad(MoMood.Listening, stringResource(R.string.overlay_hearing), ModeOverlayTone.Live, stringResource(R.string.overlay_sub_words))
         is OverlayView.Working -> Quad(
@@ -125,9 +132,9 @@ private fun Header(view: OverlayView, speaking: Boolean, onEvent: (OverlayEvent)
         is OverlayView.Question -> Quad(MoMood.YourTurn, stringResource(R.string.overlay_asking), ModeOverlayTone.Asking, view.task)
         is OverlayView.Result -> Quad(MoMood.Done, stringResource(R.string.overlay_done), ModeOverlayTone.Done, view.task)
         is OverlayView.Failed -> Quad(MoMood.Stuck, stringResource(R.string.overlay_failed), ModeOverlayTone.Problem, view.task)
-        is OverlayView.Typing -> Quad(MoMood.Idle, stringResource(R.string.overlay_type), ModeOverlayTone.Working, stringResource(R.string.overlay_sub_ready))
+        is OverlayView.Typing -> Quad(MoMood.Idle, stringResource(R.string.overlay_type), ModeOverlayTone.Working, ready)
         OverlayView.NeedsMic -> Quad(MoMood.YourTurn, stringResource(R.string.overlay_mic_title), ModeOverlayTone.Asking, "")
-        is OverlayView.Paused -> Quad(MoMood.Sleep, stringResource(R.string.overlay_paused), ModeOverlayTone.Working, stringResource(R.string.overlay_sub_ready))
+        is OverlayView.Paused -> Quad(MoMood.Sleep, stringResource(R.string.overlay_paused), ModeOverlayTone.Working, ready)
         else -> Quad(MoMood.Idle, "", ModeOverlayTone.Working, "")
     }
     ModeOverlayHeader(

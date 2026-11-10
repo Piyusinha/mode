@@ -867,14 +867,7 @@ public class ListenPresenter(
         const val STOP_WAIT_MS: Long = 30_000L
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
-        fun isWrapUp(text: String): Boolean {
-            val said = text.lowercase().replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()
-            if (said.isEmpty() || said.split(' ').size > WRAP_UP_WORDS) return false
-            // Only wrap-up words and fillers ("that's it, thanks", "bye Mo"): anything else is a request.
-            var rest = " $said "
-            (WRAP_UPS + FILLERS).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
-            return rest.isBlank()
-        }
+        fun isWrapUp(text: String): Boolean = onlyWords(text, WRAP_UPS)
 
         /** "Yes", "sure, go ahead": yes to Mode's offer. */
         fun isYes(text: String): Boolean = onlyWords(text, YESES)
@@ -885,13 +878,14 @@ public class ListenPresenter(
         /** They said the button's words ("yes look there"). */
         fun same(text: String, label: String): Boolean = norm(text) == norm(label)
 
-        private fun norm(text: String) = text.lowercase().replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()
+        /** Lower case, letters only: "That's all!" and "thats all" read the same (typed often drops the apostrophe). */
+        private fun norm(text: String) = text.lowercase().replace("'", "").replace("\u2019", "").replace(Regex("[^a-z ]"), " ").replace(Regex("\\s+"), " ").trim()
 
         private fun onlyWords(text: String, words: List<String>): Boolean {
             val said = norm(text)
             if (said.isEmpty() || said.split(' ').size > WRAP_UP_WORDS) return false
             var rest = " $said "
-            (words + FILLERS).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
+            (words + FILLERS).map(::norm).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
             return rest.isBlank()
         }
 

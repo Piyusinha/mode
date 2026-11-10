@@ -749,8 +749,8 @@
     <string name="talk_bar_open">Tap to open</string>
     <string name="talk_bar_open_label">Open the voice session</string>
     <string name="talk_bar_pause">Pause listening</string>
-    <string name="talk_bar_paused">Session open · mic paused</string>
-    <string name="talk_bar_paused_detail">Tap the mic to talk again</string>
+    <string name="talk_bar_paused">Mic paused</string>
+    <string name="talk_bar_paused_detail">Tap the mic to talk</string>
     <string name="talk_bar_resume">Resume listening</string>
     <string name="talk_bar_speaking_detail">Mode is talking · tap to see it all</string>
     <string name="talk_bar_stop">Stop</string>

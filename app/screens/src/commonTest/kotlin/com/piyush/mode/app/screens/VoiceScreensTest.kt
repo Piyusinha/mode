@@ -336,7 +336,7 @@ class VoiceScreensTest {
 
     @Test
     fun aWrapUpIsTheWholeReplyNotAWordInsideATask() {
-        listOf("That's all", "thanks", "No thank you.", "bye Mo", "nahi bas", "that's it, thanks").forEach {
+        listOf("That's all", "thats all", "That’s all.", "thanks", "No thank you.", "bye Mo", "nahi bas", "that's it, thanks", "Im done").forEach {
             assertTrue(ListenPresenter.isWrapUp(it), it)
         }
         listOf("Text Priya thanks for dinner", "No, order the large one", "Stop the music on Spotify please now").forEach {

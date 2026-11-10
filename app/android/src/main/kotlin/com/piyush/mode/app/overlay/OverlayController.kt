@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.view.Gravity
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -159,6 +160,7 @@ object OverlayController {
         begun = false
         sawWork = false
         leftInApp = 0
+        wasWorking = false
         local.value = OverlayLocal()
         state.value = null
         // A question still open goes back to a notification: the overlay was the one asking it.
@@ -192,6 +194,7 @@ object OverlayController {
                 val withTakeover = combine(local, UserTakeover.active) { loc, theirs -> loc.copy(takenOver = theirs) }
                 combine(talk.state, act.state, run.state, withTakeover, suggestions.state) { s, a, l, loc, homeState ->
                     if (a is ActivityUiState.Working) sawWork = true
+                    tidyAfter(a, s.leftInApp)
                     val chips = (homeState.suggestions.map { it.text } + homeState.tryThese).distinct().take(CHIPS)
                     overlayView(s, a, l, loc, onHiddenScreen = com.piyush.mode.app.graph.background?.working == true, chips) to (s.finished to a)
                 }.collect { (v, end) ->
@@ -252,13 +255,11 @@ object OverlayController {
         if (v is OverlayView.Minimized) {
             h.hide(OverlayWindow.Sheet)
             h.hide(OverlayWindow.Glow)
-            val y = ((app?.resources?.displayMetrics?.heightPixels ?: 0) * BUTTON_HEIGHT).toInt()
-            h.show(OverlayWindow.Button, WindowSpec(Gravity.END or Gravity.TOP, y = y)) { Themed { ButtonRoute() } }
+            h.show(OverlayWindow.Button, WindowSpec(Gravity.END or Gravity.BOTTOM, y = buttonFromBottom())) { Themed { ButtonRoute() } }
         } else if (v is OverlayView.OnScreen) {
             h.hide(OverlayWindow.Sheet)
             h.show(OverlayWindow.Glow, WindowSpec(Gravity.FILL, fullScreen = true, touchable = false)) { Themed { OverlayGlow() } }
-            val y = ((app?.resources?.displayMetrics?.heightPixels ?: 0) * BUTTON_HEIGHT).toInt()
-            h.show(OverlayWindow.Button, WindowSpec(Gravity.END or Gravity.TOP, y = y)) { Themed { ButtonRoute() } }
+            h.show(OverlayWindow.Button, WindowSpec(Gravity.END or Gravity.BOTTOM, y = buttonFromBottom())) { Themed { ButtonRoute() } }
         } else {
             h.hide(OverlayWindow.Button)
             h.hide(OverlayWindow.Glow)
@@ -279,7 +280,11 @@ object OverlayController {
         val current = v ?: return
         val jpeg = (current as? OverlayView.Working)?.screen
         val screen = remember(jpeg) { jpeg?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() } }
-        OverlaySheet(current, screen, level, speaking, ::onEvent)
+        // The keyboard sits above Mode's overlay window and Android doesn't move it out of the way: the sheet lifts
+        // itself by the keyboard's height so the text box stays in sight.
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.imePadding()) {
+            OverlaySheet(current, screen, level, speaking, hidden = com.piyush.mode.app.graph.background?.enabled == true, onEvent = ::onEvent)
+        }
     }
 
     @Composable
@@ -356,6 +361,31 @@ object OverlayController {
         }
     }
 
+    private var wasWorking = false
+
+    /**
+     * Where Mo sits, from the bottom: its window grows upward when its bubble shows, so Mo itself never moves (it
+     * jumped under the user's finger when the bubble came or went).
+     */
+    private fun buttonFromBottom(): Int = ((app?.resources?.displayMetrics?.heightPixels ?: 0) * (1 - BUTTON_HEIGHT)).toInt()
+
+    /**
+     * A task ended over the user's app: anything of System UI it left open (Quick Settings it read the battery from)
+     * closes, unless the task was to leave them there (it then counts in [leftInApp], a moment later).
+     */
+    private fun tidyAfter(activity: ActivityUiState, leftSoFar: Int) {
+        val working = activity is ActivityUiState.Working
+        if (wasWorking && !working) {
+            scope.launch {
+                delay(TIDY_AFTER_MS)
+                if ((session?.state?.value?.leftInApp ?: leftSoFar) == leftSoFar) {
+                    withContext(Dispatchers.Default) { runCatching { ServiceRegistry.service.value?.closePanels() } }
+                }
+            }
+        }
+        wasWorking = working
+    }
+
     /** How many tasks have left the user in their app so far (each one makes the overlay step aside once). */
     private var leftInApp = 0
 
@@ -363,6 +393,8 @@ object OverlayController {
     var openEntry: (() -> Unit)? = null
 
     private const val CHIPS = 2
+    /** Long enough for the session to say whether the task meant to leave them where it ended. */
+    private const val TIDY_AFTER_MS = 1_000L
     private const val SLIM_AFTER_MS = 4_000L
     private const val CLOSE_AFTER_MS = 2_000L
     /** The Mo button sits a little below the middle of the screen's right edge. */

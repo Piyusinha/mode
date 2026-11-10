@@ -135,7 +135,8 @@ internal class OverlayHost(private val service: AccessibilityService) {
         ).apply {
             gravity = spec.gravity
             y = spec.y
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            // The window doesn't move for the keyboard (it's drawn above this one); the sheet pads itself instead.
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
         }
     }
 
