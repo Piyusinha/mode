@@ -3,7 +3,6 @@ package com.piyush.mode.app.assistant
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.service.voice.VoiceInteractionService
 import android.service.voice.VoiceInteractionSession
@@ -11,8 +10,6 @@ import android.service.voice.VoiceInteractionSessionService
 import android.speech.RecognitionListener
 import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
-import com.piyush.mode.app.MainActivity
-import com.piyush.mode.app.shell.DeepLink
 import com.piyush.mode.core.common.AppLog
 
 /**
@@ -30,8 +27,9 @@ class ModeAssistantSession(context: Context) : VoiceInteractionSession(context) 
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         AppLog.log("assistant", "started from the assistant button")
-        val listen = Intent(Intent.ACTION_VIEW, Uri.parse("${DeepLink.SCHEME}://listen"), context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        // Mode's overlay over the app the user is in (Mode's own voice screen without phone control).
+        val listen = Intent(context, com.piyush.mode.app.VoiceEntryActivity::class.java)
+            .putExtra(com.piyush.mode.app.VoiceEntryActivity.ENTRY, "assistant").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         // A plain launch, not startAssistantActivity: an assistant activity goes with the session, and hiding the
         // session (below) hid Mode with it on Android 16. While the session shows, Android lets Mode start.
         runCatching { context.startActivity(listen) }

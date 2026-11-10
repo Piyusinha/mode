@@ -91,17 +91,6 @@ class MainActivity : ComponentActivity() {
             shell.navigator.talk(com.piyush.mode.app.talk.TalkRequest())
             return
         }
-        // "Hey Google, open Mode": Gemini only knows apps by their main name, so with Start by voice on, Mode opened
-        // by the phone's assistant starts listening too. A tap on Mode's icon (the launcher opens it) doesn't.
-        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER)) {
-            val from = referrer?.host
-            AppLog.log("link", "opened from ${from ?: "unknown"}")
-            if (from in ASSISTANTS && com.piyush.mode.app.graph.startByVoiceOn(application)) {
-                AppLog.log("link", "opened by the assistant: listening")
-                shell.navigator.talk(com.piyush.mode.app.talk.TalkRequest())
-            }
-            return
-        }
         val data = intent.dataString ?: return
         // OpenRouter's sign-in page answers here; the providers sheet finishes it.
         if (data.startsWith(com.piyush.mode.app.screens.onboarding.OnboardingPresenter.SIGN_IN_CALLBACK)) {
@@ -138,12 +127,6 @@ class MainActivity : ComponentActivity() {
         /** The small window's shape (board R02: 164 × 332). */
         const val PIP_WIDTH = 1
         const val PIP_HEIGHT = 2
-
-        /** Apps that open Mode when the user asks their assistant to (Google, Gemini, Bixby). */
-        val ASSISTANTS = setOf(
-            "com.google.android.googlequicksearchbox", "com.google.android.apps.bard", "com.google.android.apps.googleassistant",
-            "com.samsung.android.bixby.agent", "com.samsung.android.visionintelligence",
-        )
 
         /** Set on an intent once its link was followed, so a rotation doesn't follow it again. */
         const val FOLLOWED = "mode.followed"

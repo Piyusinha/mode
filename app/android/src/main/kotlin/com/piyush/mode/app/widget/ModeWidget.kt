@@ -48,7 +48,16 @@ class ModeWidget : AppWidgetProvider() {
             val suggestions = suggestions(context)
             val views = RemoteViews(context.packageName, R.layout.widget_mode)
             views.setOnClickPendingIntent(R.id.widget_root, link(context, "${DeepLink.SCHEME}://open"))
-            views.setOnClickPendingIntent(R.id.widget_mic, link(context, "${DeepLink.SCHEME}://listen"))
+            // The mic: Mode's overlay listening over the home screen (Mode's own voice screen without phone control).
+            views.setOnClickPendingIntent(
+                R.id.widget_mic,
+                PendingIntent.getActivity(
+                    context, MIC,
+                    Intent(context, com.piyush.mode.app.VoiceEntryActivity::class.java)
+                        .putExtra(com.piyush.mode.app.VoiceEntryActivity.ENTRY, "widget").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
             views.setViewVisibility(R.id.widget_suggestions, if (suggestions.isEmpty()) View.GONE else View.VISIBLE)
             listOf(R.id.widget_suggestion_1, R.id.widget_suggestion_2).forEachIndexed { i, id ->
                 val text = suggestions.getOrNull(i)
@@ -78,6 +87,8 @@ class ModeWidget : AppWidgetProvider() {
         )
 
         private const val WAIT_MS = 2_000L
+        /** The mic's request code, apart from the links' (they use their link's hash). */
+        private const val MIC = -1
         private const val SHOWN = 2
     }
 }

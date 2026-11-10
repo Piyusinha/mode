@@ -123,10 +123,14 @@ Known gap: the Play build has no phone control, so its setup will need its own p
   shows a second app entry, "Ask Mode" (an activity alias of the main screen), which opens straight into a voice
   session, so "Hey Google, open Ask Mode" (or Gemini, Bixby) starts the same conversation as "Hey Siri, start
   Mode": one task after another until "that's all". The widget's mic and Ask's mic do the same.
-  Gemini only finds apps by their main name ("I couldn't find an app called Ask mode", seen 10 Nov), so with Start
-  by voice on, Mode opened by the assistant (`Activity.referrer`: the Google app, Gemini, Bixby) also starts
-  listening: "Hey Google, open Mode". A tap on Mode's icon (the launcher opens it) opens Mode as usual. Start by
-  voice can be turned off in Permissions, and the "Ask Mode" icon goes with it.
+  Every voice entry opens the **overlay** over the app the user is in (`VoiceEntryActivity`, invisible, gone at
+  once; Mode's own voice screen when phone control is off): "Ask Mode", the widget's mic, Mode as the assistant, and
+  "Hey Google, open Mode". Gemini only finds apps by their main name ("I couldn't find an app called Ask mode",
+  seen 10 Nov), so Mode's icon is `LaunchActivity`, an invisible front door that reads who opened it
+  (`Activity.referrer`: the Google app, Gemini, Bixby) on every launch. Android brings an open Mode forward without
+  telling it who asked, so the check can't live in `MainActivity`. A tap on the icon opens Mode as usual. Start by
+  voice can be turned off in Permissions, and the "Ask Mode" icon goes with it. Gemini may hear "Mode" as Night
+  Light (seen 10 Nov: "open Mode" opened Night Light settings four times); "open the Mode app" is the phrase to try.
 - **The accessibility shortcut** (`ServiceRegistry.onShortcut`): the floating button, a two-finger swipe up or both
   volume keys, pointed at Mode in Settings › Accessibility › Mode shortcut, opens the overlay over the app in front
   (Mode's voice screen when Mode is in front). No assistant needed. Setup's "Shortcut to Mode" row reads it back from
