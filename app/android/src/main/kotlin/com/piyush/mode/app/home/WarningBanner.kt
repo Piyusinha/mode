@@ -42,7 +42,7 @@ import com.piyush.mode.design.ModeWarningTone
  * comes to the front, phone control's service comes or goes, the network changes, or background mode is switched.
  */
 @Composable
-fun WarningBannerHost(graph: ModeGraph, pages: SystemPages, navigate: (Route) -> Unit) {
+fun WarningBannerHost(graph: ModeGraph, pages: SystemPages, showing: Route?, navigate: (Route) -> Unit) {
     val context = LocalContext.current
     val presenter: WarningsPresenter = rememberPresenter("warnings") { graph.screens.warnings(brand = { brandOf(SharedPrefsStore(context))?.name }) }
     val state by presenter.state.collectAsStateWithLifecycle()
@@ -61,7 +61,8 @@ fun WarningBannerHost(graph: ModeGraph, pages: SystemPages, navigate: (Route) ->
         onDispose { runCatching { manager?.unregisterNetworkCallback(callback) } }
     }
 
-    val warning = state.current
+    // Not over the page it sends you to: there it would only say what the page already says, and open it again.
+    val warning = state.current?.takeIf { fixPage(it.kind) == null || fixPage(it.kind) != showing }
     AnimatedVisibility(visible = warning != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         // The last warning stays for the way out.
         val shown = warning ?: return@AnimatedVisibility
@@ -87,14 +88,22 @@ private fun WarningBanner(w: Warning, onAction: () -> Unit, onClose: () -> Unit)
     )
 }
 
+/** The page in Mode a banner's button opens (null: it opens a page of the phone's Settings instead). */
+private fun fixPage(kind: WarningKind): Route? = when (kind) {
+    WarningKind.Locked, WarningKind.PhoneControlOff -> Route.PhoneSetup
+    WarningKind.BackgroundWaitingWifi -> Route.Background
+    WarningKind.PhoneControlStopped, WarningKind.BackgroundLinkLost, WarningKind.NoSpeech -> null
+}
+
 /** Where each banner's button goes. */
 private fun act(w: Warning, pages: SystemPages, navigate: (Route) -> Unit) {
+    val page = fixPage(w.kind)
+    if (page != null) return navigate(page)
     when (w.kind) {
-        WarningKind.Locked, WarningKind.PhoneControlOff -> navigate(Route.PhoneSetup)
         WarningKind.PhoneControlStopped -> pages.accessibility()
         WarningKind.BackgroundLinkLost -> pages.wirelessDebugging()
-        WarningKind.BackgroundWaitingWifi -> navigate(Route.Background)
         WarningKind.NoSpeech -> pages.store(GOOGLE_APP)
+        else -> Unit
     }
 }
 

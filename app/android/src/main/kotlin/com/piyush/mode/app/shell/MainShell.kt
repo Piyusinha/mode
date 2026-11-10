@@ -104,7 +104,7 @@ fun MainShell(graph: ModeGraph, shell: ShellViewModel, pages: SystemPages, signI
     if (shellBar == null) barHeight = ModeSpacing.none
     Column(Modifier.fillMaxSize()) {
         // What stopped working since setup, over every tab; the page below makes room for it.
-        WarningBannerHost(graph, pages, navigate = { nav.push(it) })
+        WarningBannerHost(graph, pages, showing = stack.lastOrNull()?.route, navigate = { nav.push(it) })
         Box(Modifier.fillMaxSize()) {
         androidx.compose.runtime.CompositionLocalProvider(com.piyush.mode.app.talk.LocalSessionBar provides sessionBar?.takeIf { inChat }) {
         AnimatedContent(

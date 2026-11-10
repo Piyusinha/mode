@@ -29,6 +29,8 @@ object UserTakeover {
     private var live: LiveRunPresenter? = null
     /** The app Mode was last seen using on the hidden display. */
     private var using: String? = null
+    /** That app's task there: only this very task, seen on the user's screen, means they took it. */
+    private var usingTask: Int? = null
     private var leftFor = 0
     private var gone = 0
 
@@ -69,24 +71,35 @@ object UserTakeover {
         val busy = task is ActivityUiState.Working || (task is ActivityUiState.Waiting && !task.yourTurn)
         if (!busy || !mode.working) {
             if (_active.value && task !is ActivityUiState.Waiting) giveBack()
-            if (!busy) using = null
+            if (!busy) { using = null; usingTask = null }
             return
         }
         val service = ServiceRegistry.service.value ?: return
         val hidden = mode.hiddenDisplay ?: return
         val onHidden = service.appInFront(hidden)
-        if (onHidden != null && onHidden != ownPackage) using = onHidden
+        if (onHidden != null && onHidden != ownPackage) {
+            // Asked once per app (a round trip to the helper), not on every look.
+            if (onHidden != using || usingTask == null) usingTask = mode.taskOnHidden()
+            using = onHidden
+        }
         val app = using ?: return
         val onUsers = service.appInFront(USER_DISPLAY)
         if (!_active.value) {
             // The hidden display lost its app to the user's screen: they opened it (two looks, not a passing moment).
             gone = if (onHidden == null && onUsers == app && !mode.withTheUser) gone + 1 else 0
-            if (gone >= LEFT_LOOKS && mode.userOpenedIt()) {
+            if (gone >= LEFT_LOOKS) {
                 gone = 0
-                live?.pause()
-                _active.value = true
-                leftFor = 0
-                AppLog.log("background", "paused while the user has $app")
+                if (mode.userOpenedIt(usingTask)) {
+                    live?.pause()
+                    _active.value = true
+                    leftFor = 0
+                    AppLog.log("background", "paused while the user has $app")
+                } else {
+                    // Their own window of that app (or Mode moved on): nothing was taken. Look again once Mode is
+                    // seen using an app on the hidden display.
+                    using = null
+                    usingTask = null
+                }
             }
             return
         }

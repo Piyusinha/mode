@@ -112,14 +112,26 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
         return ok
     }
 
+    /** The task on top of the hidden display (the app Mode is using there), or null. */
+    public suspend fun taskOnHidden(): Int? {
+        val id = display ?: return null
+        val session = helper ?: return null
+        return HelperAnswer.topTask(session.send(HelperCommand.top(id)))
+    }
+
     /**
      * The user opened, on their own screen, the app Mode was using: Android moved its task there (an app has one
      * window). Remembers that task so [giveBack] returns it to the hidden display.
+     *
+     * Only when the task on their screen is [expected], the very one Mode had on the hidden display. An app can have
+     * a window of its own on their screen (a second Chrome, their launcher): that one is theirs, and sending it to
+     * the hidden display would take their app away from them.
      */
-    public suspend fun userOpenedIt(): Boolean {
+    public suspend fun userOpenedIt(expected: Int?): Boolean {
         if (withUser != null) return true
         val session = helper ?: return false
         val task = HelperAnswer.topTask(session.send(HelperCommand.top(USER_DISPLAY))) ?: return false
+        if (expected == null || task != expected) return false
         withUser = task
         AppLog.log("background", "the user opened the app Mode was using")
         return true
@@ -131,6 +143,14 @@ public class BackgroundMode(context: Context, private val prefs: KeyValueStore) 
     /** The last try to reach the phone failed (Wireless debugging off, or Wi-Fi gone): the banner's "lost its link". */
     @Volatile public var lastConnectFailed: Boolean = false
         private set
+
+    /**
+     * The link is known to be down before any task tries it: the last try failed, or Wireless debugging is off and
+     * Mode can't switch it back on itself (setup's permission is gone). With the permission Mode turns it on when a
+     * task starts, so "off" alone is no trouble.
+     */
+    public val linkDown: Boolean
+        get() = lastConnectFailed || (!holdsSecureSettings() && runCatching { Settings.Global.getInt(app.contentResolver, ADB_WIFI, 0) == 0 }.getOrDefault(false))
 
     /** What keeps background mode from being set up or used on this phone right now, or null. */
     public fun block(): BackgroundBlock? = DeviceStatus.backgroundBlock(Build.VERSION.SDK_INT, wifiConnected(), debuggingAllowed())

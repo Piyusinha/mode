@@ -92,9 +92,16 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
         when (state.value) {
             BackgroundStep.DevOptions -> if (developerOptions) begin()
             BackgroundStep.Wireless -> if (wirelessDebugging) begin()
-            BackgroundStep.BlockedWifi, BackgroundStep.BlockedPolicy -> if (mode.block() == null) begin()
+            // Back on the page still waiting for Wi-Fi: watch for it again (the watch stopped when the page went).
+            BackgroundStep.BlockedWifi -> if (mode.block() == null) begin() else watchWifi()
+            BackgroundStep.BlockedPolicy -> if (mode.block() == null) begin()
             else -> Unit
         }
+    }
+
+    /** The page went (Back, another tab): nothing keeps watching the network for a page nobody sees. */
+    fun left() {
+        stopWifiWatch()
     }
 
     private fun blocked(step: BackgroundStep) {

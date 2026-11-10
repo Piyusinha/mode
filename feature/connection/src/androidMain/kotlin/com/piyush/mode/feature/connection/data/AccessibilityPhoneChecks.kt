@@ -66,7 +66,7 @@ public class AccessibilityPhoneChecks(
                 if (power.isIgnoringBatteryOptimizations(app.packageName)) CheckState.Passed(null) else CheckState.Failed("restricted", null)),
             PhoneCheckResult(PhoneCheckId.Speech, if (speechAvailable()) CheckState.Passed(null) else CheckState.Failed("no speech recognizer", null)),
         ) + DeviceStatus.manual(brand(), confirmed()) + listOfNotNull(
-            mode?.takeIf { it.enabled }?.let { PhoneCheckResult(PhoneCheckId.BackgroundLink, DeviceStatus.backgroundLink(it.wifiConnected(), it.lastConnectFailed)) },
+            mode?.takeIf { it.enabled }?.let { PhoneCheckResult(PhoneCheckId.BackgroundLink, DeviceStatus.backgroundLink(it.wifiConnected(), it.linkDown)) },
         )
     }
 

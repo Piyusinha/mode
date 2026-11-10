@@ -127,6 +127,7 @@ fun BackgroundRoute(setup: BackgroundSetup, pages: SystemPages, close: () -> Uni
     val step by setup.step.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { setup.refresh() }
+    androidx.compose.runtime.DisposableEffect(setup) { onDispose { setup.left() } }
     BackHandler { close() }
     BackgroundScreen(step) { event ->
         when (event) {
