@@ -25,11 +25,11 @@ your apps until it’s done, then tells you how it went.
 
 ## See it in action
 
-<a href="https://github.com/Piyusinha/mode/raw/main/docs/media/mode-story.mp4"><img src="docs/media/mode-story-preview.gif" alt="The film, playing: running late in the car, Mode texts Sam, reads the unread chats and orders the usual coffee, all by voice" width="100%"></a>
+<a href="https://www.youtube.com/watch?v=o0WiY1OYjkw"><img src="docs/media/mode-story-preview.gif" alt="The film, playing: running late in the car, Mode texts Sam, reads the unread chats and orders the usual coffee, all by voice" width="100%"></a>
 
 > Running late, hands on the wheel: *“Text Sam I’m ten minutes late. Any unread messages?
 > Order my usual coffee to the office.”* The iPhone does all three by itself.
-> ▶︎ [Watch the full film with sound](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-story.mp4) (71 s) · [the 23-second teaser](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-teaser.mp4)
+> ▶︎ [Watch the full film with sound on YouTube](https://www.youtube.com/watch?v=o0WiY1OYjkw) (71 s) · [the 23-second teaser](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-teaser.mp4)
 
 <br>
 
