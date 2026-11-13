@@ -1,8 +1,37 @@
 # Changelog: Mode
 
-What changed in each release of Mode, the phone app (iPhone now, Android next). Mode releases are
+What changed in each release of Mode, the phone app (iPhone and Android). Mode releases are
 tagged `Mode-Mobile-Build-<version>`, and `tools/release-app.sh` won't make one without its section here.
 Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.md](desktop/CHANGELOG.md).
+
+## 0.2.1 · 13 Nov 2026
+
+Mode for Android. The same Mode, on Android 13 and later: download `mode-android.apk` from this release
+and open it on the phone (Android asks once to allow installing from your browser or files app).
+
+- Everything the iPhone app does: tell Mode what you want by voice or by typing, and it does it in your
+  apps. Home, Tasks, chats, repeats, what Mode remembers, Mode's voices, and your own ChatGPT, Claude or
+  OpenRouter account, with keys kept in the phone's Keystore.
+- Two ways to work. On your screen: Mode taps and types where you can watch, and you can take over at any
+  point. In the background: Mode works on a hidden screen while you keep using your phone, and hands the
+  app to you when a step is yours (a PIN, a payment). Background mode needs Android 14, Wi-Fi and one
+  pairing with the phone's Wireless debugging, which Mode walks you through and then keeps up by itself.
+- Hands-free without replacing your assistant: "Hey Google, open Mode", the home screen widget, or the
+  accessibility shortcut over any app. Mo sits at the edge of the screen while a session is open, and
+  questions can be answered from the notification.
+- Setup checks what your phone needs (battery, autostart, the maker's own switches on Samsung and Xiaomi)
+  and Health says what to fix when something stops Mode from working.
+- No computer needed on Android: no Mode Setup, no cable.
+
+On the iPhone:
+
+- After a task that didn't finish, Mode says why in plain words and offers to try again; yes runs the same
+  task. Before, it moved straight on to "Anything else?".
+- A listen that fails once is tried again before Mode falls back to typing, so one hiccup doesn't end
+  hands-free talking.
+- "That's all" ends a voice session at any point, also before the first task.
+- If you stay quiet when Mode asks a question during a task, it asks again, up to twice.
+- When the AI can't be reached, the chat and the notification say so in plain words.
 
 ## 0.2.0 · 12 Nov 2026
 
