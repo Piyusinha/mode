@@ -60,6 +60,8 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
     private var watching: Job? = null
     /** The pairing port last seen on screen, for a code typed in the notification. */
     private var seenPort: Int? = null
+    /** Every port the Wireless debugging screens showed: the connect port is among them, under the pairing window. */
+    private val seenPorts = linkedSetOf<Int>()
 
     val enabled: Boolean get() = mode.enabled
 
@@ -164,6 +166,7 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
                 if (state.value == BackgroundStep.Wireless && wirelessDebugging) state.value = BackgroundStep.Pair
                 val seen = PairingWindow.read(screenTexts())
                 if (seen.port != null) seenPort = seen.port
+                seenPorts += seen.ports
                 val code = seen.code
                 val port = seen.port
                 if (state.value == BackgroundStep.Pair && code != null && port != null) {
@@ -187,7 +190,7 @@ class BackgroundSetup(context: Context, private val mode: BackgroundMode) {
     private suspend fun pair(code: String, port: Int) {
         stopWatching()
         state.value = BackgroundStep.Linking
-        val ok = mode.link.pair(code, port) && mode.link.connect()
+        val ok = mode.link.pair(code, port) && mode.link.connect(seenPorts = (seenPorts - port).toList())
         if (!ok) {
             AppLog.log("background", "pairing failed: ${mode.link.lastError ?: "not connected"}")
             return fail()

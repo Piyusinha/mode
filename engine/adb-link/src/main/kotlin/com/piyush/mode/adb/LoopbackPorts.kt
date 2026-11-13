@@ -27,13 +27,20 @@ public object LoopbackPorts {
     }
 
     private fun listening(port: Int, timeoutMs: Int): Boolean = runCatching {
-        Socket().use { it.connect(InetSocketAddress(LOCALHOST, port), timeoutMs) }
-        true
+        Socket().use {
+            it.connect(InetSocketAddress(LOCALHOST, port), timeoutMs)
+            // A connect whose own local port is the one probed connected to itself (TCP's simultaneous open on
+            // loopback): seen on the OnePlus, 13 Nov, as dozens of "listening" ports that nothing listens on.
+            it.localPort != port
+        }
     }.getOrDefault(false)
 
     private const val LOCALHOST = "127.0.0.1"
-    /** Closed loopback ports refuse at once; many at a time keeps a full pass to a second or two on a phone. */
-    private const val THREADS = 256
-    /** Some phones drop (not refuse) closed loopback ports, so each try waits this long at most. */
-    private const val CONNECT_MS = 25
+    /** Closed loopback ports refuse at once; many at a time keeps a full pass short (about 15 s on a OnePlus 9R). */
+    private const val THREADS = 64
+    /**
+     * Some phones drop (not refuse) closed loopback ports, so each try waits this long at most. Seen on the
+     * OnePlus, 13 Nov: at 25 ms the one port that mattered timed out under the load of the scan itself.
+     */
+    private const val CONNECT_MS = 300
 }

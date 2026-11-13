@@ -37,24 +37,32 @@ public class AdbLink(context: Context) {
     }
 
     /**
-     * Connects to Wireless debugging on this phone (it must be on): the port that worked last, else the one
+     * Connects to Wireless debugging on this phone (it must be on): the port that worked last, then [seenPorts]
+     * (what the Wireless debugging page showed as "IP address & Port" while Mode watched it), else the one
      * found on the phone's own loopback address. Never mDNS: on Android 17 that brings up a picker, which
      * closes Settings' pairing window. True once Mode can run commands.
      */
-    public suspend fun connect(lastPort: Int? = null): Boolean = lock.withLock {
+    public suspend fun connect(lastPort: Int? = null, seenPorts: List<Int> = emptyList()): Boolean = lock.withLock {
         withContext(Dispatchers.IO) {
             val m = manager()
             if (m.isConnected) return@withContext true
-            fun tryPort(port: Int) = runCatching { m.connect(LOCALHOST, port) }
-                .onFailure { lastError = "port $port: ${it::class.java.simpleName}: ${it.message}" }
-                .getOrDefault(false).also { if (it) this@AdbLink.port = port }
+            val tried = mutableSetOf<Int>()
+            fun tryPort(port: Int): Boolean {
+                if (!tried.add(port)) return false
+                return runCatching { m.connect(LOCALHOST, port) }
+                    .onFailure { lastError = "port $port: ${it::class.java.simpleName}: ${it.message}" }
+                    .getOrDefault(false).also { if (it) this@AdbLink.port = port }
+            }
             // The port that worked last first; the search only when it doesn't (Wireless debugging was toggled).
             if (lastPort != null && tryPort(lastPort)) return@withContext true
+            if (seenPorts.any(::tryPort)) return@withContext true
             // Up to Android 16 the phone says its port over mDNS (about a second). Android 17 shows a picker for
             // that, which would close Settings' pairing window, so there the loopback search finds it instead.
             val announced = if (Build.VERSION.SDK_INT <= LAST_SDK_WITHOUT_PICKER) discoverConnectPort() else null
-            if (announced != null && announced != lastPort && tryPort(announced)) return@withContext true
-            LoopbackPorts.open(LoopbackPorts.EPHEMERAL).filter { it != lastPort && it != announced }.any(::tryPort)
+            if (announced != null && tryPort(announced)) return@withContext true
+            val open = LoopbackPorts.open(LoopbackPorts.EPHEMERAL)
+            if (open.isEmpty()) lastError = "no port listens on the phone's loopback address"
+            open.any(::tryPort)
         }
     }
 

@@ -18,6 +18,15 @@ class PairingWindowTest {
     }
 
     @Test
+    fun thePagesConnectPortUnderTheWindowIsKeptToo() {
+        // The pairing window over the Wireless debugging page, whose "IP address & Port" row shows the connect port.
+        val seen = PairingWindow.read(listOf("Wireless debugging", "IP address & Port", "172.20.10.2:37555", "Pair with device", "020766", "172.20.10.2:40043"))
+        assertEquals("020766", seen.code)
+        assertEquals(37555, seen.port)
+        assertEquals(listOf(37555, 40043), seen.ports)
+    }
+
+    @Test
     fun otherScreensGiveNothing() {
         val seen = PairingWindow.read(listOf("Wireless debugging", "Device name", "sdk_gphone", "Version 1234567", "12:30"))
         assertNull(seen.code)

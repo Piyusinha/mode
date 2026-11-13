@@ -6,7 +6,12 @@ package com.piyush.mode.adb
  * language.
  */
 public object PairingWindow {
-    public data class Seen(val code: String?, val port: Int?)
+    /**
+     * [port] is the first address's port (the pairing window's); [ports] every port on screen, in order. The
+     * Wireless debugging page shows the connect port ("IP address & Port") under the pairing window, so a
+     * port seen here that isn't the pairing one is where Mode connects after.
+     */
+    public data class Seen(val code: String?, val port: Int?, val ports: List<Int> = listOfNotNull(port))
 
     private val CODE = Regex("""^\d{6}$""")
     private val ADDRESS = Regex("""^(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:.%\w]+]):(\d{2,5})$""")
@@ -14,8 +19,8 @@ public object PairingWindow {
     public fun read(texts: List<String>): Seen {
         val clean = texts.map { it.trim() }
         val code = clean.firstOrNull { CODE.matches(it) }
-        val port = clean.firstNotNullOfOrNull { ADDRESS.matchEntire(it)?.groupValues?.get(1)?.toIntOrNull() }?.takeIf { it in 1..65535 }
-        return Seen(code, port)
+        val ports = clean.mapNotNull { ADDRESS.matchEntire(it)?.groupValues?.get(1)?.toIntOrNull() }.filter { it in 1..65535 }.distinct()
+        return Seen(code, ports.firstOrNull(), ports)
     }
 
     /** What the user typed in the notification: the six digits, whatever spaces or dashes came with them. */
