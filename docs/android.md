@@ -152,6 +152,12 @@ To try these on an emulator (debug builds): `--es op stream --ef s 3` plays a to
   (and `MODE_ANDROID_KEY_PASSWORD`); without them the APK is unsigned. Keep one key forever: Android only updates
   an app signed with the key it was installed with. Register that key for Android developer verification before
   the first public release.
+- Mode's release key was made on 13 Nov 2026 (RSA 4096, alias `mode`, certificate SHA-256
+  `74:2F:F2:6E:78:B0:07:DE:1D:2C:53:6B:97:BE:B7:A9:CF:78:04:9A:82:30:56:E8:4B:47:08:9F:58:D0:F2:FA`). It lives
+  outside the repository (`~/piyush/mode-backups/android/`, password in the Mac's Keychain under
+  `mode-android-keystore`) and in the repository secrets above; `.gitignore` keeps every `.jks` out, since the
+  repository is public. To build a signed release on the Mac:
+  `MODE_ANDROID_KEYSTORE=~/piyush/mode-backups/android/mode-release.jks MODE_ANDROID_KEYSTORE_PASSWORD="$(security find-generic-password -s mode-android-keystore -a mode -w)" MODE_ANDROID_KEY_ALIAS=mode tools/build-apk.sh`.
 - `.github/workflows/release-android.yml`, on the phone app's release tag `Mode-Mobile-Build-<version>` (made by
   `tools/release-app.sh`), builds and signs the APK from the repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
   and attaches it to the draft release. Without the secrets it builds unsigned and attaches nothing.
