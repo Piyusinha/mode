@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Speaking a task to Mode; asked the first time the user does. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Repeats remind on time after a restart, and at the exact minute when the user allows it. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- While a task runs: the working notification's service, and the CPU and screen kept on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- The apps Mode can open for the user: everything with a launcher icon. -->
+    <queries>
+        <!-- The phone's text-to-speech and speech recognition. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- The makers' own settings apps (PhoneQuirks): a step is asked for only on a phone that has its page. -->
+        <package android:name="com.coloros.oppoguardelf" />
+        <package android:name="com.coloros.safecenter" />
+        <package android:name="com.huawei.systemmanager" />
+        <package android:name="com.iqoo.secure" />
+        <package android:name="com.miui.powerkeeper" />
+        <package android:name="com.miui.securitycenter" />
+        <package android:name="com.oneplus.security" />
+        <package android:name="com.oppo.safe" />
+        <package android:name="com.samsung.android.lool" />
+        <package android:name="com.vivo.permissionmanager" />
+    </queries>
+
+    <application
+        android:name=".ModeApplication"
+        android:label="Mode"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
+        android:theme="@style/Theme.Mode">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Opened through LaunchActivity (Mode's icon), links, notifications and Mode itself. -->
+            <!-- mode:// links from notifications, the widget and sign-in pages. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mode" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="com.piyush.mode.core.platform.WorkService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps Mode running while it does a task the user gave it in their other apps, with an ongoing notification and Stop." />
+        </service>
+
+        <!-- Mode's icon: an invisible front door that knows who opened Mode (the assistant opens the overlay). -->
+        <activity
+            android:name=".LaunchActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Mode's voice entry: opens the overlay over the app the user is in, and goes (no screen of its own). -->
+        <activity
+            android:name=".VoiceEntryActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- "Ask Mode": opens Mode's overlay listening, over whatever is on screen, so the user's assistant can start a
+             voice session without Mode replacing it. Off until the user turns on Start by voice. -->
+        <activity-alias
+            android:name=".AskMode"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_ask_mode"
+            android:roundIcon="@mipmap/ic_ask_mode"
+            android:label="@string/ask_mode_label"
+            android:targetActivity=".VoiceEntryActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- The digital assistant (not offered in Mode's screens; there for anyone who picks Mode in Default apps). -->
+        <service
+            android:name=".assistant.ModeAssistantService"
+            android:exported="true"
+            android:label="@string/setup_welcome_app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data android:name="android.voice_interaction" android:resource="@xml/mode_assistant" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".assistant.ModeAssistantSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <service
+            android:name=".assistant.ModeRecognitionService"
+            android:exported="true"
+            android:label="@string/setup_welcome_app_name">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data android:name="android.speech" android:resource="@xml/mode_recognition" />
+        </service>
+
+        <receiver android:name=".widget.ModeWidget" android:exported="true" android:label="@string/setup_welcome_app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_mode_info" />
+        </receiver>
+        <receiver android:name=".background.PairingCodeReceiver" android:exported="false" />
+        <receiver android:name=".BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".StopReceiver" android:exported="false" />
+        <receiver android:name=".AnswerReceiver" android:exported="false" />
+        <receiver android:name=".ScheduleReceiver" android:exported="false" />
+    </application>
+</manifest>

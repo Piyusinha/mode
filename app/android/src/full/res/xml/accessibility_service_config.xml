@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mode reads the screen and taps for the user while a task runs. It is not a tool for a disability
+  (isAccessibilityTool false): screens an app marks sensitive stay hidden, and Mode hands them to the user.
+  The accessibility shortcut (button, gesture, volume keys), when the user points it at Mode, opens Mode over
+  the app in front.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/phone_control_description"
+    android:summary="@string/phone_control_summary"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagReportViewIds|flagRetrieveInteractiveWindows|flagRequestAccessibilityButton"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="200" />

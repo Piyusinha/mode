@@ -36,5 +36,3 @@ public class IosBackupFiles : BackupFiles {
         files.removeItemAtPath(path, null)
     }
 }
-
-public actual fun platformBackupFiles(): BackupFiles = IosBackupFiles()

@@ -13,6 +13,11 @@ kotlin {
         iosMain.dependencies {
             implementation(projects.engine.phoneIos)
         }
+        androidMain.dependencies {
+            api(projects.engine.phoneAndroid)
+            api(projects.engine.adbLink)
+            implementation(projects.core.storage)
+        }
         commonTest.dependencies {
             implementation(projects.testing)
         }

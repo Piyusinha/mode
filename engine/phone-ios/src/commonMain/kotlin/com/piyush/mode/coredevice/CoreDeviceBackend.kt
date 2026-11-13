@@ -4,10 +4,16 @@ import com.piyush.mode.core.telemetry.Telemetry
 import com.piyush.mode.core.telemetry.Operation
 import com.piyush.mode.core.telemetry.trace
 import com.piyush.mode.ops.Op
-import com.piyush.mode.ops.OpFailed
 import com.piyush.mode.ops.PhoneBackend
 import com.piyush.mode.ops.Unsupported
 import com.piyush.mode.ops.wireName
+import com.piyush.mode.screen.AppNames
+import com.piyush.mode.screen.ImageTools
+import com.piyush.mode.screen.InstalledApp
+import com.piyush.mode.screen.ScreenInfo
+import com.piyush.mode.screen.ScreenJson
+import com.piyush.mode.screen.ShotCache
+import com.piyush.mode.screen.TextReader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -17,14 +23,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
-import kotlin.io.encoding.Base64
 import kotlin.math.hypot
 import kotlin.math.roundToLong
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -42,7 +42,7 @@ class CoreDeviceBackend(
     private val reader: TextReader,
     private val images: ImageTools,
     private val io: CoroutineDispatcher = Dispatchers.Default,
-    private val clock: TimeSource = TimeSource.Monotonic,
+    clock: TimeSource = TimeSource.Monotonic,
     private val telemetry: Telemetry = Telemetry.None,
 ) : PhoneBackend, AutoCloseable {
 
@@ -50,14 +50,7 @@ class CoreDeviceBackend(
 
     private val lock = Mutex()
     private var apps: List<InstalledApp>? = null
-
-    /**
-     * The screenshot a `screen.capture` just took, reused once by the
-     * `screen.text` that follows it, so one look (picture + text) costs one
-     * shot. Anything else takes a fresh shot, so callers can watch the screen
-     * change (an agent waiting for a scroll to stop needs that).
-     */
-    private var lastShot: Pair<TimeMark, ByteArray>? = null
+    private val shots = ShotCache(clock)
 
     override suspend fun ops(): Set<String> = SUPPORTED
 
@@ -65,7 +58,7 @@ class CoreDeviceBackend(
         if (op.wireName !in SUPPORTED) throw Unsupported("this iPhone cannot '${op.wireName}' over CoreDevice")
         return lock.withLock {
             withContext(io) {
-                if (op.wireName !in READS) lastShot = null
+                if (op.wireName !in READS) shots.invalidate()
                 run(op)
             }
         }
@@ -107,12 +100,11 @@ class CoreDeviceBackend(
             JsonNull
         }
         is Op.LaunchApp -> JsonPrimitive(launch(op.name, op.fresh))
-        Op.ScreenBounds -> bounds()
+        Op.ScreenBounds -> ScreenJson.bounds(screen)
         is Op.ScreenCapture -> capture(op.maxSize)
         is Op.ScreenText -> JsonArray(readText(op.minConfidence))
         Op.SessionState -> JsonPrimitive("ready")
-        Op.Tree, Op.CurrentApp, is Op.OpenUrl ->
-            throw Unsupported("this iPhone cannot '${op.wireName}' over CoreDevice")
+        else -> throw Unsupported("this iPhone cannot '${op.wireName}' over CoreDevice")
     }
 
     private fun touch(x1: Double, y1: Double, x2: Double, y2: Double, holdMs: Long, travelMs: Long): JsonElement {
@@ -138,62 +130,21 @@ class CoreDeviceBackend(
         return AppNames.resolve(name, fresh)
     }
 
-    private fun bounds(): JsonElement = buildJsonObject {
-        put("x", 0)
-        put("y", 0)
-        put("w", screen.widthPt)
-        put("h", screen.heightPt)
-        put("id", 0)
-    }
-
-    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
     private suspend fun capture(maxSize: Int?): JsonElement {
-        val png = telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }.also { lastShot = clock.markNow() to it }
-        if (maxSize == null || maxSize <= 0) {
-            return buildJsonObject {
-                put("png_b64", Base64.encode(png))
-                put("bounds", bounds())
-            }
-        }
+        val png = telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }.also { shots.put(it) }
+        if (maxSize == null || maxSize <= 0) return ScreenJson.capturePng(png, screen)
         // A smaller JPEG for models: the full PNG is several megabytes.
         val small = telemetry.trace(Operation.ImageEncode) { images.shrinkToJpeg(png, maxSize) }
-        return buildJsonObject {
-            put("jpeg_b64", Base64.encode(small.jpeg))
-            put("bounds", bounds())
-            putJsonObject("img_px") {
-                put("w", small.widthPx)
-                put("h", small.heightPx)
-            }
-        }
+        return ScreenJson.captureJpeg(small, screen)
     }
 
     /** OCR boxes in screen points, centres ready to tap: `{text, confidence, source, x, y, w, h}`. */
     private suspend fun readText(minConfidence: Double): List<JsonElement> {
-        val shot = shotForText()
+        val shot = shots.take() ?: telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }
         return telemetry.trace(Operation.ScreenOcr) { reader.read(shot) }
             .filter { it.confidence >= minConfidence && it.text.isNotBlank() }
-            .map {
-                buildJsonObject {
-                    put("text", it.text)
-                    put("confidence", it.confidence)
-                    put("source", "ocr")
-                    put("x", round((it.left + it.width / 2) * screen.widthPt))
-                    put("y", round((it.top + it.height / 2) * screen.heightPt))
-                    put("w", round(it.width * screen.widthPt))
-                    put("h", round(it.height * screen.heightPt))
-                }
-            }
+            .map { ScreenJson.textBox(it, screen) }
     }
-
-    /** The capture's shot if it was just taken, else a fresh one; either way used once. */
-    private suspend fun shotForText(): ByteArray {
-        val shot = lastShot
-        lastShot = null
-        if (shot != null && shot.first.elapsedNow() < SHOT_REUSE) return shot.second
-        return telemetry.trace(Operation.ScreenCapture) { session.screenshotPng() }
-    }
-
-    private fun round(v: Double): Double = kotlin.math.round(v)
 
     private fun seconds(s: Double): Long = (s * 1000).roundToLong().coerceAtLeast(0)
 
@@ -207,9 +158,6 @@ class CoreDeviceBackend(
 
         /** Ops that only look; they keep the last screenshot valid. */
         private val READS = setOf("screen.capture", "screen.text", "screen.bounds", "session.state")
-
-        /** How long a screenshot stays good for when nothing has been done. */
-        private val SHOT_REUSE = 1500.milliseconds
 
         private const val TAP_HOLD_MS = 50L
         private const val SCROLL_SPEED_PT_PER_S = 800.0

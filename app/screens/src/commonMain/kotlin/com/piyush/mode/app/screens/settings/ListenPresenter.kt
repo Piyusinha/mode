@@ -142,6 +142,11 @@ public data class ListenUiState(
     val turns: List<TalkTurn> = emptyList(),
     /** The chosen voice or listener failed ("Mode couldn't hear with Deepgram"), with a way to Settings. */
     val voiceNotice: VoiceNotice? = null,
+    /**
+     * The last task left the user in the app it ended on (search results, a video): the overlay steps aside so they
+     * see it, and the conversation carries on. Counts up with each such task.
+     */
+    val leftInApp: Int = 0,
 )
 
 /** The chosen voice ([hearing] false) or listener [provider] failed, and why ([trouble]: a VoiceTrouble name). */
@@ -150,6 +155,9 @@ public data class VoiceNotice(val provider: String, val hearing: Boolean, val tr
         public fun of(p: com.piyush.mode.feature.settings.voice.VoiceProblem): VoiceNotice = VoiceNotice(p.kind.id, p.hearing, p.trouble.name)
     }
 }
+
+/** The entry for Mode's agent overlay over the user's app (Android): a hands-free session that speaks typed tasks too. */
+public const val OVERLAY_ENTRY: String = "overlay"
 
 public class ListenPresenter(
     parent: CoroutineScope,
@@ -211,8 +219,10 @@ public class ListenPresenter(
     private var job: Job? = null
     private var taskId: String? = null
 
-    /** Started by voice: one task after another until they say "that's all", go quiet, or close it. */
-    // Every voice session carries on after a task until it is ended (End, ×, "that's all"); a lone question doesn't.
+    /**
+     * One task after another until it is ended (End, ×, "that's all"), however it started: by voice ("Hey Siri,
+     * start Mode" on the iPhone, the assistant or the overlay on Android), Ask's mic or a chat's. A lone question doesn't.
+     */
     private val keepsGoing = !forQuestion
 
     /** Where the tasks go: the chat it opened in, else the first task's own chat, so a conversation stays together. */
@@ -401,11 +411,15 @@ public class ListenPresenter(
         mark(com.piyush.mode.core.telemetry.Event.ListenStarted)
         val since = clock.now()
         var tries = 0
+        var failures = 0
         while (true) {
             val listenedAt = clock.now()
             when (val heard = voices.hear { words -> own.value = own.value.copy(partial = words) }) {
                 is Heard.Words -> { heard(heard.text); return }
                 Heard.Nothing -> {
+                    // The listener failed (the notice says why). In a conversation it tries once more first, so a
+                    // hiccup doesn't end hands-free talking.
+                    if (keepsGoing && ++failures <= LISTEN_RETRIES) { delay(LISTEN_RETRY_MS); continue }
                     // After a task, the session's outcome stays the task's; hearing failing is the outcome only before one.
                     if (own.value.doneSoFar.isEmpty() && !own.value.sent && taskId == null) outcome = "HearingFailed"
                     own.value = own.value.copy(phase = TalkPhase.Typing)
@@ -438,7 +452,7 @@ public class ListenPresenter(
                 same(text, offer.no) || isDecline(text) -> { declined(text, offer); return }
             }
         }
-        if (keepsGoing && own.value.doneSoFar.isNotEmpty() && isWrapUp(text)) { end("ThatsAll"); return }
+        if (keepsGoing && isWrapUp(text)) { end("ThatsAll"); return }
         start(text, source)
     }
 
@@ -453,7 +467,11 @@ public class ListenPresenter(
     }
 
     /** Mode's line after a task (with its offer, if any), said out loud, then it listens again. */
-    private suspend fun nextLine(next: com.piyush.mode.feature.memory.data.NextLine?) {
+    private suspend fun nextLine(written: com.piyush.mode.feature.memory.data.NextLine?) {
+        // Without the AI's line (none connected, too slow, nothing to say) Mode still asks, so the conversation
+        // never goes quiet on the user.
+        val next = written ?: com.piyush.mode.feature.memory.data.NextLine(if (lastPartial) PART_DONE else ANYTHING_ELSE)
+        lastPartial = false
         val offer = next?.offer?.let { TalkOffer(it.task, it.yes, it.no) }
         pendingOffer = offer
         own.value = own.value.copy(phase = TalkPhase.Greeting, greeting = next?.line.orEmpty(), task = "", reply = "", partial = "", working = "", sent = false)
@@ -519,6 +537,8 @@ public class ListenPresenter(
     private var lastTask = ""
     private var lastDone = true
     private var lastSaid: String? = null
+    /** The last task finished only part of what was asked (said once, in the line after it). */
+    private var lastPartial = false
 
     /**
      * After a task in a conversation: unless it left them in another app (a video playing) or was stopped, Mode
@@ -544,11 +564,28 @@ public class ListenPresenter(
             nextLine(com.piyush.mode.feature.memory.data.NextLine(STOPPED_LINE))
             return
         }
-        // The task left them in the app (a cart to look at, a video playing): a lone question is over, but a
-        // session carries on from behind, where they are, until they end it.
-        if (done != null && done.stay && !keepsGoing) { end("LeftInApp"); return }
+        if (done != null && done.stay) {
+            // The task left them in the app (a cart to look at, a video playing): a lone question is over, but a
+            // session carries on from behind, where they are, until they end it. The overlay (Android) is already
+            // over that app: it only steps aside.
+            if (!keepsGoing) { end("LeftInApp"); return }
+            if (outsideMode) {
+                own.value = own.value.copy(leftInApp = own.value.leftInApp + 1)
+                com.piyush.mode.core.common.AppLog.log("talk", "task left them in its app: the overlay steps aside, the session goes on")
+            }
+        }
+        failureLine(task, result, finishedState.status)?.let { line ->
+            lastTask = task
+            lastDone = false
+            lastSaid = null
+            own.value = own.value.copy(doneSoFar = own.value.doneSoFar + task)
+            com.piyush.mode.core.common.AppLog.log("talk", "task didn't finish: offering to try again")
+            nextLine(line)
+            return
+        }
         lastTask = task
         lastDone = done?.success == true
+        lastPartial = done != null && !done.success
         lastSaid = said
         own.value = own.value.copy(doneSoFar = own.value.doneSoFar + task)
         val s = settings.settings.value
@@ -558,6 +595,26 @@ public class ListenPresenter(
         val next = greeter?.next(s.userName, hour(), context, task, lastDone, said, budgetMs = GREET_WAIT_MS, language = speakLanguage())
         com.piyush.mode.core.common.AppLog.log("talk", if (next != null) "next by ${greeter?.lastModel} in ${clock.now() - started} ms: \"${next.line}\"${next.offer?.let { " offers: ${it.task}" }.orEmpty()}" else "next: none, listening")
         nextLine(next)
+    }
+
+    /**
+     * What Mode says when a task didn't finish: why, in the runner's plain words, and an offer to try again (yes runs
+     * the same task). A task that never started (no AI connected, today's limit) says only why. Null when it finished.
+     */
+    private fun failureLine(task: String, result: com.piyush.mode.agent.AgentOutcome?, status: String): com.piyush.mode.feature.memory.data.NextLine? {
+        val why = when (result) {
+            null -> status
+            is com.piyush.mode.agent.AgentOutcome.Failed -> result.why
+            else -> return null
+        }.removePrefix(FAILED_PREFIX).trim().trimEnd('.')
+        if (result == null && !status.startsWith(FAILED_PREFIX)) {
+            return com.piyush.mode.feature.memory.data.NextLine(status.trim())
+        }
+        val reason = if (why.isBlank()) "" else ": $why"
+        return com.piyush.mode.feature.memory.data.NextLine(
+            "$DIDNT_WORK$reason. $TRY_AGAIN_QUESTION",
+            com.piyush.mode.feature.memory.data.NextLine.Offer(task, TRY_AGAIN, SOMETHING_ELSE),
+        )
     }
 
     /** The card with what the running task said so far and how far its plan is. */
@@ -576,7 +633,9 @@ public class ListenPresenter(
             rows.any { it.done } || done?.success == true -> TalkTaskCard.State.Partial
             else -> TalkTaskCard.State.Failed
         }
-        val headline = done?.headline ?: done?.spoken ?: done?.summary?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.trimStart('#', ' ') ?: status
+        val headline = done?.headline ?: done?.spoken ?: done?.summary?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim()?.trimStart('#', ' ')
+            // The card's label already says it couldn't finish.
+            ?: status.removePrefix(FAILED_PREFIX)
         return card.copy(state = state, seconds = ((clock.now() - card.startedAtMs) / 1000).coerceAtLeast(0), headline = headline, rows = rows)
     }
 
@@ -648,7 +707,7 @@ public class ListenPresenter(
                 delay(1_000)
                 val state = DeviceVoice.hearingState()
                 // Soniox and Deepgram need only the microphone; Apple also needs its speech model.
-                val cloud = voices.listener()?.let { it != com.piyush.mode.feature.settings.domain.VoiceKind.Apple } == true
+                val cloud = voices.listener()?.let { it != com.piyush.mode.feature.settings.domain.VoiceKind.Device } == true
                 if (cloud && state != "permission" && state != "denied") { begin(); return@launch }
                 when (state) {
                     "ready" -> { begin(); return@launch }
@@ -676,8 +735,17 @@ public class ListenPresenter(
         if (task.isEmpty()) return
         job?.cancel()
         voices.stop()
-        job = scope.launch { inSession { heard(task, TaskSource.App) } }
+        job = scope.launch { inSession { heard(task, if (typedSpeaks) TaskSource.Voice else TaskSource.App) } }
     }
+
+    /**
+     * The session is on screen over another app (Android's overlay), not in Mode's own: a task that leaves the user in
+     * its app doesn't end it, and what's typed is answered out loud. Set when Mode's app hands its session over.
+     */
+    public var outsideMode: Boolean = entry == OVERLAY
+
+    /** The overlay talks the whole way: what's typed there is answered and asked about out loud too. */
+    private val typedSpeaks get() = outsideMode
 
     /** A tapped option answers Mode's spoken question. */
     public fun answer(option: String) { runner.answer(option) }
@@ -758,6 +826,20 @@ public class ListenPresenter(
         job = scope.launch { inSession { converse("", followUp = false) } }
     }
 
+    /**
+     * The mic again in a conversation already under way, after hearing failed or they chose to type: Mode listens for
+     * the next thing and everything said so far stays ([begin] would greet again and start the conversation over).
+     */
+    public fun listenAgain() {
+        if (own.value.sent) return
+        forgotten?.cancel()
+        job?.cancel()
+        voices.stop()
+        own.value = own.value.copy(micPaused = false, partial = "")
+        com.piyush.mode.core.common.AppLog.log("talk", "listening again")
+        job = scope.launch { inSession { converse("", followUp = false) } }
+    }
+
     private fun pausedByQuiet() {
         com.piyush.mode.core.common.AppLog.log("talk", "quiet: mic paused, the session stays open")
         own.value = own.value.copy(micPaused = true, partial = "")
@@ -833,6 +915,17 @@ public class ListenPresenter(
     private fun hour(): Int = Instant.fromEpochMilliseconds(clock.now()).toLocalDateTime(clock.zone()).hour
 
     internal companion object {
+        const val OVERLAY = OVERLAY_ENTRY
+        const val ANYTHING_ELSE = "Anything else?"
+        const val PART_DONE = "I did part of it. Anything else?"
+        const val DIDNT_WORK = "That didn't work"
+        const val TRY_AGAIN_QUESTION = "Want me to try again?"
+        const val TRY_AGAIN = "Try again"
+        const val SOMETHING_ELSE = "Something else"
+        /** A listener that failed gets this many more tries in a conversation, this far apart. */
+        const val LISTEN_RETRIES = 1
+        const val LISTEN_RETRY_MS = 1_500L
+
         /**
          * How long the AI may take to write what Mode says on taking a task. Long on purpose: the task is
          * already going, and the AI's own words late beat a fixed line on time.
@@ -849,6 +942,8 @@ public class ListenPresenter(
         const val DAY_WAIT_MS = 600L
 
         private const val MAX_SILENT_LISTENS = 2
+        /** How the runner starts a failed task's status line. */
+        private const val FAILED_PREFIX = "Failed: "
 
         /** After a task, this long with nothing said ends the conversation. */
         const val FOLLOW_UP_QUIET_MS = 20_000L
@@ -860,14 +955,7 @@ public class ListenPresenter(
         const val STOP_WAIT_MS: Long = 30_000L
 
         /** "That's all", "thanks", "bye", "nahi bas": they're done (the whole reply is just that). */
-        fun isWrapUp(text: String): Boolean {
-            val said = text.lowercase().replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()
-            if (said.isEmpty() || said.split(' ').size > WRAP_UP_WORDS) return false
-            // Only wrap-up words and fillers ("that's it, thanks", "bye Mo"): anything else is a request.
-            var rest = " $said "
-            (WRAP_UPS + FILLERS).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
-            return rest.isBlank()
-        }
+        fun isWrapUp(text: String): Boolean = onlyWords(text, WRAP_UPS)
 
         /** "Yes", "sure, go ahead": yes to Mode's offer. */
         fun isYes(text: String): Boolean = onlyWords(text, YESES)
@@ -878,13 +966,14 @@ public class ListenPresenter(
         /** They said the button's words ("yes look there"). */
         fun same(text: String, label: String): Boolean = norm(text) == norm(label)
 
-        private fun norm(text: String) = text.lowercase().replace(Regex("[^a-z' ]"), " ").replace(Regex("\\s+"), " ").trim()
+        /** Lower case, letters only: "That's all!" and "thats all" read the same (typed often drops the apostrophe). */
+        private fun norm(text: String) = text.lowercase().replace("'", "").replace("\u2019", "").replace(Regex("[^a-z ]"), " ").replace(Regex("\\s+"), " ").trim()
 
         private fun onlyWords(text: String, words: List<String>): Boolean {
             val said = norm(text)
             if (said.isEmpty() || said.split(' ').size > WRAP_UP_WORDS) return false
             var rest = " $said "
-            (words + FILLERS).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
+            (words + FILLERS).map(::norm).sortedByDescending { it.length }.forEach { rest = rest.replace(" $it ", " ") }
             return rest.isBlank()
         }
 

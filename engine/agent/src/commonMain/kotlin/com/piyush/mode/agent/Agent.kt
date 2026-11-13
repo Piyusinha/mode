@@ -187,6 +187,8 @@ class Agent(
     private val recoverPhone: (suspend () -> PhoneBackend)? = null,
     /** What Mode's own app can do without a screen: links, the calendar, contacts. */
     private val device: DeviceData? = null,
+    /** Which phone this is: the words, the status bar, how back works. */
+    private val profile: PhoneProfile = PhoneProfile.IPhone,
 ) {
     /** One-time codes seen on screen: masked in everything recorded. */
     private var phone: PhoneBackend = phone
@@ -296,8 +298,8 @@ class Agent(
         context = startContext
         val started = clock.markNow()
         val ops = phone.ops()
-        val brain = config.brainModel?.let { Brain(llm, it) }
-        trace.runStarted(task, config, AgentTools.available(ops, recall = memory != null, brain = brain != null).map { it.name })
+        val brain = config.brainModel?.let { Brain(llm, it, profile) }
+        trace.runStarted(task, config, AgentTools.available(ops, recall = memory != null, brain = brain != null, profile = profile).map { it.name })
         // A learned route that fits well is the plan: the brain's brief is most of a task's cost, and the
         // route already worked. Otherwise the brain reads the request first (Brain); a failure means no brief.
         val routeSteps = startContext.knownRoute?.let(::routeSteps)?.takeIf { it.isNotEmpty() }
@@ -310,7 +312,7 @@ class Agent(
             trace.briefed(config.brainModel!!, r.brief?.text(), r.costUsd, r.error)
             r
         }
-        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device, lookup = config.webLookup)
+        val tools = AgentTools.available(ops, recall = memory != null, brain = brain != null, briefed = brief?.brief != null || routeSteps != null, device = device, lookup = config.webLookup, profile = profile)
         lookupUnsupported = false
         facts.clear()
         // "If it goes wrong" rules from the skills memory offered, shown only when their trigger is on screen.
@@ -426,6 +428,21 @@ class Agent(
             onStatus(WORKING)
             val lookStarted = clock.markNow()
             var screen = telemetry.trace(Operation.ScreenLook) { look() }
+            if (screen.private) {
+                // The phone hides this screen (a bank, a PIN pad): only the user can do this step.
+                onStatus("Your turn")
+                val outcome = when (yourTurn(PRIVATE_SCREEN, screen)) {
+                    null -> return result(AgentOutcome.Stopped("Stopped at: $PRIVATE_SCREEN"), step)
+                    false -> return result(AgentOutcome.Stopped("Waited for you: $PRIVATE_SCREEN"), step)
+                    true -> "the user did it and the screen moved on. Carry on from this screen"
+                }
+                onStep(StepRecord(step, config.model, "wait_for_user", PRIVATE_SCREEN, outcome, 0.0, lookStarted.elapsedNow().inWholeMilliseconds))
+                trace.acted(step, "wait_for_user", null, outcome, lookStarted.elapsedNow().inWholeMilliseconds)
+                history += "$step. wait_for_user — $outcome"
+                lastWasPhoneAction = false
+                answeredSinceAction = false
+                continue
+            }
             // A frame identical to the one before the action is stale or the phone stalled: look once more.
             if (lastWasPhoneAction && lastJpeg?.contentEquals(screen.jpeg) == true) {
                 delay(RECAPTURE_MS)
@@ -561,7 +578,7 @@ class Agent(
             }
             val messages = ContextBuilder.build(
                 ContextBuilder.Input(
-                    systemPrompt = SYSTEM_PROMPT + accessRules(config),
+                    systemPrompt = systemPrompt(profile) + accessRules(config, profile),
                     task = task,
                     brief = brief?.brief?.text(),
                     context = context,
@@ -815,7 +832,7 @@ class Agent(
                 }
                 else -> {
                     val op = try {
-                        AgentTools.toOp(call, screen.geometry).let { o ->
+                        AgentTools.toOp(call, screen.geometry, profile).let { o ->
                             // The brief said start fresh: the first opening of an app lands on its home page.
                             if (o is Op.LaunchApp && freshPending) { freshPending = false; o.copy(fresh = true) } else o
                         }
@@ -928,7 +945,7 @@ class Agent(
                             lastTyped = op.text
                             // Typed over old text: what the field shows is longer than what was typed. Delete it all
                             // and type again (up to twice) before it is submitted.
-                            if (clearing) staleNote = retypeIfStale(op, screen)
+                            if (clearing) staleNote = retypeIfStale(op, call, screen)
                             if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
                         }
                         if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
@@ -990,9 +1007,8 @@ class Agent(
                     }.orEmpty()
                     // Typing is checked: does the text now show? (A field that wasn't focused takes nothing.)
                     val typedNote = (op as? Op.TypeText)?.takeIf { lastWasPhoneAction && call.arguments["submit"]?.jsonPrimitive?.booleanOrNull != true }?.let { t ->
-                        val now = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
                         val probe = t.text.take(TYPED_PROBE)
-                        val shown = now.firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim()
+                        val shown = typedField(probe, call, screen)
                         when {
                             shown == null -> "; \"$probe\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
                             // Seen on the phone: "4 November" typed after "boarding pass" that clear did not remove.
@@ -1082,20 +1098,29 @@ class Agent(
         val geometry: AgentTools.Geometry,
         /** Text with its centre and size in screenshot pixels. */
         val boxes: List<ScreenLayout.Box>,
+        /** How far down the status bar reaches, in points. */
+        val statusBarPt: Double = STATUS_BAR_PT,
+        /** The phone would not show this screen (a bank, a PIN pad): no picture, the user's turn. */
+        val private: Boolean = false,
     ) {
-        /** Text with its centre in screenshot pixels. */
-        val texts: List<Triple<String, Int, Int>> = boxes.map { Triple(it.text, it.x, it.y) }
+        /** Text with its centre in screenshot pixels; the keyboard's own keys are left out when the phone marks them. */
+        val texts: List<Triple<String, Int, Int>> = boxes.filter { it.window != IME }.map { Triple(it.text, it.x, it.y) }
 
         /**
          * Text and rough position: a scroll changes it even when the words do not. The status
          * bar is left out: its clock, and the Live Activity's timer on the Dynamic Island, change
          * every second and once made every screen look "changed" (an add was tapped four times).
          */
-        val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(STATUS_BAR_PT) && TICKING.matches(it.first.trim()) }
+        val signature: String = texts.filterNot { it.third <= geometry.toPixelsY(statusBarPt) && TICKING.matches(it.first.trim()) }
             .joinToString("|") { "${it.first}@${it.third / 12}" }
 
-        /** Where the keyboard starts (screenshot pixels) when it is up. */
-        val keyboardTop: Int? = Keyboard.top(texts, geometry.imageHeight)
+        /**
+         * Where the keyboard starts (screenshot pixels) when it is up: from the phone's keyboard window when it
+         * reports windows, else read off the screen's text.
+         */
+        val keyboardTop: Int? =
+            if (boxes.any { it.window != null }) boxes.filter { it.window == IME }.minOfOrNull { it.y - it.h / 2 }
+            else Keyboard.top(texts, geometry.imageHeight)
         val keyboardUp: Boolean get() = keyboardTop != null
 
         /** What the model is shown: the page's text, without the keyboard's keys. */
@@ -1103,24 +1128,29 @@ class Agent(
 
         /** What the model reads: the page's text without the status bar or the keyboard, numbered and grouped. */
         val layout: ScreenLayout = ScreenLayout.of(
-            boxes.filter { b -> b.y > geometry.toPixelsY(STATUS_BAR_PT) && keyboardTop.let { it == null || b.y < it } },
+            boxes.filter { b -> b.window != IME && b.y > geometry.toPixelsY(statusBarPt) && keyboardTop.let { it == null || b.y < it } },
             lineHeight = geometry.toPixelsY(LINE_PT).roundToInt(),
         )
 
         /** The page's words, without the status bar or the keyboard: to tell one page from another. */
-        fun pageTexts(): List<String> = visibleTexts.filter { it.third > geometry.toPixelsY(STATUS_BAR_PT) }.map { it.first }
+        fun pageTexts(): List<String> = visibleTexts.filter { it.third > geometry.toPixelsY(statusBarPt) }.map { it.first }
     }
 
     @OptIn(ExperimentalEncodingApi::class)
     private suspend fun look(): Screen {
         val capture = phone.send(Op.ScreenCapture(maxSize = config.imageMaxSide)).jsonObject
-        val px = capture.getValue("img_px").jsonObject
         val bounds = capture.getValue("bounds").jsonObject
-        val g = AgentTools.Geometry(
-            px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int,
-            bounds.getValue("w").jsonPrimitive.double, bounds.getValue("h").jsonPrimitive.double,
-        )
-        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, screenBoxes(g))
+        val w = bounds.getValue("w").jsonPrimitive.double
+        val h = bounds.getValue("h").jsonPrimitive.double
+        val statusBar = bounds["top_inset"]?.jsonPrimitive?.doubleOrNull ?: profile.statusBarPt
+        if (capture["private"]?.jsonPrimitive?.booleanOrNull == true) {
+            // No picture to shrink: pixels are points, so the text still has positions.
+            val g = AgentTools.Geometry(w.roundToInt(), h.roundToInt(), w, h)
+            return Screen(ByteArray(0), g, runCatching { screenBoxes(g) }.getOrDefault(emptyList()), statusBar, private = true)
+        }
+        val px = capture.getValue("img_px").jsonObject
+        val g = AgentTools.Geometry(px.getValue("w").jsonPrimitive.int, px.getValue("h").jsonPrimitive.int, w, h)
+        return Screen(Base64.decode(capture.getValue("jpeg_b64").jsonPrimitive.content), g, screenBoxes(g), statusBar)
     }
 
     /**
@@ -1137,7 +1167,7 @@ class Agent(
             now.filter { (text, _, y) ->
                 val t = text.trim()
                 // Nothing in the status bar is proof of a change (the clock, the island).
-                t.isNotEmpty() && ChangeLedger.norm(t) !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(STATUS_BAR_PT)
+                t.isNotEmpty() && ChangeLedger.norm(t) !in had && t.length <= FLASH_TEXT_MAX && y > before.geometry.toPixelsY(before.statusBarPt)
             }.forEach { if (it.first.trim() !in seen) seen += it.first.trim() }
             if (Changes.proof(seen, kind) != null) break
         }
@@ -1187,6 +1217,7 @@ class Agent(
                 g.toPixelsY(box.getValue("y").jsonPrimitive.double).roundToInt(),
                 box["w"]?.jsonPrimitive?.doubleOrNull?.let { w -> g.toPixelsX(w).roundToInt() } ?: 0,
                 box["h"]?.jsonPrimitive?.doubleOrNull?.let { h -> g.toPixelsY(h).roundToInt() } ?: 0,
+                box["window"]?.jsonPrimitive?.contentOrNull,
             )
         }
 
@@ -1265,18 +1296,34 @@ class Agent(
      * After typing with clear: if the field shows more than what was typed, the old text is still there. Deletes
      * what it shows and types again, up to [RETYPE_ROUNDS] times; the note says what was done, or what is left.
      */
-    private suspend fun retypeIfStale(op: Op.TypeText, screen: Screen): String {
+    private suspend fun retypeIfStale(op: Op.TypeText, call: ToolCall, screen: Screen): String {
         val probe = op.text.take(TYPED_PROBE)
         repeat(RETYPE_ROUNDS) { round ->
-            val shown = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
-                .firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim() ?: return if (round == 0) "" else "; the old text was cleared and it was typed again"
+            val shown = typedField(probe, call, screen) ?: return if (round == 0) "" else "; the old text was cleared and it was typed again"
             if (shown.length <= op.text.length + STALE_SLACK) return if (round == 0) "" else "; the old text was cleared and it was typed again"
             repeat((shown.length * 2 + CLEAR_SLACK).coerceAtMost(CLEAR_KEYS_MAX)) { runCatching { phone.send(Op.PressKey("delete")) } }
             runCatching { phone.send(op) }
             delay(FOCUS_MS)
         }
-        val left = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty().firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim().orEmpty()
+        val left = typedField(probe, call, screen).orEmpty()
         return if (left.length > op.text.length + STALE_SLACK) "; the field still holds old text (\"${left.take(TYPED_SHOWN)}\"): tap its ×, or open the search afresh" else "; the old text was cleared and it was typed again"
+    }
+
+    /**
+     * What the field typed into shows now, null when [probe] shows nowhere. The phone's text field first (Android
+     * marks it); else the match nearest where the typing was aimed; else the first. Seen on the phone, 13 Nov:
+     * the first text with "testing" was a sent message, and the agent was told its draft held "testing Android
+     * mod" and would not clear, fifteen steps long.
+     */
+    private suspend fun typedField(probe: String, call: ToolCall, screen: Screen): String? {
+        val boxes = runCatching { screenBoxes(screen.geometry) }.getOrNull().orEmpty()
+            .filter { it.text.contains(probe, ignoreCase = true) }
+        if (boxes.isEmpty()) return null
+        val aimed = AgentTools.focusPoint(call, screen.geometry)?.let { (x, y) -> screen.geometry.toPixelsX(x).roundToInt() to screen.geometry.toPixelsY(y).roundToInt() }
+        val box = boxes.firstOrNull { it.field }
+            ?: aimed?.let { (ax, ay) -> boxes.minByOrNull { (it.x - ax) * (it.x - ax) + (it.y - ay) * (it.y - ay) } }
+            ?: boxes.first()
+        return box.text.trim()
     }
 
     /** Once-per-task flags of the done handling. */
@@ -1420,8 +1467,10 @@ class Agent(
             repeat((WAIT_FOR_USER_MS / WAIT_POLL_MS).toInt()) {
                 delay(WAIT_POLL_MS)
                 val now = runCatching { look() }.getOrNull() ?: return@repeat
+                // A hidden screen that shows again: the user is through it.
+                if (before.private && !now.private) return@async true
                 // A new page: the PIN or password screen is gone. Typing on the same page is not enough.
-                if (ChangeLedger.similarity(page, ChangeLedger.page(now.pageTexts())) < SAME_PAGE) return@async true
+                if (!now.private && ChangeLedger.similarity(page, ChangeLedger.page(now.pageTexts())) < SAME_PAGE) return@async true
             }
             false
         }
@@ -1444,15 +1493,21 @@ class Agent(
     companion object {
         /** How long Mode waits for the user to enter a PIN or password before stopping. */
         const val WAIT_FOR_USER_MS: Long = 5 * 60_000L
+
+        /** The keyboard's window, as the phone names it in a text box. */
+        private const val IME = "ime"
+
+        /** What the user is told when the phone hides the screen from Mode. */
+        const val PRIVATE_SCREEN = "Finish this step yourself: this screen is private, so Mode cannot see it"
         private const val WAIT_POLL_MS: Long = 1_500L
 
         /** The rules that depend on what the user allowed: codes, screens only they can do, full access. */
-        fun accessRules(config: AgentConfig): String = buildString {
+        fun accessRules(config: AgentConfig, p: PhoneProfile = PhoneProfile.IPhone): String = buildString {
             append("""
 
                 SCREENS ONLY THE USER CAN DO
-                A UPI or bank PIN pad, a password or passcode field, Face ID, or a screen that is black or blank where
-                an app should be (iPhone hides bank and PIN screens from Mode): call wait_for_user, saying in a few
+                A UPI or bank PIN pad, a password or passcode field, ${p.biometric}, or a screen that is black or blank where
+                an app should be (${p.hiddenScreens}): call wait_for_user, saying in a few
                 words what they should do ("Enter your UPI PIN in PhonePe"). Mode waits until the screen moves on,
                 then you carry on from the new screen. Never type a PIN, password or passcode yourself.
             """.trimIndent())
@@ -1460,7 +1515,7 @@ class Agent(
             append(
                 if (config.readCodes) """
                     ONE-TIME CODES
-                    When the app wants a one-time code (OTP), get it yourself instead of asking: tap it if iOS
+                    When the app wants a one-time code (OTP), get it yourself instead of asking: tap it if ${p.osWord}
                     suggests it above the keyboard ("From Messages"); otherwise read it from the notification
                     banner, or open Messages, read the newest code, go back to the app and type it. Never put a
                     code in a note, the plan or your summary.
@@ -1581,8 +1636,11 @@ class Agent(
         private const val MAX_GIVE_UP_CHARS = 300
         private const val MAX_RESULT_PARTS = 6
 
-        val SYSTEM_PROMPT = """
-            You operate an iPhone for the user, one action at a time, to complete their task.
+        val SYSTEM_PROMPT: String get() = systemPrompt(PhoneProfile.IPhone)
+
+        /** The rules for [p]'s phone: the same on every phone but the words, how back works and the OS know-how. */
+        fun systemPrompt(p: PhoneProfile): String = """
+            You operate ${p.article} ${p.deviceWord} for the user, one action at a time, to complete their task.
             Each turn you get the task, what you did so far (with whether each action changed the
             screen), a screenshot, and the text on the screen with positions. Reply with exactly one
             tool call. After each action you will see the new screen.
@@ -1597,7 +1655,7 @@ class Agent(
 
             Getting oriented: each time an app opens, check where you are (the page, the date shown, any search
             already typed). If it is not where the task starts, get there first: the page's own ← (top left),
-            X, Cancel or Done, or the app's main tab. The iOS back swipe does nothing in many apps. A search box
+            X, Cancel or Done, or the app's main tab. ${p.backNote} A search box
             that already holds text: clear it (its ×) and type yours. To start a new task in an app, open it with
             fresh true.
 
@@ -1670,7 +1728,7 @@ class Agent(
 
             Ask the user (ask_user) when:
             - you are blocked by something only they know: which account to sign in with, or payment details
-              Mode does not have (a PIN, password or Face ID is wait_for_user instead, below);
+              Mode does not have (a PIN, password or ${p.biometric} is wait_for_user instead, below);
             - a choice is theirs to make. Decide yourself what the task handed to you ("a highly rated
               restaurant", which screen or route, the obvious match for a name they gave). But when the task
               leaves open something they will eat, wear, use or pay for (which dish or product, size,
@@ -1689,15 +1747,7 @@ class Agent(
               the number of the item it works on in the item field (the user sees this as progress). Call
               plan again only to change course. Finish (done) only when every item is done.
 
-            Know iOS and pick the fastest route (from wherever you are):
-            - Settings has a search field at the top of its main page: searching a setting's name ("Dark
-              Mode", "Wi-Fi", "Brightness", "Bluetooth") jumps straight to it.
-            - Control Center (control_center tool) has quick toggles: Wi-Fi, Bluetooth, Airplane Mode,
-              brightness, volume, Focus, Flashlight; long-press a control for more (e.g. Dark Mode under
-              brightness). Swipe it closed or press home when done.
-            - Spotlight (swipe down in the middle of the Home Screen) finds apps, settings and contacts.
-            - Most apps put Search, Back and tabs in the same places: tabs at the bottom, Back at top left.
-            - You can start from any screen: you do not need to go home first.
+${p.knowHow.prependIndent("            ")}
 
             Keep what you find: when a screen shows something you will need later or the user asked to know
             (calendar events, times, prices, names, a tracking number), put it in the note field of your next
@@ -1714,7 +1764,7 @@ class Agent(
 
             The user's calendar: unless they name another calendar or app, it is the Google Calendar app (their
             work and personal calendars live there). Open Google Calendar for meetings and events; read_calendar
-            only sees calendars synced to the iPhone, so it is a quick extra check, never proof that a meeting
+            only sees calendars synced to the ${p.deviceWord}, so it is a quick extra check, never proof that a meeting
             doesn't exist.
 
             When something is in the way, keep going like a resourceful personal assistant would. Giving up is the
@@ -1730,7 +1780,7 @@ class Agent(
             - Search finds nothing: try a shorter or different word, the brand or category, a filter, or browsing;
               then another app that has it.
             - A pop-up, ad, rating request, permission sheet, cookie or update banner: close or dismiss it and carry on.
-            - Logged out, a PIN, OTP or Face ID: wait_for_user, then carry on.
+            - Logged out, a PIN, OTP or ${p.biometric}: wait_for_user, then carry on.
             - Not sure an order or payment went through: look once in the app's orders or history; then say
               plainly what you saw and ask before trying again (never pay twice).
             - The app is stuck, blank or loading for long: wait once, then go back, or close and reopen the app.

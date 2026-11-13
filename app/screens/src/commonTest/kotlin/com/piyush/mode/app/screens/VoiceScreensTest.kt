@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -24,7 +25,7 @@ class VoiceScreensTest {
         DeviceVoice.voices = {
             listOf(VoiceOption("ava", "Ava", "Female · English (US) · Premium", "English (US)"), VoiceOption("rishi", "Rishi", "Male · English (India)", "English (India)"))
         }
-        val p = VoicePickerPresenter(backgroundScope, f.settings, Voices(f.settings, HttpClient(MockEngine { error("offline") })), VoiceKind.Apple)
+        val p = VoicePickerPresenter(backgroundScope, f.settings, Voices(f.settings, HttpClient(MockEngine { error("offline") })), VoiceKind.Device)
         val listed = p.state.awaitState { !it.loading }
         assertEquals("ava", listed.selected, "the first voice until one is picked")
         assertEquals(listOf("English (US)", "English (India)"), listed.groups)
@@ -161,22 +162,29 @@ class VoiceScreensTest {
     @Test
     fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
         val f = Fixture(backgroundScope, model = NeverAnswers)
+        // The AI's line comes only once the task shows as sent, and the order is read from the states as they
+        // went by: the presenter runs on the test's virtual clock, so a snapshot taken from the real clock (sent
+        // but no reply yet, a line after a timed delay) is a race the CI runner lost both ways.
+        val line = "On it, Alex. Dark Mode, coming right up."
+        val lineMayCome = kotlinx.coroutines.CompletableDeferred<Unit>()
         val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
-            kotlinx.coroutines.delay(2_000)
+            lineMayCome.await()
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
-                    put("line", kotlinx.serialization.json.JsonPrimitive("On it, Alex. Dark Mode, coming right up."))
+                    put("line", kotlinx.serialization.json.JsonPrimitive(line))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             acknowledger = ack)
+        val seen = mutableListOf<com.piyush.mode.app.screens.settings.ListenUiState>()
+        backgroundScope.launch { talk.state.collect { seen += it } }
+        backgroundScope.launch { talk.state.first { it.sent }; lineMayCome.complete(Unit) }
 
         talk.submitTyped("Turn on dark mode")
-        val sent = talk.state.awaitState { it.sent }
-        assertEquals("", sent.reply)   // the task went before the line was written
         // The session carries on after the task, so the reply is checked where it stays: in the conversation.
-        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == "On it, Alex. Dark Mode, coming right up." } }
+        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == line } }
+        assertTrue(seen.any { it.sent && it.reply.isEmpty() }, "the task went before the line was written")
     }
 
     @Test
@@ -192,7 +200,7 @@ class VoiceScreensTest {
                     put("line", kotlinx.serialization.json.JsonPrimitive(greeting))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val day = com.piyush.mode.feature.memory.data.DayContext("Thursday 6 November, 18:20", events = listOf("Thu 6 Nov 19:00–21:00 · Dinner with Priya"))
         val before = DeviceVoice.hearingState
         DeviceVoice.hearingState = { "ready" }
@@ -216,12 +224,18 @@ class VoiceScreensTest {
     fun aTaskGivenWhileTheAIStillWritesTheGreetingStartsAtOnce() = runTest {
         val f = Fixture(backgroundScope, model = NeverAnswers)
         val slow = com.piyush.mode.llm.LlmClient { _, _, _ -> kotlinx.coroutines.awaitCancellation() }
-        val greeter = com.piyush.mode.feature.memory.data.Greeter(slow, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(slow, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             entry = "siri", greeter = greeter, day = { com.piyush.mode.feature.memory.data.DayContext("Monday 10 November, 21:00") })
+        // The task is typed the moment the hello shows, on the presenter's own clock. Typed from the test body it
+        // came a real moment later, and on that virtual clock the AI's 6 seconds were long over by then: Mode had
+        // already asked in its own words (seen with the test made 50 ms late, and as a timeout on CI).
+        var hello = ""
+        backgroundScope.launch {
+            hello = talk.state.first { it.greeting.isNotEmpty() }.greeting
+            talk.submitTyped("Turn on dark mode")
+        }
         talk.begin()
-        val hello = talk.state.awaitState { it.greeting.isNotEmpty() }.greeting
-        talk.submitTyped("Turn on dark mode")
         val sent = talk.state.awaitState { it.sent }
         assertEquals("Turn on dark mode", sent.task)
         assertEquals(hello, sent.greeting, "the greeting stays as Mode's hello; the AI's late line is dropped")
@@ -260,7 +274,7 @@ class VoiceScreensTest {
                     }
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        return com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        return com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
     }
 
     @Test
@@ -292,6 +306,61 @@ class VoiceScreensTest {
     }
 
     @Test
+    fun androidsAssistantButtonStartsTheSameConversation() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "assistant", greeter = nextLines("Anything else?"))
+        talk.submitTyped("Turn on dark mode")
+        val next = talk.state.awaitState { it.greeting == "Anything else?" }
+        assertFalse(next.finished, "holding power, like Hey Siri, keeps the conversation going")
+    }
+
+    @Test
+    fun theOverlayTalksTheWholeWayEvenWithoutTheAi() = runTest {
+        val f = Fixture(backgroundScope, com.piyush.mode.testing.ScriptedModel(
+            com.piyush.mode.testing.call("done", "evidence" to "x", "summary" to "Dark mode is on."),
+        ))
+        // No greeter (no AI line): Mode still asks what's next, and keeps listening.
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("Turn on dark mode")
+        val next = talk.state.awaitState { it.greeting == ListenPresenter.ANYTHING_ELSE }
+        assertFalse(next.finished, "the overlay is a conversation")
+        val task = f.tasks.recent(10).first().first()
+        assertEquals(com.piyush.mode.feature.tasks.domain.TaskSource.Voice, task.source, "typed in the overlay, its questions are asked out loud")
+    }
+
+    @Test
+    fun aTaskThatFailsIsExplainedAndTryAgainRunsItAgain() = runTest {
+        val f = Fixture(backgroundScope, com.piyush.mode.llm.LlmClient { _, _, _ ->
+            throw com.piyush.mode.llm.LlmFailed("model: HTTP 401: nope", status = 401)
+        })
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("Order my usual coffee")
+        val offer = talk.state.awaitState { it.greeting.startsWith(ListenPresenter.DIDNT_WORK) }
+        assertTrue(offer.greeting.endsWith(ListenPresenter.TRY_AGAIN_QUESTION), offer.greeting)
+        assertFalse("HTTP" in offer.greeting || "401" in offer.greeting, "plain words, never codes")
+        assertEquals(ListenPresenter.TRY_AGAIN, offer.turns.last().offer?.yes)
+
+        talk.pick(ListenPresenter.TRY_AGAIN)
+        val tries = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withTimeout(5_000) { f.tasks.recent(10).first { list -> list.size >= 2 } }
+        }
+        assertEquals(listOf("Order my usual coffee", "Order my usual coffee"), tries.map { it.text })
+    }
+
+    @Test
+    fun thatsAllEndsTheConversationEvenBeforeATask() = runTest {
+        val f = Fixture(backgroundScope)
+        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = ListenPresenter.OVERLAY)
+        talk.submitTyped("That's all, thanks")
+        assertTrue(talk.state.awaitState { it.finished }.finished)
+        assertTrue(f.tasks.recent(10).first().isEmpty(), "nothing was started")
+    }
+
+    @Test
     fun aSessionFromAChatCarriesOnAfterItsTask() = runTest {
         val f = Fixture(backgroundScope)
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
@@ -303,7 +372,7 @@ class VoiceScreensTest {
 
     @Test
     fun aWrapUpIsTheWholeReplyNotAWordInsideATask() {
-        listOf("That's all", "thanks", "No thank you.", "bye Mo", "nahi bas", "that's it, thanks").forEach {
+        listOf("That's all", "thats all", "That’s all.", "thanks", "No thank you.", "bye Mo", "nahi bas", "that's it, thanks", "Im done").forEach {
             assertTrue(ListenPresenter.isWrapUp(it), it)
         }
         listOf("Text Priya thanks for dinner", "No, order the large one", "Stop the music on Spotify please now").forEach {
@@ -385,7 +454,7 @@ class VoiceScreensTest {
                     put("no_label", kotlinx.serialization.json.JsonPrimitive("Not now"))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
-        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null) { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt }
+        val greeter = com.piyush.mode.feature.memory.data.Greeter(model, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val day = com.piyush.mode.feature.memory.data.DayContext("Monday 9 November, 22:10", repeats = listOf("Softovac at 23:30"))
         val before = DeviceVoice.hearingState
         DeviceVoice.hearingState = { "ready" }
@@ -481,6 +550,51 @@ class VoiceScreensTest {
             assertFalse(talk.state.awaitState { !it.micPaused }.finished)
         } finally {
             DeviceVoice.hearingState = before
+        }
+    }
+
+    @Test
+    fun aTaskThatLeavesThemInItsAppEndsALoneQuestionButNotTheOverlay() = runTest {
+        val stay = { com.piyush.mode.testing.ScriptedModel(com.piyush.mode.testing.call("done", "evidence" to "x", "summary" to "Here are the results.", "stay_here" to true)) }
+        val f = Fixture(backgroundScope, stay())
+        val question = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+            entry = "siri", forQuestion = true, pausedEndMs = Long.MAX_VALUE)
+        question.submitTyped("Search for Claude Fable 5.2")
+        assertTrue(question.state.awaitState { it.finished }.finished, "a lone question is over: Mode's own screen goes, so they see the results")
+
+        val g = Fixture(backgroundScope, stay())
+        val overlay = ListenPresenter(backgroundScope, Voices(g.settings, HttpClient(MockEngine { error("offline") })), g.queue, g.settings, g.runner,
+            entry = ListenPresenter.OVERLAY, pausedEndMs = Long.MAX_VALUE)
+        overlay.submitTyped("Search for Claude Fable 5.2")
+        val after = overlay.state.awaitState { it.leftInApp == 1 && it.greeting.isNotEmpty() }
+        assertFalse(after.finished, "the overlay steps aside; the conversation goes on")
+    }
+
+    @Test
+    fun listeningAgainKeepsTheConversation() = runTest {
+        val f = Fixture(backgroundScope)
+        // A mic that opens and stays open: without one, a failed listen falls back to typing after its retry, and
+        // on a slow CI runner the listening phase was gone before the test looked.
+        val state = DeviceVoice.hearingState
+        val listen = DeviceVoice.listen
+        DeviceVoice.hearingState = { "ready" }
+        DeviceVoice.listen = { _, _, _, _, _ -> }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
+            talk.submitTyped("Turn on dark mode")
+            talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+            // They chose to type, then want the mic back: the turns so far stay (begin would start over).
+            talk.typeInstead()
+            val typing = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Typing }
+            talk.listenAgain()
+            val again = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Listening }
+            assertEquals(typing.turns, again.turns, "the conversation is still there")
+            assertEquals(typing.doneSoFar, again.doneSoFar)
+            assertFalse(again.finished)
+        } finally {
+            DeviceVoice.hearingState = state
+            DeviceVoice.listen = listen
         }
     }
 

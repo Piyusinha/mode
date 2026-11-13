@@ -76,7 +76,11 @@ class PlatformServices(
     /** This build's version (CFBundleShortVersionString), written into backups. */
     val appVersion: String = "unknown",
     /** Where backups are written and picked ones read. */
-    val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles = com.piyush.mode.feature.backup.data.platformBackupFiles(),
+    val backupFiles: com.piyush.mode.feature.backup.data.BackupFiles,
+    /** Which phone this is: the agent's words, status bar and tools. */
+    val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
+    /** Whether an overlay over the user's app shows Mode (Android's agent overlay): then Mode's app stays back. */
+    val presence: com.piyush.mode.core.platform.ModePresence = com.piyush.mode.core.platform.ModePresence.None,
 )
 
 /**
@@ -84,6 +88,9 @@ class PlatformServices(
  * take what they need from here; nothing else constructs features.
  */
 class ModeGraph(platform: PlatformServices) {
+    /** The platform's notifications (Android's receivers show scheduled ones through it). */
+    val notifier: Notifier = platform.notifier
+
     /** Lives as long as the app; work started here outlives any one screen. */
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     val activity: ActivityTracker = ActivityTracker()
@@ -99,6 +106,8 @@ class ModeGraph(platform: PlatformServices) {
     /** The models to pick from: OpenRouter's live list, cached for a day. */
     val models: ModelCatalog = ModelCatalog(fetch = { OpenRouterModels(platform.http).fetchRaw() }, files = platform.files)
     val session: PhoneSession = PhoneSession(platform.phoneLink, telemetry = telemetry)
+    /** Each part of reaching the phone, checked in order (Diagnose, Health). */
+    val phoneChecks: com.piyush.mode.feature.connection.domain.PhoneChecks = platform.phoneChecks
     val runs: RunRepository = RunRepository(platform.files, database)
     val conversations: ConversationRepository = ConversationRepository(database)
     val taskHistory: TaskRepository = TaskRepository(database)
@@ -141,18 +150,20 @@ class ModeGraph(platform: PlatformServices) {
         appInfo = platform.appInfo,
         activity = activity,
         scope = scope,
-        memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory), taskHistory, ::startOfTodayMillis),
+        memory = TaskMemory(memory, MemoryRetrieval(memory), Reflector(llm, memory, platform.profile.deviceWord), taskHistory, ::startOfTodayMillis),
         voices = voices,
         telemetry = telemetry,
         narrator = com.piyush.mode.feature.tasks.presentation.Narrator(llm, ::quickModel),
         translator = com.piyush.mode.feature.tasks.presentation.Translator(llm, ::quickModel),
         titler = com.piyush.mode.feature.tasks.presentation.ChatTitler(llm, ::quickModel),
         device = platform.device,
+        profile = platform.profile,
+        presence = platform.presence,
     )
 
     /** The one way in for tasks from the app, Siri, Shortcuts, the Watch and schedules. */
     val deviceLock: com.piyush.mode.core.platform.DeviceLock = platform.deviceLock
-    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope, lock = platform.deviceLock, background = platform.background, telemetry = telemetry).also { queue ->
+    val inbox: TaskQueue = TaskQueue(tasks, taskHistory, conversations, scope, lock = platform.deviceLock, background = platform.background, telemetry = telemetry, deviceWord = if (platform.profile.id == "ios") "iPhone" else "phone").also { queue ->
         tasks.onFollowUp = { text, conversation -> queue.submit(text, com.piyush.mode.feature.tasks.domain.TaskSource.Voice, conversation, false) }
     }
 
@@ -177,7 +188,7 @@ class ModeGraph(platform: PlatformServices) {
      */
     private val backup = com.piyush.mode.feature.backup.data.BackupService(
         database, platform.prefs, platform.secrets, platform.backupFiles,
-        deviceName = { settings.settings.value.userName?.let { "$it’s iPhone" } ?: "iPhone" },
+        deviceName = { settings.settings.value.userName?.let { "$it’s ${platform.profile.deviceWord}" } ?: platform.profile.deviceWord },
         appVersion = platform.appVersion,
         onRestored = { report ->
             settings.reload()
@@ -207,9 +218,10 @@ class ModeGraph(platform: PlatformServices) {
         device = platform.device,
         backupService = backup,
         modeUpdates = com.piyush.mode.feature.settings.data.ModeUpdates(
-            platform.http, platform.prefs, platform.appInfo.version,
+            platform.http, platform.prefs, platform.appInfo.version, file = platform.appInfo.releaseFile,
         ),
         logTail = { platform.files.read("events.log")?.decodeToString()?.lines()?.takeLast(LOG_TAIL_LINES)?.joinToString("\n").orEmpty() },
+        profile = platform.profile,
     )
 
     /**

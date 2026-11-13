@@ -49,6 +49,8 @@ public class Greeter(
     private val memory: MemoryRepository?,
     /** The fast model at its lowest effort: the greeting has to come back in about a second. */
     private val model: () -> Pair<String, ModelProvider>?,
+    /** The phone Mode runs on, as the prompt names it ("iPhone", "Android phone"). */
+    private val device: String = "iPhone",
 ) {
     /** The time, for how long a prepared opening stays good (tests set their own). */
     public var now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() }
@@ -105,7 +107,7 @@ public class Greeter(
                     if (known.isNotEmpty()) append("WHAT YOU KNOW ABOUT THEM:\n").append(known.joinToString("\n") { "- $it" }).append('\n')
                     if (day.isEmpty) append("NOTHING IS COMING UP: just greet them and ask what they need.\n")
                 }
-                val system = language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM
+                val system = (language?.let { SYSTEM.replace(LANGUAGE_RULE, "Speak $it.") } ?: SYSTEM).onDevice(device)
                 val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), NEXT_TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 fun arg(key: String) = (args?.get(key) as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
@@ -147,7 +149,7 @@ public class Greeter(
                     if (day.events.isNotEmpty()) append("THEIR CALENDAR FROM NOW:\n").append(day.events.take(EVENTS).joinToString("\n") { "- $it" }).append('\n')
                     if (day.repeats.isNotEmpty()) append("TASKS THEY REPEAT, DUE SOON:\n").append(day.repeats.take(EVENTS).joinToString("\n") { "- $it" }).append('\n')
                 }
-                val system = language?.let { NEXT.replace(LANGUAGE_RULE, "Speak $it.") } ?: NEXT
+                val system = (language?.let { NEXT.replace(LANGUAGE_RULE, "Speak $it.") } ?: NEXT).onDevice(device)
                 val reply = llm.forProvider(provider).chat(id, listOf(ChatMessage("system", system), ChatMessage("user", user)), NEXT_TOOLS)
                 val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments
                 fun arg(key: String) = (args?.get(key) as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }

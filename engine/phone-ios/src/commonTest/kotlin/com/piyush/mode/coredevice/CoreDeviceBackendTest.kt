@@ -1,5 +1,10 @@
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.ScreenInfo
+import com.piyush.mode.screen.InstalledApp
+import com.piyush.mode.screen.RecognizedText
+import com.piyush.mode.screen.ShrunkImage
+
 import com.piyush.mode.ops.Op
 import com.piyush.mode.ops.OpFailed
 import com.piyush.mode.ops.Unsupported

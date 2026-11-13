@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The paper page colour behind Mo on the launcher icon. -->
+    <color name="ic_launcher_background">#F5F3EF</color>
+    <!-- The window behind Mode's screens before Compose draws (the design system's page). -->
+    <color name="mode_page">#F5F3EF</color>
+</resources>

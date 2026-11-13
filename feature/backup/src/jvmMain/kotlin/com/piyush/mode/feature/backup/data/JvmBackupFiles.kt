@@ -21,5 +21,3 @@ public class JvmBackupFiles(override val tempDir: String = System.getProperty("j
         File(path).delete()
     }
 }
-
-public actual fun platformBackupFiles(): BackupFiles = JvmBackupFiles()

@@ -47,7 +47,7 @@ object LoopbackVpn {
         }
 
     private val providerBundleId: String
-        get() = (NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode") + ".tunnel"
+        get() = (NSBundle.mainBundle.bundleIdentifier ?: "app.heymode.mode") + ".tunnel"
 
     /**
      * Makes sure the loopback VPN is up. On a paid build it adds Mode's VPN

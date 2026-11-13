@@ -2,7 +2,8 @@ package com.piyush.mode.feature.settings.domain
 
 /** One speech or hearing choice. Apple needs no key. The others do. */
 public enum class VoiceKind(public val id: String, public val needsKey: Boolean) {
-    Apple("apple", false),
+    /** The phone's own voice and hearing (Apple on iOS, Android's on Android). The id stays "apple": settings and backups keep working. */
+    Device("apple", false),
     Speechify("speechify", true),
     Fish("fish", true),
     ElevenLabs("elevenlabs", true),
@@ -11,8 +12,8 @@ public enum class VoiceKind(public val id: String, public val needsKey: Boolean)
     ;
 
     public companion object {
-        public val SPEECH: List<VoiceKind> = listOf(Apple, Speechify, Fish, ElevenLabs)
-        public val HEARING: List<VoiceKind> = listOf(Apple, Soniox, Deepgram)
+        public val SPEECH: List<VoiceKind> = listOf(Device, Speechify, Fish, ElevenLabs)
+        public val HEARING: List<VoiceKind> = listOf(Device, Soniox, Deepgram)
         public fun fromId(id: String): VoiceKind? = entries.firstOrNull { it.id == id }
         public fun speechDefault(): List<String> = SPEECH.map { it.id }
         public fun hearingDefault(): List<String> = HEARING.map { it.id }

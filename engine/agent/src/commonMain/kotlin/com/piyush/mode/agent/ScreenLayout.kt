@@ -13,8 +13,11 @@ import kotlin.math.abs
  */
 class ScreenLayout private constructor(val cards: List<Card>) {
 
-    /** One piece of recognised text: its centre and size in screenshot pixels (size 0 when unknown). */
-    class Box(val text: String, val x: Int, val y: Int, val w: Int = 0, val h: Int = 0)
+    /**
+     * One piece of recognised text: its centre and size in screenshot pixels (size 0 when unknown), and
+     * which window it is in when the phone says ("app", "ime" for the keyboard, "system"); null from OCR.
+     */
+    class Box(val text: String, val x: Int, val y: Int, val w: Int = 0, val h: Int = 0, val window: String? = null, val field: Boolean = false)
 
     class Element(val id: Int, val text: String, val x: Int, val y: Int)
 

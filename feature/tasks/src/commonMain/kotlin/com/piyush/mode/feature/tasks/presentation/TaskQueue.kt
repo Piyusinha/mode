@@ -42,6 +42,8 @@ public class TaskQueue(
     private val background: BackgroundWork? = null,
     private val now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
     private val telemetry: com.piyush.mode.core.telemetry.Telemetry = com.piyush.mode.core.telemetry.Telemetry.None,
+    /** "iPhone", "phone": in what Mode says when the phone stayed locked. */
+    private val deviceWord: String = "iPhone",
 ) : TaskInbox {
     private val waiting = MutableStateFlow<List<Task>>(emptyList())
     private val lockWait = MutableStateFlow<Task?>(null)
@@ -137,8 +139,9 @@ public class TaskQueue(
         telemetry.event(com.piyush.mode.core.telemetry.Event.WaitedForUnlock, fields = mapOf(com.piyush.mode.core.telemetry.Field.Outcome to outcome))
         if (ended == null && tasks.get(task.id)?.status == TaskStatus.Queued) {
             AppLog.log("queue", "task ${task.id} waited ${(now() - since) / 1000} s for an unlock; not started")
-            tasks.finish(task.id, TaskStatus.Stopped, WAITED_TOO_LONG, null, null)
-            task.conversationId?.let { conversations.addTurn(it, TurnRole.Mode, WAITED_TOO_LONG, task.id) }
+            val said = waitedTooLong(deviceWord)
+            tasks.finish(task.id, TaskStatus.Stopped, said, null, null)
+            task.conversationId?.let { conversations.addTurn(it, TurnRole.Mode, said, task.id) }
             refresh()
         } else if (!lock.locked.value) {
             AppLog.log("queue", "unlocked after ${(now() - since) / 1000} s; task ${task.id} starts")
@@ -154,6 +157,6 @@ public class TaskQueue(
         /** A task that waited longer than this while Mode was closed is not run at the next launch. */
         public const val MAX_WAIT_MS: Long = 60 * 60 * 1000L
         internal const val CANCELLED: String = "Cancelled before it started."
-        internal const val WAITED_TOO_LONG: String = "Your iPhone stayed locked, so I didn't start this. Ask again when it's unlocked."
+        internal fun waitedTooLong(device: String): String = "Your $device stayed locked, so I didn't start this. Ask again when it's unlocked."
     }
 }

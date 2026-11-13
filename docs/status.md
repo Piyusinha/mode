@@ -17,6 +17,23 @@ As of 2026-11-01.
 | P1 | Production step 1: modular clean architecture (layers, one module per feature, StateFlow state, ModeGraph, SKIE) | ✅ Done, 74 tests; on-phone check pending (see below) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
+## Android (started 2026-11-06, branch `mode-android`)
+
+The plan has eight phases; how Android works is in [android.md](android.md). Design: the
+Android canvas, 135 boards. Decisions D41–D43.
+
+| Phase | What | State |
+|---|---|---|
+| 0 | Foundations: Android target in the convention plugin, stores, platform adapters, OkHttp, the database driver, `app:android`, `androidModeGraph`, CI job | ✅ Done; the app starts on the API 37 emulator with the full graph |
+| 1 | Shared code for two phones: `engine:screen`, four new ops, `PhoneProfile`, keyboard and private screens from a tree, the renames | ✅ Done |
+| 2 | The accessibility engine (`engine:phone-android`): tree text, screenshots, gestures, the service, checks, the working service | ✅ Done on the API 37 emulator (look 131–229 ms); text recognition when an app's window has nothing to read (ML Kit, Latin + Devanagari, 0.4 s); a real phone still to do |
+| 3 | The app: `app:design` (tokens, components), strings, navigation, every screen from the canvas | ✅ Done on the emulator: first run and phone setup, Home, Tasks, Ask, conversation, live run, All screens, Repeat, What went wrong, Settings, providers (ChatGPT, Claude, OpenRouter sign-ins), model picker, plan models, provider page, How Mode acts, Memory, Health, Backup and restore, voice and listening, voice picker, language, Developer. Not on Android: Unlock by voice (uses the iPhone's Voice Control) |
+| 4 | Hands-free: notifications with answers, the assistant role, widget, exact-alarm schedules, Android voice | ✅ Done on the emulator: questions answered from the notification, the live working notice, the phone's voices and speech recognizer, talking mode, hold power for Mode, the home screen widget, exact repeats re-armed after a restart. A spoken task end to end needs a real AI key and a phone with a microphone |
+| 5 | Background mode: libadb-android for the link, a helper on scrcpy's approach, the hidden display | ✅ Done on the emulator: Mode pairs itself from the pairing window, reconnects (and turns Wireless debugging back on) by itself, runs tasks on a hidden display with Back/Home kept there, hands the app to the user on their turn and takes it back. The small floating window (R02) opens by itself when the user leaves Mode during a background task. A full AI task in the background still needs a real key and a phone |
+| 6 | Distribution: signed APK on GitHub, the `play` flavour, CI | ✅ Built: `tools/build-apk.sh`, release signing from the environment (verified with a test key), one version with the iPhone, the release workflow's Android job (needs the signing secrets), CI builds the release APK and runs the Android tests; the Play build has nothing that drives the phone. To do before Play: first jobs without phone control, store declarations, shrinking |
+| 7 | Quality: the task suite on phones, brand quirks, docs | 🟡 Device checks done (D50): the maker's steps in setup (Samsung, Xiaomi), background mode's requirements (Android 14, Wi-Fi, no policy), the warning banner at the top, Health rows; boards D01–D09, W01–W06. PhoneQuirks done (Xiaomi/Redmi/POCO, Samsung, OnePlus, OPPO/realme, vivo/iQOO, Huawei/Honor battery and autostart pages, tested; the battery button tries them once Android lets Mode run). Waiting on a real phone and an AI key: the 12-task suite, background mode with real tasks, checking each brand's pages open |
+| 8 | Keeping up with the iPhone (main merged 2026-11-10, Mode 0.1.9) | ✅ On the emulator: Speechify as a voice (streamed), voice sessions that stay open with the session bar (minimise, pause the mic, End, Stop only stops the task), a session continuing its chat, the connected AI's card in setup, Mode's version and "a newer Mode is out" in Settings, Developer only in debug builds. Fixed on the way: a stopped line shown as a failed voice, a stopped clip that never answered, the takeover check moving the user's own window, the link banner waiting for a failed task, a banner over its own fix page. Waiting on a real phone and a key: Speechify's own stream, a spoken task inside a session |
+
 ## Proven on the phone (iPhone 17 Pro, iOS 27.2)
 
 | What | Result |

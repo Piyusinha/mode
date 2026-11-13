@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** How a language can be heard: on this iPhone (Apple), after a one-time download, by the cloud listener, or not yet. */
-public enum class LanguageReach { Auto, OnIphone, Download, Cloud, NeedsCloud }
+public enum class LanguageReach { Auto, OnDevice, Download, Cloud, NeedsCloud }
 
 /** [listener]: the cloud listener's name when [reach] is Cloud. */
 public data class LanguageRow(
@@ -34,18 +34,18 @@ public class LanguagePresenter(
     }
 
     private fun state(chosen: String, replyInSpoken: Boolean): LanguageUiState {
-        val listener = voices.listener() ?: VoiceKind.Apple
-        val apple = DeviceVoice.appleLanguages().map { it.lowercase() }.toSet()
-        val installed = DeviceVoice.appleInstalled().map { it.lowercase() }.toSet()
+        val listener = voices.listener() ?: VoiceKind.Device
+        val apple = DeviceVoice.deviceLanguages().map { it.lowercase() }.toSet()
+        val installed = DeviceVoice.deviceInstalled().map { it.lowercase() }.toSet()
         fun reach(l: SpeechLanguage): LanguageReach = when {
             l == SpeechLanguage.Auto -> LanguageReach.Auto
-            listener != VoiceKind.Apple -> LanguageReach.Cloud
-            l.id.lowercase() in installed -> LanguageReach.OnIphone
+            listener != VoiceKind.Device -> LanguageReach.Cloud
+            l.id.lowercase() in installed -> LanguageReach.OnDevice
             l.id.lowercase() in apple || apple.isEmpty() -> LanguageReach.Download
             else -> LanguageReach.NeedsCloud
         }
         val rows = SpeechLanguage.entries.map { l ->
-            LanguageRow(l.id, l.english, l.native, reach(l), listener.takeIf { it != VoiceKind.Apple }?.let(::nameOf), l.id == chosen)
+            LanguageRow(l.id, l.english, l.native, reach(l), listener.takeIf { it != VoiceKind.Device }?.let(::nameOf), l.id == chosen)
         }
         // The chosen one first after Auto, then the rest in the list's order.
         return LanguageUiState(rows = rows, replyInSpoken = replyInSpoken)
@@ -62,7 +62,7 @@ public class LanguagePresenter(
         val language = SpeechLanguage.fromId(id)
         settings.update { it.copy(language = language.id) }
         DeviceVoice.listenLanguage = language.takeUnless { it == SpeechLanguage.Auto }?.id
-        if (voices.listener() == VoiceKind.Apple) DeviceVoice.prepare()
+        if (voices.listener() == VoiceKind.Device) DeviceVoice.prepare()
     }
 
     public fun setReplyInSpoken(on: Boolean) {

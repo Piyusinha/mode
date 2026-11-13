@@ -162,12 +162,12 @@ class OnboardingTest {
         val f = Fixture(this)
         val p = onboarding(f)
         val rows = p.state.awaitState { it.permissions.isNotEmpty() }.permissions
-        assertEquals(listOf(PermissionKind.Vpn, PermissionKind.Notifications, PermissionKind.Siri, PermissionKind.Microphone), rows.map { it.kind })
-        assertTrue(rows.single { it.kind == PermissionKind.Siri }.optional)
+        assertEquals(listOf(PermissionKind.PhoneControl, PermissionKind.Notifications, PermissionKind.Assistant, PermissionKind.Microphone), rows.map { it.kind })
+        assertTrue(rows.single { it.kind == PermissionKind.Assistant }.optional)
         assertTrue(rows.single { it.kind == PermissionKind.Microphone }.later)
         p.allow(PermissionKind.Notifications)
         val after = p.state.awaitState { st -> st.permissions.single { it.kind == PermissionKind.Notifications }.status == PermissionStatus.Allowed }
-        assertEquals(PermissionStatus.NotAsked, after.permissions.single { it.kind == PermissionKind.Vpn }.status)
+        assertEquals(PermissionStatus.NotAsked, after.permissions.single { it.kind == PermissionKind.PhoneControl }.status)
     }
 
     @Test

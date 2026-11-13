@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mo, idle: the widget's face (widgets can't draw Mo's Compose canvas). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="120" android:viewportHeight="120">
+    <path android:fillColor="@color/widget_mo"
+        android:pathData="M60 8 C92 8 112 28 112 60 C112 94 92 112 60 112 C28 112 8 94 8 60 C8 28 28 8 60 8 Z" />
+    <path android:fillColor="#40FFFFFF" android:pathData="M30 30 a12 7 -25 1 0 0.01 0 Z" />
+    <path android:fillColor="@color/widget_mo_ink" android:pathData="M45 50 a6 9 0 1 0 0.01 0 Z" />
+    <path android:fillColor="@color/widget_mo_ink" android:pathData="M75 50 a6 9 0 1 0 0.01 0 Z" />
+    <path android:fillColor="#00000000" android:strokeColor="@color/widget_mo_ink" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M50 76 Q60 84 70 76" />
+</vector>

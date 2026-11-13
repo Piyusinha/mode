@@ -141,7 +141,7 @@ class VoicesTest {
         val eleven = Voices.withOurPick(VoiceKind.ElevenLabs, list)
         assertEquals(listOf("r", "a", "g"), eleven.map { it.id })
         assertEquals(Voices.OUR_PICK, eleven.first().tag)
-        assertEquals(list, Voices.withOurPick(VoiceKind.Apple, list))
+        assertEquals(list, Voices.withOurPick(VoiceKind.Device, list))
         assertEquals(VoiceKind.Deepgram, VoiceKind.MOST_ACCURATE)
     }
 
@@ -250,7 +250,7 @@ class VoicesTest {
     @Test
     fun speechifyIsOfferedButAppleStaysTheDefaultVoice() {
         kotlin.test.assertTrue(VoiceKind.Speechify in VoiceKind.SPEECH)
-        assertEquals(VoiceKind.Apple.id, VoiceKind.speechDefault().first())
+        assertEquals(VoiceKind.Device.id, VoiceKind.speechDefault().first())
         // A saved order from before Speechify existed gains it without changing who speaks.
         val old = com.piyush.mode.feature.settings.domain.ModeSettings(speechOrder = listOf("elevenlabs", "apple", "fish")).validated()
         assertEquals(listOf("elevenlabs", "apple", "fish", "speechify"), old.speechOrder)

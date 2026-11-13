@@ -5,6 +5,7 @@ plugins {
 dependencies {
     // compileOnly: the root build puts the real plugin on the classpath (apply false).
     compileOnly(libs.kotlin.gradle.plugin)
+    compileOnly(libs.android.gradle.plugin)
 }
 
 gradlePlugin {

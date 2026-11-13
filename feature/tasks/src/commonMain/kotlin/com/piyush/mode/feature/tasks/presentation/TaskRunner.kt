@@ -104,6 +104,10 @@ public class TaskRunner(
     private val titler: ChatTitler? = null,
     /** Links, the calendar and contacts from Mode's own app: direct routes beside the screen. */
     private val device: com.piyush.mode.ops.DeviceData? = null,
+    /** Which phone this is, for the agent's prompts and tools. */
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
+    /** An overlay over the user's app shows Mode (Android): asking and answering happen there, Mode's app stays back. */
+    private val presence: com.piyush.mode.core.platform.ModePresence = com.piyush.mode.core.platform.ModePresence.None,
 ) {
     /** Keeps a task under iOS's background CPU limit (see [CpuPacer]). */
     private val pacerEpoch = kotlin.time.TimeSource.Monotonic.markNow()
@@ -174,9 +178,17 @@ public class TaskRunner(
     /** Mode came to the front for the last question (no notifications), so the agent must reopen its app. */
     private var askedInMode = true
 
-    private fun whereAnswered(answer: String): String =
-        if (askedInMode) "$answer (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)"
-        else "$answer (The user answered from the notification; the app you were using is still in front.)"
+    private fun whereAnswered(answer: String): String = when {
+        presence.overlay -> "$answer (The user answered in Mode's overlay; the app you were using is still in front.)"
+        askedInMode -> "$answer (The user answered in the Mode app, so Mode is now on screen: reopen the app you were using.)"
+        else -> "$answer (The user answered from the notification; the app you were using is still in front.)"
+    }
+
+    /** Brings Mode's app forward (to ask, or to show how a task went), unless an overlay already shows Mode. */
+    private suspend fun comeForward(phone: PhoneBackend) {
+        if (presence.overlay) return
+        runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+    }
 
     /** An answer to the question [questionId] (from a notification or the Live Activity); ignored if it was already answered. */
     public fun answer(questionId: String, text: String?) {
@@ -318,7 +330,7 @@ public class TaskRunner(
             val base = TaskContext(
                 userName = settings.settings.value.userName, replyLanguage = replyLanguage, earlierTurns = earlier, today = today(),
                 resumed = resumedFrom(saved),
-                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device),
+                directRoutes = com.piyush.mode.agent.AgentTools.directRoutes(runCatching { phone.ops() }.getOrDefault(emptySet()), device, profile = profile),
             )
             val prepared = telemetry.trace(Operation.MemoryPrepare) { memory?.prepare(agentTask, base, useMemory, saved.id) }
             val agent = Agent(
@@ -342,6 +354,7 @@ public class TaskRunner(
                 onScreen = { jpeg -> mutableState.update { it.copy(latestScreen = jpeg) } },
                 recoverPhone = { session.reconnect() },
                 device = device,
+                profile = profile,
             )
             // Spoken tasks: Mode keeps the user posted while it works, and stops before the answer.
             val updates = if (spoken) narrator?.let { n -> scope.launch { narrate(n, task, taskStarted) } } else null
@@ -376,7 +389,7 @@ public class TaskRunner(
             if ((finished.outcome as? AgentOutcome.Done)?.stay == true) {
                 AppLog.log("agent", "run ${recorder.id}: left on the screen it ended on (the task was to be there)")
             } else {
-                runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+                comeForward(phone)
             }
             return finished
         } catch (e: CancellationException) {
@@ -388,10 +401,11 @@ public class TaskRunner(
         } catch (e: Exception) {
             outcome = TaskStatus.Failed
             // The chat shows "Failed" as a tag; the reply is just what went wrong.
-            reply = e.message ?: "Something went wrong."
+            // Plain words for the user; the raw error stays in the log and on What went wrong.
+            reply = com.piyush.mode.llm.FailureWords.of(e) ?: e.message ?: "Something went wrong."
             AppLog.error("agent", "run ${recorder.id} failed", e)
             status("Failed: $reply")
-            notifier.post("Mode", "Task failed: ${e.message}")
+            notifier.post("Mode", reply)
             return null
         } finally {
             span.fields(mapOf(Field.Outcome to outcome.name))
@@ -619,8 +633,8 @@ public class TaskRunner(
         val voice = if (yourTurn || voices == null || !spoken) null else scope.launch {
             telemetry.trace(Operation.VoiceTurn, parent = parent) { hearQuestion(phone, pending) }
         }.also { voiceJob = it }
-        askedInMode = !yourTurn && (!notifier.canAskInPlace() || voice != null)
-        if (askedInMode && voice == null) runCatching { phone.send(Op.LaunchApp(appInfo.bundleId)) }
+        askedInMode = !yourTurn && !presence.overlay && (!notifier.canAskInPlace() || voice != null)
+        if (askedInMode && voice == null) comeForward(phone)
         try {
             return pending.answer.await().also { AppLog.log("agent", "user answered: ${it ?: "(stopped)"}") }
         } finally {
@@ -645,7 +659,7 @@ public class TaskRunner(
         session.duringVoice { live ->
             val hands = live ?: return@duringVoice
             mutableState.update { it.copy(voice = VoiceTurn(VoiceTurnPhase.Asking, pending.text, pending.options, task)) }
-            runCatching { hands.send(Op.LaunchApp(appInfo.bundleId)) }
+            comeForward(hands)
             hands.pauseStream()
             // A tap on an option, or an answer from the notification, closes the microphone at once.
             val stopListening = pending.answer.invokeOnCompletion { voices?.stop() }
@@ -653,15 +667,26 @@ public class TaskRunner(
                 // Talking over the question is the answer.
                 val over = voices?.speakOrHear(pending.text) { words -> turn { it.copy(phase = VoiceTurnPhase.Listening, heard = words) } }
                 if (over is Heard.Words) answer(pending.id, over.text)
-                if (!pending.answer.isCompleted) {
+                // Silence: ask once more before leaving the question to a tap (or the notification).
+                var listens = 0
+                while (!pending.answer.isCompleted && listens < QUESTION_LISTENS) {
+                    if (listens > 0) {
+                        turn { it.copy(phase = VoiceTurnPhase.Asking) }
+                        voices?.speak("$DIDNT_CATCH ${pending.text}")
+                        if (pending.answer.isCompleted) break
+                    }
                     turn { it.copy(phase = VoiceTurnPhase.Listening) }
                     val heard = voices?.hear { words -> turn { it.copy(heard = words) } }
                     if (heard is Heard.Words) answer(pending.id, heard.text)
+                    if (heard !is Heard.Silence) break
+                    listens++
                 }
                 val given = pending.answer.getCompletedOrNull()
                 if (given != null) {
-                    turn { it.copy(phase = VoiceTurnPhase.Answered, heard = given, reply = GOT_IT) }
-                    voices?.speak(GOT_IT)
+                    // Over an overlay nobody goes anywhere: just "Got it."
+                    val reply = if (presence.overlay) GOT_IT_HERE else GOT_IT
+                    turn { it.copy(phase = VoiceTurnPhase.Answered, heard = given, reply = reply) }
+                    voices?.speak(reply)
                     delay(ANSWERED_PAUSE_MS)
                 }
             } finally {
@@ -719,6 +744,10 @@ private const val FOUND_NOTES = 4
 /** Every this many steps there is something new to say (about 15–25 s of work). */
 private const val NARRATE_EVERY_STEPS = 2
 private const val GOT_IT = "Got it. Going back."
+private const val GOT_IT_HERE = "Got it."
+private const val DIDNT_CATCH = "Sorry, I didn't catch that."
+/** How many times a spoken question listens before it waits for a tap. */
+private const val QUESTION_LISTENS = 2
 
 /** How long "Got it" stays on screen after it is said, before Mode leaves. */
 private const val ANSWERED_PAUSE_MS = 900L

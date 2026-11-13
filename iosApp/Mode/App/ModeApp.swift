@@ -61,8 +61,8 @@ final class AppleVoice: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDele
     }
 
     func install() {
-        DeviceVoice.shared.appleLanguages = { [weak self] in self?.appleSupported ?? [] }
-        DeviceVoice.shared.appleInstalled = { [weak self] in self?.appleInstalled ?? [] }
+        DeviceVoice.shared.deviceLanguages = { [weak self] in self?.appleSupported ?? [] }
+        DeviceVoice.shared.deviceInstalled = { [weak self] in self?.appleInstalled ?? [] }
         Voices.companion.installReader { path in
             guard let data = FileManager.default.contents(atPath: path) else { return nil }
             let bytes = KotlinByteArray(size: Int32(data.count))

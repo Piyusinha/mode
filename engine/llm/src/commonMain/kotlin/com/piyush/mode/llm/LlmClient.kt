@@ -75,8 +75,8 @@ fun interface LlmClient {
     fun forProvider(provider: ModelProvider): LlmClient = this
 }
 
-/** The model call failed: network, key, credit, or a model that cannot do this. */
-class LlmFailed(message: String, val status400: Boolean = false) : RuntimeException(message)
+/** The model call failed: network, key, credit, or a model that cannot do this. [status]: the HTTP status, 0 when none. */
+class LlmFailed(message: String, val status400: Boolean = false, val status: Int = if (status400) 400 else 0) : RuntimeException(message)
 
 /**
  * OpenRouter's OpenAI-compatible chat completions, which also fits any
@@ -155,7 +155,7 @@ class OpenRouterClient(
         }
         val text = response.bodyAsText()
         if (!response.status.isSuccess()) {
-            throw LlmFailed("$model: HTTP ${response.status.value}: ${errorMessage(text)}", status400 = response.status.value == 400)
+            throw LlmFailed("$model: HTTP ${response.status.value}: ${errorMessage(text)}", status400 = response.status.value == 400, status = response.status.value)
         }
         return parse(text, model)
     }

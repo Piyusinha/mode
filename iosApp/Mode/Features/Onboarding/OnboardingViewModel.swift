@@ -435,9 +435,9 @@ final class OnboardingViewModel {
 
     private static func permission(_ p: ModeKit.PermissionRow) -> PermissionRow {
         let (title, why, icon, background, foreground): (LocalizedStringResource, LocalizedStringResource, ModeIcon, Color, Color) = switch p.kind {
-        case .vpn: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .vpn, ModeColor.tileGray, ModeColor.textPrimary)
+        case .phoneControl: (L10n.Setup.vpn, L10n.Setup.vpnWhy, .vpn, ModeColor.tileGray, ModeColor.textPrimary)
         case .notifications: (L10n.Setup.notifications, L10n.Setup.notificationsWhy, .bell, ModeColor.tileRed, ModeColor.danger)
-        case .siri: (L10n.Setup.siri, L10n.Setup.siriWhy, .siriWave, ModeColor.tileOrange, ModeColor.tileOrangeText)
+        case .assistant: (L10n.Setup.siri, L10n.Setup.siriWhy, .siriWave, ModeColor.tileOrange, ModeColor.tileOrangeText)
         case .microphone: (L10n.Setup.microphone, L10n.Setup.microphoneWhy, .microphone, ModeColor.tileGray, ModeColor.textPrimary)
         }
         let action: ModeStatusAction = switch p.status {
@@ -468,9 +468,13 @@ final class OnboardingViewModel {
         case .diskImage: L10n.Setup.checkDiskImage
         case .screen: L10n.Setup.checkScreen
         case .hands: L10n.Setup.checkHands
+        // Android's checks; the iPhone never runs them.
+        case .restrictedSettings, .engine, .battery, .sleeping, .autostart, .popups, .backgroundLink, .speech, .shortcut: L10n.Setup.checkReach
         }
         switch onEnum(of: check.state) {
         case .notChecked: return CheckRow(id: index, title: title, leading: .pending, detail: nil, trailing: String(localized: L10n.Setup.notChecked))
+        // Android only (a setting Mode can't read, confirmed by the user); the iPhone never shows it.
+        case let .unverifiable(u): return CheckRow(id: index, title: title, leading: u.confirmed ? .check : .pending, detail: nil, trailing: nil)
         case .running: return CheckRow(id: index, title: title, leading: .progress, detail: nil, trailing: nil)
         case let .passed(p): return CheckRow(id: index, title: title, leading: .check, detail: nil, trailing: p.ms.map { Format.seconds(Double(truncating: $0) / 1000) })
         case let .failed(f): return CheckRow(id: index, title: title, leading: .failure, detail: [f.reason, f.fix].compactMap { $0 }.joined(separator: " "), trailing: nil)

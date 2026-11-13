@@ -163,7 +163,7 @@ final class VoiceListModel {
         case let .checkKey(service, key): presenter.checkAndSaveKey(id: service.id, key: key)
         case .keySheetClosed: presenter.clearKeyCheck()
         case let .removeKey(service): presenter.remove(id: service.id); linking = nil; opened = nil
-        case .turnOnApple: presenter.prepareApple()
+        case .turnOnApple: presenter.prepareDevice()
         case .playSample: presenter.playSample()
         case let .speed(id): presenter.setSpeed(id: id)
         case let .speakResult(on): presenter.setSpeakResult(on: on)

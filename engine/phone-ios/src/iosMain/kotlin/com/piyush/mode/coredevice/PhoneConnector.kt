@@ -2,6 +2,8 @@
 
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.ScreenInfo
+
 import com.piyush.mode.core.telemetry.Telemetry
 import com.piyush.mode.core.telemetry.Operation
 import com.piyush.mode.core.telemetry.Field

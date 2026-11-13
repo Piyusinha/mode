@@ -91,6 +91,22 @@ sealed interface Op {
     @Serializable @SerialName("nav.home")
     data object Home : Op
 
+    /** Back one screen the way the OS does it (Android's Back). Not every phone can answer. */
+    @Serializable @SerialName("nav.back")
+    data object Back : Op
+
+    /** The recent-apps switcher. Not every phone can answer. */
+    @Serializable @SerialName("nav.recents")
+    data object Recents : Op
+
+    /** Pulls down the notification shade. Not every phone can answer. */
+    @Serializable @SerialName("notifications.open")
+    data object OpenNotifications : Op
+
+    /** Opens the quick toggles (Quick Settings). Not every phone can answer. */
+    @Serializable @SerialName("quicksettings.open")
+    data object OpenQuickSettings : Op
+
     /** Launch by bundle id, or by the name on the icon. Answers the bundle id in front afterwards. */
     @Serializable @SerialName("apps.launch")
     data class LaunchApp(val name: String, val fresh: Boolean = false) : Op

@@ -21,6 +21,22 @@ jobs:
       - name: Shared tests and module rules
         run: ./gradlew jvmTest checkModuleRules
 
+  android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          # The action's default also asks for "tools", a package the SDK no longer has (the run fails on it).
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android app and host tests
+        run: ./gradlew :app:android:assembleFullDebug :app:android:assemblePlayDebug :app:android:assembleFullRelease testAndroidHostTest :app:android:testFullDebugUnitTest :engine:adb-link:testDebugUnitTest :app:android:checkUiLiterals
+
   mode-setup:
     runs-on: ubuntu-22.04
     steps:

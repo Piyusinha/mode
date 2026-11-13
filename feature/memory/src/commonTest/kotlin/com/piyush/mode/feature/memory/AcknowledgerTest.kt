@@ -62,7 +62,7 @@ class AcknowledgerTest {
 
     @Test
     fun withoutAModelOrWithAnUnusableLineModeUsesItsOwn() = runTest {
-        assertNull(Acknowledger(Model("x"), memory) { null }.line("Turn on dark mode", "Alex", hour = 20))
+        assertNull(Acknowledger(Model("x"), memory, model = { null }).line("Turn on dark mode", "Alex", hour = 20))
         val rambling = Model((1..40).joinToString(" ") { "word" })
         assertNull(Acknowledger(rambling, memory, fast).line("Turn on dark mode", "Alex", hour = 20))
         assertEquals("On it, Alex.", Acknowledger(Model("\"On it, Alex.\" 🚀"), memory, fast).line("Turn on dark mode", "Alex", hour = 20))

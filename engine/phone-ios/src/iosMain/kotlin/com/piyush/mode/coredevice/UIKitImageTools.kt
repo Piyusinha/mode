@@ -2,6 +2,9 @@
 
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.ImageTools
+import com.piyush.mode.screen.ShrunkImage
+
 import com.piyush.mode.ops.OpFailed
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi

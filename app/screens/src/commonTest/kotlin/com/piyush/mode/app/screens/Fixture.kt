@@ -25,6 +25,7 @@ import com.piyush.mode.testing.InMemorySecretStore
 import com.piyush.mode.testing.ScriptedModel
 import com.piyush.mode.testing.testDatabase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -53,6 +54,15 @@ internal class Notes : Notifier {
     override fun cancel(id: String) { scheduled.remove(id) }
 }
 
+/** A lifecycle the test moves by hand. */
+internal class FakeLifecycle : com.piyush.mode.core.platform.AppLifecycle {
+    private val foreground = mutableListOf<() -> Unit>()
+    override fun onBackground(action: () -> Unit) {}
+    override fun onForeground(action: () -> Unit) { foreground += action }
+    override fun onTerminate(action: () -> Unit) {}
+    fun cameBack() = foreground.forEach { it() }
+}
+
 internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
     val granted = mutableSetOf<com.piyush.mode.core.platform.Permission>()
     override suspend fun status(permission: com.piyush.mode.core.platform.Permission) =
@@ -65,8 +75,12 @@ internal class FakePermissions : com.piyush.mode.core.platform.Permissions {
 
 internal class FakeChecks(var paired: Boolean = true) : com.piyush.mode.feature.connection.domain.PhoneChecks {
     var vpn = false
-    override fun hasPairingFile() = paired
-    override suspend fun vpnAllowed() = vpn
+    override val steps = com.piyush.mode.feature.connection.domain.PhoneCheckId.entries.take(8)
+    /** What [status] reads (Android's quick look at its settings). */
+    var quick: List<com.piyush.mode.feature.connection.domain.PhoneCheckResult> = emptyList()
+    override suspend fun status() = quick
+    override fun ready() = paired
+    override suspend fun permitted() = vpn
     override suspend fun run(update: (List<com.piyush.mode.feature.connection.domain.PhoneCheckResult>) -> Unit) {
         update(listOf(
             com.piyush.mode.feature.connection.domain.PhoneCheckResult(com.piyush.mode.feature.connection.domain.PhoneCheckId.PairingFile, com.piyush.mode.feature.connection.domain.CheckState.Passed(null)),
@@ -113,17 +127,30 @@ internal class Fixture(scope: CoroutineScope, model: LlmClient = ScriptedModel()
 }
 
 /**
- * A model that never answers: a task given to it keeps running until it is stopped. For tests that look at a
- * running task: with the scripted model a task is over in a moment, so "sent" or "working" could come and go
- * between two looks at the state (seen on CI, never on a fast Mac).
+ * A model that never answers. A task given to it still ends, and soon: the presenters run on the test's virtual
+ * clock, where every timeout comes due the moment nothing else is waiting, so "Mode couldn't reach your AI"
+ * arrives after about 10 ms of real time. It only keeps a scripted answer from finishing the task at once;
+ * [awaitState] is what makes a passing state ("sent", "working") safe to wait for.
  */
 internal val NeverAnswers = LlmClient { _, _, _ -> kotlinx.coroutines.awaitCancellation() }
 
 /**
- * Waits (in real time, up to 5 s) for the presenter's state to match: the
- * database flows behind it emit on a background thread, not the test's clock.
+ * Waits for the presenter's state to match and returns that state, giving up after 5 s of real time (the
+ * database flows behind a presenter emit on a background thread, not the test's clock).
+ *
+ * The watching happens on the test's own dispatcher, in step with the presenter, so a state that only lasts a
+ * moment is seen; only the giving up is on a real clock. Watching from a real thread, as this did before, raced
+ * the virtual clock: "sent" lasts about 10 ms before a task with no AI fails, a busy CI runner looked too late,
+ * and one test or another timed out on most runs (13 Nov, PR 1) while a fast Mac never missed.
  */
 internal suspend fun <S> kotlinx.coroutines.flow.StateFlow<S>.awaitState(test: (S) -> Boolean): S =
-    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-        kotlinx.coroutines.withTimeout(5_000) { first(test) }
+    kotlinx.coroutines.coroutineScope {
+        val seen = async { first(test) }
+        try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                kotlinx.coroutines.withTimeout(5_000) { seen.await() }
+            }
+        } finally {
+            seen.cancel()
+        }
     }

@@ -33,3 +33,10 @@ brag-output*/
 
 # Your own Apple team and app ID (see iosApp/Signing.example.env)
 iosApp/Signing.env
+
+# Android builds from tools/build-apk.sh
+/dist/
+
+# Android release signing keys never go in the repository (it is public); see docs/android.md
+*.jks
+*.keystore

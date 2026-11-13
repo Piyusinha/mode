@@ -74,6 +74,8 @@ public class Screens(
     private val background: com.piyush.mode.core.platform.BackgroundWork? = null,
     /** Backup and restore (null where there is none). */
     private val backupService: com.piyush.mode.feature.backup.data.BackupService? = null,
+    /** Words about the phone ("this iPhone", where its Settings are). */
+    private val profile: com.piyush.mode.agent.PhoneProfile = com.piyush.mode.agent.PhoneProfile.IPhone,
     /** Is a newer Mode out (Settings)? */
     private val modeUpdates: com.piyush.mode.feature.settings.data.ModeUpdates? = null,
 ) {
@@ -87,14 +89,14 @@ public class Screens(
     public fun voicePicker(provider: String): com.piyush.mode.app.screens.settings.VoicePickerPresenter =
         com.piyush.mode.app.screens.settings.VoicePickerPresenter(
             scope, settings, voices!!,
-            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Apple,
+            com.piyush.mode.feature.settings.domain.VoiceKind.fromId(provider) ?: com.piyush.mode.feature.settings.domain.VoiceKind.Device,
         )
 
     /** Talking mode; [conversationId] (from a chat's mic) puts the spoken task in that chat, else a new one. */
     /** What went wrong in a task that couldn't finish, and questions about it. */
     public fun taskDebug(taskId: String): com.piyush.mode.app.screens.debug.TaskDebugPresenter =
         com.piyush.mode.app.screens.debug.TaskDebugPresenter(
-            scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude,
+            scope, taskId, tasks, runs, telemetry, settings, session, phoneChecks, queue, providers, chatGpt, claude, profile,
         )
 
     /** Settings → Backup and restore. */
@@ -104,7 +106,7 @@ public class Screens(
     /** Settings → Health & repair. */
     public fun health(): com.piyush.mode.app.screens.settings.HealthPresenter =
         com.piyush.mode.app.screens.settings.HealthPresenter(
-            scope, settings, session, phoneChecks, runner, voices, permissions, providers, chatGpt, claude, logTail,
+            scope, settings, session, phoneChecks, runner, voices, permissions, providers, chatGpt, claude, logTail, profile,
         )
 
     /** Settings → Listening → Language. */
@@ -150,12 +152,12 @@ public class Screens(
     /** Mode's first words when started by voice, written by the fast model with what's coming up in their day. */
     private val greeter: com.piyush.mode.feature.memory.data.Greeter? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Greeter(llm, memory) {
+            com.piyush.mode.feature.memory.data.Greeter(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 com.piyush.mode.feature.settings.domain.ProviderModels.fast(
                     s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
                 )
-            }
+            })
         }
     }
 
@@ -183,13 +185,13 @@ public class Screens(
     /** What Mode says when handed a spoken task, written by the fast model (phone control's). */
     private val acknowledger: com.piyush.mode.feature.memory.data.Acknowledger? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Acknowledger(llm, memory) {
+            com.piyush.mode.feature.memory.data.Acknowledger(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 // One spoken line needs no thinking: the model's lowest effort, so it comes back in time.
                 com.piyush.mode.feature.settings.domain.ProviderModels.fast(
                     s.model, s.provider, chatGpt.modelInfo.value + claudeModels?.known?.value.orEmpty(),
                 )
-            }
+            })
         }
     }
 
@@ -227,6 +229,10 @@ public class Screens(
 
     public fun home(): HomePresenter = HomePresenter(scope, settings, runner, queue, tasks, conversations, memory, clock)
 
+    /** The warning banner at the top (boards W01–W06); [brand] names the phone's maker when the words need it. */
+    public fun warnings(brand: () -> String? = { null }): com.piyush.mode.app.screens.home.WarningsPresenter =
+        com.piyush.mode.app.screens.home.WarningsPresenter(scope, phoneChecks, settings, lifecycle, now = clock.now, brand = brand)
+
     public fun tasks(): TasksPresenter = TasksPresenter(scope, runner, queue, scheduler, tasks, clock)
 
     public fun conversation(conversationId: String): ConversationPresenter =
@@ -235,10 +241,10 @@ public class Screens(
     /** Turns what the user teaches into tips, written by the brain's model. */
     private val teacher: com.piyush.mode.feature.memory.data.Teacher? by lazy {
         providers?.let { llm ->
-            com.piyush.mode.feature.memory.data.Teacher(llm, memory) {
+            com.piyush.mode.feature.memory.data.Teacher(llm, memory, device = profile.deviceWord, model = {
                 val s = settings.settings.value
                 (s.strongModel ?: s.model) to s.provider
-            }
+            })
         }
     }
 
@@ -251,18 +257,29 @@ public class Screens(
     public fun sessionActivity(): com.piyush.mode.app.screens.run.SessionActivityPresenter =
         com.piyush.mode.app.screens.run.SessionActivityPresenter(scope, runner, session, clock)
 
-    /** The first run: Welcome, Connect your AI, a first job (asking for the VPN and notifications as it starts). */
-    public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter =
-        com.piyush.mode.app.screens.firstrun.FirstRunPresenter(scope, settings, connectChatGpt(), queue) {
-            if (!phoneChecks.vpnAllowed()) {
-                try {
-                    session.reconnect()
-                } finally {
-                    session.disconnectAndRelease()
+    /** The first run: Welcome, Connect your AI, (on Android) phone control, a first job (asking for what is left as it starts). */
+    public fun firstRun(): com.piyush.mode.app.screens.firstrun.FirstRunPresenter {
+        val phoneStep = com.piyush.mode.feature.connection.domain.PhoneCheckId.Engine in phoneChecks.steps
+        return com.piyush.mode.app.screens.firstrun.FirstRunPresenter(
+            scope, settings, connectChatGpt(), queue,
+            prepare = {
+                // The iPhone asks for its VPN by connecting once; Android set phone control up in its own step.
+                if (!phoneStep && !phoneChecks.permitted()) {
+                    try {
+                        session.reconnect()
+                    } finally {
+                        session.disconnectAndRelease()
+                    }
                 }
-            }
-            permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
-        }
+                permissions.request(com.piyush.mode.core.platform.Permission.Notifications)
+            },
+            phoneStep = phoneStep,
+        )
+    }
+
+    /** Setting up phone control (Android): the switches it needs, and a guide for each. */
+    public fun phoneSetup(): com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter =
+        com.piyush.mode.app.screens.firstrun.PhoneSetupPresenter(scope, phoneChecks, permissions, lifecycle, settings)
 
     /** Settings → Unlock by voice: the guide, and the check that it works. */
     public fun unlockVoice(): com.piyush.mode.app.screens.start.UnlockVoicePresenter =

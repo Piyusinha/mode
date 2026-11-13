@@ -41,7 +41,7 @@ final class LanguageModel {
         State(rows: s.rows.map { r in
             let reach: String = switch r.reach {
             case .auto: String(localized: L10n.Language.auto)
-            case .onIphone: String(localized: L10n.Language.onIphone)
+            case .onDevice: String(localized: L10n.Language.onIphone)
             case .download: String(localized: L10n.Language.download)
             case .cloud: String(localized: L10n.Language.cloud(r.listener ?? ""))
             default: String(localized: L10n.Language.needsCloud)

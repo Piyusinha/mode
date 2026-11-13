@@ -11,6 +11,13 @@ public enum class RiskConfirmation {
     Never,
 }
 
+/** Preference keys other layers read without the repository (the phone checks, before the graph exists). */
+public object SettingsKeys {
+    public const val DEVICE_STEPS: String = "device_steps_done"
+    /** A debug-only maker override ("samsung"), so one phone can show another's setup rows. */
+    public const val DEBUG_BRAND: String = "debug_brand"
+}
+
 /** Everything the user can set, typed and already validated. */
 public data class ModeSettings(
     val model: String = AgentConfig.DEFAULT_MODEL,
@@ -71,6 +78,10 @@ public data class ModeSettings(
     val tipsStartedAtMs: Long? = null,
     /** The user closed the tips: never shown again (they stay in Settings). */
     val tipsHidden: Boolean = false,
+    /** Phone settings Mode can't read back that the user confirmed doing (a ManualStep name each). */
+    val deviceSteps: Set<String> = emptySet(),
+    /** Warnings the user closed, by kind name, and until when (epoch ms). */
+    val warningSnoozes: Map<String, Long> = emptyMap(),
 ) {
     public val hasModelAccess: Boolean get() = when (provider) {
         ModelProvider.OpenRouter -> hasApiKey

@@ -26,6 +26,10 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        // libadb-android (background mode's link) is published only on JitPack: nothing else comes from there.
+        maven("https://jitpack.io") {
+            mavenContent { includeGroupAndSubgroups("com.github.MuntashirAkon") }
+        }
     }
 }
 
@@ -37,9 +41,13 @@ include(":core:platform")
 include(":core:network")
 include(":core:database")
 include(":engine:ops")
+include(":engine:screen")
 include(":engine:llm")
 include(":engine:agent")
 include(":engine:phone-ios")
+include(":engine:phone-android")
+include(":engine:adb-helper")
+include(":engine:adb-link")
 include(":feature:conversations")
 include(":feature:memory")
 include(":feature:connection")
@@ -56,3 +64,7 @@ include(":app:screens")
 include(":app:graph")
 include(":app:dev-ui")
 include(":app:kit")
+// The Android app (Compose over the shared presenters).
+include(":app:android")
+// The Android design system (Compose): tokens and components, like iosApp/Packages/ModeDesignSystem.
+include(":app:design")

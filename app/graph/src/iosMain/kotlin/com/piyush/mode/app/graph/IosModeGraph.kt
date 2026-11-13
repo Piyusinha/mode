@@ -77,6 +77,7 @@ val iosModeGraph: ModeGraph by lazy {
             phoneChecks = com.piyush.mode.feature.connection.data.CoreDevicePhoneChecks(),
             device = IosDeviceData(),
             appVersion = version,
+            backupFiles = com.piyush.mode.feature.backup.data.IosBackupFiles(),
         ),
     )
 }

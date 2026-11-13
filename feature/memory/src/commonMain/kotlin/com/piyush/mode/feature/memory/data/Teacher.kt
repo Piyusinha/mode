@@ -28,6 +28,8 @@ public class Teacher(
     private val memory: MemoryRepository,
     /** The model that writes the tip, and its provider: the brain's. */
     private val model: () -> Pair<String, ModelProvider>,
+    /** The phone Mode runs on, as the prompt names it ("iPhone", "Android phone"). */
+    private val device: String = "iPhone",
 ) {
     /** A saved lesson: the tip (for Edit and Undo) and what Mode says back. */
     public class Lesson(public val item: MemoryItem, public val reply: String)
@@ -66,7 +68,7 @@ public class Teacher(
             step?.let { append("THE STEP IT IS ABOUT: ").append(it).append('\n') }
             append("WHAT THE USER SAID: ").append(said)
         }
-        val reply = llm.forProvider(provider).chat(name, listOf(ChatMessage("system", SYSTEM), ChatMessage("user", user)), TOOLS)
+        val reply = llm.forProvider(provider).chat(name, listOf(ChatMessage("system", SYSTEM.onDevice(device)), ChatMessage("user", user)), TOOLS)
         val args = reply.toolCall?.takeIf { it.name == TOOL }?.arguments ?: return null
         fun str(k: String) = (args[k] as? JsonPrimitive)?.contentOrNull?.trim()
         return Written(str("app"), str("title"), str("tip"), str("reply"))

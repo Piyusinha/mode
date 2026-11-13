@@ -1,16 +1,9 @@
 plugins {
     id("mode.kmp.library")
-    alias(libs.plugins.androidKmp)
 }
 
+// The Android target also runs the common contract tests (mode.android.hostTests in gradle.properties).
 kotlin {
-    android {
-        namespace = "com.piyush.mode.core.telemetry"
-        compileSdk = 36
-        minSdk = 26
-        // Run the exact same common contract tests through the Android library target.
-        withHostTestBuilder { sourceSetTreeName = "test" }.configure {}
-    }
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.storage)

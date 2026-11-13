@@ -10,9 +10,6 @@ public interface BackupFiles {
     public fun delete(path: String)
 }
 
-/** The platform's files: NSFileManager on iOS, java.io on the JVM. */
-public expect fun platformBackupFiles(): BackupFiles
-
 /** True when [path] is inside [BackupFiles.tempDir]: only such copies are Mode's to delete. */
 internal fun BackupFiles.isTemp(path: String): Boolean {
     // iOS names the same folder /private/var/… or /var/… depending on who asks.

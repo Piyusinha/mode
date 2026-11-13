@@ -31,6 +31,16 @@ class ModeUpdatesTest {
         assertEquals(ModeUpdate("0.1.10", "https://x/Mode-Mobile-Build-0.1.10"), ModeUpdates.newestOf(list))
     }
 
+    @Test fun aReleaseIsAnUpdateOnlyWhereItCarriesThatPlatformsFile() {
+        fun withFiles(tag: String, vararg files: String) =
+            """{"tag_name":"$tag","draft":false,"prerelease":false,"html_url":"https://x/$tag","assets":[${files.joinToString(",") { """{"name":"$it"}""" }}]}"""
+        // 0.1.10 came out for the iPhone only; Android's newest is 0.1.9.
+        val both = "[" + withFiles("Mode-Mobile-Build-0.1.10", "Mode.ipa") + "," + withFiles("Mode-Mobile-Build-0.1.9", "Mode.ipa", "mode-android.apk") + "]"
+        assertEquals("0.1.10", ModeUpdates.newestOf(both)?.version)
+        assertEquals("0.1.9", ModeUpdates.newestOf(both, file = "mode-android.apk")?.version)
+        assertNull(ModeUpdates.newestOf(list, file = "mode-android.apk"), "no Android build yet: nothing to offer")
+    }
+
     @Test fun comparesVersions() {
         assertTrue(ModeUpdates.isNewer("0.1.10", "0.1.9"))
         assertTrue(ModeUpdates.isNewer("0.2", "0.1.9"))
@@ -58,6 +68,16 @@ class ModeUpdatesTest {
         val newest = ModeUpdates(http, prefs, current = "0.1.10", now = { now })
         newest.check()
         assertNull(newest.available.value)
+    }
+
+    @Test fun aCheckThatFindsNothingForThisPlatformIsStillTodaysCheck() = runTest {
+        var calls = 0
+        val http = HttpClient(MockEngine { calls++; respond(list) })
+        val updates = ModeUpdates(http, InMemoryKeyValueStore(), current = "0.1.3", now = { 1_000L }, file = "mode-android.apk")
+        updates.check()
+        updates.check()
+        assertNull(updates.available.value)
+        assertEquals(1, calls, "asked once, not every time Settings opens")
     }
 
     @Test fun offlineKeepsWhatItKnew() = runTest {

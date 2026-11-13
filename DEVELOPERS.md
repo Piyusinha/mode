@@ -404,7 +404,7 @@ Mode and Mode Setup are released separately, each with its own version and chang
 | Version in | `iosApp/project.yml` (`MARKETING_VERSION`) | `desktop/setup-app/tauri.conf.json`, `desktop/Cargo.toml` |
 | Changelog | `CHANGELOG.md` | `desktop/CHANGELOG.md` |
 | Release | `tools/release-app.sh <version>` | `tools/release-setup.sh <version>` |
-| Holds | `Mode.ipa`, `Mode-paid.ipa` (and `Mode.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
+| Holds | `Mode.ipa`, `Mode-paid.ipa` (and `mode-android.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
 | Publish | `gh release edit Mode-Mobile-Build-<v> --draft=false --latest` | `gh release edit Mode-Desktop-App-<v> --draft=false --latest=false` |
 
 - Versions count 0.1.8, 0.1.9, 0.2.0: three single digits, so a part never reaches 10 (0.2.0
@@ -417,6 +417,21 @@ Mode and Mode Setup are released separately, each with its own version and chang
 - A Mode Setup release carries the newest published Mode inside it
   (`tools/latest-app-release.sh`), so it installs offline too.
 - heymode.app's download links serve the newest Mode Setup release (`website/worker`).
+
+## 14b. Android
+
+The Android app is `app/android` (Compose over the same shared presenters as the iPhone), its design
+library `app/design`, and the engine `engine/phone-android` (Mode's accessibility service). Background
+mode adds `engine/adb-link` and `engine/adb-helper`. Everything, from setup to background mode, is in
+[docs/android.md](docs/android.md).
+
+```sh
+./gradlew :app:android:installFullDebug      # onto a phone or emulator with USB debugging
+tools/build-apk.sh                           # a release APK into dist/ (signing: see docs/android.md)
+```
+
+Debug builds have an adb probe (`DevProbe`) that drives the engine, posts sample notifications and
+walks setup on an emulator; docs/android.md lists its commands.
 
 ## 15. More documents
 

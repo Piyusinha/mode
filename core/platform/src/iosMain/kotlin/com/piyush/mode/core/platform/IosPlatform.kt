@@ -15,7 +15,7 @@ import platform.UIKit.UIApplicationWillTerminateNotification
 import platform.UIKit.UIBackgroundTaskInvalid
 
 public class IosAppInfo : AppInfo {
-    override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "com.piyush.mode"
+    override val bundleId: String = NSBundle.mainBundle.bundleIdentifier ?: "app.heymode.mode"
     override val version: String = NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: ""
 
     /** What iOS counts against a background app's CPU limit (80% over 60 s, else it kills the app). */

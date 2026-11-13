@@ -17,7 +17,7 @@ public data class Finding(val kind: FindingKind, val title: String, val detail: 
  */
 public object TaskDiagnosis {
     /** [outcome]: the run's (done, gave_up, stopped, failed, not_started, running); [summary]: its reason or answer. */
-    public fun of(outcome: String?, summary: String?, steps: List<JsonObject>, spans: List<SpanRecord>): List<Finding> {
+    public fun of(outcome: String?, summary: String?, steps: List<JsonObject>, spans: List<SpanRecord>, device: String = "this iPhone", os: String = "iOS"): List<Finding> {
         val out = mutableListOf<Finding>()
         val acts = steps.filter { it.str("event") == "act" }
         val said = summary.orEmpty()
@@ -33,11 +33,11 @@ public object TaskDiagnosis {
             out += Finding(FindingKind.AiFailed, "Your AI couldn't answer", why.ifBlank { "It returned an error" }, problem = true)
         }
         if (spans.any { it.name == "mode.phone.connect" && it.error != null } || "could not connect" in said.lowercase()) {
-            out += Finding(FindingKind.PhoneUnreachable, "Mode couldn't reach this iPhone", "Phone control didn't connect", problem = true)
+            out += Finding(FindingKind.PhoneUnreachable, "Mode couldn't reach $device", "Phone control didn't connect", problem = true)
         }
         when {
             outcome == "running" ->
-                out += Finding(FindingKind.Interrupted, "Mode was closed while it worked", "iOS ended Mode before the task finished; Try again picks it up", problem = true)
+                out += Finding(FindingKind.Interrupted, "Mode was closed while it worked", "$os ended Mode before the task finished; Try again picks it up", problem = true)
             outcome == "not_started" ->
                 out += Finding(FindingKind.NotStarted, "It didn't start", said.take(MAX_DETAIL), problem = true)
             outcome == "stopped" && said.startsWith("Stuck") ->

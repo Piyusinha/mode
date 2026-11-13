@@ -127,6 +127,8 @@ public class SettingsRepository(
         prefs.putString(VOICE_UNLOCK, next.voiceUnlock.toString())
         prefs.putString(TIPS_STARTED, next.tipsStartedAtMs?.toString().orEmpty())
         prefs.putString(TIPS_HIDDEN, next.tipsHidden.toString())
+        prefs.putString(DEVICE_STEPS, next.deviceSteps.sorted().joinToString(","))
+        prefs.putString(WARNING_SNOOZES, next.warningSnoozes.entries.joinToString(",") { "${it.key}=${it.value}" })
         prefs.putString(VOICES, kotlinx.serialization.json.Json.encodeToString(next.voices))
         state.value = read()
     }
@@ -193,6 +195,11 @@ public class SettingsRepository(
             voiceUnlock = prefs.getString(VOICE_UNLOCK)?.toBooleanStrictOrNull() ?: defaults.voiceUnlock,
             tipsStartedAtMs = prefs.getString(TIPS_STARTED)?.toLongOrNull(),
             tipsHidden = prefs.getString(TIPS_HIDDEN)?.toBooleanStrictOrNull() ?: defaults.tipsHidden,
+            deviceSteps = prefs.getString(DEVICE_STEPS)?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: defaults.deviceSteps,
+            warningSnoozes = prefs.getString(WARNING_SNOOZES)?.split(',')?.mapNotNull { pair ->
+                val (kind, until) = pair.split('=').takeIf { it.size == 2 } ?: return@mapNotNull null
+                until.toLongOrNull()?.let { kind to it }
+            }?.toMap() ?: defaults.warningSnoozes,
             voices = prefs.getString(VOICES)?.let {
                 runCatching { kotlinx.serialization.json.Json.decodeFromString<Map<String, VoiceChoice>>(it) }.getOrNull()
             } ?: defaults.voices,
@@ -235,6 +242,8 @@ public class SettingsRepository(
         const val VOICE_UNLOCK = "voice_unlock_set_up"
         const val TIPS_STARTED = "home_tips_started_at"
         const val TIPS_HIDDEN = "home_tips_hidden"
+        const val DEVICE_STEPS = com.piyush.mode.feature.settings.domain.SettingsKeys.DEVICE_STEPS
+        const val WARNING_SNOOZES = "warning_snoozes"
         const val VOICES = "voice_choices"
 
         fun voiceSecret(kind: VoiceKind): String = "voice_key_${kind.id}"

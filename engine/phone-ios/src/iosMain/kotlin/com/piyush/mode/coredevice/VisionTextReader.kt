@@ -2,6 +2,9 @@
 
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.TextReader
+import com.piyush.mode.screen.RecognizedText
+
 import com.piyush.mode.ops.OpFailed
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents

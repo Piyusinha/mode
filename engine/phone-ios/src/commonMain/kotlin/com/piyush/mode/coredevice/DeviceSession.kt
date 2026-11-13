@@ -1,5 +1,8 @@
 package com.piyush.mode.coredevice
 
+import com.piyush.mode.screen.InstalledApp
+import com.piyush.mode.screen.ScreenInfo
+
 /**
  * One live CoreDevice connection to the phone: what `native/modecore` can do.
  *
@@ -40,49 +43,11 @@ interface DeviceSession : AutoCloseable {
 
 enum class HardwareButton { Home, Lock, VolumeUp, VolumeDown }
 
-data class InstalledApp(val name: String, val bundleId: String)
+/** A point on screen in the touchscreen's 0..65535 space, clamped to the screen. */
+fun ScreenInfo.toTouch(x: Double, y: Double): Pair<Int, Int> = axis(x, widthPt) to axis(y, heightPt)
 
-/** The screen in points, the space ops are given in. */
-data class ScreenInfo(val widthPt: Double, val heightPt: Double) {
-    init {
-        require(widthPt > 0 && heightPt > 0) { "screen size must be positive" }
-    }
+private fun axis(v: Double, extent: Double): Int =
+    (v / extent * TOUCH_MAX).let { if (it.isNaN()) 0.0 else it }.coerceIn(0.0, TOUCH_MAX).let { kotlin.math.round(it).toInt() }
 
-    /** A point on screen in the touchscreen's 0..65535 space, clamped to the screen. */
-    fun toTouch(x: Double, y: Double): Pair<Int, Int> = axis(x, widthPt) to axis(y, heightPt)
-
-    private fun axis(v: Double, extent: Double): Int =
-        (v / extent * MAX).let { if (it.isNaN()) 0.0 else it }.coerceIn(0.0, MAX).roundToIntExact()
-
-    private fun Double.roundToIntExact(): Int = kotlin.math.round(this).toInt()
-
-    companion object {
-        const val MAX = 65535.0
-    }
-}
-
-/** Reads text off a screenshot. */
-fun interface TextReader {
-    fun read(png: ByteArray): List<RecognizedText>
-}
-
-/**
- * One piece of text and where it is, as fractions of the image (0..1), top-left
- * origin, so it maps onto any screen size.
- */
-data class RecognizedText(
-    val text: String,
-    val confidence: Double,
-    val left: Double,
-    val top: Double,
-    val width: Double,
-    val height: Double,
-)
-
-/** Image work the phone does natively. */
-fun interface ImageTools {
-    /** Re-encodes a PNG as JPEG with its longer side at most [maxSide] pixels. */
-    fun shrinkToJpeg(png: ByteArray, maxSide: Int): ShrunkImage
-}
-
-class ShrunkImage(val jpeg: ByteArray, val widthPx: Int, val heightPx: Int)
+/** The HID touchscreen's range. */
+const val TOUCH_MAX = 65535.0

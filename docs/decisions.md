@@ -490,3 +490,111 @@ the graph grows past what one file reads comfortably.
   transaction; nothing is deleted. Settings from the backup are applied (they are the user's setup). A
   sign-in comes back only for a provider with none here. A task that was queued or running in the backup
   comes back ended, so it never runs; added repeats get their next time from now and their reminder.
+
+## D41. Every shared module builds for Android too (2026-11-07)
+
+The convention plugin (`mode.kmp.library`) adds the Android library target to every shared module
+beside the iPhone and JVM targets, built against Android 17 (API 37) with Android 13 (API 33) as the
+floor. A module opts out in its own `gradle.properties`: `mode.android=false` for `engine:phone-ios`
+(its cinterop is iOS-only), `mode.ios=false` for Android-only engines; `mode.android.hostTests=true`
+also runs the common tests through the Android target on the host JVM. The backup files became a
+plain constructor argument instead of an `expect`, since Android's need a `Context`.
+
+## D42. One agent, a profile per phone (2026-11-07)
+
+The agent, its tools and the brain take a `PhoneProfile`: the device and OS words for the prompts,
+the status bar height, whether back is an op or an edge swipe, which quick panel exists and whether
+Shortcuts can run. The iPhone profile is the default and keeps the prompt text and tool list exactly
+as they were (a test asserts it); the Android profile offers `back`, `quick_settings` and
+`notifications` through four new ops (`nav.back`, `nav.recents`, `notifications.open`,
+`quicksettings.open`) that the iPhone backend refuses. A phone that reports windows marks the
+keyboard's keys (`window: "ime"`), so the agent knows the keyboard is up without guessing; a capture
+that says `private` is the user's turn at once, with no model call.
+
+## D43. Platform words out of the shared names (2026-11-07)
+
+`Permission.Siri` is `Assistant` (Siri's App Shortcuts on iOS, the assistant role on Android),
+`PermissionKind.Vpn` is `PhoneControl` (the VPN on iOS, Accessibility on Android),
+`LanguageReach.OnIphone` is `OnDevice`, `VoiceKind.Apple` is `Device` with its id still `"apple"`
+(settings and backups keep working), and `DeviceVoice.appleLanguages/appleInstalled` are
+`deviceLanguages/deviceInstalled`. `PhoneChecks.hasPairingFile()/vpnAllowed()` became
+`ready()/permitted()`, and `steps` says which checks a phone runs. The health rows for Android's
+own checks come with its engine.
+
+## D44. Keeping Mode running on Android: a special-use foreground service (2026-11-07)
+
+While a task runs, a foreground service of type `specialUse` shows the ongoing "Mode is working"
+notification with Stop, and Mode holds a partial and a screen-on wake lock until the last run ends.
+Silent audio (the iPhone's way, D19) is not used: Android 17 restricts background audio, and it would
+mislead the user. Android allows the start from the background because the accessibility service is
+bound. `AppLifecycle.onTerminate` does nothing on Android: there is no reliable call, and running
+terminate actions on every trip to the background closed the session mid-task.
+
+## D45. The Android engine reads the tree, in dp (2026-11-07)
+
+On Android, `screen.text` is the accessibility tree (`source: "tree"`, each box's window), not OCR; OCR is
+only a fallback for an app window with no readable text. Points are dp, and `screen.bounds` gives the
+status bar inset. The service is not marked `isAccessibilityTool`: Mode is not a disability tool, so
+screens an app marks sensitive stay hidden from it, and a secure screen answers `private`, which the
+agent turns into the user's turn. Background mode (Phase 5) reuses libadb-android and a scrcpy server
+fork rather than new code (see android.md).
+
+
+## D46. Android screens: Compose without Material3, strings generated from the iPhone's (2026-11-07)
+
+The Android app draws every screen with `app:design`, a port of the iPhone's ModeDesignSystem (tokens,
+components, Mo), on plain Compose foundation: no Material3, so nothing looks like a stock Android app
+and nothing differs from the boards. Screens are dumb views over the shared presenters, with a literal
+check (`tools/check-ui-literals-android.sh`) like the iPhone's. Strings both apps share are generated
+from the iPhone's `L10n*.swift` by `tools/gen-android-strings.py`, swapping iPhone words for Android's;
+Android-only strings are written by hand in `strings.xml`. Navigation is a small per-tab stack
+(`Navigator`) with presenters released when their page goes, rather than a navigation library.
+Shared names that end up in the iPhone's Objective-C header avoid Objective-C keywords (`YES`, `NO`).
+
+## D47. Starting by voice without replacing the assistant; the assistant role stays optional (2026-11-07)
+
+Mode never asks to replace the phone's assistant. "Start by voice" turns on an "Ask Mode" app entry that opens a
+voice session, so the user's own assistant starts Mode by name ("Hey Google, open Ask Mode"). Android lets only
+system-approved assistants listen for a wake word, so there is no "Hey Mode". The rest of this entry describes
+the assistant service kept for anyone who chooses Mode as their assistant in Android's settings.
+
+Holding power (or the assistant gesture) opens Mode's talking mode through a `VoiceInteractionService`
+whose session only starts Mode's own screen: Mode doesn't draw an assistant overlay. Android requires an
+assistant to declare a speech recognizer and may make it the phone's default, so `ModeRecognitionService`
+forwards to the phone's own recognizer (voice typing elsewhere keeps working) and Mode's listening names the
+phone's recognizer directly. `ROLE_ASSISTANT` can't be requested by an app; Mode opens Default apps.
+
+## D48. Repeats on Android: exact alarms, re-armed after a restart (2026-11-07)
+
+A repeat's reminder is an exact alarm (`SCHEDULE_EXACT_ALARM`; inexact when the user hasn't allowed it).
+Android drops alarms on a restart, so `BootReceiver` re-arms every enabled repeat after a restart, an update,
+or a clock or time zone change (`Scheduler.rearmAll`, shared and tested). As on the iPhone, the reminder is a
+notification the user taps; the task runs when Mode is open.
+
+## D49. Background mode: Mode's own Wireless debugging link and a hidden display (2026-11-07)
+
+Mode pairs with its own phone's Wireless debugging (libadb-android, Conscrypt 2.8.0 for 16 KB-page phones)
+and starts a small helper as the shell user from its own APK (scrcpy's approach, no socket: one `exec:`
+stream). The helper only makes a trusted, always-unlocked virtual display with its own focus, presses Back
+and Home there, and moves the user's-turn app between displays; Mode keeps reading and tapping through its
+accessibility service, which takes a display id, so one engine serves both modes. No mDNS (Android 17 shows
+a picker that closes the pairing window): the port is found on 127.0.0.1, and the pairing code is read off
+the screen by phone control, with a notification as the fallback. Mode grants itself `WRITE_SECURE_SETTINGS`
+over the link to switch Wireless debugging back on after a restart. When the hidden display isn't ready, the
+task runs on the user's screen instead, so background mode never makes a task fail. With it on, a locked
+phone doesn't hold tasks back.
+
+## D50. Device checks: verify what can be verified, confirm the rest, and warn at the top (2026-11-08)
+
+Phones differ in what stops Mode: Samsung puts unused apps to sleep, Xiaomi needs Autostart and a
+pop-up permission, Android 13 locks a sideloaded app's accessibility switch, battery managers freeze
+the service while its toggle still reads "on", background mode needs Android 14 and Wi-Fi, and some
+phones have no speech recognizer. The rule: anything Mode can read becomes a check with a way to
+fix it in setup (and a requirement where it has to be, like Android 14 for background mode); anything
+it can't read (the makers' switches, which Android hides from apps) becomes a row that says so and a
+guide ending in "I've done this", kept in settings and never required; and anything that breaks after
+setup shows as one banner at the top over every tab while Mode is open, the most serious first, red
+ones staying until fixed and orange ones closable for three days. No silent fallbacks: when background
+mode falls back to the screen, the banner says why. The rules live in shared, tested code
+(`DeviceStatus`, `WarningsPresenter`); Android only reads the inputs and opens the pages
+(`PhoneQuirks` holds each maker's pages, by component or by action).

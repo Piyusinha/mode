@@ -53,7 +53,7 @@ class OpTest {
             Op.Tap(0.0, 0.0), Op.LongPress(0.0, 0.0), Op.Drag(0.0, 0.0, 1.0, 1.0),
             Op.Scroll(0.0, 0.0, dy = -1.0), Op.TypeText("hi"), Op.PressKey("return"),
             Op.Home, Op.LaunchApp("Uber"), Op.CurrentApp, Op.OpenUrl("https://example.com"),
-            Op.SessionState,
+            Op.SessionState, Op.Back, Op.Recents, Op.OpenNotifications, Op.OpenQuickSettings,
         )
         val names = all.map { it.wireName }
         assertEquals(names.size, names.toSet().size, "duplicate wire name in $names")
