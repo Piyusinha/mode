@@ -145,7 +145,7 @@ To try these on an emulator (debug builds): `--es op stream --ef s 3` plays a to
 
 ## Releases
 
-- `tools/build-apk.sh [full|play] [release|debug]` builds into `dist/` (`Mode.apk` + `.sha256`). The version is
+- `tools/build-apk.sh [full|play] [release|debug]` builds into `dist/` (`mode-android.apk` + `.sha256`). The version is
   the iPhone's `MARKETING_VERSION` (`iosApp/project.yml`): one version everywhere; the version code is
   major·10000 + minor·100 + patch.
 - Release signing comes from `MODE_ANDROID_KEYSTORE`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
@@ -162,7 +162,7 @@ To try these on an emulator (debug builds): `--es op stream --ef s 3` plays a to
   `tools/release-app.sh`), builds and signs the APK from the repository secrets `MODE_ANDROID_KEYSTORE_BASE64`, `MODE_ANDROID_KEYSTORE_PASSWORD`, `MODE_ANDROID_KEY_ALIAS`
   and attaches it to the draft release. Without the secrets it builds unsigned and attaches nothing.
 - **A newer Mode** (`ModeUpdates`, shared): once a day Settings asks GitHub for Mode's releases. A release is an
-  update only where it carries that platform's file (`AppInfo.releaseFile`: `Mode.ipa`, `Mode.apk`), so Android is
+  update only where it carries that platform's file (`AppInfo.releaseFile`: `Mode.ipa`, `mode-android.apk`), so Android is
   never told about an iPhone-only release. Settings then says "Mode 0.2.0 is available" with a row to the release
   page (the APK is downloaded and installed over this one), and shows this Mode's version at the bottom.
   Settings › Developer shows only in debug builds.

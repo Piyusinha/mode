@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds Mode for Android into dist/.
-#   tools/build-apk.sh                  # full release → dist/Mode.apk (+ .sha256)
-#   tools/build-apk.sh play release     # the Play build → dist/Mode-play.apk
+#   tools/build-apk.sh                  # full release → dist/mode-android.apk (+ .sha256)
+#   tools/build-apk.sh play release     # the Play build → dist/mode-android-play.apk
 #   tools/build-apk.sh full debug       # a debug build
 #
 # Release signing comes from the environment; without it the APK is unsigned (fine for trying it, not for
@@ -24,8 +24,8 @@ TCAP=$(printf '%s' "$TYPE" | cut -c1 | tr a-z A-Z)$(printf '%s' "$TYPE" | cut -c
 
 OUT="$ROOT/dist"
 mkdir -p "$OUT"
-NAME=Mode
-[ "$FLAVOR" = play ] && NAME=Mode-play
+NAME=mode-android
+[ "$FLAVOR" = play ] && NAME=mode-android-play
 [ "$TYPE" = debug ] && NAME="$NAME-debug"
 APK=$(find "app/android/build/outputs/apk/$FLAVOR/$TYPE" -name '*.apk' | head -1)
 [ -n "$APK" ] || { echo "build-apk: no APK was built" >&2; exit 1; }

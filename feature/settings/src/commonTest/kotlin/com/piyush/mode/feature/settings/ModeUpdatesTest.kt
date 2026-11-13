@@ -35,10 +35,10 @@ class ModeUpdatesTest {
         fun withFiles(tag: String, vararg files: String) =
             """{"tag_name":"$tag","draft":false,"prerelease":false,"html_url":"https://x/$tag","assets":[${files.joinToString(",") { """{"name":"$it"}""" }}]}"""
         // 0.1.10 came out for the iPhone only; Android's newest is 0.1.9.
-        val both = "[" + withFiles("Mode-Mobile-Build-0.1.10", "Mode.ipa") + "," + withFiles("Mode-Mobile-Build-0.1.9", "Mode.ipa", "Mode.apk") + "]"
+        val both = "[" + withFiles("Mode-Mobile-Build-0.1.10", "Mode.ipa") + "," + withFiles("Mode-Mobile-Build-0.1.9", "Mode.ipa", "mode-android.apk") + "]"
         assertEquals("0.1.10", ModeUpdates.newestOf(both)?.version)
-        assertEquals("0.1.9", ModeUpdates.newestOf(both, file = "Mode.apk")?.version)
-        assertNull(ModeUpdates.newestOf(list, file = "Mode.apk"), "no Android build yet: nothing to offer")
+        assertEquals("0.1.9", ModeUpdates.newestOf(both, file = "mode-android.apk")?.version)
+        assertNull(ModeUpdates.newestOf(list, file = "mode-android.apk"), "no Android build yet: nothing to offer")
     }
 
     @Test fun comparesVersions() {
@@ -73,7 +73,7 @@ class ModeUpdatesTest {
     @Test fun aCheckThatFindsNothingForThisPlatformIsStillTodaysCheck() = runTest {
         var calls = 0
         val http = HttpClient(MockEngine { calls++; respond(list) })
-        val updates = ModeUpdates(http, InMemoryKeyValueStore(), current = "0.1.3", now = { 1_000L }, file = "Mode.apk")
+        val updates = ModeUpdates(http, InMemoryKeyValueStore(), current = "0.1.3", now = { 1_000L }, file = "mode-android.apk")
         updates.check()
         updates.check()
         assertNull(updates.available.value)

@@ -404,7 +404,7 @@ Mode and Mode Setup are released separately, each with its own version and chang
 | Version in | `iosApp/project.yml` (`MARKETING_VERSION`) | `desktop/setup-app/tauri.conf.json`, `desktop/Cargo.toml` |
 | Changelog | `CHANGELOG.md` | `desktop/CHANGELOG.md` |
 | Release | `tools/release-app.sh <version>` | `tools/release-setup.sh <version>` |
-| Holds | `Mode.ipa`, `Mode-paid.ipa` (and `Mode.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
+| Holds | `Mode.ipa`, `Mode-paid.ipa` (and `mode-android.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
 | Publish | `gh release edit Mode-Mobile-Build-<v> --draft=false --latest` | `gh release edit Mode-Desktop-App-<v> --draft=false --latest=false` |
 
 - Versions count 0.1.8, 0.1.9, 0.2.0: three single digits, so a part never reaches 10 (0.2.0

@@ -37,7 +37,7 @@ public class ModeUpdates(
     public val current: String,
     private val now: () -> Long = ::nowMs,
     private val repo: String = "Piyusinha/mode",
-    /** The file a release must carry to be an update here: Mode.ipa on the iPhone, Mode.apk on Android. */
+    /** The file a release must carry to be an update here: Mode.ipa on the iPhone, mode-android.apk on Android. */
     private val file: String = IPA,
 ) {
     private val newest = MutableStateFlow(cached())

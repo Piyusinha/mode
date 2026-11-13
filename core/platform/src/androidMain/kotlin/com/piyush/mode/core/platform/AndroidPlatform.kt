@@ -10,7 +10,7 @@ public class AndroidAppInfo(context: Context) : AppInfo {
     override val version: String = runCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName
     }.getOrNull().orEmpty()
-    override val releaseFile: String = "Mode.apk"
+    override val releaseFile: String = "mode-android.apk"
 }
 
 /**

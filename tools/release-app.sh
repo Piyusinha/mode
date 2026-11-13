@@ -12,7 +12,7 @@
 # The release holds, each checked by Mode Setup against its .sha256:
 #   Mode.ipa, Mode.ipa.sha256             iPhone, the free build (LocalDevVPN)
 #   Mode-paid.ipa, Mode-paid.ipa.sha256   iPhone, with Mode's own VPN, for paid Apple accounts
-#   Mode.apk, Mode.apk.sha256             Android, when build/release/Mode.apk is there
+#   mode-android.apk, mode-android.apk.sha256   Android, when build/release/mode-android.apk is there
 #
 # Publishing makes it GitHub's "Latest" release (Mode Setups up to 0.1.2 look for Mode there).
 set -eu
@@ -29,10 +29,10 @@ tools/release-notes.sh app "$V" >/dev/null || die "write the $V section of CHANG
 echo "== Mode for iPhone (.ipa, free and paid)"
 tools/build-ipa.sh both
 FILES="build/release/Mode.ipa build/release/Mode.ipa.sha256 build/release/Mode-paid.ipa build/release/Mode-paid.ipa.sha256"
-if [ -f build/release/Mode.apk ]; then
+if [ -f build/release/mode-android.apk ]; then
     echo "== Mode for Android (.apk)"
-    (cd build/release && shasum -a 256 Mode.apk > Mode.apk.sha256)
-    FILES="$FILES build/release/Mode.apk build/release/Mode.apk.sha256"
+    (cd build/release && shasum -a 256 mode-android.apk > mode-android.apk.sha256)
+    FILES="$FILES build/release/mode-android.apk build/release/mode-android.apk.sha256"
 fi
 
 echo "== Draft release $TAG"
