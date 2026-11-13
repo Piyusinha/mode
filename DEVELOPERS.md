@@ -407,6 +407,8 @@ Mode and Mode Setup are released separately, each with its own version and chang
 | Holds | `Mode.ipa`, `Mode-paid.ipa` (and `Mode.apk` for Android) | the Mac `.dmg`; CI adds Windows and Linux |
 | Publish | `gh release edit Mode-Mobile-Build-<v> --draft=false --latest` | `gh release edit Mode-Desktop-App-<v> --draft=false --latest=false` |
 
+- Versions count 0.1.8, 0.1.9, 0.2.0: three single digits, so a part never reaches 10 (0.2.0
+  follows 0.1.9, never 0.1.10). The scripts refuse anything else.
 - Each script stops before building if the version doesn't match or its changelog has no
   section for it. The section becomes the release's "What's new" (`tools/release-notes.sh`).
 - A Mode release is GitHub's "Latest". Mode Setup finds the newest Mode by its tag, installs it

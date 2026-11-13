@@ -4,6 +4,32 @@ What changed in each release of Mode, the phone app (iPhone now, Android next). 
 tagged `Mode-Mobile-Build-<version>`, and `tools/release-app.sh` won't make one without its section here.
 Mode Setup, the desktop app that installs Mode, has its own: [desktop/CHANGELOG.md](desktop/CHANGELOG.md).
 
+## 0.2.0 · 12 Nov 2026
+
+The launch release. If you're new here: Mode is an AI agent on your iPhone. You tell it what to do, by
+voice or by typing, and it does it in your apps, looking at the screen and tapping like you would. It
+runs with your own AI account (ChatGPT, Claude or OpenRouter), is installed from your Mac or PC with
+Mode Setup, and is open source.
+
+- Everything from 0.1.10 is here: the greeting that speaks at once, voice sessions that stay open and
+  minimise into a session bar, Speechify as a voice, instant Stop, chats named by the AI.
+- Version numbers now go 0.1.9 → 0.2.0 (three single digits), so this follows 0.1.10 directly;
+  nothing in the app changed between the two.
+
+## 0.1.10 · 10 Nov 2026
+
+- Mode speaks the moment you call it. Its own hello ("Hey Piyush, good evening.") comes at once and the
+  mic opens with it, while the AI writes what comes next: an offer from your day, or how it asks what
+  you need. That line follows when it arrives, as one greeting; say your task at any point and Mode
+  takes it straight away. Before, nothing was said or heard until the AI answered, 5–12 seconds some
+  evenings. The AI gets 6 seconds, then Mode asks in its own words.
+- The next greeting is ready before you ask: after each one, Mode writes the next for the same hour
+  and keeps it for 20 minutes, so a session opened soon after greets instantly, still in the AI's words.
+- A task that leaves you in another app (a cart to look at, a video playing) no longer ends the voice
+  session: Mode carries on from behind, and you tap the bar to bring it forward.
+- Fixed: after a task, a listen that came back at once could hold Mode's thread for 20 seconds, with the
+  screen standing still.
+
 ## 0.1.9 · 9 Nov 2026
 
 - Speechify is a new voice for Mode, first in Settings → Voice and in Choose a voice: natural voices

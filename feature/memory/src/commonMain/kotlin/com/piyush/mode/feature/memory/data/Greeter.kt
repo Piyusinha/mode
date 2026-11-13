@@ -52,19 +52,47 @@ public class Greeter(
     /** The phone Mode runs on, as the prompt names it ("iPhone", "Android phone"). */
     private val device: String = "iPhone",
 ) {
+    /** The time, for how long a prepared opening stays good (tests set their own). */
+    public var now: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() }
+
+    /** An opening written ahead for one moment ([key]): the next session greets at once. */
+    private class Prepared(val key: String, val line: NextLine, val madeAt: Long)
+    private var prepared: Prepared? = null
+
     /** The model the last line was asked of ("gpt-6-luna@low"), for the log. */
     public var lastModel: String? = null
         private set
 
     /**
-     * The first words, and, when they offer to do something, that task and the two answers: a "yes" to the
-     * greeting then runs the offered task (not the word "yes").
+     * What Mode says after its own hello ("Hey Alex, good evening."), and, when it offers to do something, that
+     * task and the two answers: a "yes" to the greeting then runs the offered task (not the word "yes"). One
+     * [prepare]d for this moment comes back at once (and is used up); otherwise the AI writes it now.
      */
     public suspend fun opening(
         name: String?, hour: Int, day: DayContext, budgetMs: Long = BUDGET_MS,
         /** The language to speak ("Hindi"); null: English. */
         language: String? = null,
     ): NextLine? {
+        val key = key(name, hour, day, language)
+        val ready = prepared
+        prepared = null
+        if (ready != null && ready.key == key && now() - ready.madeAt < PREPARED_FOR_MS) return ready.line
+        return write(name, hour, day, budgetMs, language)
+    }
+
+    /**
+     * Writes the opening for this moment ahead of time, so the next session within [PREPARED_FOR_MS] greets at
+     * once. Called after a greeting was used; a later one for the same moment replaces it.
+     */
+    public suspend fun prepare(name: String?, hour: Int, day: DayContext, language: String? = null) {
+        val line = write(name, hour, day, BUDGET_MS, language) ?: return
+        prepared = Prepared(key(name, hour, day, language), line, now())
+    }
+
+    private fun key(name: String?, hour: Int, day: DayContext, language: String?): String =
+        listOf(name.orEmpty(), hour, day.events, day.repeats, day.lastTask.orEmpty(), language.orEmpty()).joinToString("|")
+
+    private suspend fun write(name: String?, hour: Int, day: DayContext, budgetMs: Long, language: String?): NextLine? {
         val (id, provider) = model() ?: return null
         lastModel = id
         return try {
@@ -158,6 +186,8 @@ public class Greeter(
 
         /** How long the greeting may take before Mode says its own. */
         public const val BUDGET_MS: Long = 1_800
+        /** How long a prepared opening stays good for: the day moves on. */
+        public const val PREPARED_FOR_MS: Long = 20 * 60 * 1_000L
         private const val EVENTS = 5
         private const val FACTS = 8
         private const val MAX_WORDS = 28
@@ -176,16 +206,17 @@ public class Greeter(
         }
 
         private val SYSTEM = """
-            You are Mode, the user's personal assistant on their iPhone. They just called you by voice; you speak
-            first, out loud. Say one short, natural line (at most 24 words), like a warm, capable human assistant
-            picking up the phone.
+            You are Mode, the user's personal assistant on their iPhone. They just called you by voice, and you have
+            already said hello out loud ("Hey Alex, good evening."). Say what comes next: one short, natural line
+            (at most 24 words), like a warm, capable human assistant picking up the phone. Never greet again, and
+            don't start with their name.
             - If something in their day is coming up soon (within about 3 hours) and you could clearly help with it
               on their phone, offer that ONE thing as a question ("Dinner with Priya's at 7. Want me to text her
               you're on your way?"). Only use what is listed; never invent plans, people or times. Whenever the line
               offers to do something, also give offer_task (the whole task to run if they say yes, standing on its
               own: "Text Priya that I'm on my way to dinner"), yes_label ("Yes, text her") and no_label ("Not now").
-            - Otherwise greet them and ask what they need, in your own words, different each time.
-            - Use their first name now and then, not always. Match the time of day.
+            - Otherwise ask what they need, in your own words, different each time ("What can I do for you?").
+            - Their first name now and then, not always, and never as the first word.
             - Plain spoken words: no emoji, no markdown, no quotes, no lists. Speak English.
             Call say with the line.
         """.trimIndent()
