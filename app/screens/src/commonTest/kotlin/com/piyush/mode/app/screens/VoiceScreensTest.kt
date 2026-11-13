@@ -161,8 +161,11 @@ class VoiceScreensTest {
     @Test
     fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
         val f = Fixture(backgroundScope, model = NeverAnswers)
+        // The line arrives only when the test lets it: on a slow CI runner a timed delay had already passed by the
+        // time the task showed as sent, and the reply was no longer empty.
+        val lineMayCome = kotlinx.coroutines.CompletableDeferred<Unit>()
         val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
-            kotlinx.coroutines.delay(2_000)
+            lineMayCome.await()
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
                     put("line", kotlinx.serialization.json.JsonPrimitive("On it, Alex. Dark Mode, coming right up."))
@@ -175,6 +178,7 @@ class VoiceScreensTest {
         talk.submitTyped("Turn on dark mode")
         val sent = talk.state.awaitState { it.sent }
         assertEquals("", sent.reply)   // the task went before the line was written
+        lineMayCome.complete(Unit)
         // The session carries on after the task, so the reply is checked where it stays: in the conversation.
         talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == "On it, Alex. Dark Mode, coming right up." } }
     }
@@ -559,18 +563,29 @@ class VoiceScreensTest {
     @Test
     fun listeningAgainKeepsTheConversation() = runTest {
         val f = Fixture(backgroundScope)
-        val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
-            greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
-        talk.submitTyped("Turn on dark mode")
-        talk.state.awaitState { it.doneSoFar.isNotEmpty() }
-        // They chose to type, then want the mic back: the turns so far stay (begin would start over).
-        talk.typeInstead()
-        val typing = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Typing }
-        talk.listenAgain()
-        val again = talk.state.awaitState { it.phase != com.piyush.mode.app.screens.settings.TalkPhase.Typing }
-        assertEquals(typing.turns, again.turns, "the conversation is still there")
-        assertEquals(typing.doneSoFar, again.doneSoFar)
-        assertFalse(again.finished)
+        // A mic that opens and stays open: without one, a failed listen falls back to typing after its retry, and
+        // on a slow CI runner the listening phase was gone before the test looked.
+        val state = DeviceVoice.hearingState
+        val listen = DeviceVoice.listen
+        DeviceVoice.hearingState = { "ready" }
+        DeviceVoice.listen = { _, _, _, _, _ -> }
+        try {
+            val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
+                greeter = nextLines("Anything else?"), pausedEndMs = Long.MAX_VALUE)
+            talk.submitTyped("Turn on dark mode")
+            talk.state.awaitState { it.doneSoFar.isNotEmpty() }
+            // They chose to type, then want the mic back: the turns so far stay (begin would start over).
+            talk.typeInstead()
+            val typing = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Typing }
+            talk.listenAgain()
+            val again = talk.state.awaitState { it.phase == com.piyush.mode.app.screens.settings.TalkPhase.Listening }
+            assertEquals(typing.turns, again.turns, "the conversation is still there")
+            assertEquals(typing.doneSoFar, again.doneSoFar)
+            assertFalse(again.finished)
+        } finally {
+            DeviceVoice.hearingState = state
+            DeviceVoice.listen = listen
+        }
     }
 
     @Test
