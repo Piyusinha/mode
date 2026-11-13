@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -161,26 +162,29 @@ class VoiceScreensTest {
     @Test
     fun theTaskStartsAtOnceAndModeSaysTheAIsOwnLineWhenItArrives() = runTest {
         val f = Fixture(backgroundScope, model = NeverAnswers)
-        // The line arrives only when the test lets it: on a slow CI runner a timed delay had already passed by the
-        // time the task showed as sent, and the reply was no longer empty.
+        // The AI's line comes only once the task shows as sent, and the order is read from the states as they
+        // went by: the presenter runs on the test's virtual clock, so a snapshot taken from the real clock (sent
+        // but no reply yet, a line after a timed delay) is a race the CI runner lost both ways.
+        val line = "On it, Alex. Dark Mode, coming right up."
         val lineMayCome = kotlinx.coroutines.CompletableDeferred<Unit>()
         val slowButPersonal = com.piyush.mode.llm.LlmClient { _, _, _ ->
             lineMayCome.await()
             com.piyush.mode.llm.ChatResult(
                 com.piyush.mode.llm.ToolCall("say", kotlinx.serialization.json.buildJsonObject {
-                    put("line", kotlinx.serialization.json.JsonPrimitive("On it, Alex. Dark Mode, coming right up."))
+                    put("line", kotlinx.serialization.json.JsonPrimitive(line))
                 }), "", com.piyush.mode.llm.Usage(10, 5, 0.0))
         }
         val ack = com.piyush.mode.feature.memory.data.Acknowledger(slowButPersonal, null, model = { "fast@low" to com.piyush.mode.llm.ModelProvider.ChatGpt })
         val talk = ListenPresenter(backgroundScope, Voices(f.settings, HttpClient(MockEngine { error("offline") })), f.queue, f.settings, f.runner,
             acknowledger = ack)
+        val seen = mutableListOf<com.piyush.mode.app.screens.settings.ListenUiState>()
+        backgroundScope.launch { talk.state.collect { seen += it } }
+        backgroundScope.launch { talk.state.first { it.sent }; lineMayCome.complete(Unit) }
 
         talk.submitTyped("Turn on dark mode")
-        val sent = talk.state.awaitState { it.sent }
-        assertEquals("", sent.reply)   // the task went before the line was written
-        lineMayCome.complete(Unit)
         // The session carries on after the task, so the reply is checked where it stays: in the conversation.
-        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == "On it, Alex. Dark Mode, coming right up." } }
+        talk.state.awaitState { s -> s.turns.any { !it.mine && it.text == line } }
+        assertTrue(seen.any { it.sent && it.reply.isEmpty() }, "the task went before the line was written")
     }
 
     @Test
