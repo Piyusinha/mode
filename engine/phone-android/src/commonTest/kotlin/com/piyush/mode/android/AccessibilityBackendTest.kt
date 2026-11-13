@@ -58,8 +58,8 @@ private class FakeHands(
 }
 
 private fun node(id: Int, text: String? = null, l: Int, t: Int, r: Int, b: Int, vararg children: NodeSnapshot, desc: String? = null, hint: String? = null,
-                 editable: Boolean = false, focused: Boolean = false, visible: Boolean = true, password: Boolean = false) =
-    NodeSnapshot(id, text, desc, hint, "android.widget.TextView", PxRect(l, t, r, b), visible, editable = editable, focused = focused, password = password, children = children.toList())
+                 editable: Boolean = false, focused: Boolean = false, visible: Boolean = true, password: Boolean = false, showingHint: Boolean = false) =
+    NodeSnapshot(id, text, desc, hint, "android.widget.TextView", PxRect(l, t, r, b), visible, editable = editable, focused = focused, password = password, showingHint = showingHint, children = children.toList())
 
 private fun app(root: NodeSnapshot, pkg: String = "com.example.app") = WindowSnapshot(WindowKind.App, pkg, PxRect(0, 0, 1080, 2400), root)
 private fun ime(root: NodeSnapshot) = WindowSnapshot(WindowKind.Ime, "com.google.android.inputmethod.latin", PxRect(0, 1500, 1080, 2400), root)
@@ -177,6 +177,30 @@ class AccessibilityBackendTest {
         hands.windowsNow = listOf(app(node(1, null, 0, 0, 1080, 2400, node(2, "Hel", 0, 0, 500, 100, editable = true, focused = true))))
         backend(hands).send(Op.TypeText("lo"))
         assertEquals("setText 2 'Hello'", hands.calls.last())
+    }
+
+    @Test
+    fun anEmptyFieldShowingItsHintTakesTheTextAlone() = runTest {
+        // WhatsApp's compose field reports "Message" as its text while empty, and no hint: the phone says it is
+        // showing its hint. Typing must not give "Messagetesting"; delete has nothing to remove.
+        val hands = FakeHands(listOf(app(node(1, null, 0, 0, 1080, 2400, node(2, "Message", 0, 0, 500, 100, editable = true, focused = true, showingHint = true)))))
+        val b = backend(hands)
+        b.send(Op.TypeText("testing"))
+        assertEquals("setText 2 'testing'", hands.calls.single())
+        b.send(Op.PressKey("delete"))
+        assertEquals(1, hands.calls.size, "nothing to delete: ${'$'}{hands.calls}")
+    }
+
+    @Test
+    fun aTextFieldIsMarkedAmongTheScreenTexts() = runTest {
+        val hands = FakeHands(listOf(app(node(1, null, 0, 0, 1080, 2400,
+            node(2, "testing Android mod", 0, 300, 600, 360),
+            node(3, "testing", 0, 600, 500, 700, editable = true, focused = true),
+        ))))
+        val boxes = (backend(hands).send(Op.ScreenText()) as JsonArray).map { it.jsonObject }
+        assertEquals(listOf("testing Android mod", "testing"), boxes.map { it["text"]!!.jsonPrimitive.content })
+        assertEquals(null, boxes[0]["field"])
+        assertEquals(true, boxes[1]["field"]!!.jsonPrimitive.boolean)
     }
 
     @Test

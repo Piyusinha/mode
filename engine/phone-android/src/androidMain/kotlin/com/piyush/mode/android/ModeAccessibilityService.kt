@@ -22,6 +22,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import com.piyush.mode.core.common.AppLog
 import com.piyush.mode.screen.InstalledApp
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -156,16 +157,24 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
             editable = node.isEditable,
             focused = node.isFocused,
             password = node.isPassword,
+            showingHint = node.isShowingHintText,
             children = children,
         )
     }
 
-    /** The user's screen is captured without Mode's own overlay on it (it hides for the shot). */
+    /**
+     * The user's screen is captured without Mode's own overlay on it (it hides for the shot). Android answers a
+     * screenshot through a callback; one that never comes (seen on the OnePlus, 13 Nov: a task stood still for
+     * minutes after a confirmation) is a failure after [SHOT_TIMEOUT_MS], not a wait without end.
+     */
     override suspend fun screenshot(displayId: Int): Shot {
         val guarded = displayId == Display.DEFAULT_DISPLAY
         if (guarded) OverlayGuard.beforeShot()
         try {
-            return takeShot(displayId)
+            return withTimeoutOrNull(SHOT_TIMEOUT_MS) { takeShot(displayId) } ?: run {
+                AppLog.log("phone", "screenshot: no answer from the system in ${SHOT_TIMEOUT_MS / 1000} s")
+                Shot.Failed(SHOT_TIMED_OUT)
+            }
         } finally {
             if (guarded) OverlayGuard.afterShot()
         }
@@ -203,12 +212,19 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
 
     // Hands -----------------------------------------------------------------------------------
 
-    /** A gesture on the user's screen goes through Mode's own overlay (it lets touches pass while it runs). */
+    /**
+     * A gesture on the user's screen goes through Mode's own overlay (it lets touches pass while it runs). The
+     * system reports a gesture done or cancelled through a callback; one that never comes counts as not done
+     * after the stroke's own length plus [GESTURE_GRACE_MS].
+     */
     override suspend fun gesture(stroke: Stroke): Boolean {
         val guarded = stroke.displayId == Display.DEFAULT_DISPLAY
         if (guarded) OverlayGuard.beforeGesture()
         try {
-            return dispatch(stroke)
+            return withTimeoutOrNull(stroke.durationMs + GESTURE_GRACE_MS) { dispatch(stroke) } ?: run {
+                AppLog.log("phone", "gesture: no answer from the system in ${(stroke.durationMs + GESTURE_GRACE_MS) / 1000} s")
+                false
+            }
         } finally {
             if (guarded) OverlayGuard.afterGesture()
         }
@@ -360,5 +376,11 @@ class ModeAccessibilityService : AccessibilityService(), AccessibilityHands {
         const val MAX_DEPTH = 40
         /** Android lets a service take a screenshot about three times a second. */
         const val SHOT_INTERVAL_MS = 350L
+        /** How long a screenshot may take before it counts as failed. */
+        const val SHOT_TIMEOUT_MS = 6_000L
+        /** A screenshot whose callback never came. */
+        const val SHOT_TIMED_OUT = -3
+        /** How long past its own length a gesture may take to be reported done. */
+        const val GESTURE_GRACE_MS = 4_000L
     }
 }

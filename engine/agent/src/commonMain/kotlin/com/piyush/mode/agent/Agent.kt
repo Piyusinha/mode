@@ -945,7 +945,7 @@ class Agent(
                             lastTyped = op.text
                             // Typed over old text: what the field shows is longer than what was typed. Delete it all
                             // and type again (up to twice) before it is submitted.
-                            if (clearing) staleNote = retypeIfStale(op, screen)
+                            if (clearing) staleNote = retypeIfStale(op, call, screen)
                             if (call.arguments["submit"]?.jsonPrimitive?.booleanOrNull == true) phone.send(Op.PressKey("return"))
                         }
                         if (op is Op.Tap) lastTapAt = op.x to op.y else if (op !is Op.TypeText) lastTapAt = null
@@ -1007,9 +1007,8 @@ class Agent(
                     }.orEmpty()
                     // Typing is checked: does the text now show? (A field that wasn't focused takes nothing.)
                     val typedNote = (op as? Op.TypeText)?.takeIf { lastWasPhoneAction && call.arguments["submit"]?.jsonPrimitive?.booleanOrNull != true }?.let { t ->
-                        val now = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
                         val probe = t.text.take(TYPED_PROBE)
-                        val shown = now.firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim()
+                        val shown = typedField(probe, call, screen)
                         when {
                             shown == null -> "; \"$probe\" does not show on screen: the field may not be focused (give type_text the field's x and y)"
                             // Seen on the phone: "4 November" typed after "boarding pass" that clear did not remove.
@@ -1297,18 +1296,34 @@ class Agent(
      * After typing with clear: if the field shows more than what was typed, the old text is still there. Deletes
      * what it shows and types again, up to [RETYPE_ROUNDS] times; the note says what was done, or what is left.
      */
-    private suspend fun retypeIfStale(op: Op.TypeText, screen: Screen): String {
+    private suspend fun retypeIfStale(op: Op.TypeText, call: ToolCall, screen: Screen): String {
         val probe = op.text.take(TYPED_PROBE)
         repeat(RETYPE_ROUNDS) { round ->
-            val shown = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty()
-                .firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim() ?: return if (round == 0) "" else "; the old text was cleared and it was typed again"
+            val shown = typedField(probe, call, screen) ?: return if (round == 0) "" else "; the old text was cleared and it was typed again"
             if (shown.length <= op.text.length + STALE_SLACK) return if (round == 0) "" else "; the old text was cleared and it was typed again"
             repeat((shown.length * 2 + CLEAR_SLACK).coerceAtMost(CLEAR_KEYS_MAX)) { runCatching { phone.send(Op.PressKey("delete")) } }
             runCatching { phone.send(op) }
             delay(FOCUS_MS)
         }
-        val left = runCatching { screenTexts(screen.geometry) }.getOrNull().orEmpty().firstOrNull { it.first.contains(probe, ignoreCase = true) }?.first?.trim().orEmpty()
+        val left = typedField(probe, call, screen).orEmpty()
         return if (left.length > op.text.length + STALE_SLACK) "; the field still holds old text (\"${left.take(TYPED_SHOWN)}\"): tap its ×, or open the search afresh" else "; the old text was cleared and it was typed again"
+    }
+
+    /**
+     * What the field typed into shows now, null when [probe] shows nowhere. The phone's text field first (Android
+     * marks it); else the match nearest where the typing was aimed; else the first. Seen on the phone, 13 Nov:
+     * the first text with "testing" was a sent message, and the agent was told its draft held "testing Android
+     * mod" and would not clear, fifteen steps long.
+     */
+    private suspend fun typedField(probe: String, call: ToolCall, screen: Screen): String? {
+        val boxes = runCatching { screenBoxes(screen.geometry) }.getOrNull().orEmpty()
+            .filter { it.text.contains(probe, ignoreCase = true) }
+        if (boxes.isEmpty()) return null
+        val aimed = AgentTools.focusPoint(call, screen.geometry)?.let { (x, y) -> screen.geometry.toPixelsX(x).roundToInt() to screen.geometry.toPixelsY(y).roundToInt() }
+        val box = boxes.firstOrNull { it.field }
+            ?: aimed?.let { (ax, ay) -> boxes.minByOrNull { (it.x - ax) * (it.x - ax) + (it.y - ay) * (it.y - ay) } }
+            ?: boxes.first()
+        return box.text.trim()
     }
 
     /** Once-per-task flags of the done handling. */

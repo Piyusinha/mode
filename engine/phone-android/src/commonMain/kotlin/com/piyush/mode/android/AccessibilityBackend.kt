@@ -121,10 +121,16 @@ class AccessibilityBackend(
     /** Into the focused field, after what it holds; the field's hint is not text it holds. */
     private fun type(text: String): JsonElement {
         val field = hands.focusedEditable(displayId) ?: throw OpFailed("no text field is focused: tap one first")
-        val held = field.text?.takeUnless { it == field.hint }.orEmpty()
-        if (!hands.setText(field, held + text) && !hands.paste(field, text)) throw OpFailed("could not type into the field")
+        if (!hands.setText(field, held(field) + text) && !hands.paste(field, text)) throw OpFailed("could not type into the field")
         return JsonNull
     }
+
+    /**
+     * What a field holds. An empty field reports its hint as its text (WhatsApp's "Message"; seen on the phone,
+     * 13 Nov: "testing" went in as "Messagetesting" and the agent fought the draft for fifteen steps).
+     */
+    private fun held(field: NodeSnapshot): String =
+        if (field.showingHint) "" else field.text?.takeUnless { it.equals(field.hint, ignoreCase = true) }.orEmpty()
 
     private fun key(combo: String): JsonElement {
         val field = hands.focusedEditable(displayId)
@@ -135,7 +141,7 @@ class AccessibilityBackend(
             }
             "delete", "backspace" -> {
                 if (field == null) throw OpFailed("no text field is focused")
-                val held = field.text?.takeUnless { it == field.hint }.orEmpty()
+                val held = held(field)
                 if (held.isNotEmpty() && !hands.setText(field, held.dropLast(1))) throw OpFailed("could not delete")
             }
             else -> throw Unsupported("this Android phone takes return and delete only, not '$combo'")
@@ -185,7 +191,7 @@ class AccessibilityBackend(
     /** Tree boxes in dp; OCR of the screen only when the app's window has nothing to read. */
     private suspend fun readText(minConfidence: Double): List<JsonElement> {
         val boxes = telemetry.trace(Operation.ScreenOcr) { TreeText.boxes(hands.windows(displayId), density) }
-        val fromTree = boxes.map { ScreenJson.textBox(it.text, 1.0, "tree", it.x, it.y, it.w, it.h, it.window) }
+        val fromTree = boxes.map { ScreenJson.textBox(it.text, 1.0, "tree", it.x, it.y, it.w, it.h, it.window, field = it.field) }
         if (boxes.any { it.window == "app" } || reader == null) return fromTree
         val shot = shots.take() ?: (shoot() as? Shot.Image)?.png ?: return fromTree
         val ocr = telemetry.trace(Operation.ScreenOcr) { reader.read(shot) }

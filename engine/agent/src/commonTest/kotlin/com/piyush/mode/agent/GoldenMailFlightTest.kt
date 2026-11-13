@@ -73,4 +73,30 @@ class GoldenMailFlightTest {
         assertTrue(taps.any { kotlin.math.abs(it.x - 370.0) < 2 && kotlin.math.abs(it.y - 100.0) < 2 }, "the × was tapped: ${phone.actions}")
         assertTrue("the old text was not cleared" in steps[0].outcome, steps[0].outcome)
     }
+
+    @Test
+    fun theTypedCheckReadsTheFieldNotAMessageThatSaysTheSame() = runTest {
+        // WhatsApp's self-chat: a sent "testing Android mod" sits above the compose field that now holds "testing".
+        // Seen on the phone (13 Nov): the check took the message for the field and sent the agent in circles.
+        val chat = listOf("testing Android mod" to (200.0 to 500.0), "testing" to (150.0 to 800.0), "Send" to (380.0 to 800.0))
+        val phone = FakePhone(listOf(chat, chat, chat, chat)).apply { fields = setOf("testing") }
+        val steps = mutableListOf<StepRecord>()
+        val type = call("type_text", "text" to "testing", "x" to 150 * 500 / 402, "y" to 800 * 1000 / 874, "clear" to true, "reason" to "Writing your message")
+        val model = ScriptedModel(type, call("done", "success" to false, "summary" to "stop", "evidence" to "x"))
+        Agent(phone, model, Gate(), config, onStep = { steps += it }).run(task)
+        assertTrue("the field shows \"testing\"" in steps[0].outcome, steps[0].outcome)
+        assertTrue("not cleared" !in steps[0].outcome, steps[0].outcome)
+    }
+
+    @Test
+    fun withoutAFieldMarkTheTypedCheckTakesTheMatchNearestTheField() = runTest {
+        // An iPhone's OCR marks no fields: the match nearest where the typing was aimed is the field.
+        val chat = listOf("testing Android mod" to (200.0 to 500.0), "testing" to (150.0 to 800.0))
+        val phone = FakePhone(listOf(chat, chat, chat, chat))
+        val steps = mutableListOf<StepRecord>()
+        val type = call("type_text", "text" to "testing", "x" to 150 * 500 / 402, "y" to 800 * 1000 / 874, "clear" to true, "reason" to "Writing your message")
+        val model = ScriptedModel(type, call("done", "success" to false, "summary" to "stop", "evidence" to "x"))
+        Agent(phone, model, Gate(), config, onStep = { steps += it }).run(task)
+        assertTrue("the field shows \"testing\"" in steps[0].outcome, steps[0].outcome)
+    }
 }

@@ -65,6 +65,7 @@ object ScreenJson {
         w: Double,
         h: Double,
         window: String? = null,
+        field: Boolean = false,
     ): JsonObject = buildJsonObject {
         put("text", text)
         put("confidence", confidence)
@@ -74,6 +75,8 @@ object ScreenJson {
         put("w", round(w))
         put("h", round(h))
         if (window != null) put("window", window)
+        // A text field (editable): what was typed is checked against it, not against a message that says the same.
+        if (field) put("field", true)
     }
 
     /** An OCR result, from image fractions to screen points. */

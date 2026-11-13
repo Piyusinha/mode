@@ -30,6 +30,8 @@ data class NodeSnapshot(
     val editable: Boolean = false,
     val focused: Boolean = false,
     val password: Boolean = false,
+    /** An empty field showing its hint: its text is the hint, not what it holds (WhatsApp's "Message"). */
+    val showingHint: Boolean = false,
     val children: List<NodeSnapshot> = emptyList(),
 )
 

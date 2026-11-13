@@ -32,6 +32,8 @@ public class FakePhone(
     var captures = 0
     /** Which window a text is in ("ime" for the keyboard's keys), for phones that report windows. */
     var windows: Map<String, String> = emptyMap()
+    /** Texts that are text fields, for phones that mark them (Android). */
+    var fields: Set<String> = emptySet()
     /** Screens (by index) the phone will not show: the capture says private. */
     var privateScreens: Set<Int> = emptySet()
     private var screen = 0
@@ -56,6 +58,7 @@ public class FakePhone(
                 buildJsonObject {
                     put("text", text); put("x", at.first); put("y", at.second); put("confidence", 1.0)
                     windows[text]?.let { put("window", it) }
+                    if (text in fields) put("field", true)
                 },
             )
         }

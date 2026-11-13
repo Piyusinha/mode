@@ -3,7 +3,7 @@ package com.piyush.mode.android
 import kotlin.math.abs
 
 /** One piece of on-screen text in dp, its centre ready to tap, and the window it is in. */
-data class TextBox(val text: String, val x: Double, val y: Double, val w: Double, val h: Double, val window: String)
+data class TextBox(val text: String, val x: Double, val y: Double, val w: Double, val h: Double, val window: String, val field: Boolean = false)
 
 /**
  * The accessibility tree as text with positions: what `screen.text` answers on
@@ -45,6 +45,7 @@ object TreeText {
                 w = node.bounds.width / density.toDouble(),
                 h = node.bounds.height / density.toDouble(),
                 window = window,
+                field = node.editable,
             )
         }
         node.children.forEach { walk(it, density, window, out) }
