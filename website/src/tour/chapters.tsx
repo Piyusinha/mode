@@ -119,7 +119,7 @@ export const CHAPTERS: Chapter[] = [
         <div className="D-h"><Mo mood="listening" className="mo" />Hands-free</div>
         <div className="way h1"><b>“Hey Siri, start Mode”</b>Built in. Nothing to set up.</div>
         <div className="way h2"><b>Keep talking, even locked</b>Mode listens on your Lock Screen and starts by itself when you stop talking.</div>
-        <div className="way h3"><b>Watch it work</b>Each step in the Live Activity, with Stop always there.</div>
+        <div className="way h3"><b>Watch it work</b>Each step as it happens, with Stop always there.</div>
         <div className="way h4"><b>The answer waits for you</b>On the Lock Screen, out loud, with “Another task” one tap away.</div>
       </>
     ),
@@ -162,7 +162,7 @@ export const CHAPTERS: Chapter[] = [
             <div className="labs"><span>Open app</span><span>Your usual</span><span><b>Pay</b></span><span>Order</span></div>
           </div>
         </div>
-        <p>Stop sits in the Live Activity on every task. Tap it, and Mode stops right there.</p>
+        <p>Stop is there on every task. Tap it, and Mode stops right there.</p>
       </>
     ),
   },
