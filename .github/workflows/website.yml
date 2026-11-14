@@ -1,0 +1,54 @@
+# Checks for the website (heymode.app) and the stats dashboard: both are Cloudflare Workers that the
+# Tests workflow doesn't look at. Runs only when their files change, so Kotlin-only pull requests
+# don't pay for it. Run by hand from Actions → Website and workers → Run workflow.
+#
+# wrangler's --dry-run bundles each worker the way `npm run deploy` does and stops before uploading,
+# so a broken import or a bad wrangler.jsonc fails here instead of at deploy. It needs no Cloudflare
+# login or secrets.
+name: Website and workers
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - "stats/**"
+      - "docs/media/**" # the website's prebuild copies the films from here
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  website:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - name: Type check and build (tsc -b && vite build)
+        run: npm run build
+      - name: Worker bundles (wrangler dry run)
+        run: npx --yes wrangler@4 deploy --dry-run --outdir "$RUNNER_TEMP/website-worker"
+
+  stats:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: stats
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Syntax check
+        run: for f in src/*.js public/*.js scripts/*.mjs; do node --check "$f"; done
+      - name: Worker bundles (wrangler dry run)
+        run: npx --yes wrangler@4 deploy --dry-run --outdir "$RUNNER_TEMP/stats-worker"
