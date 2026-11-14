@@ -43,7 +43,7 @@ The agent:
 - Search grounding (Mode's own search with a cache) is the next big piece. No plan written yet.
 
 Not started: desktop diagnostics, self-update on the iPhone, Mo's spoken lines from Apple's on-device
-model, the Home Screen widget and the Watch app.
+model, the iPhone Home Screen widget and the Watch app.
 
 ## Phases
 
