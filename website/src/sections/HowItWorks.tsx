@@ -7,13 +7,13 @@ const Stroke = ({ children }: { children: ReactNode }) => (
 
 const STEPS: { icon: ReactNode; title: string; text: string }[] = [
   { icon: <Stroke><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z" /><path d="M19 11a7 7 0 0 1-14 0M12 18v3" /></Stroke>,
-    title: 'You ask', text: 'Through Siri, the Action Button, or the Mode app itself. In your words, in English or Hindi.' },
+    title: 'You ask', text: 'In the Mode app, or with Siri and the Action Button on iPhone. In your words, in English or Hindi.' },
   { icon: <Stroke><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Stroke>,
     title: 'Mode looks', text: "It reads what's on screen the way you do: buttons, labels, text fields, lists. Any app, no special support needed." },
   { icon: <Stroke><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></Stroke>,
     title: 'Your AI decides', text: 'The screen and your request go to the ChatGPT, Claude or OpenRouter key you chose, and nowhere else. One step at a time.' },
   { icon: <Stroke><path d="M9 11V5a2 2 0 1 1 4 0v6" /><path d="M13 10a2 2 0 1 1 4 0v2a2 2 0 1 1 4 0v3a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-2.7L5 14a2 2 0 0 1 3.3-2.3L9 13" /></Stroke>,
-    title: 'Mode taps, types, checks', text: 'On your screen, where you can see it, with every step in your Live Activity. It only says done when it can see it worked.' },
+    title: 'Mode taps, types, checks', text: 'You see every step as it happens. It only says done when it can see it worked.' },
 ];
 
 export function HowItWorks() {

@@ -20,5 +20,11 @@ export function detectPlatform(): Platform | null {
   return 'mac';
 }
 
+/** Android phones and tablets get the Mode app itself (the APK), straight from heymode.app. detectPlatform() still says null for them. */
+export const ANDROID_HREF = '/download/android';
+export function isAndroid(): boolean {
+  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+}
+
 /** The other two computers, in a fixed order, for "also for …" links. */
 export const others = (p: Platform | null) => (['mac', 'windows', 'linux'] as Platform[]).filter((x) => x !== p);

@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { AndroidLogo, AppleLogo } from '../components/Icons';
 import { Mo } from '../components/Mo';
+import { withVisitor } from '../lib/analytics';
+import { ANDROID_HREF } from '../lib/platform';
 
 export type Screen = { file: string; alt: string; dark?: boolean };
 export type Chapter = {
@@ -117,7 +119,7 @@ export const CHAPTERS: Chapter[] = [
         <div className="D-h"><Mo mood="listening" className="mo" />Hands-free</div>
         <div className="way h1"><b>“Hey Siri, start Mode”</b>Built in. Nothing to set up.</div>
         <div className="way h2"><b>Keep talking, even locked</b>Mode listens on your Lock Screen and starts by itself when you stop talking.</div>
-        <div className="way h3"><b>Watch it work</b>Each step in the Live Activity, with Stop always there.</div>
+        <div className="way h3"><b>Watch it work</b>Each step as it happens, with Stop always there.</div>
         <div className="way h4"><b>The answer waits for you</b>On the Lock Screen, out loud, with “Another task” one tap away.</div>
       </>
     ),
@@ -160,7 +162,7 @@ export const CHAPTERS: Chapter[] = [
             <div className="labs"><span>Open app</span><span>Your usual</span><span><b>Pay</b></span><span>Order</span></div>
           </div>
         </div>
-        <p>Stop sits in the Live Activity on every task. Tap it, and Mode stops right there.</p>
+        <p>Stop is there on every task. Tap it, and Mode stops right there.</p>
       </>
     ),
   },
@@ -185,7 +187,7 @@ export const CHAPTERS: Chapter[] = [
   {
     name: 'Get Mode', kick: 'Get Mode',
     title: <>Stop tapping. <em>Start asking.</em></>,
-    body: <>Free and open source. Download Mode Setup on your Mac, plug in your iPhone, and it installs Mode for you.</>,
+    body: <>Free and open source. On Android, download it straight to your phone. On iPhone, Mode Setup on your computer installs it for you.</>,
     screens: [{ file: 'HomeTips', alt: 'Home: what can I do for you, with a tip' }],
     darkCard: true,
     detail: (
@@ -195,7 +197,7 @@ export const CHAPTERS: Chapter[] = [
         <p>A small app that installs Mode on your iPhone. A few minutes, once.</p>
         <div className="avail">
           <a className="ab ios" href="#get"><AppleLogo /><span><small>Available on</small>iOS</span></a>
-          <span className="ab and" aria-label="Android, coming soon"><AndroidLogo /><span><small>Coming soon</small>Android</span></span>
+          <a className="ab and" href={withVisitor(ANDROID_HREF, 'tour')} data-ev="download_click" data-where="tour" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
         </div>
       </>
     ),
