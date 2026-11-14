@@ -344,7 +344,7 @@ a.ab:hover{transform:translateY(-1px)}
 }
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
-  .panel,.droid .wd,.faq summary::after,.rv,.words .wd,.btn,.say-grid li{transition:none!important;animation:none!important}
+  .panel,.droid .wd,.faq summary::after,.rv,.words .wd,.btn,a.ab,.say-grid li{transition:none!important;animation:none!important}
   .rv,.words .wd{opacity:1;transform:none}
 }
 

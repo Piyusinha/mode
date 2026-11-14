@@ -21,7 +21,7 @@ export function Closing() {
         </div>
         <div className="avail">
           <a className="ab ios" href="/#get" data-ev="nav_click" data-where="closing" data-target="get"><AppleLogo /><span><small>Available on</small>iOS</span></a>
-          <a className="ab and" href={withVisitor(ANDROID_HREF, 'closing')} aria-label="Download Mode for Android" data-ev="download_click" data-where="closing" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
+          <a className="ab and" href={withVisitor(ANDROID_HREF, 'closing')} data-ev="download_click" data-where="closing" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
         </div>
       </div>
 

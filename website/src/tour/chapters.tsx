@@ -197,7 +197,7 @@ export const CHAPTERS: Chapter[] = [
         <p>A small app that installs Mode on your iPhone. A few minutes, once.</p>
         <div className="avail">
           <a className="ab ios" href="#get"><AppleLogo /><span><small>Available on</small>iOS</span></a>
-          <a className="ab and" href={withVisitor(ANDROID_HREF, 'tour')} aria-label="Download Mode for Android" data-ev="download_click" data-where="tour" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
+          <a className="ab and" href={withVisitor(ANDROID_HREF, 'tour')} data-ev="download_click" data-where="tour" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
         </div>
       </>
     ),
