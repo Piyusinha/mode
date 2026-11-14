@@ -35,7 +35,9 @@ android {
                 storeFile = file(keystore)
                 storePassword = System.getenv("MODE_ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("MODE_ANDROID_KEY_ALIAS")
-                keyPassword = System.getenv("MODE_ANDROID_KEY_PASSWORD") ?: System.getenv("MODE_ANDROID_KEYSTORE_PASSWORD")
+                // An empty value counts as not set: the release workflow passes the optional secret as "" when the
+                // repository doesn't have it, and "" as the key's password failed the 0.2.1 run ("Get Key failed").
+                keyPassword = System.getenv("MODE_ANDROID_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: System.getenv("MODE_ANDROID_KEYSTORE_PASSWORD")
             }
         }
     }
