@@ -198,7 +198,7 @@ final class OnboardingViewModel {
     var report: String?
 
     /// Where the code lives.
-    let codeURL = URL(string: "https://github.com/Piyusinha/mode")!
+    let codeURL = URL(string: "https://github.com/heymode/mode")!
     /// The scheme OpenRouter sends the user back to.
     let callbackScheme = "mode"
 

@@ -70,7 +70,7 @@ final class FirstRunModel {
     }
 
     /// Mode's code (open source).
-    static let repository = "https://github.com/Piyusinha/mode"
+    static let repository = "https://github.com/heymode/mode"
 
     /// The ChatGPT page closed: if the sign-in never came back, it was cancelled.
     func pageClosed() {

@@ -9,7 +9,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
-REPO=${GITHUB_REPOSITORY:-Piyusinha/mode}
+REPO=${GITHUB_REPOSITORY:-heymode/mode}
 OUT="$ROOT/build/release"
 mkdir -p "$OUT"
 

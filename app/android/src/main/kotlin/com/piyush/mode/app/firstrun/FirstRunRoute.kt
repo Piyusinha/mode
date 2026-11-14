@@ -136,4 +136,4 @@ fun PhoneSetupRoute(graph: ModeGraph, pages: SystemPages, dots: StepDots?, onCon
 }
 
 /** Mode's code (open source). */
-private const val REPOSITORY = "https://github.com/Piyusinha/mode"
+private const val REPOSITORY = "https://github.com/heymode/mode"

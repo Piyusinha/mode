@@ -14,7 +14,7 @@
 
 import { collect, write } from './analytics.js';
 
-const REPO = 'Piyusinha/mode';
+const REPO = 'heymode/mode';
 const CACHE_VERSION = 2;
 const FILES = {
   mac: { file: 'Mode-Setup-mac.dmg', label: 'Mac' },

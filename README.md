@@ -29,7 +29,7 @@ your apps until it’s done, then tells you how it went.
 
 > Running late, hands on the wheel: *“Text Sam I’m ten minutes late. Any unread messages?
 > Order my usual coffee to the office.”* The iPhone does all three by itself.
-> ▶︎ [Watch the full film with sound on YouTube](https://www.youtube.com/watch?v=o0WiY1OYjkw) (71 s) · [the 23-second teaser](https://github.com/Piyusinha/mode/raw/main/docs/media/mode-teaser.mp4)
+> ▶︎ [Watch the full film with sound on YouTube](https://www.youtube.com/watch?v=o0WiY1OYjkw) (71 s) · [the 23-second teaser](https://github.com/heymode/mode/raw/main/docs/media/mode-teaser.mp4)
 
 <br>
 

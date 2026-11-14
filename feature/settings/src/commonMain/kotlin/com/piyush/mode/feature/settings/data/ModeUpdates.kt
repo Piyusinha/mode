@@ -36,7 +36,7 @@ public class ModeUpdates(
     /** This Mode's version ("0.1.3"). */
     public val current: String,
     private val now: () -> Long = ::nowMs,
-    private val repo: String = "Piyusinha/mode",
+    private val repo: String = "heymode/mode",
     /** The file a release must carry to be an update here: Mode.ipa on the iPhone, mode-android.apk on Android. */
     private val file: String = IPA,
 ) {
@@ -83,7 +83,7 @@ public class ModeUpdates(
                 val version = TAG.find(r["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty())?.groupValues?.get(1) ?: return@mapNotNull null
                 val hasFile = r["assets"]?.jsonArray.orEmpty().any { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull == file }
                 if (!hasFile) return@mapNotNull null
-                ModeUpdate(version, r["html_url"]?.jsonPrimitive?.contentOrNull ?: "https://github.com/Piyusinha/mode/releases")
+                ModeUpdate(version, r["html_url"]?.jsonPrimitive?.contentOrNull ?: "https://github.com/heymode/mode/releases")
             }.reduceOrNull { a, b -> if (isNewer(b.version, a.version)) b else a }
         }
 

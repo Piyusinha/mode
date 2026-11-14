@@ -6,7 +6,7 @@ security reports are welcome and handled first.
 ## Reporting a vulnerability
 
 Please don’t open a public issue. Use GitHub’s private
-[Report a vulnerability](https://github.com/Piyusinha/mode/security/advisories/new)
+[Report a vulnerability](https://github.com/heymode/mode/security/advisories/new)
 form with what you found, how to reproduce it, and its impact. You’ll get a reply
 within a few days, and credit in the fix’s release notes if you want it.
 

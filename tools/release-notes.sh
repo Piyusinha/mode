@@ -31,7 +31,7 @@ Mode is installed with **Mode Setup** on a Mac, Windows or Linux computer: get i
 Already have Mode? Open Mode Setup and press **Check for updates**.
 
 Mode needs an iPhone on iOS 27 or later. Android is next. See the
-[README](https://github.com/Piyusinha/mode#readme) and the [changelog](https://github.com/Piyusinha/mode/blob/main/CHANGELOG.md).
+[README](https://github.com/heymode/mode#readme) and the [changelog](https://github.com/heymode/mode/blob/main/CHANGELOG.md).
 
 ## Files
 - `Mode.ipa`: Mode for iPhone, unsigned. Mode Setup signs it with your Apple account.
@@ -50,6 +50,6 @@ else cat <<'NOTES'
    the installer isn't signed with a paid Windows certificate.
 3. Connect your iPhone with a cable and follow the steps. Mode Setup installs the newest Mode.
 
-See the [changelog](https://github.com/Piyusinha/mode/blob/main/desktop/CHANGELOG.md).
+See the [changelog](https://github.com/heymode/mode/blob/main/desktop/CHANGELOG.md).
 NOTES
 fi

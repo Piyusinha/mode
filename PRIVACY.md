@@ -63,4 +63,4 @@ This is about the website only: the Mode app and Mode Setup send nothing.
 
 ## Questions
 
-Open an issue at https://github.com/Piyusinha/mode/issues.
+Open an issue at https://github.com/heymode/mode/issues.

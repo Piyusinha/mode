@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{Result, SetupError};
 
-pub const MODE_REPO: &str = "Piyusinha/mode";
+pub const MODE_REPO: &str = "heymode/mode";
 /// The free build: Mode and its widget, no special entitlements (iosApp/project.yml).
 pub const MODE_ASSET: &str = "Mode.ipa";
 pub const SIDESTORE_IPA: &str = "https://github.com/SideStore/SideStore/releases/latest/download/SideStore.ipa";

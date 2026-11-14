@@ -190,7 +190,7 @@ const screens = {
         + row('', 'A passcode on your iPhone', 'Your iPhone asks for it to trust this computer.', '', false, tile('shield', '', 32)))}</div>`
       + computerCheck()
       + `<p class="note">${svg('lock', 16, 2)}<span>Mode is free and open source. Your Apple password goes only to Apple.</span></p>`,
-    left: link('How setup works', 'https://github.com/Piyusinha/mode/blob/main/docs/mac-windows-setup-plan.md'),
+    left: link('How setup works', 'https://github.com/heymode/mode/blob/main/docs/mac-windows-setup-plan.md'),
     right: btn('Get started', 'start', 'primary', S.computer?.ready ? '' : 'disabled'),
   }),
 
@@ -373,7 +373,7 @@ const screens = {
         + (needsVpnApp && !vpnApp ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span class="qr" role="img" aria-label="QR code for LocalDevVPN on the App Store">${S.qr ?? ''}</span><span style="font-size:12px;color:var(--sec)">LocalDevVPN · App Store</span></div>` : '') + '</div>'
         + callout('Already set up? Run a short task such as “Open Settings” in that copy of Mode. Confirm only if it can see and tap your screen. This computer cannot automatically detect the test result.', '', 'phone')
         + (S.failure ? callout(esc(S.failure), 'orange', 'plug') : ''),
-      left: btn('Finish later', 'device') + link(needsVpnApp ? 'Why LocalDevVPN?' : 'Setup help', 'https://github.com/Piyusinha/mode/blob/main/docs/mac-windows-setup-plan.md'),
+      left: btn('Finish later', 'device') + link(needsVpnApp ? 'Why LocalDevVPN?' : 'Setup help', 'https://github.com/heymode/mode/blob/main/docs/mac-windows-setup-plan.md'),
       right: S.phoneTestConfirmed
         ? btn('Mode works unplugged — finish', 'finishPhoneSetup', 'primary', S.phonePresenceKnown && S.cableDisconnected ? '' : 'disabled')
         : btn('Setup complete — test passed', 'confirmPhoneTest', 'primary'),
@@ -467,7 +467,7 @@ const screens = {
       <section class="group"><h2 class="label">Sign-in helper</h2>${helperList(false)}<p>Tells Apple which computer you’re signing in from. It never sees your password. Run by open-source projects, not by Mode.</p></section>
       <section class="group"><h2 class="label">Apple account</h2>${box(kv('Signed in as', esc(S.prefs.email ?? 'Not signed in'), S.prefs.email ? btnIcon('Sign out', 'out', 'signOut', 'small plain') : '')
         + kv('Password', S.hasSaved ? 'Kept in this computer’s Keychain' : 'Asked each time', ''))}</section>
-      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', `${esc(S.setupVersion || '')} · free and open source`, link('Source', 'https://github.com/Piyusinha/mode')) + setupUpdateRow() + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
+      <section class="group"><h2 class="label">About</h2>${box(kv('Mode Setup', `${esc(S.setupVersion || '')} · free and open source`, link('Source', 'https://github.com/heymode/mode')) + setupUpdateRow() + kv('Help', 'Copy a report to share when asking for help', btnIcon(S.copied ? 'Copied' : 'Copy report', 'copy', 'copyReport', 'small')))}
       <p>Reports never include passwords, codes, keys or phone-control files.</p></section></main>`,
 };
 
