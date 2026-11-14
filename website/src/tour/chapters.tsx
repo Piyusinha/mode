@@ -107,7 +107,7 @@ export const CHAPTERS: Chapter[] = [
   {
     name: 'Hands-free', kick: 'Hands-free',
     title: <>Ask from <em>anywhere.</em></>,
-    body: <>“Hey Siri, start Mode”, then just talk. Lock your phone if you like: Mode keeps listening on the Lock Screen, starts when you stop talking, and leaves the result there. Or use the Action Button, your Watch, or a Shortcut.</>,
+    body: <>Say “Hey Siri, start Mode” on iPhone or “Hey Google, open Mode” on Android, then just talk. On iPhone, Mode keeps listening on the Lock Screen, starts when you stop talking, and leaves the result there. The Action Button, your Watch and Shortcuts work too.</>,
     screens: [
       { file: 'Main', alt: 'Hey Siri, start Mode: Mode is listening', dark: true },
       { file: 'Listening', alt: "The Lock Screen listening: Text Lucy I'm leaving in 10, then tell me what's on my calendar", dark: true },
@@ -117,10 +117,10 @@ export const CHAPTERS: Chapter[] = [
     detail: (
       <>
         <div className="D-h"><Mo mood="listening" className="mo" />Hands-free</div>
-        <div className="way h1"><b>“Hey Siri, start Mode”</b>Built in. Nothing to set up.</div>
-        <div className="way h2"><b>Keep talking, even locked</b>Mode listens on your Lock Screen and starts by itself when you stop talking.</div>
+        <div className="way h1"><b>“Hey Siri” or “Hey Google”</b>Built into iPhone. On Android, turn on Start by voice in Mode once.</div>
+        <div className="way h2"><b>On iPhone, keep talking, even locked</b>Mode listens on your Lock Screen and starts by itself when you stop talking.</div>
         <div className="way h3"><b>Watch it work</b>Each step as it happens, with Stop always there.</div>
-        <div className="way h4"><b>The answer waits for you</b>On the Lock Screen, out loud, with “Another task” one tap away.</div>
+        <div className="way h4"><b>The answer waits for you</b>Out loud, and on screen when you look back. On iPhone, right on the Lock Screen, with “Another task” one tap away.</div>
       </>
     ),
   },
