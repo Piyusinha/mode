@@ -1,0 +1,27 @@
+# Tests for native/modecore, the iPhone's Rust layer. The Tests workflow builds Mode Setup's Rust
+# (desktop/) but not this crate; the iPhone build compiles it only on a Mac. This runs its unit tests
+# on Linux, only when its files change. Run by hand from Actions → modecore → Run workflow.
+name: modecore
+
+on:
+  pull_request:
+    paths:
+      - "native/modecore/**"
+      - ".github/workflows/modecore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/modecore
+      - name: Unit tests
+        working-directory: native/modecore
+        run: cargo test --locked
