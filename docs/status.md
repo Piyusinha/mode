@@ -1,6 +1,49 @@
 # Status
 
-As of 2026-11-01.
+As of 2026-11-14. The sections from "Phases" down were written on 1 Nov and are kept as the record;
+where one has moved on since, it says so. What changed in each release is in
+[CHANGELOG.md](../CHANGELOG.md).
+
+## Where things stand (2026-11-14)
+
+| Part | State |
+|---|---|
+| Mode for iPhone | Released, 0.2.1 (13 Nov). The talking-mode changes in 0.2.1 have not been run on a real iPhone yet |
+| Mode for Android | Released, 0.2.1, the first Android release: `mode-android.apk` on the GitHub release. Android 13 and later; background mode needs Android 14 and Wi-Fi |
+| The agent | One shared Kotlin agent with a profile per phone. "The agent fights to finish" is in `main`. The eval suite has not been run on either phone |
+| Memory, voice, hands-free | Working on both phones. Unlock by voice is iPhone only |
+| Mode Setup | Released for Mac, Windows and Linux. The Windows build is unsigned, by decision |
+| Website | heymode.app. The Android download is in review (pull requests #3 and #4) |
+| Repository | `heymode/mode` since 14 Nov, public since 7 Nov. Old links redirect |
+| CI and releases | Tests on every pull request. A release tag builds, signs and attaches the Android APK |
+
+Releases: 0.1.3 to 0.1.10, then 0.2.0 (the launch release, 12 Nov) and 0.2.1 (13 Nov).
+
+### Open now
+
+iPhone:
+- 0.2.1 talking mode on the phone: a task that fails (Mode says why and offers to try again), staying
+  silent at a question (it asks again), "that's all" right after the greeting.
+- Connecting with only mobile data on, and the five-minute background soak (Phase 4 below).
+- On-phone checks from the agent work: a link opened from the background, calendar and contact
+  permissions, lookup on a ChatGPT plan. Settings rows for "suggest routines" and "talk over Mode".
+- The free-account build with LocalDevVPN, and the two "Last" checks. Still kept for the end.
+
+Android:
+- Retest the 13 Nov fixes on the OnePlus 9R: typing in WhatsApp, pairing for background mode, a stuck
+  tap recovering. Four bugs were found and fixed there on 13 Nov; the phone dropped off USB before the retest.
+- Install the release APK on a phone (the debug build has to be removed first, which clears Mode's data).
+- The fast pairing path (reading the connect port from the Wireless debugging page) on a phone.
+- Samsung and Xiaomi on real hardware; overlay phases 6 to 9; the signing key registered for Google's
+  developer verification.
+
+The agent:
+- Run [the eval suite](eval-suite.md) on both phones and keep the numbers.
+- Pick the default models by cost per finished task.
+- Search grounding (Mode's own search with a cache) is the next big piece. No plan written yet.
+
+Not started: desktop diagnostics, self-update on the iPhone, Mo's spoken lines from Apple's on-device
+model, the iPhone Home Screen widget and the Watch app.
 
 ## Phases
 
@@ -17,7 +60,10 @@ As of 2026-11-01.
 | P1 | Production step 1: modular clean architecture (layers, one module per feature, StateFlow state, ModeGraph, SKIE) | ✅ Done, 74 tests; on-phone check pending (see below) |
 | Last | Free-account build tested with the LocalDevVPN app | ⏳ Deferred to the end at the user's request |
 
-## Android (started 2026-11-06, branch `mode-android`)
+## Android (started 2026-11-06, merged into `main` and released in 0.2.1 on 2026-11-13)
+
+Built on the branch `mode-android` (pull request #1, 104 commits). The states below are as written
+before the merge; what is still open on real phones is in "Open now" above.
 
 The plan has eight phases; how Android works is in [android.md](android.md). Design: the
 Android canvas, 135 boards. Decisions D41–D43.
@@ -52,6 +98,8 @@ Android canvas, 135 boards. Decisions D41–D43.
 | Agent: send a WhatsApp message, then read today's calendar | ✅ 11 steps, 62 s, $0.0065, no questions |
 
 ## Mode v2: in now, and later one at a time (2026-11-05)
+
+Still true on 14 Nov: none of the "later" pieces below has been brought back.
 
 The full v2 UI was built and tried on the phone, then rolled back to v1 because it felt unstable (hold to talk
 especially). All of it is saved: `git stash` "Mode v2 UI + unlock by voice (2026-11-05)…" and
@@ -97,17 +145,23 @@ Later, one at a time, each tested on the phone before the next:
 - [ ] **Desktop diagnostics:** fetch phone and desktop traces, export reports,
   explain bottlenecks/failures with deterministic rules (no AI), and offer
   explicit repair actions.
-- [ ] **Encrypted settings backup/restore:** include preferences and AI-provider
+- [x] **Encrypted settings backup/restore** (done: one file, locked when it holds sign-ins): include preferences and AI-provider
   credentials, protected by a separate backup password; exclude chats, memory,
   signing identities, and pairing records.
 
 Implementation and acceptance criteria:
 [OpenTelemetry, diagnostics, and backup plan](telemetry-diagnostics-backup-plan.md).
-Current implementation: [Observability](observability.md). Desktop fetching,
-deterministic analysis, and backup/restore are still pending.
+Current implementation: [Observability](observability.md). Desktop fetching and
+deterministic analysis are still pending.
 
 ### Focus now (set 2026-11-01)
 In this order; everything else below waits until these are done.
+
+Since this list was set: items 5 to 8 are done and released (Siri and the Live Activity, speaking a
+task and talking mode, Mode Setup for Mac, Windows and Linux, and "the agent fights to finish" merged
+into `main`). From item 8, the on-phone checks and the eval run are still open; see "Open now" at the top.
+The landing page and the demo film are live. The Watch app has not started.
+
 1. ~~**H2, the context builder:**~~ done 2026-11-01: sectioned prompt with budgets, notes,
    verify before done, stuck check, time limit, daily cap, prompt caching
    (`docs/harness.md` §9).
