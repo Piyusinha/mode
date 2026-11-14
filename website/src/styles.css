@@ -94,6 +94,8 @@ em{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.0
 .hero h1{font-size:clamp(46px,7.6vw,116px);max-width:12ch;margin:0 auto}
 .hero .sub{font-size:clamp(17px,1.5vw,21px);line-height:1.55;color:var(--ink-2);margin:22px auto 0;max-width:34em}
 .hero .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:30px}
+.hero .need{margin:14px auto 0;font-size:14px;opacity:.6;text-align:center;max-width:34em}
+.hero .need a{text-decoration:underline;text-underline-offset:3px}
 .hero .proof{justify-content:center}
 .reel{position:relative;margin:clamp(64px,7vw,88px) auto 0;width:100%;max-width:1280px;aspect-ratio:16/9;scroll-margin-top:calc(96px + var(--sat))}
 .reel-in{position:absolute;inset:0;transform-origin:50% 0;transform:scale(.84)}
@@ -154,16 +156,17 @@ em{font-family:var(--serif);font-style:italic;font-weight:400;letter-spacing:-.0
 .setup .steps3 span{font-size:15px;line-height:1.5;opacity:.75}
 .setup .need{margin-top:20px;font-size:14px;opacity:.6}
 .setup .btn svg{width:18px;height:18px}
-/* Available on iOS · Android coming soon */
+/* Available on iOS · Available on Android */
 .avail{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .ab{display:inline-flex;align-items:center;gap:12px;height:60px;padding:0 22px 0 16px;border-radius:16px;text-decoration:none;color:inherit}
 .ab svg{width:28px;height:28px;flex:none}
 .ab span{display:flex;flex-direction:column;line-height:1.15;font-size:18px;font-weight:800;letter-spacing:-.01em}
 .ab small{font-size:11.5px;font-weight:600;opacity:.65;letter-spacing:0}
 .ab.ios{background:var(--paper);color:var(--ink)}
-.ab.and{border:1.5px dashed rgba(127,127,127,.55);color:var(--paper)}
-.ab.and .eye{fill:var(--ink)}
-.ab.and span{opacity:.85}
+.ab.and{background:var(--paper);color:var(--ink)}
+.ab.and .eye{fill:var(--paper)}   /* eyes cut out of the robot, as on the iOS badge's paper */
+a.ab{transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+a.ab:hover{transform:translateY(-1px)}
 /* ---------- the tour: what else Mode does (one scroll, one step) ---------- */
 .stage.tour{grid-template-columns:150px minmax(0,1fr) minmax(0,.82fr) minmax(0,.8fr);gap:clamp(18px,2.4vw,44px)}
 .tour .panel h2{font-size:clamp(32px,3.3vw,52px)}

@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { AndroidLogo, AppleLogo } from '../components/Icons';
 import { Mo } from '../components/Mo';
+import { withVisitor } from '../lib/analytics';
+import { ANDROID_HREF } from '../lib/platform';
 
 export type Screen = { file: string; alt: string; dark?: boolean };
 export type Chapter = {
@@ -185,7 +187,7 @@ export const CHAPTERS: Chapter[] = [
   {
     name: 'Get Mode', kick: 'Get Mode',
     title: <>Stop tapping. <em>Start asking.</em></>,
-    body: <>Free and open source. Download Mode Setup on your Mac, plug in your iPhone, and it installs Mode for you.</>,
+    body: <>Free and open source. On Android, download it straight to your phone. On iPhone, Mode Setup on your computer installs it for you.</>,
     screens: [{ file: 'HomeTips', alt: 'Home: what can I do for you, with a tip' }],
     darkCard: true,
     detail: (
@@ -195,7 +197,7 @@ export const CHAPTERS: Chapter[] = [
         <p>A small app that installs Mode on your iPhone. A few minutes, once.</p>
         <div className="avail">
           <a className="ab ios" href="#get"><AppleLogo /><span><small>Available on</small>iOS</span></a>
-          <span className="ab and" aria-label="Android, coming soon"><AndroidLogo /><span><small>Coming soon</small>Android</span></span>
+          <a className="ab and" href={withVisitor(ANDROID_HREF, 'tour')} aria-label="Download Mode for Android" data-ev="download_click" data-where="tour" data-target="android"><AndroidLogo /><span><small>Available on</small>Android</span></a>
         </div>
       </>
     ),

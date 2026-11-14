@@ -1,7 +1,8 @@
-// heymode.app: serves the website (dist/) and the Mode Setup downloads.
+// heymode.app: serves the website (dist/), the Mode Setup downloads and the Android app.
 //
 //   /download/mac | windows | windows-msi | linux | linux-deb   that installer
-//   /download                                                   the right one for the visitor's computer
+//   /download/android                                           the Mode app for Android (mode-android.apk)
+//   /download                                                   the right one for the visitor's device (Android: the app)
 //
 //   /download/v/<tag>/<file>                                    a file from a specific release (the Releases page)
 //   /api/stars                                                  the GitHub star count (for the star button)
@@ -16,17 +17,23 @@ import { collect, write } from './analytics.js';
 
 const REPO = 'heymode/mode';
 const CACHE_VERSION = 2;
+// `release` is the file a release must carry to count as the newest for that download: Mode Setup releases
+// ("Mode-Desktop-App-…") carry the Mac installer, Mode releases ("Mode-Mobile-Build-…") carry the APK.
+const SETUP = 'Mode-Setup-mac.dmg';
 const FILES = {
-  mac: { file: 'Mode-Setup-mac.dmg', label: 'Mac' },
-  windows: { file: 'Mode-Setup-windows.exe', label: 'Windows' },
-  'windows-msi': { file: 'Mode-Setup-windows.msi', label: 'Windows' },
-  linux: { file: 'Mode-Setup-linux.AppImage', label: 'Linux' },
-  'linux-deb': { file: 'Mode-Setup-linux.deb', label: 'Linux' },
+  mac: { file: 'Mode-Setup-mac.dmg', name: 'Mode Setup for Mac', release: SETUP },
+  windows: { file: 'Mode-Setup-windows.exe', name: 'Mode Setup for Windows', release: SETUP },
+  'windows-msi': { file: 'Mode-Setup-windows.msi', name: 'Mode Setup for Windows', release: SETUP },
+  linux: { file: 'Mode-Setup-linux.AppImage', name: 'Mode Setup for Linux', release: SETUP },
+  'linux-deb': { file: 'Mode-Setup-linux.deb', name: 'Mode Setup for Linux', release: SETUP },
+  android: { file: 'mode-android.apk', name: 'Mode for Android', release: 'mode-android.apk' },
 };
 
-/** Which installer fits the visitor's computer; null for phones and tablets (Mode Setup runs on a computer). */
+/** What fits the visitor's device: Android gets the app itself, a computer gets its Mode Setup installer,
+    iPhone and iPad get null (Mode Setup runs on a computer, so they go to the instructions). */
 function detect(ua = '') {
-  if (/iPhone|iPad|iPod|Android|Mobile/i.test(ua)) return null;
+  if (/Android/i.test(ua)) return 'android';
+  if (/iPhone|iPad|iPod|Mobile/i.test(ua)) return null;
   if (/Windows/i.test(ua)) return 'windows';
   if (/Macintosh|Mac OS X/i.test(ua)) return 'mac';
   if (/Linux|X11|CrOS/i.test(ua)) return 'linux';
@@ -51,10 +58,10 @@ export default {
 
     // Ask which release is newest, then fetch that exact version's file: each release has its own address,
     // so no cache (Cloudflare's or the browser's) can hand out an older installer.
-    const tag = await latestTag();
+    const tag = await latestTag(entry.release);
     const from = tag ? `https://github.com/${REPO}/releases/download/${tag}/${entry.file}`
                      : `https://github.com/${REPO}/releases/latest/download/${entry.file}`;
-    return counted(env, request, url, m[1] ? key : `auto-${key}`, tag, entry.file, await send(request, from, entry.file, entry.label, tag));
+    return counted(env, request, url, m[1] ? key : `auto-${key}`, tag, entry.file, await send(request, from, entry.file, entry.name, tag));
   },
 };
 
@@ -65,16 +72,17 @@ function counted(env, request, url, target, tag, file, response) {
     const ready = !(response.headers.get('content-type') || '').startsWith('text/html');
     write(env, request, { v: url.searchParams.get('vid') || '', r: hostOf(request.headers.get('referer')) },
       { e: 'download_sent', p: url.pathname, a: url.searchParams.get('where') || '', t: target,
-        d: (tag || '').replace(/^Mode-Desktop-App-|^v/, ''), x: file, val: ready ? 1 : 0 });
+        d: (tag || '').replace(/^Mode-Desktop-App-|^Mode-Mobile-Build-|^v/, ''), x: file, val: ready ? 1 : 0 });
   }
   return response;
 }
 const hostOf = (u) => { try { return u ? new URL(u).hostname : ''; } catch { return ''; } };
 
-/** The newest published Mode Setup release's tag (e.g. "Mode-Desktop-App-0.1.3"), checked at most once a minute; null if
-    GitHub can't say. Mode and Mode Setup are released separately ("Mode-Mobile-Build-…" and "Mode-Desktop-App-…"); the first releases
-    ("v0.1.0" to "v0.1.2") held both. GitHub's own "Latest" is the newest Mode, so it isn't used here. */
-async function latestTag() {
+/** The tag of the newest published release that carries `asset` (e.g. "Mode-Desktop-App-0.1.3" for the Mac installer,
+    "Mode-Mobile-Build-0.2.1" for the APK), checked at most once a minute; null if GitHub can't say. Mode and Mode Setup
+    are released separately ("Mode-Mobile-Build-…" and "Mode-Desktop-App-…"); the first releases ("v0.1.0" to "v0.1.2")
+    held both. GitHub's own "Latest" is the newest Mode, so it isn't used for Mode Setup. */
+async function latestTag(asset) {
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=50`, {
       headers: { 'User-Agent': 'heymode.app', Accept: 'application/vnd.github+json' },
@@ -83,8 +91,8 @@ async function latestTag() {
     if (!res.ok) return null;
     let best = null;
     for (const r of await res.json()) {
-      if (r.draft || r.prerelease || !r.assets.some((a) => a.name === FILES.mac.file)) continue;
-      const v = (r.tag_name.match(/^(?:Mode-Desktop-App-|v)(\d[\w.]*)$/) || [])[1];
+      if (r.draft || r.prerelease || !r.assets.some((a) => a.name === asset)) continue;
+      const v = (r.tag_name.match(/^(?:Mode-Desktop-App-|Mode-Mobile-Build-|v)(\d[\w.]*)$/) || [])[1];
       if (v && (!best || newer(v, best.v))) best = { v, tag: r.tag_name };
     }
     return best ? best.tag : null;
@@ -103,15 +111,16 @@ function newer(a, b) {
 
 /** Fetches a release file and sends it from heymode.app as a download. A file at a version's own address never
     changes, so Cloudflare keeps it a day; the browser keeps nothing, so it always gets what we serve now. */
-async function send(request, from, file, label, tag) {
+async function send(request, from, file, name, tag) {
   const upstream = await fetch(`${from}?v=${CACHE_VERSION}`, {
     method: request.method === 'HEAD' ? 'HEAD' : 'GET',
     redirect: 'follow',
     cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': tag ? 86400 : 300, '300-599': 0 } },
   });
-  if (!upstream.ok) return almostHere(label);
+  if (!upstream.ok) return almostHere(name);
   const headers = new Headers({
-    'Content-Type': 'application/octet-stream',
+    // Android's package installer looks for this type; everything else is a plain download.
+    'Content-Type': file.endsWith('.apk') ? 'application/vnd.android.package-archive' : 'application/octet-stream',
     'Content-Disposition': `attachment; filename="${file}"`,
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
@@ -150,9 +159,10 @@ async function stars(fresh) {
   });
 }
 
-function almostHere(label) {
+/** `name` is what's coming, e.g. "Mode Setup for Mac" or "Mode for Android". */
+function almostHere(name) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mode Setup is almost here</title><link rel="icon" href="/favicon.svg">
+<title>${name} is almost here</title><link rel="icon" href="/favicon.svg">
 <style>
 :root{color-scheme:light dark;--p:#F5F3EF;--i:#1A1A1F;--s:#5E5C66;--c:#fff}
 @media (prefers-color-scheme:dark){:root{--p:#111114;--i:#F4F2EE;--s:#A6A3AD;--c:#1C1C21}}
@@ -163,7 +173,7 @@ a{display:inline-flex;align-items:center;height:48px;padding:0 22px;border-radiu
 .ink{background:var(--i);color:var(--p)}.soft{background:var(--c);color:var(--i)}
 </style></head><body><main>
 <img src="/favicon.svg" alt="">
-<h1>Mode Setup for ${label} is almost here</h1>
+<h1>${name} is almost here</h1>
 <p>We're putting the finishing touches on the first release. Star the project on GitHub and you'll hear the moment it's out.</p>
 <a class="ink" href="https://github.com/${REPO}">Star on GitHub</a><a class="soft" href="/">Back to Mode</a>
 </main></body></html>`;
