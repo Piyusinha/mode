@@ -4,16 +4,16 @@
 
 # Mode
 
-### Tell your iPhone what to do. Mode does it in your apps.
+### Tell your phone what to do. Mode does it in your apps.
 
-An AI agent that lives on your iPhone. Say a task, and Mode taps, types and opens
+An AI agent that lives on your iPhone or Android phone. Say a task, and Mode taps, types and opens
 your apps until it’s done, then tells you how it went.
 
 <br>
 
-<a href="https://heymode.app/download/mac"><img src="https://img.shields.io/badge/Download_Mode_installer_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode installer for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
+<a href="https://heymode.app/download/mac"><img src="https://img.shields.io/badge/Download_Mode_installer_for_Mac-1A1A1F?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mode installer for Mac" height="44"></a>&nbsp;&nbsp;<a href="https://github.com/heymode/mode/releases/latest/download/mode-android.apk"><img src="https://img.shields.io/badge/Download_Mode_for_Android-1A1A1F?style=for-the-badge&logo=android&logoColor=3DDC84" alt="Download Mode for Android" height="44"></a>&nbsp;&nbsp;<a href="https://heymode.app"><img src="https://img.shields.io/badge/heymode.app-FF6B3D?style=for-the-badge&logo=safari&logoColor=white" alt="Website: heymode.app" height="44"></a>&nbsp;&nbsp;<a href="#see-it-in-action"><img src="https://img.shields.io/badge/Watch_the_film-F5F3EF?style=for-the-badge&logo=youtube&logoColor=FF6B3D" alt="Watch the film" height="44"></a>
 
-<sub>Free and open source · iPhone on iOS 27 · Your own ChatGPT, Claude or OpenRouter</sub>
+<sub>Free and open source · iPhone on iOS 27 · Android 13 and later · Your own ChatGPT, Claude or OpenRouter</sub>
 
 <br><br>
 
@@ -72,8 +72,8 @@ OpenRouter key and pick any model.
 <td width="33%" valign="top" align="center">
 <img src="docs/media/phone-home.png" width="260" alt="Home: what can I do for you, with tips and recent tasks">
 <h3>Yours, privately</h3>
-No Mode server, no account. Your chats and memory stay on your iPhone, and your keys
-stay in its Keychain.
+No Mode server, no account. Your chats and memory stay on your phone, and your keys
+stay in its secure storage.
 </td>
 </tr>
 </table>
@@ -97,6 +97,8 @@ to try another way.
 <br>
 
 ## Get started
+
+### On iPhone
 
 <table>
 <tr>
@@ -136,6 +138,20 @@ Mode Setup checks your computer before it starts and tells you if anything is mi
 > **Windows says “Windows protected your PC”?** Mode Setup isn’t signed with a paid Windows
 > certificate yet, so SmartScreen doesn’t know it. Click **More info**, then **Run anyway**.
 > It’s the same open-source app as on this page, built by GitHub from this repository.
+
+### On Android
+
+**[Download Mode for Android](https://github.com/heymode/mode/releases/latest/download/mode-android.apk)**
+(`mode-android.apk`) on your phone and open it. No computer needed.
+
+1. **Allow the install.** Android asks once to let your browser install apps. Allow it, then tap **Install**.
+2. **Turn on Phone control.** Mode walks you through it. Android locks this switch for apps from
+   outside a store, so Mode first shows you where to unlock it (App info › ⋮ › **Allow restricted settings**).
+3. **Say hello to Mo.** Connect your AI and give it its first task. Then try *“Hey Google, open Mode.”*
+
+**You’ll need:** an Android phone on Android 13 or later · a ChatGPT or Claude plan, or an
+OpenRouter key. Background mode, where Mode works while you use other apps, needs Android 14
+and Wi-Fi. Each release’s APK and its SHA-256 are on the [Releases page](https://github.com/heymode/mode/releases).
 
 <br>
 
@@ -269,7 +285,8 @@ numbers: when a step needs one, it hands the phone back to you.
 <details>
 <summary><b>Android?</b></summary>
 <br>
-Coming soon.
+Yes, since 0.2.1. See <a href="#on-android">Get started on Android</a>. Android 13 or later;
+background mode needs Android 14 and Wi-Fi.
 </details>
 
 <br>
